@@ -1,7 +1,7 @@
 # Plan maestro de implementación e integración — HOMEX Frontend
 
 **Fecha de revisión:** 19 de septiembre de 2026  
-**Versión del plan:** 1.0 — baseline rector de frontend  
+**Versión del plan:** 1.1 — baseline rector + responsive universal  
 **Repositorio:** <code>gabriel-arinez/homex-frontend</code>  
 **Rama rectora:** <code>main</code>  
 **Baseline de código previo al plan:** <code>187670fe59da077311d9d3edea32cb1c4532cad4</code>  
@@ -43,6 +43,8 @@ Una fase **NO** se considera terminada porque:
 - una captura de pantalla se parezca a un mockup.
 
 Una fase solo se cierra cuando todos sus gates obligatorios están verdes, no existen errores TypeScript, no hay tests críticos omitidos, CI remoto está verde y la evidencia de fase está versionada.
+
+**Responsive es una condición transversal y no una fase tardía.** Todo componente, vista, formulario, tabla, modal, navegación, estado vacío, flujo comercial y flujo NLP que se implemente debe nacer responsive desde su propia fase. Está prohibido acumular “deuda responsive” para corregirla al final en FE08.
 
 Los mockups visuales utilizados durante el diseño son **referencias de ideas**, no contratos pixel-perfect. Este plan prevalece sobre cualquier contradicción visual de los mockups.
 
@@ -552,10 +554,15 @@ El diseño prioriza bordes y contraste de superficie antes que sombras grandes.
 
 ## 11.1. Sidebar
 
-El sidebar es permanente en escritorio y puede contraerse.
+El sidebar es el patrón principal y permanente de navegación de HOMEX, pero su comportamiento se adapta al viewport.
 
-Estado expandido aproximado: <code>264px</code>.  
-Estado compacto aproximado: <code>72px</code>.
+En desktop (≥ 1024px):
+
+- sidebar visible permanentemente;
+- estado expandido aproximado: <code>264px</code>;
+- estado compacto aproximado: <code>72px</code>;
+- el usuario puede alternar entre ambos estados;
+- la preferencia se conserva localmente.
 
 Expandido:
 
@@ -575,7 +582,21 @@ Compacto:
 - badges cuando aporten valor;
 - tema y avatar/usuario compactos.
 
-La preferencia expandido/compacto se conserva localmente.
+En tablet (768–1023px):
+
+- el sidebar puede iniciar compacto;
+- puede expandirse como overlay sin reducir excesivamente el contenido;
+- nunca debe bloquear acciones esenciales;
+- el mismo árbol de navegación se conserva.
+
+En móvil (< 768px):
+
+- el sidebar se convierte en drawer/off-canvas;
+- no queda una columna fija de 72px que desperdicie ancho;
+- el disparador de navegación forma parte del <code>PageHeader</code> móvil, no de una topbar global;
+- al abrirse conserva marca, navegación, selector de tema y usuario;
+- el drawer atrapa foco, cierra con Escape y devuelve el foco al disparador;
+- no se crea una segunda navegación móvil distinta.
 
 ## 11.2. No existe topbar global
 
@@ -592,6 +613,8 @@ No habrá en una barra superior global:
 
 Cada módulo controla sus acciones dentro de su propio encabezado.
 
+En móvil puede existir dentro del <code>PageHeader</code> el botón de apertura del drawer; esto no constituye una topbar global.
+
 ## 11.3. Contenido
 
 El área de contenido:
@@ -600,13 +623,16 @@ El área de contenido:
 - usa ancho máximo aproximado de 1440px para contenido general;
 - mantiene márgenes/padding consistentes;
 - permite tablas más anchas cuando sea necesario;
-- no estira formularios y cards innecesariamente en ultrawide.
+- no estira formularios y cards innecesariamente en ultrawide;
+- nunca debe provocar overflow horizontal a nivel de página;
+- reorganiza columnas, formularios y acciones según espacio disponible.
 
 Padding orientativo:
 
 - desktop amplio: 32px;
-- desktop medio/tablet horizontal: 24px;
-- viewport reducido: 16px.
+- desktop/tablet: 24px;
+- móvil: 16px;
+- móvil muy estrecho: 12px cuando sea necesario.
 
 ---
 
@@ -783,7 +809,7 @@ No depender únicamente de toasts.
 
 # 15. Tablas
 
-Las tablas son la visualización principal para entidades operativas.
+Las tablas son la visualización principal para entidades operativas en desktop, pero **deben tener una estrategia responsive explícita**.
 
 Patrón compartido:
 
@@ -809,8 +835,12 @@ Reglas:
 - moneda explícita;
 - fechas consistentes;
 - acciones destructivas fuera de clic accidental;
-- desktop completo objetivo mínimo 1024px de ancho;
-- en viewports menores, permitir scroll horizontal controlado o adaptación de columnas.
+- en desktop se usa tabla completa;
+- en tablet se priorizan columnas esenciales y las secundarias pueden pasar a detalle;
+- en móvil, cuando una tabla resulte ilegible, debe transformarse en lista/card responsive o patrón maestro-detalle;
+- el scroll horizontal interno se permite solo para tablas excepcionalmente densas y nunca como solución por defecto;
+- ninguna acción crítica puede quedar fuera de pantalla;
+- no se permite overflow horizontal del documento completo.
 
 ---
 
@@ -1188,27 +1218,98 @@ Los tests E2E críticos utilizarán <code>@axe-core/playwright</code> o equivale
 
 ---
 
-# 25. Responsive
+# 25. Responsive universal — regla no negociable
 
-HOMEX es desktop-first por ser una herramienta administrativa.
+HOMEX debe ser **full responsive en todo lo que se implemente**.
 
-Objetivo de experiencia operativa completa: **1024px de ancho o superior**.
+Responsive no significa únicamente “que no se rompa”. Significa que cada flujo principal debe seguir siendo comprensible, navegable y operable en desktop, tablet y móvil, adaptando composición y densidad sin perder funcionalidad esencial.
 
-Breakpoints orientativos:
+Esta regla aplica desde FE01 y a **cada nueva vista/componente en su propia fase**. FE08 verifica y endurece; no es la fase donde se “arregla responsive”.
 
-- ≥ 1440: desktop amplio;
-- 1024–1439: desktop estándar;
-- 768–1023: tablet/compacto;
-- < 768: experiencia reducida, sin ruptura visual, pero no se promete edición compleja de grandes tablas como caso primario.
+## 25.1. Viewports de aceptación
 
-En tablet:
+Matriz mínima obligatoria para interfaces nuevas:
 
-- sidebar puede iniciar compacto;
-- contenido reduce padding;
-- tablas pueden ocultar columnas secundarias o permitir scroll horizontal;
-- acciones no deben quedar fuera de viewport.
+- 360px: móvil estrecho;
+- 390px: móvil común;
+- 768px: tablet vertical;
+- 1024px: tablet horizontal / desktop compacto;
+- 1440px: desktop estándar/amplio.
 
-No construir una segunda interfaz móvil independiente.
+Además se debe comprobar que el layout siga siendo estable entre estos puntos, no solo exactamente en ellos.
+
+No asumir únicamente dispositivos específicos; los breakpoints responden al contenido.
+
+## 25.2. Reglas globales
+
+En cualquier viewport:
+
+- no debe existir overflow horizontal a nivel de página;
+- texto crítico no se corta ni se solapa;
+- acciones principales siguen accesibles;
+- modales/dialogs caben y pueden desplazarse internamente;
+- formularios cambian de multi-columna a una columna cuando sea necesario;
+- cards reorganizan grid automáticamente;
+- filtros se apilan o condensan sin desaparecer;
+- botones pueden ocupar ancho completo en móvil cuando mejora uso;
+- targets táctiles deben ser cómodos;
+- estados loading/empty/error/forbidden también son responsive;
+- dark/light deben funcionar en todos los tamaños;
+- no se oculta información comercial esencial solo para “hacer que quepa”.
+
+## 25.3. Navegación responsive
+
+- ≥ 1024px: sidebar permanente, expandido o compacto;
+- 768–1023px: sidebar compacto por defecto, con expansión overlay cuando convenga;
+- < 768px: drawer/off-canvas accesible desde el <code>PageHeader</code>;
+- tema y usuario permanecen en la parte inferior de esa navegación;
+- no introducir topbar global para resolver móvil.
+
+## 25.4. Tablas responsive
+
+Prioridad:
+
+1. tabla completa en desktop;
+2. reducción de columnas y detalle progresivo en tablet;
+3. lista/card o maestro-detalle en móvil;
+4. scroll horizontal interno solo cuando la naturaleza de los datos lo haga realmente necesario.
+
+Las acciones críticas nunca pueden requerir desplazarse horizontalmente para descubrir que existen.
+
+## 25.5. Formularios responsive
+
+- desktop: dos o más columnas cuando mejore lectura;
+- tablet: una o dos columnas según contenido;
+- móvil: una columna;
+- labels y errores no se separan de su control;
+- footer de acciones puede volverse sticky solo si se demuestra útil y accesible;
+- teclados móviles (<code>inputmode</code>, tipos de input) deben configurarse correctamente.
+
+## 25.6. Gráficas responsive
+
+Toda gráfica que se incorpore:
+
+- debe redimensionarse sin perder significado;
+- debe tener alternativa textual/tabular;
+- leyendas y etiquetas se adaptan;
+- no depende del hover para información esencial;
+- en móvil se simplifica si es necesario, sin cambiar la métrica.
+
+## 25.7. Prueba y gate responsive
+
+Toda fase con UI debe incluir evidencia responsive de las vistas que crea o modifica.
+
+Como mínimo:
+
+- pruebas automatizadas de viewport con Playwright cuando esté disponible;
+- validación manual documentada antes de introducir Playwright;
+- ausencia de overflow global;
+- flujos críticos ejecutables a 360/390, 768, 1024 y 1440;
+- screenshots de regresión selectivos en móvil y desktop para componentes/pantallas críticas.
+
+Una fase con UI **no puede cerrarse** si “desktop está terminado pero móvil queda para después”.
+
+No construir una segunda aplicación móvil independiente; la misma SPA se adapta responsivamente.
 
 ---
 
@@ -1587,8 +1688,9 @@ No avanzar a FE01 con CI rojo.
 10. Implementar estados loading/empty/error/forbidden.
 11. Definir tablas base y toolbar contextual.
 12. Definir focus states.
-13. Definir responsive shell.
-14. Documentar <code>docs/design-system.md</code>.
+13. Definir responsive shell completo para desktop, tablet y móvil.
+14. Implementar sidebar/drawer responsive según §11 y §25.
+15. Documentar <code>docs/design-system.md</code>.
 
 ## Criterios visuales obligatorios
 
@@ -1609,8 +1711,10 @@ No avanzar a FE01 con CI rojo.
 - componentes base;
 - keyboard;
 - tema persistente;
-- sidebar persistente;
-- visual snapshots clave;
+- sidebar persistente/compacto/drawer según viewport;
+- shell validado en 360, 390, 768, 1024 y 1440px;
+- ausencia de overflow horizontal global;
+- visual snapshots clave en móvil y desktop;
 - axe sin violaciones serias/críticas en shell.
 
 ## Cierre
@@ -1736,7 +1840,10 @@ Resolver contrato real de imagen principal. Hasta entonces, fallback funcional.
 - imagen rota;
 - dark/light;
 - stock no alterable desde frontend salvo endpoint explícito;
-- promociones no recalculadas arbitrariamente.
+- promociones no recalculadas arbitrariamente;
+- clientes y productos operables en 360/390, 768, 1024 y 1440px;
+- grid de productos refluye correctamente;
+- listado/tabla adopta patrón responsive sin perder acciones críticas.
 
 ## Cierre
 
@@ -1796,7 +1903,10 @@ Resolver contrato real de imagen principal. Hasta entonces, fallback funcional.
 - visualizar freeze;
 - aprobar;
 - error de stock;
-- error de concurrencia/conflicto.
+- error de concurrencia/conflicto;
+- creación/edición/revisión de proforma operable en 360/390, 768, 1024 y 1440px;
+- formulario se reorganiza sin perder campos, totales ni acciones;
+- listado/tabla responsive sin overflow global.
 
 ## Cierre
 
@@ -1878,7 +1988,10 @@ solo cuando backend exponga el recurso correspondiente.
 - errores 409/400 visibles;
 - ausencia de porcentajes inventados;
 - documentos;
-- permisos por módulo.
+- permisos por módulo;
+- pedidos, OT, stock, recibos y notas operables en 360/390, 768, 1024 y 1440px;
+- estados y acciones críticas visibles sin depender de hover;
+- tablas/listados adaptan su patrón en móvil.
 
 ## Cierre
 
@@ -1952,7 +2065,10 @@ No usar “confianza” inventada si el contrato no expone un score definido.
 - browser no sustituye original IA;
 - doble confirmación;
 - confirmación no aprueba proforma;
-- refresh no recupera audio eliminado.
+- refresh no recupera audio eliminado;
+- grabación, progreso, revisión HITL y confirmación operables en 360/390, 768, 1024 y 1440px;
+- evidencia y formulario de corrección se reordenan sin perder contexto;
+- controles de grabación tienen targets táctiles adecuados.
 
 ## Cierre
 
@@ -2011,7 +2127,10 @@ Cada chart debe documentar:
 - light/dark;
 - a11y del gráfico;
 - fallback textual de valores;
-- no carga de librería chart en rutas que no la usan.
+- no carga de librería chart en rutas que no la usan;
+- dashboard operativo en 360/390, 768, 1024 y 1440px;
+- KPI cards y charts refluye sin overflow ni texto ilegible;
+- métricas siguen disponibles sin depender de hover.
 
 ## Cierre
 
@@ -2034,7 +2153,7 @@ Cada chart debe documentar:
 - Playwright contra backend real;
 - accesibilidad;
 - regresión visual;
-- responsive;
+- auditoría responsive transversal de todos los módulos;
 - manejo de caídas;
 - permisos;
 - contract drift;
@@ -2299,6 +2418,8 @@ Una fase está terminada únicamente cuando:
 - [ ] E2E verde cuando aplica;
 - [ ] a11y verde cuando aplica;
 - [ ] light/dark validados cuando aplica;
+- [ ] toda UI nueva/modificada es responsive y está validada en los viewports obligatorios;
+- [ ] no existe overflow horizontal global;
 - [ ] no hay skips críticos;
 - [ ] no hay <code>any</code> añadido para evadir contrato;
 - [ ] CI remoto completamente verde;
@@ -2327,7 +2448,9 @@ Además de FE00–FE09:
 - [ ] no notificaciones ficticias;
 - [ ] no porcentajes de pedido inventados;
 - [ ] a11y crítica sin fallos serios;
-- [ ] responsive objetivo probado;
+- [ ] responsive completo probado en todos los módulos y flujos críticos;
+- [ ] flujo comercial y NLP utilizables en 360/390, 768, 1024 y 1440px;
+- [ ] no existe deuda responsive conocida ni overflow global;
 - [ ] errores API representados;
 - [ ] no audio histórico;
 - [ ] no secretos en bundle;
@@ -2426,6 +2549,7 @@ FE02 en adelante no debe programarse contra endpoints imaginarios.
 17. **Audio es efímero.**
 18. **Permisos del frontend mejoran UX; permisos backend garantizan seguridad.**
 19. **No hacer un refactor masivo de idioma después de construir módulos.**
-20. **Si una prueba revela una contradicción, se corrige el diseño antes de consolidar la siguiente fase.**
+20. **Todo lo que se construye nace responsive; no existe una fase posterior para “adaptarlo a móvil”.**
+21. **Si una prueba revela una contradicción, se corrige el diseño antes de consolidar la siguiente fase.**
 
 El objetivo no es completar pantallas lo más rápido posible. El objetivo es que cada fase aceptada se convierta en una base estable, comprobable y coherente con <code>homex-backend</code>, <code>homex-nlp</code> y <code>homex-deploy</code>.
