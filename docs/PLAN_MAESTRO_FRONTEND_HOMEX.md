@@ -1,7 +1,7 @@
 # Plan maestro de implementación e integración — HOMEX Frontend
 
 **Fecha de revisión:** 22 de septiembre de 2026  
-**Versión del plan:** 1.2 — responsive universal + contrato definitivo de media  
+**Versión del plan:** 1.3 — responsive universal + media pública unificada definitiva  
 **Repositorio:** <code>gabriel-arinez/homex-frontend</code>  
 **Rama rectora:** <code>main</code>  
 **Baseline de código previo al plan:** <code>187670fe59da077311d9d3edea32cb1c4532cad4</code>  
@@ -911,8 +911,9 @@ Django/DRF
  ├── valida y procesa con Pillow
  ├── genera WebP 320/640/1280
  └── Cloudflare R2 Standard
-       ├── homex-public-media  → catálogo/productos
-       └── homex-private-media → referencias de proforma
+       └── homex-public-media
+            ├── productos/ → catálogo
+            └── proformas/ → referencias de muebles a pedido
 ~~~
 
 ### Imagen principal de producto
@@ -947,7 +948,7 @@ Una línea de mueble a pedido puede tener múltiples imágenes de referencia per
 El flujo es exclusivamente:
 
 ~~~text
-Vue → Django/DRF → R2 privado
+Vue → Django/DRF → R2 público
 ~~~
 
 No existe subida directa navegador → R2.
@@ -959,7 +960,7 @@ Vue puede crear una preview local efímera con <code>URL.createObjectURL()</code
 - no se persiste en localStorage/IndexedDB;
 - no se trata como confirmación de subida.
 
-Los adjuntos privados se muestran únicamente con URLs temporales devueltas por backend después de autorización. Vue no conserva esas URLs como dato durable y debe poder refrescarlas mediante el recurso API cuando expiren.
+Los adjuntos persistentes de proforma se sirven mediante URL pública estable/cacheable del dominio de medios. **La lectura de la imagen no requiere autenticación una vez que alguien conoce su URL**; esta es una decisión explícita del producto. La creación, reemplazo y eliminación continúan pasando por Django y respetan autenticación, permisos y estado comercial.
 
 ### Formatos aceptados
 
@@ -979,9 +980,8 @@ Vue consume solo el contrato OpenAPI. Está prohibido:
 
 - importar SDK de Cloudflare/AWS para media;
 - usar access keys o secrets;
-- conocer nombres de buckets;
-- persistir URL firmada;
-- derivar keys/rutas;
+- conocer nombres de buckets como requisito funcional;
+- construir URLs del proveedor o derivar keys/rutas;
 - guardar imagen en Base64 como dato comercial.
 
 FE01 y FE02 no dependen del storage. **FE03 y FE04 sí requieren F07.7 del backend cerrado y OpenAPI actualizado.**
@@ -1952,7 +1952,7 @@ FE03 **no puede cerrarse** con un placeholder permanente si F07.7 está disponib
 - FE03 cerrada;
 - backend F07.7 cerrado;
 - backend F07.2 funcional para endpoints comerciales necesarios;
-- OpenAPI actualizado, incluyendo archivos privados por detalle.
+- OpenAPI actualizado, incluyendo adjuntos públicos por detalle.
 
 ## Trabajo obligatorio
 
@@ -1975,7 +1975,7 @@ FE03 **no puede cerrarse** con un placeholder permanente si F07.7 está disponib
 15. Congelar controles de UI cuando estado ya no permita edición.
 16. Mostrar siempre valores autoritativos devueltos por backend.
 17. Acción <code>Nueva proforma</code> solo dentro de contexto de proformas/cliente.
-18. Gestionar imágenes de referencia de muebles a pedido por <code>DetalleProforma</code> mediante el API de archivos privado.
+18. Gestionar imágenes de referencia de muebles a pedido por <code>DetalleProforma</code> mediante el API de media pública.
 
 ## Imágenes de referencia por detalle
 
@@ -1987,12 +1987,11 @@ Para un detalle de mueble a pedido:
 - mostrar estado de subida/error;
 - después de confirmar, reemplazar la preview local por el recurso devuelto por backend;
 - listar adjuntos ya persistidos;
-- visualizar variantes privadas mediante URL temporal;
-- solicitar nuevamente el recurso cuando la URL temporal haya expirado;
+- visualizar y descargar mediante URL pública estable/cacheable devuelta por backend;
 - eliminar un adjunto únicamente si backend lo permite para el estado actual;
 - asociar siempre el archivo al detalle correcto, no solo a la cabecera de proforma;
 - no usar SVG;
-- no guardar Blob/Base64/URL firmada en estado persistente del navegador.
+- no guardar Blob/Base64 en estado persistente del navegador.
 
 El navegador no decide el nombre de storage, la key ni la política de acceso.
 
@@ -2019,8 +2018,8 @@ El navegador no decide el nombre de storage, la key ni la política de acceso.
 - error de concurrencia/conflicto;
 - subir imagen válida a detalle;
 - archivo inválido/tamaño rechazado representa error backend;
-- adjunto de otro vendedor/otra proforma no es accesible;
-- URL privada expirada puede renovarse sin volver a subir;
+- otro vendedor no puede modificar/eliminar por API un adjunto fuera de su alcance;
+- una URL pública de media puede visualizarse/descargarse sin sesión según el contrato;
 - eliminación bloqueada por estado se representa correctamente;
 - preview local se revoca y no persiste al recargar;
 - creación/edición/revisión de proforma operable en 360/390, 768, 1024 y 1440px;
@@ -2562,9 +2561,9 @@ Además de FE00–FE09:
 - [ ] light/dark;
 - [ ] sidebar expandido/compacto;
 - [ ] catálogo visual con imagen principal real, variantes WebP y fallback;
-- [ ] adjuntos privados de muebles a pedido operativos por detalle;
+- [ ] adjuntos públicos de muebles a pedido operativos por detalle;
 - [ ] ninguna imagen comercial persistida en Base64/localStorage/IndexedDB;
-- [ ] ninguna credencial, bucket o SDK R2 presente en frontend;
+- [ ] ninguna credencial, SDK R2 ni construcción manual de URLs/keys presente en frontend;
 - [ ] no topbar global;
 - [ ] no search global;
 - [ ] no notificaciones ficticias;
@@ -2594,7 +2593,7 @@ Dependencias conocidas:
 4. Media persistente:
    - arquitectura cerrada en backend F07.7;
    - Cloudflare R2 Standard productivo;
-   - OpenAPI de imagen principal y adjuntos privados debe estar disponible antes de cerrar FE03/FE04;
+   - OpenAPI de imagen principal y adjuntos públicos debe estar disponible antes de cerrar FE03/FE04;
    - credenciales/dominio R2 son responsabilidad de backend/deploy y nunca del frontend.
 5. Datos reales de catálogo:
    - SKU;
