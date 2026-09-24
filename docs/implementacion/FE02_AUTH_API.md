@@ -2,17 +2,19 @@
 
 ## Estado
 
-FE02 está publicada en `feat/fe02-auth-api` sobre el cierre de FE01. El commit funcional
+**FE02 cerrada.**
+
+La fase está publicada en `feat/fe02-auth-api` sobre el cierre de FE01. El commit funcional
 `30eadeca07d234e7cbfed5546c216c38f7020588` integró autenticación, contrato OpenAPI,
 identidad/capacidades y routing.
 
-La primera ejecución remota, GitHub Actions `36037810110`, detectó un problema de configuración
-del entorno de CI: `VITE_API_BASE_URL` no estaba definido para Vitest ni para el build usado por
-Playwright. El código de la fase no debe depender de `.env.example` durante CI. La corrección de
-cierre define explícitamente `VITE_API_BASE_URL=http://localhost:8000` en el workflow y separa las
-capturas de regresión de FE01 de su evidencia histórica.
+La primera ejecución remota, GitHub Actions `36037810110`, reveló que
+`VITE_API_BASE_URL` no estaba definido para Vitest ni para el build usado por Playwright. El
+commit de corrección `aa753acfc9f16ad4f665b3b10835eb5ebbda4dd6` fija explícitamente
+`VITE_API_BASE_URL=http://localhost:8000` en CI, restaura la evidencia histórica de FE01 y mueve
+las capturas de regresión a `test-results/playwright/evidence/fe01-regression/`.
 
-El cierre formal exige una ejecución remota completamente verde después de estas correcciones.
+La ejecución remota de cierre `36039173478` terminó completamente verde.
 
 ## Contrato fijado
 
@@ -80,10 +82,24 @@ backend puede conceder.
 El workflow ejecuta instalación reproducible, type-check, lint, formato, pruebas unitarias y de
 integración, build, Playwright, contract drift y auditoría completa de dependencias.
 
-La ejecución `36037810110` del commit funcional inicial quedó roja en `unit-component` y
-`e2e` porque el runner no tenía `VITE_API_BASE_URL`; los demás jobs quedaron verdes. Esta
-corrección resuelve la causa verificada en los logs remotos y evita que las regresiones FE02
-modifiquen los PNG históricos de FE01.
+Evidencia remota de cierre:
 
-FE02 se declarará formalmente cerrada cuando el nuevo commit de corrección tenga CI remoto
-completamente verde.
+- GitHub Actions: `36039173478`;
+- commit validado: `aa753acfc9f16ad4f665b3b10835eb5ebbda4dd6`;
+- estado: `success`;
+- install: verde;
+- type-check: verde;
+- lint: verde;
+- format: verde;
+- unit/component/integration: `18 passed`;
+- build: verde;
+- Playwright: `13 passed`;
+- contract drift: verde;
+- dependency audit: verde;
+- skips obligatorios: cero.
+
+La evidencia histórica de FE01 permanece intacta. Los tests de regresión FE01 ejecutados durante
+FE02 escriben resultados temporales únicamente bajo `test-results/`.
+
+Con el contrato backend fijado, `GET /api/v1/auth/me/` integrado y CI remoto completamente verde,
+FE02 queda formalmente cerrada.
