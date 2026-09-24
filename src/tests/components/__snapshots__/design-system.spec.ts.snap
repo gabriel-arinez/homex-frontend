@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`design system FE01 > renderiza navegación, tema y usuario sin topbar global > drawer abierto compacto 1`] = `
+exports[`design system FE01 > renderiza navegación autorizada e identidad real sin topbar global > drawer abierto compacto 1`] = `
 "<div data-v-69f24f92="" class="sidebar-layer sidebar-layer--open sidebar-layer--compact">
   <aside data-v-69f24f92="" class="sidebar sidebar--compact">
     <div data-v-69f24f92="" class="brand"><strong data-v-69f24f92="">H</strong><span data-v-69f24f92="">HOMEX</span><button data-v-69f24f92="" type="button" class="close" aria-label="Cerrar navegación"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x" aria-hidden="true">
@@ -32,11 +32,6 @@ exports[`design system FE01 > renderiza navegación, tema y usuario sin topbar g
         <!--teleport end-->
       </section>
       <section data-v-69f24f92="">
-        <h2 data-v-69f24f92="">Stock</h2><span data-v-bd015e50="" class="tooltip tooltip--block"><a data-v-69f24f92="" href="/movimientos-stock" class="" aria-label="Movimientos de stock"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-boxes" aria-hidden="true"><path d="M2.97 12.92A2 2 0 0 0 2 14.63v3.24a2 2 0 0 0 .97 1.71l3 1.8a2 2 0 0 0 2.06 0L12 19v-5.5l-5-3-4.03 2.42Z"></path><path d="m7 16.5-4.74-2.85"></path><path d="m7 16.5 5-3"></path><path d="M7 16.5v5.17"></path><path d="M12 13.5V19l3.97 2.38a2 2 0 0 0 2.06 0l3-1.8a2 2 0 0 0 .97-1.71v-3.24a2 2 0 0 0-.97-1.71L17 10.5l-5 3Z"></path><path d="m17 16.5-5-3"></path><path d="m17 16.5 4.74-2.85"></path><path d="M17 16.5v5.17"></path><path d="M7.97 4.42A2 2 0 0 0 7 6.13v4.37l5 3 5-3V6.13a2 2 0 0 0-.97-1.71l-3-1.8a2 2 0 0 0-2.06 0l-3 1.8Z"></path><path d="M12 8 7.26 5.15"></path><path d="m12 8 4.74-2.85"></path><path d="M12 13.5V8"></path></svg><span data-v-69f24f92="">Movimientos de stock</span></a></span>
-        <!--teleport start-->
-        <!--teleport end-->
-      </section>
-      <section data-v-69f24f92="">
         <h2 data-v-69f24f92="">Finanzas</h2><span data-v-bd015e50="" class="tooltip tooltip--block"><a data-v-69f24f92="" href="/recibos" class="" aria-label="Recibos"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-receipt" aria-hidden="true"><path d="M12 17V7"></path><path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8"></path><path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z"></path></svg><span data-v-69f24f92="">Recibos</span></a></span>
         <!--teleport start-->
         <!--teleport end-->
@@ -46,17 +41,16 @@ exports[`design system FE01 > renderiza navegación, tema y usuario sin topbar g
         <!--teleport start-->
         <!--teleport end-->
       </section>
-      <section data-v-69f24f92="">
-        <h2 data-v-69f24f92="">Sistema</h2><span data-v-bd015e50="" class="tooltip tooltip--block"><a data-v-69f24f92="" href="/catalogos" class="" aria-label="Catálogos"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-book-open" aria-hidden="true"><path d="M12 5v16"></path><path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z"></path></svg><span data-v-69f24f92="">Catálogos</span></a></span>
-        <!--teleport start-->
-        <!--teleport end-->
-      </section>
     </nav>
     <div data-v-69f24f92="" class="sidebar__footer"><button data-v-69f24f92="" type="button"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-moon" aria-hidden="true">
           <path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"></path>
         </svg><span data-v-69f24f92="">Tema oscuro</span></button>
-      <div data-v-69f24f92="" class="user"><span data-v-69f24f92="" aria-hidden="true">UH</span>
-        <div data-v-69f24f92=""><strong data-v-69f24f92="">Usuario HOMEX</strong><small data-v-69f24f92="">Perfil local</small></div>
+      <div data-v-69f24f92="" class="user"><span data-v-69f24f92="" aria-hidden="true">MV</span>
+        <div data-v-69f24f92=""><strong data-v-69f24f92="">María Vendedora</strong><small data-v-69f24f92="">vendedor</small></div><button data-v-69f24f92="" type="button" aria-label="Cerrar sesión"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-log-out" aria-hidden="true">
+            <path d="m16 17 5-5-5-5"></path>
+            <path d="M21 12H9"></path>
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+          </svg><span data-v-69f24f92="">Cerrar sesión</span></button>
       </div><button data-v-69f24f92="" type="button" class="compact" aria-label="Expandir navegación"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-right" aria-hidden="true">
           <path d="m9 18 6-6-6-6"></path>
         </svg><span data-v-69f24f92="">Compactar</span></button>
@@ -65,7 +59,7 @@ exports[`design system FE01 > renderiza navegación, tema y usuario sin topbar g
 </div>"
 `;
 
-exports[`design system FE01 > renderiza navegación, tema y usuario sin topbar global > drawer abierto expandido 1`] = `
+exports[`design system FE01 > renderiza navegación autorizada e identidad real sin topbar global > drawer abierto expandido 1`] = `
 "<div data-v-69f24f92="" class="sidebar-layer sidebar-layer--open">
   <aside data-v-69f24f92="" class="sidebar">
     <div data-v-69f24f92="" class="brand"><strong data-v-69f24f92="">H</strong><span data-v-69f24f92="">HOMEX</span><button data-v-69f24f92="" type="button" class="close" aria-label="Cerrar navegación"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x" aria-hidden="true">
@@ -97,11 +91,6 @@ exports[`design system FE01 > renderiza navegación, tema y usuario sin topbar g
         <!--teleport end-->
       </section>
       <section data-v-69f24f92="">
-        <h2 data-v-69f24f92="">Stock</h2><span data-v-bd015e50="" class="tooltip tooltip--block"><a data-v-69f24f92="" href="/movimientos-stock" class=""><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-boxes" aria-hidden="true"><path d="M2.97 12.92A2 2 0 0 0 2 14.63v3.24a2 2 0 0 0 .97 1.71l3 1.8a2 2 0 0 0 2.06 0L12 19v-5.5l-5-3-4.03 2.42Z"></path><path d="m7 16.5-4.74-2.85"></path><path d="m7 16.5 5-3"></path><path d="M7 16.5v5.17"></path><path d="M12 13.5V19l3.97 2.38a2 2 0 0 0 2.06 0l3-1.8a2 2 0 0 0 .97-1.71v-3.24a2 2 0 0 0-.97-1.71L17 10.5l-5 3Z"></path><path d="m17 16.5-5-3"></path><path d="m17 16.5 4.74-2.85"></path><path d="M17 16.5v5.17"></path><path d="M7.97 4.42A2 2 0 0 0 7 6.13v4.37l5 3 5-3V6.13a2 2 0 0 0-.97-1.71l-3-1.8a2 2 0 0 0-2.06 0l-3 1.8Z"></path><path d="M12 8 7.26 5.15"></path><path d="m12 8 4.74-2.85"></path><path d="M12 13.5V8"></path></svg><span data-v-69f24f92="">Movimientos de stock</span></a></span>
-        <!--teleport start-->
-        <!--teleport end-->
-      </section>
-      <section data-v-69f24f92="">
         <h2 data-v-69f24f92="">Finanzas</h2><span data-v-bd015e50="" class="tooltip tooltip--block"><a data-v-69f24f92="" href="/recibos" class=""><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-receipt" aria-hidden="true"><path d="M12 17V7"></path><path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8"></path><path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z"></path></svg><span data-v-69f24f92="">Recibos</span></a></span>
         <!--teleport start-->
         <!--teleport end-->
@@ -111,17 +100,16 @@ exports[`design system FE01 > renderiza navegación, tema y usuario sin topbar g
         <!--teleport start-->
         <!--teleport end-->
       </section>
-      <section data-v-69f24f92="">
-        <h2 data-v-69f24f92="">Sistema</h2><span data-v-bd015e50="" class="tooltip tooltip--block"><a data-v-69f24f92="" href="/catalogos" class=""><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-book-open" aria-hidden="true"><path d="M12 5v16"></path><path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z"></path></svg><span data-v-69f24f92="">Catálogos</span></a></span>
-        <!--teleport start-->
-        <!--teleport end-->
-      </section>
     </nav>
     <div data-v-69f24f92="" class="sidebar__footer"><button data-v-69f24f92="" type="button"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-moon" aria-hidden="true">
           <path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"></path>
         </svg><span data-v-69f24f92="">Tema oscuro</span></button>
-      <div data-v-69f24f92="" class="user"><span data-v-69f24f92="" aria-hidden="true">UH</span>
-        <div data-v-69f24f92=""><strong data-v-69f24f92="">Usuario HOMEX</strong><small data-v-69f24f92="">Perfil local</small></div>
+      <div data-v-69f24f92="" class="user"><span data-v-69f24f92="" aria-hidden="true">MV</span>
+        <div data-v-69f24f92=""><strong data-v-69f24f92="">María Vendedora</strong><small data-v-69f24f92="">vendedor</small></div><button data-v-69f24f92="" type="button" aria-label="Cerrar sesión"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-log-out" aria-hidden="true">
+            <path d="m16 17 5-5-5-5"></path>
+            <path d="M21 12H9"></path>
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+          </svg><span data-v-69f24f92="">Cerrar sesión</span></button>
       </div><button data-v-69f24f92="" type="button" class="compact" aria-label="Compactar navegación"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-left" aria-hidden="true">
           <path d="m15 18-6-6 6-6"></path>
         </svg><span data-v-69f24f92="">Compactar</span></button>
@@ -130,7 +118,7 @@ exports[`design system FE01 > renderiza navegación, tema y usuario sin topbar g
 </div>"
 `;
 
-exports[`design system FE01 > renderiza navegación, tema y usuario sin topbar global > drawer cerrado compacto 1`] = `
+exports[`design system FE01 > renderiza navegación autorizada e identidad real sin topbar global > drawer cerrado compacto 1`] = `
 "<div data-v-69f24f92="" class="sidebar-layer sidebar-layer--compact">
   <aside data-v-69f24f92="" class="sidebar sidebar--compact">
     <div data-v-69f24f92="" class="brand"><strong data-v-69f24f92="">H</strong><span data-v-69f24f92="">HOMEX</span><button data-v-69f24f92="" type="button" class="close" aria-label="Cerrar navegación"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x" aria-hidden="true">
@@ -162,11 +150,6 @@ exports[`design system FE01 > renderiza navegación, tema y usuario sin topbar g
         <!--teleport end-->
       </section>
       <section data-v-69f24f92="">
-        <h2 data-v-69f24f92="">Stock</h2><span data-v-bd015e50="" class="tooltip tooltip--block"><a data-v-69f24f92="" href="/movimientos-stock" class="" aria-label="Movimientos de stock"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-boxes" aria-hidden="true"><path d="M2.97 12.92A2 2 0 0 0 2 14.63v3.24a2 2 0 0 0 .97 1.71l3 1.8a2 2 0 0 0 2.06 0L12 19v-5.5l-5-3-4.03 2.42Z"></path><path d="m7 16.5-4.74-2.85"></path><path d="m7 16.5 5-3"></path><path d="M7 16.5v5.17"></path><path d="M12 13.5V19l3.97 2.38a2 2 0 0 0 2.06 0l3-1.8a2 2 0 0 0 .97-1.71v-3.24a2 2 0 0 0-.97-1.71L17 10.5l-5 3Z"></path><path d="m17 16.5-5-3"></path><path d="m17 16.5 4.74-2.85"></path><path d="M17 16.5v5.17"></path><path d="M7.97 4.42A2 2 0 0 0 7 6.13v4.37l5 3 5-3V6.13a2 2 0 0 0-.97-1.71l-3-1.8a2 2 0 0 0-2.06 0l-3 1.8Z"></path><path d="M12 8 7.26 5.15"></path><path d="m12 8 4.74-2.85"></path><path d="M12 13.5V8"></path></svg><span data-v-69f24f92="">Movimientos de stock</span></a></span>
-        <!--teleport start-->
-        <!--teleport end-->
-      </section>
-      <section data-v-69f24f92="">
         <h2 data-v-69f24f92="">Finanzas</h2><span data-v-bd015e50="" class="tooltip tooltip--block"><a data-v-69f24f92="" href="/recibos" class="" aria-label="Recibos"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-receipt" aria-hidden="true"><path d="M12 17V7"></path><path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8"></path><path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z"></path></svg><span data-v-69f24f92="">Recibos</span></a></span>
         <!--teleport start-->
         <!--teleport end-->
@@ -176,17 +159,16 @@ exports[`design system FE01 > renderiza navegación, tema y usuario sin topbar g
         <!--teleport start-->
         <!--teleport end-->
       </section>
-      <section data-v-69f24f92="">
-        <h2 data-v-69f24f92="">Sistema</h2><span data-v-bd015e50="" class="tooltip tooltip--block"><a data-v-69f24f92="" href="/catalogos" class="" aria-label="Catálogos"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-book-open" aria-hidden="true"><path d="M12 5v16"></path><path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z"></path></svg><span data-v-69f24f92="">Catálogos</span></a></span>
-        <!--teleport start-->
-        <!--teleport end-->
-      </section>
     </nav>
     <div data-v-69f24f92="" class="sidebar__footer"><button data-v-69f24f92="" type="button"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-moon" aria-hidden="true">
           <path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"></path>
         </svg><span data-v-69f24f92="">Tema oscuro</span></button>
-      <div data-v-69f24f92="" class="user"><span data-v-69f24f92="" aria-hidden="true">UH</span>
-        <div data-v-69f24f92=""><strong data-v-69f24f92="">Usuario HOMEX</strong><small data-v-69f24f92="">Perfil local</small></div>
+      <div data-v-69f24f92="" class="user"><span data-v-69f24f92="" aria-hidden="true">MV</span>
+        <div data-v-69f24f92=""><strong data-v-69f24f92="">María Vendedora</strong><small data-v-69f24f92="">vendedor</small></div><button data-v-69f24f92="" type="button" aria-label="Cerrar sesión"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-log-out" aria-hidden="true">
+            <path d="m16 17 5-5-5-5"></path>
+            <path d="M21 12H9"></path>
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+          </svg><span data-v-69f24f92="">Cerrar sesión</span></button>
       </div><button data-v-69f24f92="" type="button" class="compact" aria-label="Expandir navegación"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-right" aria-hidden="true">
           <path d="m9 18 6-6-6-6"></path>
         </svg><span data-v-69f24f92="">Compactar</span></button>

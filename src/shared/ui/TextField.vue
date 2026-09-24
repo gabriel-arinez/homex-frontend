@@ -6,6 +6,7 @@ defineProps<{
   type?: string
   error?: string
   placeholder?: string
+  autocomplete?: string
 }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 </script>
@@ -18,6 +19,7 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
       :type="type ?? 'text'"
       :value="modelValue"
       :placeholder
+      :autocomplete
       :aria-invalid="Boolean(error)"
       :aria-describedby="error ? `${name}-error` : undefined"
       @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"

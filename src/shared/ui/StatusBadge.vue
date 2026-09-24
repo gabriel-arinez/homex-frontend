@@ -14,5 +14,5 @@ const tones: Record<string, 'neutral' | 'success' | 'warning' | 'danger' | 'info
 }
 </script>
 <template>
-  <Badge :tone="tones[props.status] ?? 'neutral'">{{ status.replaceAll('_', ' ') }}</Badge>
+  <Badge :tone="tones[props.status] ?? 'neutral'">{{ status.replace(/_/g, ' ') }}</Badge>
 </template>
