@@ -2,9 +2,7 @@ import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 import { mkdirSync } from 'node:fs'
 
-const evidenceDir = process.env.CI
-  ? 'test-results/playwright/evidence/fe01'
-  : 'docs/implementacion/evidencias/fe01'
+const evidenceDir = 'test-results/playwright/evidence/fe01-regression'
 mkdirSync(evidenceDir, { recursive: true })
 
 const e2eAccess = 'eyJhbGciOiJub25lIn0.eyJ1c2VyX2lkIjo3fQ.signature'

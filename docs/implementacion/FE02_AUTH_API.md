@@ -2,10 +2,17 @@
 
 ## Estado
 
-La implementación local de FE02 está completa en `feat/fe02-auth-api`, creada desde
-`feat/fe01-design-system` conservando todo el trabajo previo. El cierre remoto queda condicionado
-al commit/push que realizará el responsable del repositorio y a que el workflow resultante termine
-verde; esta fase no contiene commits creados automáticamente.
+FE02 está publicada en `feat/fe02-auth-api` sobre el cierre de FE01. El commit funcional
+`30eadeca07d234e7cbfed5546c216c38f7020588` integró autenticación, contrato OpenAPI,
+identidad/capacidades y routing.
+
+La primera ejecución remota, GitHub Actions `36037810110`, detectó un problema de configuración
+del entorno de CI: `VITE_API_BASE_URL` no estaba definido para Vitest ni para el build usado por
+Playwright. El código de la fase no debe depender de `.env.example` durante CI. La corrección de
+cierre define explícitamente `VITE_API_BASE_URL=http://localhost:8000` en el workflow y separa las
+capturas de regresión de FE01 de su evidencia histórica.
+
+El cierre formal exige una ejecución remota completamente verde después de estas correcciones.
 
 ## Contrato fijado
 
@@ -43,7 +50,8 @@ conjunto y contenido de los archivos para detectar drift.
 - `comercial.administrar` habilita las entradas administrativas de catálogo y stock;
 - una cuenta autenticada con `capabilities=[]` conserva identidad, pero no accede a rutas ni
   navegación comercial;
-- navegación filtrada, guards de autenticación/capacidad y vistas 401/403/404;
+- navegación filtrada y guards de autenticación/capacidad;
+- un `401` autenticado invalida la sesión y redirige al login; `403` y `404` tienen vistas dedicadas;
 - rutas lazy para login, resumen y errores;
 - logout que limpia tokens, identidad y capacidades;
 - MSW para login, identidad, refresh, 401, 403, capacidades vacías y fallo de red;
@@ -63,14 +71,19 @@ backend puede conceder.
 - contract drift: cero;
 - build productivo: correcto;
 - Playwright: `13 passed`;
-- regresiones responsive/Axe FE01: verdes;
+- regresiones responsive/Axe FE01: verdes y sus capturas temporales se escriben en `test-results/playwright/evidence/fe01-regression/`, sin sobrescribir evidencia histórica;
 - skips obligatorios: cero;
-- auditoría npm completa con severidad alta: cero vulnerabilidades; `js-yaml` queda fijado en\n `4.3.2` para corregir la vulnerabilidad transitiva del generador OpenAPI.
+- auditoría npm completa con severidad alta: cero vulnerabilidades; `js-yaml` queda fijado en `4.3.2` para corregir la vulnerabilidad transitiva del generador OpenAPI.
 
 ## CI y cierre formal
 
 El workflow ejecuta instalación reproducible, type-check, lint, formato, pruebas unitarias y de
-integración, build, Playwright, contract drift y auditoría completa de dependencias. Como esta
-entrega debe mostrarse antes de crear commit o push, todavía no existe una ejecución remota para
-`feat/fe02-auth-api`. FE02 se declarará formalmente cerrada cuando el responsable publique estos
-cambios y GitHub Actions termine completamente verde.
+integración, build, Playwright, contract drift y auditoría completa de dependencias.
+
+La ejecución `36037810110` del commit funcional inicial quedó roja en `unit-component` y
+`e2e` porque el runner no tenía `VITE_API_BASE_URL`; los demás jobs quedaron verdes. Esta
+corrección resuelve la causa verificada en los logs remotos y evita que las regresiones FE02
+modifiquen los PNG históricos de FE01.
+
+FE02 se declarará formalmente cerrada cuando el nuevo commit de corrección tenga CI remoto
+completamente verde.
