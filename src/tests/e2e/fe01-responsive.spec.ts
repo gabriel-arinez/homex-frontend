@@ -2,11 +2,37 @@ import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 import { mkdirSync } from 'node:fs'
 
-const evidenceDir = process.env.CI
-  ? 'test-results/playwright/evidence/fe01'
-  : 'docs/implementacion/evidencias/fe01'
-
+const evidenceDir = 'test-results/playwright/evidence/fe01-regression'
 mkdirSync(evidenceDir, { recursive: true })
+
+const e2eAccess = 'eyJhbGciOiJub25lIn0.eyJ1c2VyX2lkIjo3fQ.signature'
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/v1/auth/token/refresh/', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ access: e2eAccess, refresh: 'e2e-refresh' }),
+    }),
+  )
+  await page.route('**/api/v1/auth/me/', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 7,
+        username: 'vendedor',
+        display_name: 'María Vendedora',
+        capabilities: ['comercial.operar'],
+      }),
+    }),
+  )
+  await page.addInitScript(
+    ({ access }) => {
+      sessionStorage.setItem('homex.session.v1', JSON.stringify({ access, refresh: 'e2e-refresh' }))
+    },
+    { access: e2eAccess },
+  )
+})
 
 const viewports = [
   { width: 360, height: 900 },

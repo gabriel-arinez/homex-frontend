@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { RouterLink } from 'vue-router'
 import {
   BookOpen,
@@ -18,44 +19,106 @@ import {
   Sun,
   Users,
   X,
+  LogOut,
 } from '@lucide/vue'
 import { usePreferencesStore } from '@/app/stores/usePreferencesStore'
+import { useSessionStore } from '@/app/stores/useSessionStore'
+import type { Capability } from '@/modules/auth/types/session'
 import { useFocusTrap } from '@/shared/composables/useFocusTrap'
 import Tooltip from '@/shared/ui/Tooltip.vue'
 const props = defineProps<{ drawerOpen: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 const preferences = usePreferencesStore()
+const session = useSessionStore()
+const router = useRouter()
+function logout() {
+  session.logout()
+  void router.replace('/login')
+}
 const panel = ref<HTMLElement | null>(null)
 useFocusTrap(
   panel,
   computed(() => props.drawerOpen),
 )
-const groups = [
-  { label: 'General', items: [{ label: 'Resumen', to: '/resumen', icon: LayoutDashboard }] },
+const groups: Array<{
+  label: string
+  items: Array<{ label: string; to: string; icon: unknown; capability?: Capability }>
+}> = [
+  {
+    label: 'General',
+    items: [
+      { label: 'Resumen', to: '/resumen', icon: LayoutDashboard, capability: 'comercial.operar' },
+    ],
+  },
   {
     label: 'Comercial',
     items: [
-      { label: 'Clientes', to: '/clientes', icon: Users },
-      { label: 'Proformas', to: '/proformas', icon: FileText },
-      { label: 'Productos', to: '/productos', icon: PackageOpen },
+      { label: 'Clientes', to: '/clientes', icon: Users, capability: 'comercial.operar' },
+      { label: 'Proformas', to: '/proformas', icon: FileText, capability: 'comercial.operar' },
+      { label: 'Productos', to: '/productos', icon: PackageOpen, capability: 'comercial.operar' },
     ],
   },
   {
     label: 'Operaciones',
     items: [
-      { label: 'Pedidos', to: '/pedidos', icon: PackageCheck },
-      { label: 'Órdenes de trabajo', to: '/ordenes-trabajo', icon: ClipboardList },
-      { label: 'Notas de entrega', to: '/notas-entrega', icon: FileCheck2 },
+      { label: 'Pedidos', to: '/pedidos', icon: PackageCheck, capability: 'comercial.operar' },
+      {
+        label: 'Órdenes de trabajo',
+        to: '/ordenes-trabajo',
+        icon: ClipboardList,
+        capability: 'comercial.operar',
+      },
+      {
+        label: 'Notas de entrega',
+        to: '/notas-entrega',
+        icon: FileCheck2,
+        capability: 'comercial.operar',
+      },
     ],
   },
   {
     label: 'Stock',
-    items: [{ label: 'Movimientos de stock', to: '/movimientos-stock', icon: Boxes }],
+    items: [
+      {
+        label: 'Movimientos de stock',
+        to: '/movimientos-stock',
+        icon: Boxes,
+        capability: 'comercial.administrar',
+      },
+    ],
   },
-  { label: 'Finanzas', items: [{ label: 'Recibos', to: '/recibos', icon: Receipt }] },
-  { label: 'Inteligencia', items: [{ label: 'Capturas', to: '/capturas', icon: Sparkles }] },
-  { label: 'Sistema', items: [{ label: 'Catálogos', to: '/catalogos', icon: BookOpen }] },
+  {
+    label: 'Finanzas',
+    items: [{ label: 'Recibos', to: '/recibos', icon: Receipt, capability: 'comercial.operar' }],
+  },
+  {
+    label: 'Inteligencia',
+    items: [{ label: 'Capturas', to: '/capturas', icon: Sparkles, capability: 'comercial.operar' }],
+  },
+  {
+    label: 'Sistema',
+    items: [
+      { label: 'Catálogos', to: '/catalogos', icon: BookOpen, capability: 'comercial.administrar' },
+    ],
+  },
 ]
+const initials = computed(
+  () =>
+    session.identity?.display_name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join('') || 'H',
+)
+const visibleGroups = computed(() =>
+  groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => session.can(item.capability)),
+    }))
+    .filter((group) => group.items.length > 0),
+)
 </script>
 <template>
   <div
@@ -79,7 +142,7 @@ const groups = [
         </button>
       </div>
       <nav aria-label="Navegación principal">
-        <section v-for="group in groups" :key="group.label">
+        <section v-for="group in visibleGroups" :key="group.label">
           <h2>{{ group.label }}</h2>
           <Tooltip
             v-for="item in group.items"
@@ -106,8 +169,14 @@ const groups = [
           }}</span>
         </button>
         <div class="user">
-          <span aria-hidden="true">UH</span>
-          <div><strong>Usuario HOMEX</strong><small>Perfil local</small></div>
+          <span aria-hidden="true">{{ initials }}</span>
+          <div>
+            <strong>{{ session.identity?.display_name ?? 'Sesión HOMEX' }}</strong
+            ><small>{{ session.identity?.username ?? 'Cuenta autenticada' }}</small>
+          </div>
+          <button type="button" aria-label="Cerrar sesión" @click="logout">
+            <LogOut :size="20" /><span>Cerrar sesión</span>
+          </button>
         </div>
         <button
           type="button"

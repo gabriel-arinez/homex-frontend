@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import AppSidebar from '@/app/layouts/AppSidebar.vue'
 import { usePreferencesStore } from '@/app/stores/usePreferencesStore'
+import { useSessionStore } from '@/app/stores/useSessionStore'
 import Button from '@/shared/ui/Button.vue'
 import Modal from '@/shared/ui/Modal.vue'
 import TextField from '@/shared/ui/TextField.vue'
@@ -77,15 +78,25 @@ describe('design system FE01', () => {
     host.remove()
   })
 
-  it('renderiza navegación, tema y usuario sin topbar global', async () => {
+  it('renderiza navegación autorizada e identidad real sin topbar global', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const session = useSessionStore()
+    session.identity = { id: 7, username: 'vendedor', display_name: 'María Vendedora' }
+    session.capabilities = ['comercial.operar']
     const wrapper = mount(AppSidebar, {
       props: { drawerOpen: true },
-      global: { plugins: [createPinia(), router()] },
+      global: { plugins: [pinia, router()] },
       attachTo: document.body,
     })
     expect(wrapper.text()).toContain('HOMEX')
-    expect(wrapper.text()).toContain('Usuario HOMEX')
-    expect(wrapper.text()).not.toContain('Gabriel Arinez')
+    expect(wrapper.text()).toContain('María Vendedora')
+    expect(wrapper.text()).toContain('vendedor')
+    expect(wrapper.text()).toContain('Clientes')
+    expect(wrapper.text()).not.toContain('Catálogos')
+    expect(wrapper.text()).not.toContain('Movimientos de stock')
+    expect(wrapper.text()).not.toContain('Usuario HOMEX')
+    expect(wrapper.text()).not.toContain('Perfil local')
     expect(wrapper.text()).toContain('Tema oscuro')
     expect(wrapper.text()).not.toContain('Notificaciones')
     expect(wrapper.text()).not.toContain('Nueva proforma')
