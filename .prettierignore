@@ -3,3 +3,5 @@ dist/
 coverage/
 .eslintcache
 docs/PLAN_MAESTRO_FRONTEND_HOMEX.md
+test-results/
+playwright-report/

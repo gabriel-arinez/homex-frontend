@@ -5,22 +5,33 @@ import pluginVitest from '@vitest/eslint-plugin'
 import pluginOxlint from 'eslint-plugin-oxlint'
 import skipFormatting from 'eslint-config-prettier/flat'
 
-// To allow more languages other than `ts` in `.vue` files, uncomment the following lines:
-// import { configureVueProject } from '@vue/eslint-config-typescript'
-// configureVueProject({ scriptLangs: ['ts', 'tsx'] })
-// More info at https://github.com/vuejs/eslint-config-typescript/#advanced-setup
-
 export default defineConfigWithVueTs(
-  {
-    name: 'app/files-to-lint',
-    files: ['**/*.{vue,ts,mts,tsx}'],
-  },
-
+  { name: 'app/files-to-lint', files: ['**/*.{vue,ts,mts,tsx}'] },
   globalIgnores(['**/dist/**', '**/dist-ssr/**', '**/coverage/**']),
-
   ...pluginVue.configs['flat/essential'],
   vueTsConfigs.recommended,
-
+  {
+    rules: {
+      'vue/multi-word-component-names': [
+        'error',
+        {
+          ignores: [
+            'Badge',
+            'Button',
+            'Card',
+            'Checkbox',
+            'Modal',
+            'Pagination',
+            'Radio',
+            'Select',
+            'Switch',
+            'Toast',
+            'Tooltip',
+          ],
+        },
+      ],
+    },
+  },
   {
     ...pluginVitest.configs.recommended,
     files: [
@@ -29,8 +40,6 @@ export default defineConfigWithVueTs(
       'src/**/*.{spec,test}.{ts,tsx}',
     ],
   },
-
   ...pluginOxlint.buildFromOxlintConfigFile('.oxlintrc.json'),
-
   skipFormatting,
 )
