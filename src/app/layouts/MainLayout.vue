@@ -7,17 +7,19 @@ import { usePreferencesStore } from '@/app/stores/usePreferencesStore'
 const drawerOpen = ref(false)
 const preferences = usePreferencesStore()
 </script>
+
 <template>
   <a class="skip-link" href="#main-content">Saltar al contenido principal</a>
   <div class="shell" :class="{ 'shell--compact': preferences.sidebarCompact }">
     <AppSidebar :drawer-open="drawerOpen" @close="drawerOpen = false" />
-    <main id="main-content">
+    <main id="main-content" tabindex="-1">
       <RouterView v-slot="{ Component }"
         ><component :is="Component" @open-menu="drawerOpen = true"
       /></RouterView>
     </main>
   </div>
 </template>
+
 <style scoped>
 .skip-link {
   position: fixed;
@@ -41,6 +43,9 @@ const preferences = usePreferencesStore()
   margin-left: var(--sidebar-expanded);
   padding: var(--space-8);
   transition: margin-left var(--transition-fast);
+}
+.shell main:focus {
+  outline: 0;
 }
 .shell--compact main {
   margin-left: var(--sidebar-compact);

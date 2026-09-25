@@ -1,24 +1,34 @@
 <script setup lang="ts">
+import { useId } from 'vue'
 import { Search, X } from '@lucide/vue'
+
 defineProps<{ modelValue?: string; label?: string }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
+const inputId = useId()
 </script>
+
 <template>
-  <label class="search"
-    ><span class="sr-only">{{ label ?? 'Buscar' }}</span
-    ><Search :size="18" aria-hidden="true" /><input
+  <div class="search">
+    <label class="sr-only" :for="inputId">{{ label ?? 'Buscar' }}</label>
+    <Search :size="18" aria-hidden="true" />
+    <input
+      :id="inputId"
       type="search"
       :value="modelValue"
       :placeholder="label ?? 'Buscar'"
-      @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)" /><button
+      @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
+    />
+    <button
       v-if="modelValue"
       type="button"
       :aria-label="`Limpiar ${label ?? 'búsqueda'}`"
       @click="emit('update:modelValue', '')"
     >
-      <X :size="16" aria-hidden="true" /></button
-  ></label>
+      <X :size="16" aria-hidden="true" />
+    </button>
+  </div>
 </template>
+
 <style scoped>
 .search {
   display: flex;
