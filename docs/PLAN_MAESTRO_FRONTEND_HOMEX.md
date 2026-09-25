@@ -1,7 +1,7 @@
 # Plan maestro de implementación e integración — HOMEX Frontend
 
-**Fecha de revisión:** 22 de septiembre de 2026  
-**Versión del plan:** 1.3 — responsive universal + media pública unificada definitiva  
+**Fecha de revisión:** 25 de septiembre de 2026  
+**Versión del plan:** 1.4 — usabilidad Nielsen + contrato FE04 actualizado  
 **Repositorio:** <code>gabriel-arinez/homex-frontend</code>  
 **Rama rectora:** <code>main</code>  
 **Baseline de código previo al plan:** <code>187670fe59da077311d9d3edea32cb1c4532cad4</code>  
@@ -805,6 +805,32 @@ Definir consistentemente:
 
 No depender únicamente de toasts.
 
+## 14.6. Heurísticas de Nielsen — criterio transversal obligatorio
+
+A partir de FE03.5, toda interfaz existente y toda interfaz nueva debe diseñarse y revisarse contra las **10 heurísticas de usabilidad de Jakob Nielsen**. No constituyen una capa visual opcional ni sustituyen accesibilidad, responsive, permisos o contrato OpenAPI.
+
+La aplicación práctica en HOMEX es:
+
+1. **Visibilidad del estado del sistema.** Toda carga, guardado, envío, aprobación, procesamiento o error debe comunicar claramente qué está ocurriendo y cuándo termina. No dejar acciones aparentemente inertes.
+2. **Correspondencia entre el sistema y el mundo real.** Usar lenguaje comercial de HOMEX, nombres semánticos y unidades comprensibles. Si el backend expone código/nombre, no presentar IDs técnicos como significado de negocio.
+3. **Control y libertad del usuario.** Permitir cancelar/cerrar operaciones de interfaz cuando sea seguro, volver sin quedar atrapado y confirmar acciones destructivas o irreversibles. No inventar reversas comerciales que el backend no permita.
+4. **Consistencia y estándares.** Botones, formularios, tablas, badges, mensajes, navegación, ubicación de acciones y terminología deben seguir los mismos componentes y patrones en todos los módulos.
+5. **Prevención de errores.** Deshabilitar o no ofrecer acciones imposibles según estado/capacidad conocida, validar antes de enviar cuando aporte UX y pedir confirmación donde el riesgo lo justifique. El backend sigue siendo autoridad.
+6. **Reconocimiento antes que recuerdo.** Hacer visibles etiquetas, contexto, filtros activos, opciones y estado actual; no obligar al usuario a recordar IDs, códigos internos o información de una pantalla anterior.
+7. **Flexibilidad y eficiencia de uso.** Los flujos frecuentes deben ser directos, operables por teclado y sin pasos redundantes. Atajos solo se incorporan si son descubribles, accesibles y realmente útiles.
+8. **Diseño estético y minimalista.** Mostrar lo necesario para la tarea actual, con jerarquía visual clara; eliminar controles, textos o decoraciones redundantes que compitan con acciones comerciales.
+9. **Ayudar a reconocer, diagnosticar y recuperarse de errores.** Los errores deben indicar qué ocurrió, qué campo/acción está afectado y cómo continuar. Los datos introducidos no deben perderse innecesariamente tras un fallo recuperable.
+10. **Ayuda y documentación.** Conceptos no obvios deben tener ayuda contextual breve, labels/descripciones accesibles o documentación enlazable cuando corresponda. No convertir cada pantalla en un manual.
+
+Reglas de verificación:
+
+- cada fase nueva debe indicar qué heurísticas afecta y cómo las verifica;
+- una mejora heurística no puede duplicar reglas de dominio en Vue;
+- no se considera evidencia suficiente una apreciación visual subjetiva;
+- cuando una heurística admita automatización, debe existir prueba unitaria, de componente, integración o E2E;
+- lo que requiera revisión humana debe quedar en una matriz de auditoría versionada con escenario, evidencia y resultado;
+- accesibilidad WCAG/axe, responsive y heurísticas Nielsen son gates complementarios, no equivalentes.
+
 ---
 
 # 15. Tablas
@@ -1512,6 +1538,29 @@ No escribir tests inútiles para inflar cobertura.
 
 Cada fase lista explícitamente los casos críticos que deben existir.
 
+## 28.7. Verificación de usabilidad heurística
+
+Desde FE03.5, cada fase debe mantener una matriz H1–H10 que relacione:
+
+- heurística;
+- pantalla/flujo;
+- riesgo detectado;
+- cambio aplicado;
+- prueba automatizada cuando sea posible;
+- evidencia manual cuando la automatización no sea suficiente;
+- resultado final.
+
+Pruebas esperadas según el caso:
+
+- componentes para estados loading/disabled/error/success y preservación de datos;
+- MSW para 400/401/403/404/409/500 y errores de red;
+- Playwright para navegación, foco, teclado, confirmaciones, recuperación y flujos críticos;
+- axe para accesibilidad automatizable;
+- screenshots selectivos para consistencia, jerarquía y estados visuales;
+- validación responsive en 360/390, 768, 1024 y 1440px.
+
+Una fase no se cierra con una matriz H1–H10 incompleta o con defectos críticos de usabilidad conocidos sin documentar.
+
 ---
 
 # 29. CI mínimo obligatorio
@@ -1668,6 +1717,7 @@ main
  ├── feat/fe01-design-system
  ├── feat/fe02-auth-api
  ├── feat/fe03-clientes-productos
+ ├── refactor/fe03-5-usabilidad-nielsen
  ├── feat/fe04-proformas
  ├── feat/fe05-operaciones
  ├── feat/fe06-capturas-hitl
@@ -1943,16 +1993,151 @@ FE03 **no puede cerrarse** con un placeholder permanente si F07.7 está disponib
 
 ---
 
+# 35.5. FE03.5 — Refactor de usabilidad según las 10 heurísticas de Nielsen
+
+**Objetivo:** refactorizar la interfaz ya implementada en FE00–FE03 para establecer un baseline de usabilidad verificable antes de construir proformas manuales.
+
+**Precondiciones:**
+
+- FE03 cerrada y fusionada a `main`;
+- CI de FE03 completamente verde;
+- contrato OpenAPI de FE03 estable;
+- no iniciar implementación de FE04 en paralelo sobre una base UX distinta.
+
+## Alcance obligatorio
+
+Auditar y refactorizar únicamente lo ya existente:
+
+- login, restauración de sesión y estados de autenticación;
+- shell, sidebar/drawer, tema y encabezados;
+- navegación, forbidden y not-found;
+- estados compartidos loading/skeleton/empty/no-results/error/success/processing;
+- clientes;
+- productos;
+- formularios, filtros, paginación, tablas/grid y mensajes de validación existentes.
+
+No implementar todavía proformas, pedidos, NLP ni funcionalidades de fases posteriores.
+
+## Aplicación obligatoria H1–H10
+
+La fase debe demostrar, como mínimo:
+
+- **H1:** feedback visible en operaciones asíncronas y prevención de doble submit;
+- **H2:** lenguaje HOMEX y representación semántica; no IDs técnicos cuando exista etiqueta contractual;
+- **H3:** cierre/cancelación segura de overlays y confirmación de acciones destructivas;
+- **H4:** unificación de patrones de botones, formularios, estados, tablas, badges y mensajes;
+- **H5:** prevención de acciones inválidas sin sustituir la validación del backend;
+- **H6:** filtros/opciones/contexto visibles y reconocibles;
+- **H7:** flujos frecuentes sin pasos redundantes y completamente operables por teclado;
+- **H8:** reducción de ruido visual y jerarquía clara de información/acciones;
+- **H9:** errores accionables, asociados al campo/acción y sin pérdida innecesaria de datos;
+- **H10:** ayuda contextual breve para conceptos no evidentes y labels/descripciones accesibles.
+
+## Restricciones
+
+- no cambiar reglas de negocio;
+- no crear endpoints;
+- no hardcodear roles, estados o catálogos;
+- no recalcular stock, precios, descuentos ni permisos;
+- no sustituir respuestas 4xx/409 del backend por éxito aparente;
+- no introducir una librería UI completa para resolver inconsistencias que el design system existente pueda cubrir;
+- no convertir la fase en un rediseño visual sin evidencia de problema de usabilidad.
+
+## Pruebas obligatorias
+
+### Unitarias/componentes
+
+- loading/processing bloquea doble acción;
+- errores de campo son visibles y mantienen el valor introducido;
+- confirmación destructiva no ejecuta antes de confirmar;
+- componentes compartidos mantienen terminología, variantes y estados consistentes;
+- filtros activos son visibles y removibles;
+- empty/no-results/error no se confunden entre sí;
+- controles deshabilitados explican el motivo cuando sea necesario.
+
+### Integración con MSW
+
+Cubrir en flujos existentes:
+
+- 400 de validación;
+- 401 y restauración/expiración de sesión;
+- 403;
+- 404;
+- 409 cuando el contrato consumido pueda producirlo;
+- 500/error de red;
+- reintento manual seguro;
+- conservación de datos de formulario tras errores recuperables.
+
+### E2E / accesibilidad
+
+- login → navegación permitida;
+- navegación por teclado de sidebar/drawer y acciones críticas;
+- foco visible y retorno de foco al cerrar overlays;
+- Escape donde corresponda;
+- dark/light;
+- axe sin violaciones críticas/serias en rutas auditadas;
+- 360/390, 768, 1024 y 1440px;
+- sin overflow horizontal global;
+- clientes y productos siguen siendo operables después del refactor;
+- screenshots selectivos de estados clave para detectar regresiones de consistencia.
+
+### Auditoría heurística
+
+Crear una matriz H1–H10 con al menos un escenario real por heurística. Cada hallazgo debe quedar en uno de estos estados:
+
+- corregido y probado;
+- no aplica, con justificación;
+- riesgo aceptado explícitamente, sin severidad crítica.
+
+No se permite cerrar la fase con hallazgos críticos abiertos.
+
+## Gate
+
+Además del gate normal:
+
+```bash
+npm run type-check
+npm run lint:check
+npm run format:check
+npm run test:unit -- --run
+npm run test:e2e
+npm run test:a11y
+npm run build
+```
+
+Ejecutar también `npm run contract:check` para demostrar que el refactor no alteró ni falsificó el contrato backend.
+
+## Cierre
+
+Crear:
+
+`docs/implementacion/FE03_5_USABILIDAD_NIELSEN.md`
+
+Debe incluir:
+
+- matriz H1–H10;
+- hallazgos antes/después;
+- cambios realizados;
+- pruebas y viewports ejecutados;
+- evidencia light/dark y teclado;
+- riesgos aceptados;
+- commit final y CI.
+
+**FE04 no puede comenzar hasta que FE03.5 esté cerrada y fusionada a `main`.**
+
+---
+
 # 36. FE04 — Proformas manuales
 
 **Objetivo:** implementar el flujo comercial manual completo antes de captura NLP.
 
 **Precondiciones:**
 
-- FE03 cerrada;
+- FE03.5 cerrada y fusionada a `main`;
 - backend F07.7 cerrado;
-- backend F07.2 funcional para endpoints comerciales necesarios;
-- OpenAPI actualizado, incluyendo adjuntos públicos por detalle.
+- contrato backend de FE04 fusionado a `homex-backend/main` (PR #3, merge `9fac22ecc4f471237e6611b5a226532ab2a037ab`);
+- snapshot OpenAPI frontend actualizado contra ese contrato antes de escribir UI de proformas;
+- adjuntos públicos por detalle disponibles según OpenAPI.
 
 ## Trabajo obligatorio
 
@@ -1970,12 +2155,14 @@ FE03 **no puede cerrarse** con un placeholder permanente si F07.7 está disponib
 10. Visualización de promoción aplicada.
 11. Estados.
 12. Envío.
-13. Aprobación solo si rol/endpoint lo permiten.
-14. Cancelación donde corresponda.
-15. Congelar controles de UI cuando estado ya no permita edición.
-16. Mostrar siempre valores autoritativos devueltos por backend.
-17. Acción <code>Nueva proforma</code> solo dentro de contexto de proformas/cliente.
-18. Gestionar imágenes de referencia de muebles a pedido por <code>DetalleProforma</code> mediante el API de media pública.
+13. Aprobación de la propia proforma por el vendedor mediante el endpoint autorizado; no existe capacidad separada `comercial.aprobar`.
+14. Cancelación únicamente donde exista acción válida del backend: después de aprobación la cancelación pertenece al PEDIDO, no se “desaprueba” la proforma.
+15. Congelar controles de UI fuera de BORRADOR; ENVIADA y APROBADA no admiten edición.
+16. Mostrar siempre valores autoritativos devueltos por backend y representar conflictos de estado/concurrencia 409 de forma accionable.
+17. Consumir `estado_info`, `moneda_info`, `cliente_resumen`, `tipo_item_info`, `unidad_info` y `tipo_mueble_info` en lugar de inferir semántica por IDs.
+18. Consumir `GET /api/v1/catalogo/opciones/?concepto=...` para ESTADO_PROFORMA, MONEDA, TIPO_ITEM, UNIDAD_MEDIDA y TIPO_MUEBLE; no hardcodear IDs.
+19. Acción <code>Nueva proforma</code> solo dentro de contexto de proformas/cliente.
+20. Gestionar imágenes de referencia de muebles a pedido por <code>DetalleProforma</code> mediante el API de media pública.
 
 ## Imágenes de referencia por detalle
 
@@ -2427,6 +2614,11 @@ FE02:
 - <code>openapi-typescript</code>;
 - <code>msw</code>.
 
+FE03.5:
+
+- no añadir una librería UI completa por defecto;
+- reutilizar Playwright/axe existentes o incorporarlos solo si aún no están presentes.
+
 FE04:
 
 - <code>decimal.js</code> solo si existe cálculo provisional necesario.
@@ -2517,6 +2709,7 @@ No:
 | Permisos | ocultación UX + 403 forzado cubiertos |
 | Tema | rutas críticas pasan light y dark |
 | A11y | teclado/foco/axe en flujos críticos |
+| Nielsen H1–H10 | cada fase desde FE03.5 mantiene matriz heurística, pruebas automatizables y evidencia manual de lo no automatizable |
 
 ---
 
@@ -2535,6 +2728,8 @@ Una fase está terminada únicamente cuando:
 - [ ] contract check verde cuando aplica;
 - [ ] E2E verde cuando aplica;
 - [ ] a11y verde cuando aplica;
+- [ ] matriz Nielsen H1–H10 completa desde FE03.5, sin hallazgos críticos abiertos;
+- [ ] pruebas/evidencia de usabilidad de la fase versionadas;
 - [ ] light/dark validados cuando aplica;
 - [ ] toda UI nueva/modificada es responsive y está validada en los viewports obligatorios;
 - [ ] no existe overflow horizontal global;
@@ -2612,7 +2807,7 @@ Una fase puede cerrar como “implementación validada; integración real bloque
 # 49. Secuencia de ejecución
 
 ~~~text
-MAIN + Plan Frontend 1.2
+MAIN + Plan Frontend 1.4
         ↓
 FE00 baseline + CI + convenciones
         ↓
@@ -2623,6 +2818,8 @@ FE02 OpenAPI + auth + permisos + routing
 backend F07.7 media + OpenAPI cerrado
         ↓
 FE03 clientes + productos visuales
+        ↓
+FE03.5 refactor de usabilidad + Nielsen H1–H10
         ↓
 FE04 proformas manuales
         ↓
