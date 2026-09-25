@@ -65,25 +65,25 @@ describe('FE03 clientes y productos', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('12 clientes')
-    expect(requests.at(-1)?.searchParams.get('page_size')).toBe('10')
-    expect(requests.at(-1)?.searchParams.get('page')).toBe('1')
+    expect(requests[requests.length - 1]?.searchParams.get('page_size')).toBe('10')
+    expect(requests[requests.length - 1]?.searchParams.get('page')).toBe('1')
 
     await wrapper.get('input[type="search"]').setValue('Lucía')
     await flushPromises()
-    expect(requests.at(-1)?.searchParams.get('search')).toBe('Lucía')
+    expect(requests[requests.length - 1]?.searchParams.get('search')).toBe('Lucía')
     expect(wrapper.text()).toContain('Lucía HOMEX')
 
     await wrapper.get('select').setValue('inactivos')
     await flushPromises()
-    expect(requests.at(-1)?.searchParams.get('activo')).toBe('false')
+    expect(requests[requests.length - 1]?.searchParams.get('activo')).toBe('false')
     expect(wrapper.text()).toContain('Sin resultados')
   })
 
   it('envía filtros contractuales de productos y consume envelope paginado', async () => {
-    let requested: URL | null = null
+    let requestedUrl = ''
     server.use(
       http.get('http://localhost:8000/api/v1/catalogo/productos/', ({ request }) => {
-        requested = new URL(request.url)
+        requestedUrl = request.url
         return HttpResponse.json({
           count: 1,
           next: null,
@@ -115,13 +115,14 @@ describe('FE03 clientes y productos', () => {
       page_size: 12,
     })
 
+    const requested = new URL(requestedUrl)
     expect(response.count).toBe(1)
     expect(response.results[0]?.nombre).toBe('Silla B15')
-    expect(requested?.searchParams.get('search')).toBe('B15')
-    expect(requested?.searchParams.get('activo')).toBe('true')
-    expect(requested?.searchParams.get('categoria')).toBe('3')
-    expect(requested?.searchParams.get('page')).toBe('2')
-    expect(requested?.searchParams.get('page_size')).toBe('12')
+    expect(requested.searchParams.get('search')).toBe('B15')
+    expect(requested.searchParams.get('activo')).toBe('true')
+    expect(requested.searchParams.get('categoria')).toBe('3')
+    expect(requested.searchParams.get('page')).toBe('2')
+    expect(requested.searchParams.get('page_size')).toBe('12')
   })
 
   it('construye srcset sólo con variantes y usa fallback sin original', async () => {

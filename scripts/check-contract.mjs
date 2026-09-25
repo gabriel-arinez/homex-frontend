@@ -25,11 +25,16 @@ try {
   if (JSON.stringify(expected) !== JSON.stringify(actual))
     throw new Error('Cambió el conjunto generado.')
   for (const file of expected) {
-    if (
-      readFileSync(join('src/generated/api', file), 'utf8') !==
-      readFileSync(join(temporary, file), 'utf8')
-    )
+    const expectedPath = join('src/generated/api', file)
+    const actualPath = join(temporary, file)
+    if (readFileSync(expectedPath, 'utf8') !== readFileSync(actualPath, 'utf8')) {
+      try {
+        execFileSync('diff', ['-u', expectedPath, actualPath], { stdio: 'inherit' })
+      } catch {
+        // diff devuelve 1 precisamente cuando encuentra diferencias.
+      }
       throw new Error(`El tipo generado ${file} no corresponde al snapshot OpenAPI.`)
+    }
   }
 } finally {
   rmSync(temporary, { recursive: true, force: true })
