@@ -35,6 +35,8 @@ export type {
   MonedaCodigoEnum,
   NotaEntrega,
   OrdenTrabajo,
+  PaginatedClienteList,
+  PaginatedProductoList,
   PatchedCliente,
   PatchedClienteWritable,
   PatchedDescuentoProducto,

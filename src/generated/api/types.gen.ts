@@ -259,6 +259,20 @@ export type OrdenTrabajo = {
   readonly updated_by: number | null
 }
 
+export type PaginatedClienteList = {
+  count: number
+  next?: string | null
+  previous?: string | null
+  results: Array<Cliente>
+}
+
+export type PaginatedProductoList = {
+  count: number
+  next?: string | null
+  previous?: string | null
+  results: Array<Producto>
+}
+
 export type PatchedCliente = {
   readonly id?: number
   tipo_cliente?: number
@@ -970,12 +984,27 @@ export type V1CatalogoPisosUpdateResponse =
 export type V1CatalogoProductosListData = {
   body?: never
   path?: never
-  query?: never
+  query?: {
+    activo?: boolean
+    categoria?: number
+    /**
+     * Un número de página dentro del conjunto de resultados paginado.
+     */
+    page?: number
+    /**
+     * Número de resultados a devolver por página.
+     */
+    page_size?: number
+    /**
+     * Un término de búsqueda.
+     */
+    search?: string
+  }
   url: '/api/v1/catalogo/productos/'
 }
 
 export type V1CatalogoProductosListResponses = {
-  200: Array<Producto>
+  200: PaginatedProductoList
 }
 
 export type V1CatalogoProductosListResponse =
@@ -1225,12 +1254,27 @@ export type V1CatalogoSillasUpdateResponse =
 export type V1ClientesListData = {
   body?: never
   path?: never
-  query?: never
+  query?: {
+    activo?: boolean
+    /**
+     * Un número de página dentro del conjunto de resultados paginado.
+     */
+    page?: number
+    /**
+     * Número de resultados a devolver por página.
+     */
+    page_size?: number
+    /**
+     * Un término de búsqueda.
+     */
+    search?: string
+    tipo_cliente?: number
+  }
   url: '/api/v1/clientes/'
 }
 
 export type V1ClientesListResponses = {
-  200: Array<Cliente>
+  200: PaginatedClienteList
 }
 
 export type V1ClientesListResponse = V1ClientesListResponses[keyof V1ClientesListResponses]
