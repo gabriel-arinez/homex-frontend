@@ -2191,7 +2191,8 @@ El navegador no decide el nombre de storage, la key ni la política de acceso.
 - ENVIADA congela campos visualmente según reglas;
 - backend 409/conflicto se explica;
 - aprobación doble no se simula como éxito;
-- otro vendedor 403;
+- recurso comercial de otro vendedor no se revela: acceso directo a proforma/detalle queda fuera del queryset autorizado y se representa como 404;
+- operaciones de media ajena mantienen 403 cuando así lo define el contrato;
 - usuario sin permiso no ve acción, y si fuerza URL recibe 403.
 
 ## Tests E2E con API controlada
