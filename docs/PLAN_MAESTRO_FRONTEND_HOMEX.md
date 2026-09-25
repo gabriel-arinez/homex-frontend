@@ -1,7 +1,7 @@
 # Plan maestro de implementación e integración — HOMEX Frontend
 
-**Fecha de revisión:** 19 de septiembre de 2026  
-**Versión del plan:** 1.1 — baseline rector + responsive universal  
+**Fecha de revisión:** 22 de septiembre de 2026  
+**Versión del plan:** 1.3 — responsive universal + media pública unificada definitiva  
 **Repositorio:** <code>gabriel-arinez/homex-frontend</code>  
 **Rama rectora:** <code>main</code>  
 **Baseline de código previo al plan:** <code>187670fe59da077311d9d3edea32cb1c4532cad4</code>  
@@ -893,20 +893,98 @@ La imagen:
 - tiene placeholder/fallback cuando no existe;
 - no deforma el layout.
 
-## 16.1. Dependencia backend pendiente: imagen principal
+## 16.1. Contrato definitivo de imágenes y media
 
-El SQL/backend revisado no debe asumirse como si ya tuviera imagen de producto.
+La decisión ya no está pendiente.
 
-Antes de cerrar FE03 debe existir una decisión coordinada con backend para exponer una imagen principal opcional por producto mediante URL/recurso de medios.
+Producción utilizará **Cloudflare R2 Standard** como almacenamiento persistente de media, gestionado exclusivamente por <code>homex-backend</code> mediante Django <code>STORAGES</code>. El frontend no conoce credenciales, buckets, endpoint S3 ni reglas internas del proveedor.
 
-Reglas:
+Arquitectura congelada:
 
-- no inventar <code>producto.imagen</code> solo en frontend;
-- no guardar base64 comercial en Pinia/localStorage;
-- no bloquear todo FE01/FE02 por esta dependencia;
-- si la API aún no ofrece imagen, el componente utiliza fallback, pero FE03 no se declara visualmente completo hasta resolver el contrato acordado.
+~~~text
+Vue
+ │
+ │ multipart/form-data
+ ▼
+Django/DRF
+ │
+ ├── valida y procesa con Pillow
+ ├── genera WebP 320/640/1280
+ └── Cloudflare R2 Standard
+       └── homex-public-media
+            ├── productos/ → catálogo
+            └── proformas/ → referencias de muebles a pedido
+~~~
 
-No implementar galería múltiple en la primera versión salvo requisito posterior explícito.
+### Imagen principal de producto
+
+Cada producto puede tener **cero o una** imagen principal. No existe galería en la primera versión.
+
+El backend expone la imagen principal como recurso OpenAPI; Vue nunca construye rutas de R2.
+
+La respuesta debe permitir generar <code>srcset</code> a partir de variantes disponibles. Cada variante expuesta incluye al menos:
+
+- URL;
+- ancho real;
+- alto real;
+- formato WebP.
+
+El original no se carga por defecto en tarjetas/listados.
+
+Reglas frontend:
+
+- <code>loading="lazy"</code> fuera de contenido inmediatamente visible;
+- <code>srcset</code> + <code>sizes</code>;
+- dimensiones/aspect ratio reservados para evitar layout shift;
+- <code>object-fit: contain</code> cuando corresponda;
+- alt basado en nombre/contexto del producto;
+- fallback estable cuando <code>imagen_principal = null</code>;
+- error de red/imagen rota cae a fallback sin romper la card.
+
+### Archivos de referencia de proforma
+
+Una línea de mueble a pedido puede tener múltiples imágenes de referencia persistentes.
+
+El flujo es exclusivamente:
+
+~~~text
+Vue → Django/DRF → R2 público
+~~~
+
+No existe subida directa navegador → R2.
+
+Vue puede crear una preview local efímera con <code>URL.createObjectURL()</code> antes de enviar, pero:
+
+- se revoca al dejar de necesitarla;
+- no se persiste en Pinia;
+- no se persiste en localStorage/IndexedDB;
+- no se trata como confirmación de subida.
+
+Los adjuntos persistentes de proforma se sirven mediante URL pública estable/cacheable del dominio de medios. **La lectura de la imagen no requiere autenticación una vez que alguien conoce su URL**; esta es una decisión explícita del producto. La creación, reemplazo y eliminación continúan pasando por Django y respetan autenticación, permisos y estado comercial.
+
+### Formatos aceptados
+
+La UI permite seleccionar únicamente:
+
+- JPEG;
+- PNG;
+- WebP.
+
+SVG no se admite en la primera versión.
+
+La validación del navegador es de UX; la validación autoritativa siempre pertenece al backend.
+
+### Regla de independencia del proveedor
+
+Vue consume solo el contrato OpenAPI. Está prohibido:
+
+- importar SDK de Cloudflare/AWS para media;
+- usar access keys o secrets;
+- conocer nombres de buckets como requisito funcional;
+- construir URLs del proveedor o derivar keys/rutas;
+- guardar imagen en Base64 como dato comercial.
+
+FE01 y FE02 no dependen del storage. **FE03 y FE04 sí requieren F07.7 del backend cerrado y OpenAPI actualizado.**
 
 ---
 
@@ -1785,9 +1863,10 @@ No avanzar a FE01 con CI rojo.
 **Precondiciones:**
 
 - FE02 cerrada;
+- backend F07.7 cerrado;
 - endpoints backend de clientes/productos estables;
-- contrato de paginación/búsqueda definido;
-- decisión backend sobre imagen principal resuelta o documentada como bloqueo visual.
+- OpenAPI de imagen principal estable y generado;
+- contrato de paginación/búsqueda definido.
 
 ## Clientes
 
@@ -1824,7 +1903,18 @@ Implementar:
 
 ## Imagen
 
-Resolver contrato real de imagen principal. Hasta entonces, fallback funcional.
+Implementar el contrato definitivo de §16.1:
+
+- consumir únicamente <code>imagen_principal</code> generado por OpenAPI;
+- construir <code>srcset</code> con las variantes WebP disponibles;
+- seleccionar <code>sizes</code> según grid/lista responsive;
+- no solicitar el original como recurso normal de catálogo;
+- lazy loading cuando corresponda;
+- fallback para producto sin imagen;
+- fallback ante URL inválida/fallo de carga;
+- no exponer detalles R2 en estado, logs o UI.
+
+FE03 **no puede cerrarse** con un placeholder permanente si F07.7 está disponible: debe integrar el recurso real.
 
 ## Tests
 
@@ -1835,9 +1925,11 @@ Resolver contrato real de imagen principal. Hasta entonces, fallback funcional.
 - 403;
 - validation error;
 - empty/no results;
-- card con imagen;
+- card con imagen y <code>srcset</code>;
 - card sin imagen;
 - imagen rota;
+- variante responsive correcta sin descargar original innecesariamente;
+- ninguna dependencia/SDK de R2 en bundle;
 - dark/light;
 - stock no alterable desde frontend salvo endpoint explícito;
 - promociones no recalculadas arbitrariamente;
@@ -1858,8 +1950,9 @@ Resolver contrato real de imagen principal. Hasta entonces, fallback funcional.
 **Precondiciones:**
 
 - FE03 cerrada;
-- backend F07.2 funcional para endpoints necesarios;
-- OpenAPI actualizado.
+- backend F07.7 cerrado;
+- backend F07.2 funcional para endpoints comerciales necesarios;
+- OpenAPI actualizado, incluyendo adjuntos públicos por detalle.
 
 ## Trabajo obligatorio
 
@@ -1882,6 +1975,25 @@ Resolver contrato real de imagen principal. Hasta entonces, fallback funcional.
 15. Congelar controles de UI cuando estado ya no permita edición.
 16. Mostrar siempre valores autoritativos devueltos por backend.
 17. Acción <code>Nueva proforma</code> solo dentro de contexto de proformas/cliente.
+18. Gestionar imágenes de referencia de muebles a pedido por <code>DetalleProforma</code> mediante el API de media pública.
+
+## Imágenes de referencia por detalle
+
+Para un detalle de mueble a pedido:
+
+- permitir seleccionar una o varias imágenes JPEG/PNG/WebP;
+- mostrar previews locales efímeras antes de subir;
+- enviar cada archivo mediante <code>multipart/form-data</code> al backend;
+- mostrar estado de subida/error;
+- después de confirmar, reemplazar la preview local por el recurso devuelto por backend;
+- listar adjuntos ya persistidos;
+- visualizar y descargar mediante URL pública estable/cacheable devuelta por backend;
+- eliminar un adjunto únicamente si backend lo permite para el estado actual;
+- asociar siempre el archivo al detalle correcto, no solo a la cabecera de proforma;
+- no usar SVG;
+- no guardar Blob/Base64 en estado persistente del navegador.
+
+El navegador no decide el nombre de storage, la key ni la política de acceso.
 
 ## Regresiones críticas
 
@@ -1904,6 +2016,12 @@ Resolver contrato real de imagen principal. Hasta entonces, fallback funcional.
 - aprobar;
 - error de stock;
 - error de concurrencia/conflicto;
+- subir imagen válida a detalle;
+- archivo inválido/tamaño rechazado representa error backend;
+- otro vendedor no puede modificar/eliminar por API un adjunto fuera de su alcance;
+- una URL pública de media puede visualizarse/descargarse sin sesión según el contrato;
+- eliminación bloqueada por estado se representa correctamente;
+- preview local se revoca y no persiste al recargar;
 - creación/edición/revisión de proforma operable en 360/390, 768, 1024 y 1440px;
 - formulario se reorganiza sin perder campos, totales ni acciones;
 - listado/tabla responsive sin overflow global.
@@ -2442,7 +2560,10 @@ Además de FE00–FE09:
 - [ ] flujo NLP E2E verde;
 - [ ] light/dark;
 - [ ] sidebar expandido/compacto;
-- [ ] catálogo visual con fallback y contrato de imagen resuelto;
+- [ ] catálogo visual con imagen principal real, variantes WebP y fallback;
+- [ ] adjuntos públicos de muebles a pedido operativos por detalle;
+- [ ] ninguna imagen comercial persistida en Base64/localStorage/IndexedDB;
+- [ ] ninguna credencial, SDK R2 ni construcción manual de URLs/keys presente en frontend;
 - [ ] no topbar global;
 - [ ] no search global;
 - [ ] no notificaciones ficticias;
@@ -2469,10 +2590,11 @@ Dependencias conocidas:
 1. OpenAPI backend por fase.
 2. Matriz real de permisos.
 3. Contrato de autenticación definitivo.
-4. Imagen principal de producto:
-   - almacenamiento;
-   - URL/recurso;
-   - campo OpenAPI.
+4. Media persistente:
+   - arquitectura cerrada en backend F07.7;
+   - Cloudflare R2 Standard productivo;
+   - OpenAPI de imagen principal y adjuntos públicos debe estar disponible antes de cerrar FE03/FE04;
+   - credenciales/dominio R2 son responsabilidad de backend/deploy y nunca del frontend.
 5. Datos reales de catálogo:
    - SKU;
    - precio;
@@ -2490,13 +2612,15 @@ Una fase puede cerrar como “implementación validada; integración real bloque
 # 49. Secuencia de ejecución
 
 ~~~text
-MAIN + Plan Frontend 1.0
+MAIN + Plan Frontend 1.2
         ↓
 FE00 baseline + CI + convenciones
         ↓
 FE01 design system + light/dark + sidebar
         ↓
 FE02 OpenAPI + auth + permisos + routing
+        ↓
+backend F07.7 media + OpenAPI cerrado
         ↓
 FE03 clientes + productos visuales
         ↓
