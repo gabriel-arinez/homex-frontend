@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Search } from '@lucide/vue'
+import { Search, X } from '@lucide/vue'
 defineProps<{ modelValue?: string; label?: string }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 </script>
@@ -10,8 +10,14 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
       type="search"
       :value="modelValue"
       :placeholder="label ?? 'Buscar'"
-      @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
-  /></label>
+      @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)" /><button
+      v-if="modelValue"
+      type="button"
+      :aria-label="`Limpiar ${label ?? 'búsqueda'}`"
+      @click="emit('update:modelValue', '')"
+    >
+      <X :size="16" aria-hidden="true" /></button
+  ></label>
 </template>
 <style scoped>
 .search {
@@ -35,5 +41,17 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
   border: 0;
   background: transparent;
   outline: 0;
+}
+.search button {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
 }
 </style>

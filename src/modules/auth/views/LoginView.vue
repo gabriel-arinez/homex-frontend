@@ -13,6 +13,7 @@ const session = useSessionStore()
 const router = useRouter()
 const route = useRoute()
 async function submit() {
+  if (loading.value) return
   error.value = ''
   loading.value = true
   try {
@@ -41,7 +42,7 @@ async function submit() {
       <p class="eyebrow">HOMEX</p>
       <h1 id="login-title">Iniciar sesión</h1>
       <p>Accede con tus credenciales de trabajo.</p>
-      <form @submit.prevent="submit">
+      <form :aria-busy="loading" @submit.prevent="submit">
         <TextField v-model="username" name="username" label="Usuario" autocomplete="username" />
         <TextField
           v-model="password"
@@ -51,9 +52,13 @@ async function submit() {
           autocomplete="current-password"
         />
         <p v-if="error" class="form-error" role="alert">{{ error }}</p>
-        <Button type="submit" :disabled="loading || !username || !password">{{
-          loading ? 'Ingresando…' : 'Ingresar'
-        }}</Button>
+        <Button
+          type="submit"
+          :disabled="!username || !password"
+          :processing="loading"
+          processing-label="Ingresando…"
+          >Ingresar</Button
+        >
       </form>
     </section>
   </main>

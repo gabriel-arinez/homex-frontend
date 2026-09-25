@@ -2,7 +2,8 @@
 withDefaults(defineProps<{ lines?: number }>(), { lines: 3 })
 </script>
 <template>
-  <div class="skeleton" aria-busy="true" aria-label="Cargando">
+  <div class="skeleton" role="status" aria-live="polite" aria-busy="true">
+    <span class="sr-only">Cargando contenido…</span>
     <span v-for="line in lines" :key="line" />
   </div>
 </template>

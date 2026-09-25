@@ -7,6 +7,7 @@ import { ApiError } from '@/shared/api'
 import ProductImage from '../components/ProductImage.vue'
 import { productosService } from '../services/productosService'
 import Button from '@/shared/ui/Button.vue'
+import ConfirmDialog from '@/shared/ui/ConfirmDialog.vue'
 import Card from '@/shared/ui/Card.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
@@ -22,6 +23,7 @@ const error = ref('')
 const editing = ref(false)
 const saving = ref(false)
 const success = ref('')
+const confirmCancel = ref(false)
 const fields = ref<Record<string, string[]>>({})
 const form = reactive({ sku: '', nombre: '', precio_lista: '', observaciones: '', activo: true })
 const canEdit = computed(() => session.can('comercial.administrar'))
@@ -76,6 +78,10 @@ async function save() {
 }
 
 function cancelEdit() {
+  confirmCancel.value = true
+}
+function discardEdit() {
+  confirmCancel.value = false
   editing.value = false
   error.value = ''
   if (product.value) fill(product.value)
@@ -99,7 +105,9 @@ onMounted(load)
       </template>
     </PageHeader>
     <LoadingSkeleton v-if="loading" :lines="8" />
-    <ErrorState v-else-if="error && !product" :description="error" />
+    <ErrorState v-else-if="error && !product" :description="error"
+      ><button type="button" @click="load">Reintentar</button></ErrorState
+    >
     <div v-else-if="product" class="layout">
       <Card>
         <ProductImage
@@ -135,10 +143,10 @@ onMounted(load)
           <label><input v-model="form.activo" type="checkbox" /> Producto activo</label>
           <p v-if="error" class="form-error" role="alert">{{ error }}</p>
           <div class="actions">
-            <Button type="submit" :disabled="saving">{{
-              saving ? 'Guardando…' : 'Guardar'
-            }}</Button>
-            <Button variant="secondary" @click="cancelEdit">Cancelar</Button>
+            <Button type="submit" :processing="saving" processing-label="Guardando…"
+              >Guardar</Button
+            >
+            <Button variant="secondary" :disabled="saving" @click="cancelEdit">Cancelar</Button>
           </div>
         </form>
         <dl v-else>
@@ -180,6 +188,14 @@ onMounted(load)
         </p>
       </Card>
     </div>
+    <ConfirmDialog
+      :open="confirmCancel"
+      title="Descartar cambios"
+      description="Los cambios del producto no se guardarán."
+      confirm-label="Descartar"
+      @close="confirmCancel = false"
+      @confirm="discardEdit"
+    />
   </div>
 </template>
 

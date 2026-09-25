@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import type { Cliente } from '@/generated/api'
 import { clientesService, nombreCliente } from '../services/clientesService'
+import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
 import DataTable from '@/shared/ui/DataTable.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
@@ -28,6 +29,18 @@ let requestId = 0
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
 const hasFilters = computed(() => Boolean(search.value.trim()) || status.value !== 'todos')
+const activeFilters = computed(() => [
+  ...(search.value.trim() ? [{ key: 'search', label: `Búsqueda: ${search.value.trim()}` }] : []),
+  ...(status.value !== 'todos' ? [{ key: 'status', label: `Estado: ${status.value}` }] : []),
+])
+function removeFilter(key: string) {
+  if (key === 'search') search.value = ''
+  if (key === 'status') status.value = 'todos'
+}
+function clearFilters() {
+  search.value = ''
+  status.value = 'todos'
+}
 
 function activeFilter() {
   if (status.value === 'activos') return true
@@ -112,6 +125,8 @@ const columns = [
         ]"
       />
     </FilterBar>
+    <ActiveFilters :filters="activeFilters" @remove="removeFilter" @clear="clearFilters" />
+    <p v-if="loading" class="sr-only" role="status">Actualizando resultados…</p>
     <LoadingSkeleton v-if="loading" :lines="6" />
     <ErrorState v-else-if="error" :description="error">
       <button type="button" @click="load">Reintentar</button>
