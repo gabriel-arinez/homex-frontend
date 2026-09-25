@@ -135,7 +135,9 @@ onMounted(load)
           <label><input v-model="form.activo" type="checkbox" /> Producto activo</label>
           <p v-if="error" class="form-error" role="alert">{{ error }}</p>
           <div class="actions">
-            <Button type="submit" :disabled="saving">{{ saving ? 'Guardando…' : 'Guardar' }}</Button>
+            <Button type="submit" :disabled="saving">{{
+              saving ? 'Guardando…' : 'Guardar'
+            }}</Button>
             <Button variant="secondary" @click="cancelEdit">Cancelar</Button>
           </div>
         </form>

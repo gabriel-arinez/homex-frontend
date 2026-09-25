@@ -74,7 +74,10 @@ async function mockBackend(page: Page) {
       contentType: 'application/json',
       body: JSON.stringify({
         count: clients.length,
-        next: start + pageSize < clients.length ? 'http://localhost:8000/api/v1/clientes/?page=2' : null,
+        next:
+          start + pageSize < clients.length
+            ? 'http://localhost:8000/api/v1/clientes/?page=2'
+            : null,
         previous: pageNumber > 1 ? 'http://localhost:8000/api/v1/clientes/?page=1' : null,
         results: clients.slice(start, start + pageSize),
       }),
@@ -97,7 +100,10 @@ async function mockBackend(page: Page) {
       contentType: 'application/json',
       body: JSON.stringify({
         count: products.length,
-        next: start + pageSize < products.length ? 'http://localhost:8000/api/v1/catalogo/productos/?page=2' : null,
+        next:
+          start + pageSize < products.length
+            ? 'http://localhost:8000/api/v1/catalogo/productos/?page=2'
+            : null,
         previous: pageNumber > 1 ? 'http://localhost:8000/api/v1/catalogo/productos/?page=1' : null,
         results: products.slice(start, start + pageSize),
       }),

@@ -46,8 +46,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 24.12.0, cache: npm }
       - run: npm ci
-      - run: npm run format
-      - run: git diff --exit-code
+      - run: npm run format:check
 
   unit-component:
     runs-on: ubuntu-latest

@@ -266,11 +266,25 @@ export type PaginatedClienteList = {
   results: Array<Cliente>
 }
 
+export type PaginatedClienteListWritable = {
+  count: number
+  next?: string | null
+  previous?: string | null
+  results: Array<ClienteWritable>
+}
+
 export type PaginatedProductoList = {
   count: number
   next?: string | null
   previous?: string | null
   results: Array<Producto>
+}
+
+export type PaginatedProductoListWritable = {
+  count: number
+  next?: string | null
+  previous?: string | null
+  results: Array<ProductoWritable>
 }
 
 export type PatchedCliente = {

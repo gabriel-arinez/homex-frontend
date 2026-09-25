@@ -132,7 +132,9 @@ const columns = [
         :columns="columns"
         :rows="clients.map((client) => ({ ...client, nombre: nombreCliente(client) }))"
       >
-        <template #cell-nombre="{ row }"><strong>{{ row.nombre }}</strong></template>
+        <template #cell-nombre="{ row }"
+          ><strong>{{ row.nombre }}</strong></template
+        >
         <template #cell-celular="{ row }">{{ row.celular || 'Sin celular' }}</template>
         <template #cell-estado="{ row }">
           <span :class="row.activo === false ? 'inactive' : 'active'">{{

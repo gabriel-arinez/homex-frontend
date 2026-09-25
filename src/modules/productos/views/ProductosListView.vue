@@ -165,14 +165,10 @@ const money = (value: string) =>
           </div>
         </article>
       </div>
-      <DataTable
-        v-else
-        caption="Listado de productos"
-        :columns="columns"
-        :rows="products"
-      >
+      <DataTable v-else caption="Listado de productos" :columns="columns" :rows="products">
         <template #cell-producto="{ row }">
-          <strong>{{ row.nombre }}</strong><br /><small>{{ row.sku || 'Sin SKU' }}</small>
+          <strong>{{ row.nombre }}</strong
+          ><br /><small>{{ row.sku || 'Sin SKU' }}</small>
         </template>
         <template #cell-categoria="{ row }">#{{ row.categoria }}</template>
         <template #cell-precio="{ row }">{{ money(String(row.precio_vigente)) }}</template>
