@@ -64,7 +64,7 @@ async function mockBackend(page: Page) {
       }),
     }),
   )
-  await page.route('**/api/v1/clientes/', (route) => {
+  await page.route(/\/api\/v1\/clientes\/(?:\?.*)?$/, (route) => {
     const url = new URL(route.request().url())
     const pageNumber = Number(url.searchParams.get('page') ?? '1')
     const pageSize = Number(url.searchParams.get('page_size') ?? '20')
@@ -90,7 +90,7 @@ async function mockBackend(page: Page) {
       body: JSON.stringify(clients[0]),
     }),
   )
-  await page.route('**/api/v1/catalogo/productos/', (route) => {
+  await page.route(/\/api\/v1\/catalogo\/productos\/(?:\?.*)?$/, (route) => {
     const url = new URL(route.request().url())
     const pageNumber = Number(url.searchParams.get('page') ?? '1')
     const pageSize = Number(url.searchParams.get('page_size') ?? '20')
