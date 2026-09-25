@@ -113,6 +113,7 @@ test('FE03.5 expone filtros, permite retirarlos y evita navegación prematura', 
 test('FE03.5 activa el skip-link y mueve el foco al contenido principal', async ({ page }) => {
   await mockApp(page)
   await page.goto('/clientes')
+  await expect(page.getByRole('heading', { name: 'Clientes' })).toBeVisible()
   await page.keyboard.press('Tab')
   const skipLink = page.getByRole('link', { name: 'Saltar al contenido principal' })
   await expect(skipLink).toBeFocused()
