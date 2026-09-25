@@ -266,25 +266,11 @@ export type PaginatedClienteList = {
   results: Array<Cliente>
 }
 
-export type PaginatedClienteListWritable = {
-  count: number
-  next?: string | null
-  previous?: string | null
-  results: Array<ClienteWritable>
-}
-
 export type PaginatedProductoList = {
   count: number
   next?: string | null
   previous?: string | null
   results: Array<Producto>
-}
-
-export type PaginatedProductoListWritable = {
-  count: number
-  next?: string | null
-  previous?: string | null
-  results: Array<ProductoWritable>
 }
 
 export type PatchedCliente = {
@@ -578,6 +564,20 @@ export type EspecificacionMuebleWritable = {
   accesorios?: unknown
   observaciones?: string | null
   tipo_mueble?: number | null
+}
+
+export type PaginatedClienteListWritable = {
+  count: number
+  next?: string | null
+  previous?: string | null
+  results: Array<ClienteWritable>
+}
+
+export type PaginatedProductoListWritable = {
+  count: number
+  next?: string | null
+  previous?: string | null
+  results: Array<ProductoWritable>
 }
 
 export type PatchedClienteWritable = {
