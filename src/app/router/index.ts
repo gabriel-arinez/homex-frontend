@@ -23,6 +23,30 @@ const router = createRouter({
           meta: { capability: 'comercial.operar' },
         },
         {
+          path: 'clientes',
+          name: 'clientes',
+          component: () => import('@/modules/clientes/views/ClientesListView.vue'),
+          meta: { capability: 'comercial.operar' },
+        },
+        {
+          path: 'clientes/:id',
+          name: 'cliente-detail',
+          component: () => import('@/modules/clientes/views/ClienteDetailView.vue'),
+          meta: { capability: 'comercial.operar' },
+        },
+        {
+          path: 'productos',
+          name: 'productos',
+          component: () => import('@/modules/productos/views/ProductosListView.vue'),
+          meta: { capability: 'comercial.operar' },
+        },
+        {
+          path: 'productos/:id',
+          name: 'producto-detail',
+          component: () => import('@/modules/productos/views/ProductoDetailView.vue'),
+          meta: { capability: 'comercial.operar' },
+        },
+        {
           path: 'forbidden',
           name: 'forbidden',
           component: () => import('@/modules/errors/views/ForbiddenView.vue'),
