@@ -6,6 +6,7 @@ import { useSessionStore } from '@/app/stores/useSessionStore'
 import { ApiError } from '@/shared/api'
 import { clientesService, nombreCliente } from '../services/clientesService'
 import Button from '@/shared/ui/Button.vue'
+import ConfirmDialog from '@/shared/ui/ConfirmDialog.vue'
 import Card from '@/shared/ui/Card.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
@@ -20,6 +21,7 @@ const error = ref('')
 const editing = ref(false)
 const saving = ref(false)
 const success = ref('')
+const confirmCancel = ref(false)
 const fields = ref<Record<string, string[]>>({})
 const form = reactive({
   nombres: '',
@@ -79,6 +81,10 @@ async function save() {
   }
 }
 function cancelEdit() {
+  confirmCancel.value = true
+}
+function discardEdit() {
+  confirmCancel.value = false
   editing.value = false
   if (client.value) fill(client.value)
 }
@@ -99,7 +105,8 @@ onMounted(load)
     ><LoadingSkeleton v-if="loading" :lines="6" /><ErrorState
       v-else-if="error && !client"
       :description="error"
-    /><Card v-else-if="client"
+      ><button type="button" @click="load">Reintentar</button></ErrorState
+    ><Card v-else-if="client"
       ><p v-if="success" class="success" role="status">{{ success }}</p>
       <form v-if="editing" @submit.prevent="save">
         <div class="form-grid">
@@ -138,8 +145,8 @@ onMounted(load)
         <label><input v-model="form.activo" type="checkbox" /> Cliente activo</label>
         <p v-if="error" class="form-error" role="alert">{{ error }}</p>
         <div class="actions">
-          <Button type="submit" :disabled="saving">{{ saving ? 'Guardando…' : 'Guardar' }}</Button
-          ><Button variant="secondary" @click="cancelEdit">Cancelar</Button>
+          <Button type="submit" :processing="saving" processing-label="Guardando…">Guardar</Button
+          ><Button variant="secondary" :disabled="saving" @click="cancelEdit">Cancelar</Button>
         </div>
       </form>
       <dl v-else>
@@ -165,6 +172,14 @@ onMounted(load)
         </div>
       </dl></Card
     >
+    <ConfirmDialog
+      :open="confirmCancel"
+      title="Descartar cambios"
+      description="Los cambios del cliente no se guardarán."
+      confirm-label="Descartar"
+      @close="confirmCancel = false"
+      @confirm="discardEdit"
+    />
   </div>
 </template>
 <style scoped>

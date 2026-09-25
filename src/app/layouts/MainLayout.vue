@@ -8,6 +8,7 @@ const drawerOpen = ref(false)
 const preferences = usePreferencesStore()
 </script>
 <template>
+  <a class="skip-link" href="#main-content">Saltar al contenido principal</a>
   <div class="shell" :class="{ 'shell--compact': preferences.sidebarCompact }">
     <AppSidebar :drawer-open="drawerOpen" @close="drawerOpen = false" />
     <main id="main-content">
@@ -18,6 +19,20 @@ const preferences = usePreferencesStore()
   </div>
 </template>
 <style scoped>
+.skip-link {
+  position: fixed;
+  z-index: 200;
+  top: 0.5rem;
+  left: 0.5rem;
+  padding: 0.65rem 1rem;
+  transform: translateY(-150%);
+  color: white;
+  border-radius: var(--radius-control);
+  background: var(--color-primary);
+}
+.skip-link:focus {
+  transform: translateY(0);
+}
 .shell {
   min-height: 100dvh;
 }

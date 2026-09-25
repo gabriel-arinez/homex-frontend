@@ -3,19 +3,11 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { RouterLink } from 'vue-router'
 import {
-  BookOpen,
-  Boxes,
   ChevronLeft,
   ChevronRight,
-  ClipboardList,
-  FileCheck2,
-  FileText,
   LayoutDashboard,
   Moon,
-  PackageCheck,
   PackageOpen,
-  Receipt,
-  Sparkles,
   Sun,
   Users,
   X,
@@ -54,51 +46,7 @@ const groups: Array<{
     label: 'Comercial',
     items: [
       { label: 'Clientes', to: '/clientes', icon: Users, capability: 'comercial.operar' },
-      { label: 'Proformas', to: '/proformas', icon: FileText, capability: 'comercial.operar' },
       { label: 'Productos', to: '/productos', icon: PackageOpen, capability: 'comercial.operar' },
-    ],
-  },
-  {
-    label: 'Operaciones',
-    items: [
-      { label: 'Pedidos', to: '/pedidos', icon: PackageCheck, capability: 'comercial.operar' },
-      {
-        label: 'Órdenes de trabajo',
-        to: '/ordenes-trabajo',
-        icon: ClipboardList,
-        capability: 'comercial.operar',
-      },
-      {
-        label: 'Notas de entrega',
-        to: '/notas-entrega',
-        icon: FileCheck2,
-        capability: 'comercial.operar',
-      },
-    ],
-  },
-  {
-    label: 'Stock',
-    items: [
-      {
-        label: 'Movimientos de stock',
-        to: '/movimientos-stock',
-        icon: Boxes,
-        capability: 'comercial.administrar',
-      },
-    ],
-  },
-  {
-    label: 'Finanzas',
-    items: [{ label: 'Recibos', to: '/recibos', icon: Receipt, capability: 'comercial.operar' }],
-  },
-  {
-    label: 'Inteligencia',
-    items: [{ label: 'Capturas', to: '/capturas', icon: Sparkles, capability: 'comercial.operar' }],
-  },
-  {
-    label: 'Sistema',
-    items: [
-      { label: 'Catálogos', to: '/catalogos', icon: BookOpen, capability: 'comercial.administrar' },
     ],
   },
 ]

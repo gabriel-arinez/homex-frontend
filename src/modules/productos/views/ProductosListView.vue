@@ -5,6 +5,7 @@ import type { Producto } from '@/generated/api'
 import { productosService } from '../services/productosService'
 import ProductImage from '../components/ProductImage.vue'
 import Button from '@/shared/ui/Button.vue'
+import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
 import DataTable from '@/shared/ui/DataTable.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
@@ -30,7 +31,19 @@ const pageSize = 12
 let requestId = 0
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
-const hasFilters = computed(() => Boolean(search.value.trim()) || status.value !== 'todos')
+const hasFilters = computed(() => Boolean(search.value.trim()) || status.value !== 'activos')
+const activeFilters = computed(() => [
+  ...(search.value.trim() ? [{ key: 'search', label: `Búsqueda: ${search.value.trim()}` }] : []),
+  ...(status.value !== 'activos' ? [{ key: 'status', label: `Estado: ${status.value}` }] : []),
+])
+function removeFilter(key: string) {
+  if (key === 'search') search.value = ''
+  if (key === 'status') status.value = 'activos'
+}
+function clearFilters() {
+  search.value = ''
+  status.value = 'activos'
+}
 
 function activeFilter() {
   if (status.value === 'activos') return true
@@ -129,6 +142,8 @@ const money = (value: string) =>
         ]"
       />
     </FilterBar>
+    <ActiveFilters :filters="activeFilters" @remove="removeFilter" @clear="clearFilters" />
+    <p v-if="loading" class="sr-only" role="status">Actualizando resultados…</p>
     <LoadingSkeleton v-if="loading" :lines="8" />
     <ErrorState v-else-if="error" :description="error">
       <button type="button" @click="load">Reintentar</button>

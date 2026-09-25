@@ -7,6 +7,8 @@ defineProps<{
   error?: string
   placeholder?: string
   autocomplete?: string
+  hint?: string
+  disabled?: boolean
 }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 </script>
@@ -20,10 +22,12 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
       :value="modelValue"
       :placeholder
       :autocomplete
+      :disabled
       :aria-invalid="Boolean(error)"
-      :aria-describedby="error ? `${name}-error` : undefined"
+      :aria-describedby="error ? `${name}-error` : hint ? `${name}-hint` : undefined"
       @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
-    /><small v-if="error" :id="`${name}-error`" role="alert">{{ error }}</small></label
+    /><small v-if="error" :id="`${name}-error`" class="error" role="alert">{{ error }}</small
+    ><small v-else-if="hint" :id="`${name}-hint`" class="hint">{{ hint }}</small></label
   >
 </template>
 <style scoped>
@@ -44,8 +48,16 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 .field input[aria-invalid='true'] {
   border-color: var(--color-danger);
 }
-.field small {
+.field .error {
   color: var(--color-danger);
   font-weight: 400;
+}
+.field .hint {
+  color: var(--color-text-secondary);
+  font-weight: 400;
+}
+.field input:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 </style>
