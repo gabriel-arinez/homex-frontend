@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { X } from '@lucide/vue'
+
 defineProps<{ filters: Array<{ key: string; label: string }> }>()
 const emit = defineEmits<{ remove: [key: string]; clear: [] }>()
 </script>
+
 <template>
   <section v-if="filters.length" class="active-filters" aria-label="Filtros activos">
     <span>Filtros activos:</span>
@@ -10,6 +12,7 @@ const emit = defineEmits<{ remove: [key: string]; clear: [] }>()
       v-for="filter in filters"
       :key="filter.key"
       type="button"
+      :aria-label="`Quitar filtro: ${filter.label}`"
       @click="emit('remove', filter.key)"
     >
       {{ filter.label }} <X :size="14" aria-hidden="true" />
@@ -17,6 +20,7 @@ const emit = defineEmits<{ remove: [key: string]; clear: [] }>()
     <button class="clear" type="button" @click="emit('clear')">Limpiar todos</button>
   </section>
 </template>
+
 <style scoped>
 .active-filters {
   display: flex;

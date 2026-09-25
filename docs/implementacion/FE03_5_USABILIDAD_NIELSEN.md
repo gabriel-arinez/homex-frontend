@@ -2,9 +2,9 @@
 
 ## Estado
 
-**Implementación local completada y validada.**
+**Implementación completada y validada en CI.**
 
-Rama de trabajo: `feat/fe03-5-usabilidad-nielsen`.
+Rama de trabajo: `refactor/fe03-5-usabilidad-nielsen`.
 
 Punto de partida: `main` en `2a3930a7a72c3c4920494da75c8a221c96987a5c`.
 
@@ -62,13 +62,13 @@ Evidencia visual versionada:
 
 Las ejecuciones posteriores guardan artefactos temporales en `test-results/playwright/evidence/fe03-5/` y no sobrescriben la evidencia histórica.
 
-## Validación local
+## Validación automatizada
 
 - type-check: verde;
 - lint (Oxlint + ESLint): verde;
 - format check: verde;
-- unit/component/integration: **28 pruebas verdes**;
-- E2E completo: **29 pruebas verdes**;
+- unit/component/integration: **30 pruebas verdes**;
+- E2E completo: **31 pruebas verdes**;
 - gate a11y independiente: **7 pruebas verdes**;
 - contract drift: verde;
 - build productivo: verde;
@@ -81,6 +81,6 @@ Las ejecuciones posteriores guardan artefactos temporales en `test-results/playw
 
 ## Evidencia remota
 
-Commit final: pendiente; el usuario administra commits.
+Commit funcional validado: `d1355c85d7d1f8afc024ded518951fe73f1649a1`.
 
-GitHub Actions: pendiente hasta que los cambios sean publicados por el usuario.
+GitHub Actions: run `36158259858`, **10/10 jobs verdes**. Incluye 30 unit/component, 31 E2E, 7 a11y, type-check, lint, format, build, contract drift y dependency audit.

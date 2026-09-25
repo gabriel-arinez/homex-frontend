@@ -30,12 +30,20 @@ const page = ref(Math.max(1, Number(route.query.pagina) || 1))
 const pageSize = 12
 let requestId = 0
 
+const statusLabels: Record<string, string> = {
+  todos: 'Todos',
+  activos: 'Activos',
+  inactivos: 'Inactivos',
+}
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
 const hasFilters = computed(() => Boolean(search.value.trim()) || status.value !== 'activos')
 const activeFilters = computed(() => [
   ...(search.value.trim() ? [{ key: 'search', label: `Búsqueda: ${search.value.trim()}` }] : []),
-  ...(status.value !== 'activos' ? [{ key: 'status', label: `Estado: ${status.value}` }] : []),
+  ...(status.value !== 'activos'
+    ? [{ key: 'status', label: `Estado: ${statusLabels[status.value] ?? status.value}` }]
+    : []),
 ])
+
 function removeFilter(key: string) {
   if (key === 'search') search.value = ''
   if (key === 'status') status.value = 'activos'
@@ -121,10 +129,18 @@ const money = (value: string) =>
       @menu="emit('openMenu')"
     >
       <template #actions>
-        <Button :variant="view === 'grid' ? 'primary' : 'secondary'" @click="view = 'grid'">
+        <Button
+          :variant="view === 'grid' ? 'primary' : 'secondary'"
+          :aria-pressed="view === 'grid'"
+          @click="view = 'grid'"
+        >
           Cuadrícula
         </Button>
-        <Button :variant="view === 'lista' ? 'primary' : 'secondary'" @click="view = 'lista'">
+        <Button
+          :variant="view === 'lista' ? 'primary' : 'secondary'"
+          :aria-pressed="view === 'lista'"
+          @click="view = 'lista'"
+        >
           Lista
         </Button>
       </template>
@@ -143,7 +159,6 @@ const money = (value: string) =>
       />
     </FilterBar>
     <ActiveFilters :filters="activeFilters" @remove="removeFilter" @clear="clearFilters" />
-    <p v-if="loading" class="sr-only" role="status">Actualizando resultados…</p>
     <LoadingSkeleton v-if="loading" :lines="8" />
     <ErrorState v-else-if="error" :description="error">
       <button type="button" @click="load">Reintentar</button>

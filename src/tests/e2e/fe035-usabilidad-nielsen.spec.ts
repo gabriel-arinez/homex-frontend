@@ -104,10 +104,33 @@ test('FE03.5 expone filtros, permite retirarlos y evita navegación prematura', 
   await page.goto('/clientes')
   await page.getByRole('searchbox', { name: 'Buscar por nombre, empresa o celular' }).fill('Ana')
   await expect(page.getByLabel('Filtros activos')).toContainText('Búsqueda: Ana')
-  await page.getByRole('button', { name: 'Búsqueda: Ana' }).click()
+  await page.getByRole('button', { name: 'Quitar filtro: Búsqueda: Ana' }).click()
   await expect(page.getByLabel('Filtros activos')).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'Proformas' })).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'Pedidos' })).toHaveCount(0)
+})
+
+test('FE03.5 activa el skip-link y mueve el foco al contenido principal', async ({ page }) => {
+  await mockApp(page)
+  await page.goto('/clientes')
+  await expect(page.getByRole('heading', { name: 'Clientes' })).toBeVisible()
+  await page.keyboard.press('Tab')
+  const skipLink = page.getByRole('link', { name: 'Saltar al contenido principal' })
+  await expect(skipLink).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(page.locator('#main-content')).toBeFocused()
+})
+
+test('FE03.5 comunica qué vista de productos está seleccionada', async ({ page }) => {
+  await mockApp(page)
+  await page.goto('/productos')
+  const grid = page.getByRole('button', { name: 'Cuadrícula' })
+  const list = page.getByRole('button', { name: 'Lista' })
+  await expect(grid).toHaveAttribute('aria-pressed', 'true')
+  await expect(list).toHaveAttribute('aria-pressed', 'false')
+  await list.click()
+  await expect(grid).toHaveAttribute('aria-pressed', 'false')
+  await expect(list).toHaveAttribute('aria-pressed', 'true')
 })
 
 test('@a11y FE03.5 navegación móvil cierra con Escape y devuelve el foco', async ({ page }) => {

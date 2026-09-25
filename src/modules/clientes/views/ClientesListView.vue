@@ -27,12 +27,20 @@ const page = ref(Math.max(1, Number(route.query.pagina) || 1))
 const pageSize = 10
 let requestId = 0
 
+const statusLabels: Record<string, string> = {
+  todos: 'Todos',
+  activos: 'Activos',
+  inactivos: 'Inactivos',
+}
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
 const hasFilters = computed(() => Boolean(search.value.trim()) || status.value !== 'todos')
 const activeFilters = computed(() => [
   ...(search.value.trim() ? [{ key: 'search', label: `Búsqueda: ${search.value.trim()}` }] : []),
-  ...(status.value !== 'todos' ? [{ key: 'status', label: `Estado: ${status.value}` }] : []),
+  ...(status.value !== 'todos'
+    ? [{ key: 'status', label: `Estado: ${statusLabels[status.value] ?? status.value}` }]
+    : []),
 ])
+
 function removeFilter(key: string) {
   if (key === 'search') search.value = ''
   if (key === 'status') status.value = 'todos'
@@ -126,7 +134,6 @@ const columns = [
       />
     </FilterBar>
     <ActiveFilters :filters="activeFilters" @remove="removeFilter" @clear="clearFilters" />
-    <p v-if="loading" class="sr-only" role="status">Actualizando resultados…</p>
     <LoadingSkeleton v-if="loading" :lines="6" />
     <ErrorState v-else-if="error" :description="error">
       <button type="button" @click="load">Reintentar</button>
