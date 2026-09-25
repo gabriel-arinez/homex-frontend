@@ -5,11 +5,7 @@ import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 import ClientesListView from '@/modules/clientes/views/ClientesListView.vue'
 import ProductImage from '@/modules/productos/components/ProductImage.vue'
-import {
-  activeDiscount,
-  presentation,
-  productosService,
-} from '@/modules/productos/services/productosService'
+import { productosService } from '@/modules/productos/services/productosService'
 import { clientesService } from '@/modules/clientes/services/clientesService'
 import { server } from '@/tests/msw/server'
 
@@ -23,6 +19,7 @@ const clients = Array.from({ length: 12 }, (_, index) => ({
   created_by: 7,
   updated_by: 7,
 }))
+
 function testRouter() {
   return createRouter({
     history: createMemoryHistory(),
@@ -34,21 +31,97 @@ function testRouter() {
 }
 
 describe('FE03 clientes y productos', () => {
-  it('busca, filtra y pagina clientes sin inventar query params backend', async () => {
-    server.use(http.get('http://localhost:8000/api/v1/clientes/', () => HttpResponse.json(clients)))
+  it('envía búsqueda, filtro y paginación de clientes al backend', async () => {
+    const requests: URL[] = []
+    server.use(
+      http.get('http://localhost:8000/api/v1/clientes/', ({ request }) => {
+        const url = new URL(request.url)
+        requests.push(url)
+        const search = url.searchParams.get('search')
+        const activo = url.searchParams.get('activo')
+        const filtered = clients.filter((client) => {
+          const matchesSearch =
+            !search ||
+            [client.nombres, client.apellidos, client.celular]
+              .filter(Boolean)
+              .join(' ')
+              .toLowerCase()
+              .includes(search.toLowerCase())
+          const matchesActive =
+            activo === null || String(client.activo !== false) === activo.toLowerCase()
+          return matchesSearch && matchesActive
+        })
+        return HttpResponse.json({
+          count: filtered.length,
+          next: null,
+          previous: null,
+          results: filtered.slice(0, 10),
+        })
+      }),
+    )
     const router = testRouter()
     await router.push('/clientes')
     const wrapper = mount(ClientesListView, { global: { plugins: [createPinia(), router] } })
     await flushPromises()
+
     expect(wrapper.text()).toContain('12 clientes')
-    expect(wrapper.text()).toContain('Página 1 de 2')
+    expect(requests.at(-1)?.searchParams.get('page_size')).toBe('10')
+    expect(requests.at(-1)?.searchParams.get('page')).toBe('1')
+
     await wrapper.get('input[type="search"]').setValue('Lucía')
     await flushPromises()
+    expect(requests.at(-1)?.searchParams.get('search')).toBe('Lucía')
     expect(wrapper.text()).toContain('Lucía HOMEX')
-    expect(wrapper.text()).not.toContain('Cliente 1 HOMEX')
+
     await wrapper.get('select').setValue('inactivos')
     await flushPromises()
+    expect(requests.at(-1)?.searchParams.get('activo')).toBe('false')
     expect(wrapper.text()).toContain('Sin resultados')
+  })
+
+  it('envía filtros contractuales de productos y consume envelope paginado', async () => {
+    let requested: URL | null = null
+    server.use(
+      http.get('http://localhost:8000/api/v1/catalogo/productos/', ({ request }) => {
+        requested = new URL(request.url)
+        return HttpResponse.json({
+          count: 1,
+          next: null,
+          previous: null,
+          results: [
+            {
+              id: 4,
+              categoria: 3,
+              unidad_stock: 2,
+              nombre: 'Silla B15',
+              precio_vigente: '1200.00',
+              stock: 8,
+              demanda_pendiente: 3,
+              disponibilidad_referencial: 5,
+              imagen_principal: null,
+              created_by: 7,
+              updated_by: 7,
+            },
+          ],
+        })
+      }),
+    )
+
+    const response = await productosService.list({
+      search: 'B15',
+      activo: true,
+      categoria: 3,
+      page: 2,
+      page_size: 12,
+    })
+
+    expect(response.count).toBe(1)
+    expect(response.results[0]?.nombre).toBe('Silla B15')
+    expect(requested?.searchParams.get('search')).toBe('B15')
+    expect(requested?.searchParams.get('activo')).toBe('true')
+    expect(requested?.searchParams.get('categoria')).toBe('3')
+    expect(requested?.searchParams.get('page')).toBe('2')
+    expect(requested?.searchParams.get('page_size')).toBe('12')
   })
 
   it('construye srcset sólo con variantes y usa fallback sin original', async () => {
@@ -73,20 +146,6 @@ describe('FE03 clientes y productos', () => {
     expect(image.attributes('loading')).toBe('lazy')
     await image.trigger('error')
     expect(wrapper.text()).toContain('Sin imagen')
-  })
-
-  it('deriva presentación y promoción sin recalcular el precio contractual', () => {
-    expect(presentation(4, [{ producto: 4, modelo: 'B15' }], [])).toEqual({
-      type: 'SILLA',
-      detail: 'B15',
-    })
-    expect(
-      activeDiscount(
-        4,
-        [{ id: 2, producto: 4, precio_antes: '1500.00', precio_ahora: '1200.00', activo: true }],
-        new Date('2026-09-24T12:00:00Z'),
-      )?.precio_ahora,
-    ).toBe('1200.00')
   })
 
   it('edita datos comerciales sin enviar stock calculado por frontend', async () => {
@@ -115,6 +174,7 @@ describe('FE03 clientes y productos', () => {
     expect(sent).not.toHaveProperty('stock')
     expect(sent).not.toHaveProperty('precio_vigente')
   })
+
   it('conserva errores 403 y validaciones del servidor en edición de clientes', async () => {
     server.use(
       http.patch('http://localhost:8000/api/v1/clientes/3/', () =>

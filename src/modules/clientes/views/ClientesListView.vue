@@ -17,31 +17,25 @@ const emit = defineEmits<{ openMenu: [] }>()
 const route = useRoute()
 const router = useRouter()
 const clients = ref<Cliente[]>([])
+const total = ref(0)
 const loading = ref(true)
 const error = ref('')
 const search = ref(typeof route.query.q === 'string' ? route.query.q : '')
 const status = ref(typeof route.query.estado === 'string' ? route.query.estado : 'todos')
 const page = ref(Math.max(1, Number(route.query.pagina) || 1))
 const pageSize = 10
-const filtered = computed(() => {
-  const query = search.value.trim().toLocaleLowerCase('es')
-  return clients.value.filter((client) => {
-    const matchesStatus =
-      status.value === 'todos' ||
-      (status.value === 'activos' ? client.activo !== false : client.activo === false)
-    const haystack = [nombreCliente(client), client.celular, client.direccion]
-      .filter(Boolean)
-      .join(' ')
-      .toLocaleLowerCase('es')
-    return matchesStatus && (!query || haystack.includes(query))
-  })
-})
-const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize)))
-const visible = computed(() =>
-  filtered.value.slice((page.value - 1) * pageSize, page.value * pageSize),
-)
-watch([search, status], () => (page.value = 1))
-watch([search, status, page], () => {
+let requestId = 0
+
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
+const hasFilters = computed(() => Boolean(search.value.trim()) || status.value !== 'todos')
+
+function activeFilter() {
+  if (status.value === 'activos') return true
+  if (status.value === 'inactivos') return false
+  return undefined
+}
+
+function syncRoute() {
   void router.replace({
     query: {
       q: search.value || undefined,
@@ -49,19 +43,46 @@ watch([search, status, page], () => {
       pagina: page.value > 1 ? page.value : undefined,
     },
   })
-})
+}
+
 async function load() {
+  const currentRequest = ++requestId
   loading.value = true
   error.value = ''
   try {
-    clients.value = await clientesService.list()
+    const response = await clientesService.list({
+      search: search.value.trim() || undefined,
+      activo: activeFilter(),
+      page: page.value,
+      page_size: pageSize,
+    })
+    if (currentRequest !== requestId) return
+    clients.value = response.results
+    total.value = response.count
   } catch (cause) {
+    if (currentRequest !== requestId) return
+    clients.value = []
+    total.value = 0
     error.value = cause instanceof Error ? cause.message : 'No se pudieron cargar los clientes.'
   } finally {
-    loading.value = false
+    if (currentRequest === requestId) loading.value = false
   }
 }
+
+watch([search, status], () => {
+  if (page.value !== 1) {
+    page.value = 1
+    return
+  }
+  syncRoute()
+  void load()
+})
+watch(page, () => {
+  syncRoute()
+  void load()
+})
 onMounted(load)
+
 const columns = [
   { key: 'nombre', label: 'Cliente' },
   { key: 'celular', label: 'Celular' },
@@ -69,6 +90,7 @@ const columns = [
   { key: 'acciones', label: 'Acciones' },
 ]
 </script>
+
 <template>
   <div>
     <PageHeader
@@ -78,7 +100,7 @@ const columns = [
       @menu="emit('openMenu')"
     />
     <FilterBar>
-      <SearchField v-model="search" label="Buscar por nombre, celular o dirección" />
+      <SearchField v-model="search" label="Buscar por nombre, empresa o celular" />
       <Select
         v-model="status"
         name="estado-cliente"
@@ -91,38 +113,41 @@ const columns = [
       />
     </FilterBar>
     <LoadingSkeleton v-if="loading" :lines="6" />
-    <ErrorState v-else-if="error" :description="error"
-      ><button type="button" @click="load">Reintentar</button></ErrorState
-    >
+    <ErrorState v-else-if="error" :description="error">
+      <button type="button" @click="load">Reintentar</button>
+    </ErrorState>
     <EmptyState
-      v-else-if="filtered.length === 0"
-      title="Sin resultados"
-      description="No hay clientes que coincidan con los filtros."
+      v-else-if="clients.length === 0"
+      :title="hasFilters ? 'Sin resultados' : 'Sin clientes'"
+      :description="
+        hasFilters
+          ? 'No hay clientes que coincidan con la búsqueda y los filtros.'
+          : 'No hay clientes registrados para mostrar.'
+      "
     />
     <template v-else>
-      <p class="results">{{ filtered.length }} cliente{{ filtered.length === 1 ? '' : 's' }}</p>
+      <p class="results">{{ total }} cliente{{ total === 1 ? '' : 's' }}</p>
       <DataTable
         caption="Listado de clientes"
         :columns="columns"
-        :rows="visible.map((client) => ({ ...client, nombre: nombreCliente(client) }))"
+        :rows="clients.map((client) => ({ ...client, nombre: nombreCliente(client) }))"
       >
-        <template #cell-nombre="{ row }"
-          ><strong>{{ row.nombre }}</strong></template
-        >
+        <template #cell-nombre="{ row }"><strong>{{ row.nombre }}</strong></template>
         <template #cell-celular="{ row }">{{ row.celular || 'Sin celular' }}</template>
-        <template #cell-estado="{ row }"
-          ><span :class="row.activo === false ? 'inactive' : 'active'">{{
+        <template #cell-estado="{ row }">
+          <span :class="row.activo === false ? 'inactive' : 'active'">{{
             row.activo === false ? 'Inactivo' : 'Activo'
-          }}</span></template
-        >
-        <template #cell-acciones="{ row }"
-          ><RouterLink :to="`/clientes/${row.id}`">Ver detalle</RouterLink></template
-        >
+          }}</span>
+        </template>
+        <template #cell-acciones="{ row }">
+          <RouterLink :to="`/clientes/${row.id}`">Ver detalle</RouterLink>
+        </template>
       </DataTable>
       <Pagination :page="page" :total-pages="totalPages" @change="page = $event" />
     </template>
   </div>
 </template>
+
 <style scoped>
 .filter-bar {
   margin-bottom: var(--space-6);

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import type { DescuentoProducto, Producto, ProductoPiso, ProductoSilla } from '@/generated/api'
-import { activeDiscount, presentation, productosService } from '../services/productosService'
+import type { Producto } from '@/generated/api'
+import { productosService } from '../services/productosService'
 import ProductImage from '../components/ProductImage.vue'
 import Button from '@/shared/ui/Button.vue'
 import DataTable from '@/shared/ui/DataTable.vue'
@@ -14,80 +14,83 @@ import PageHeader from '@/shared/ui/PageHeader.vue'
 import Pagination from '@/shared/ui/Pagination.vue'
 import SearchField from '@/shared/ui/SearchField.vue'
 import Select from '@/shared/ui/Select.vue'
+
 const emit = defineEmits<{ openMenu: [] }>()
 const route = useRoute()
 const router = useRouter()
-const products = ref<Producto[]>([]),
-  chairs = ref<ProductoSilla[]>([]),
-  floors = ref<ProductoPiso[]>([]),
-  discounts = ref<DescuentoProducto[]>([])
-const loading = ref(true),
-  error = ref('')
+const products = ref<Producto[]>([])
+const total = ref(0)
+const loading = ref(true)
+const error = ref('')
 const search = ref(typeof route.query.q === 'string' ? route.query.q : '')
-const type = ref(typeof route.query.tipo === 'string' ? route.query.tipo : 'todos')
 const status = ref(typeof route.query.estado === 'string' ? route.query.estado : 'activos')
 const view = ref(route.query.vista === 'lista' ? 'lista' : 'grid')
 const page = ref(Math.max(1, Number(route.query.pagina) || 1))
 const pageSize = 12
-const enriched = computed(() =>
-  products.value.map((product) => ({
-    product,
-    presentation: presentation(product.id, chairs.value, floors.value),
-    discount: activeDiscount(product.id, discounts.value),
-  })),
-)
-const filtered = computed(() => {
-  const q = search.value.trim().toLocaleLowerCase('es')
-  return enriched.value.filter((item) => {
-    const active =
-      status.value === 'todos' ||
-      (status.value === 'activos' ? item.product.activo !== false : item.product.activo === false)
-    const kind = type.value === 'todos' || item.presentation.type === type.value
-    const text = [item.product.sku, item.product.nombre, item.presentation.detail]
-      .filter(Boolean)
-      .join(' ')
-      .toLocaleLowerCase('es')
-    return active && kind && (!q || text.includes(q))
+let requestId = 0
+
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
+const hasFilters = computed(() => Boolean(search.value.trim()) || status.value !== 'todos')
+
+function activeFilter() {
+  if (status.value === 'activos') return true
+  if (status.value === 'inactivos') return false
+  return undefined
+}
+
+function syncRoute() {
+  void router.replace({
+    query: {
+      q: search.value || undefined,
+      estado: status.value === 'activos' ? undefined : status.value,
+      vista: view.value === 'grid' ? undefined : view.value,
+      pagina: page.value > 1 ? page.value : undefined,
+    },
   })
-})
-const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize)))
-const visible = computed(() =>
-  filtered.value.slice((page.value - 1) * pageSize, page.value * pageSize),
-)
-watch([search, type, status], () => (page.value = 1))
-watch(
-  [search, type, status, view, page],
-  () =>
-    void router.replace({
-      query: {
-        q: search.value || undefined,
-        tipo: type.value === 'todos' ? undefined : type.value,
-        estado: status.value === 'activos' ? undefined : status.value,
-        vista: view.value === 'grid' ? undefined : view.value,
-        pagina: page.value > 1 ? page.value : undefined,
-      },
-    }),
-)
+}
+
 async function load() {
+  const currentRequest = ++requestId
   loading.value = true
   error.value = ''
   try {
-    ;[products.value, chairs.value, floors.value, discounts.value] = await Promise.all([
-      productosService.list(),
-      productosService.chairs(),
-      productosService.floors(),
-      productosService.discounts(),
-    ])
+    const response = await productosService.list({
+      search: search.value.trim() || undefined,
+      activo: activeFilter(),
+      page: page.value,
+      page_size: pageSize,
+    })
+    if (currentRequest !== requestId) return
+    products.value = response.results
+    total.value = response.count
   } catch (cause) {
+    if (currentRequest !== requestId) return
+    products.value = []
+    total.value = 0
     error.value = cause instanceof Error ? cause.message : 'No se pudo cargar el catálogo.'
   } finally {
-    loading.value = false
+    if (currentRequest === requestId) loading.value = false
   }
 }
+
+watch([search, status], () => {
+  if (page.value !== 1) {
+    page.value = 1
+    return
+  }
+  syncRoute()
+  void load()
+})
+watch(page, () => {
+  syncRoute()
+  void load()
+})
+watch(view, syncRoute)
 onMounted(load)
+
 const columns = [
   { key: 'producto', label: 'Producto' },
-  { key: 'tipo', label: 'Tipo' },
+  { key: 'categoria', label: 'Categoría' },
   { key: 'precio', label: 'Precio' },
   { key: 'stock', label: 'Stock' },
   { key: 'acciones', label: 'Acciones' },
@@ -95,6 +98,7 @@ const columns = [
 const money = (value: string) =>
   new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(Number(value))
 </script>
+
 <template>
   <div>
     <PageHeader
@@ -102,24 +106,19 @@ const money = (value: string) =>
       description="Catálogo comercial y disponibilidad general."
       show-menu
       @menu="emit('openMenu')"
-      ><template #actions
-        ><Button :variant="view === 'grid' ? 'primary' : 'secondary'" @click="view = 'grid'"
-          >Cuadrícula</Button
-        ><Button :variant="view === 'lista' ? 'primary' : 'secondary'" @click="view = 'lista'"
-          >Lista</Button
-        ></template
-      ></PageHeader
-    ><FilterBar
-      ><SearchField v-model="search" label="Buscar por SKU, nombre o presentación" /><Select
-        v-model="type"
-        name="tipo-producto"
-        label="Tipo"
-        :options="[
-          { label: 'Todos', value: 'todos' },
-          { label: 'Sillas', value: 'SILLA' },
-          { label: 'Pisos flotantes', value: 'PISO FLOTANTE' },
-          { label: 'Otros', value: 'OTRO' },
-        ]" /><Select
+    >
+      <template #actions>
+        <Button :variant="view === 'grid' ? 'primary' : 'secondary'" @click="view = 'grid'">
+          Cuadrícula
+        </Button>
+        <Button :variant="view === 'lista' ? 'primary' : 'secondary'" @click="view = 'lista'">
+          Lista
+        </Button>
+      </template>
+    </PageHeader>
+    <FilterBar>
+      <SearchField v-model="search" label="Buscar por SKU o nombre" />
+      <Select
         v-model="status"
         name="estado-producto"
         label="Estado"
@@ -127,36 +126,42 @@ const money = (value: string) =>
           { label: 'Activos', value: 'activos' },
           { label: 'Todos', value: 'todos' },
           { label: 'Inactivos', value: 'inactivos' },
-        ]" /></FilterBar
-    ><LoadingSkeleton v-if="loading" :lines="8" /><ErrorState v-else-if="error" :description="error"
-      ><button type="button" @click="load">Reintentar</button></ErrorState
-    ><EmptyState
-      v-else-if="filtered.length === 0"
-      title="Sin productos"
-      description="No hay productos que coincidan con los filtros."
-    /><template v-else
-      ><p class="results">{{ filtered.length }} producto{{ filtered.length === 1 ? '' : 's' }}</p>
+        ]"
+      />
+    </FilterBar>
+    <LoadingSkeleton v-if="loading" :lines="8" />
+    <ErrorState v-else-if="error" :description="error">
+      <button type="button" @click="load">Reintentar</button>
+    </ErrorState>
+    <EmptyState
+      v-else-if="products.length === 0"
+      :title="hasFilters ? 'Sin resultados' : 'Sin productos'"
+      :description="
+        hasFilters
+          ? 'No hay productos que coincidan con la búsqueda y los filtros.'
+          : 'No hay productos registrados para mostrar.'
+      "
+    />
+    <template v-else>
+      <p class="results">{{ total }} producto{{ total === 1 ? '' : 's' }}</p>
       <div v-if="view === 'grid'" class="product-grid">
-        <article v-for="item in visible" :key="item.product.id" class="product-card">
-          <span class="category">{{ item.presentation.type }}</span
-          ><ProductImage :image="item.product.imagen_principal" :alt="item.product.nombre" />
+        <article v-for="product in products" :key="product.id" class="product-card">
+          <span class="category">Categoría #{{ product.categoria }}</span>
+          <ProductImage :image="product.imagen_principal" :alt="product.nombre" />
           <div class="body">
-            <small>{{ item.product.sku || 'Sin SKU' }}</small>
+            <small>{{ product.sku || 'Sin SKU' }}</small>
             <h2>
-              <RouterLink :to="`/productos/${item.product.id}`">{{
-                item.product.nombre
-              }}</RouterLink>
+              <RouterLink :to="`/productos/${product.id}`">{{ product.nombre }}</RouterLink>
             </h2>
-            <p>{{ item.presentation.detail || 'Sin presentación adicional' }}</p>
-            <p v-if="item.discount" class="promotion">Promoción vigente</p>
+            <p>Unidad registrada #{{ product.unidad_stock }}</p>
             <div class="commercial">
-              <strong>{{ money(item.product.precio_vigente) }}</strong
-              ><span>Stock: {{ item.product.stock }}</span>
+              <strong>{{ money(product.precio_vigente) }}</strong>
+              <span>Stock: {{ product.stock }}</span>
             </div>
-            <small
-              >Comprometido: {{ item.product.demanda_pendiente }} · Referencial:
-              {{ item.product.disponibilidad_referencial }}</small
-            >
+            <small>
+              Comprometido: {{ product.demanda_pendiente }} · Referencial:
+              {{ product.disponibilidad_referencial }}
+            </small>
           </div>
         </article>
       </div>
@@ -164,20 +169,25 @@ const money = (value: string) =>
         v-else
         caption="Listado de productos"
         :columns="columns"
-        :rows="visible.map((item) => ({ ...item.product, tipo: item.presentation.type }))"
-        ><template #cell-producto="{ row }"
-          ><strong>{{ row.nombre }}</strong
-          ><br /><small>{{ row.sku || 'Sin SKU' }}</small></template
-        ><template #cell-precio="{ row }">{{ money(String(row.precio_vigente)) }}</template
-        ><template #cell-stock="{ row }"
-          >{{ row.stock }} <small>(ref. {{ row.disponibilidad_referencial }})</small></template
-        ><template #cell-acciones="{ row }"
-          ><RouterLink :to="`/productos/${row.id}`">Ver detalle</RouterLink></template
-        ></DataTable
-      ><Pagination :page="page" :total-pages="totalPages" @change="page = $event"
-    /></template>
+        :rows="products"
+      >
+        <template #cell-producto="{ row }">
+          <strong>{{ row.nombre }}</strong><br /><small>{{ row.sku || 'Sin SKU' }}</small>
+        </template>
+        <template #cell-categoria="{ row }">#{{ row.categoria }}</template>
+        <template #cell-precio="{ row }">{{ money(String(row.precio_vigente)) }}</template>
+        <template #cell-stock="{ row }">
+          {{ row.stock }} <small>(ref. {{ row.disponibilidad_referencial }})</small>
+        </template>
+        <template #cell-acciones="{ row }">
+          <RouterLink :to="`/productos/${row.id}`">Ver detalle</RouterLink>
+        </template>
+      </DataTable>
+      <Pagination :page="page" :total-pages="totalPages" @change="page = $event" />
+    </template>
   </div>
 </template>
+
 <style scoped>
 .filter-bar {
   margin-bottom: var(--space-6);
@@ -223,10 +233,6 @@ a {
 .body p {
   margin: 0.3rem 0;
   color: var(--color-text-secondary);
-}
-.promotion {
-  color: var(--color-success) !important;
-  font-weight: 700;
 }
 .commercial {
   display: flex;

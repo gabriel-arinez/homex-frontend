@@ -1,63 +1,46 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import type {
-  DescuentoProducto,
-  PatchedProductoWritable,
-  Producto,
-  ProductoPiso,
-  ProductoSilla,
-} from '@/generated/api'
+import type { PatchedProductoWritable, Producto } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { ApiError } from '@/shared/api'
 import ProductImage from '../components/ProductImage.vue'
-import { activeDiscount, presentation, productosService } from '../services/productosService'
+import { productosService } from '../services/productosService'
 import Button from '@/shared/ui/Button.vue'
 import Card from '@/shared/ui/Card.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
 import TextField from '@/shared/ui/TextField.vue'
+
 const emit = defineEmits<{ openMenu: [] }>()
-const route = useRoute(),
-  session = useSessionStore()
-const product = ref<Producto | null>(null),
-  chairs = ref<ProductoSilla[]>([]),
-  floors = ref<ProductoPiso[]>([]),
-  discounts = ref<DescuentoProducto[]>([]),
-  loading = ref(true),
-  error = ref(''),
-  editing = ref(false),
-  saving = ref(false),
-  success = ref(''),
-  fields = ref<Record<string, string[]>>({})
+const route = useRoute()
+const session = useSessionStore()
+const product = ref<Producto | null>(null)
+const loading = ref(true)
+const error = ref('')
+const editing = ref(false)
+const saving = ref(false)
+const success = ref('')
+const fields = ref<Record<string, string[]>>({})
 const form = reactive({ sku: '', nombre: '', precio_lista: '', observaciones: '', activo: true })
 const canEdit = computed(() => session.can('comercial.administrar'))
-const info = computed(() =>
-  product.value ? presentation(product.value.id, chairs.value, floors.value) : null,
-)
-const discount = computed(() =>
-  product.value ? activeDiscount(product.value.id, discounts.value) : undefined,
-)
-const money = (v: string) =>
-  new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(Number(v))
-function fill(v: Producto) {
-  form.sku = v.sku ?? ''
-  form.nombre = v.nombre
-  form.precio_lista = v.precio_lista ?? ''
-  form.observaciones = v.observaciones ?? ''
-  form.activo = v.activo !== false
+const money = (value: string) =>
+  new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(Number(value))
+
+function fill(value: Producto) {
+  form.sku = value.sku ?? ''
+  form.nombre = value.nombre
+  form.precio_lista = value.precio_lista ?? ''
+  form.observaciones = value.observaciones ?? ''
+  form.activo = value.activo !== false
 }
+
 async function load() {
   loading.value = true
   error.value = ''
   try {
-    ;[product.value, chairs.value, floors.value, discounts.value] = await Promise.all([
-      productosService.get(Number(route.params.id)),
-      productosService.chairs(),
-      productosService.floors(),
-      productosService.discounts(),
-    ])
+    product.value = await productosService.get(Number(route.params.id))
     fill(product.value)
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : 'No se pudo cargar el producto.'
@@ -65,11 +48,13 @@ async function load() {
     loading.value = false
   }
 }
+
 async function save() {
   if (!product.value) return
   saving.value = true
   fields.value = {}
   error.value = ''
+  success.value = ''
   const body: PatchedProductoWritable = {
     sku: form.sku || null,
     nombre: form.nombre,
@@ -89,12 +74,16 @@ async function save() {
     saving.value = false
   }
 }
+
 function cancelEdit() {
   editing.value = false
+  error.value = ''
   if (product.value) fill(product.value)
 }
+
 onMounted(load)
 </script>
+
 <template>
   <div>
     <PageHeader
@@ -102,46 +91,52 @@ onMounted(load)
       description="Detalle comercial y disponibilidad general."
       show-menu
       @menu="emit('openMenu')"
-      ><template #actions
-        ><Button v-if="product && canEdit && !editing" variant="secondary" @click="editing = true"
-          >Editar datos comerciales</Button
-        ></template
-      ></PageHeader
-    ><LoadingSkeleton v-if="loading" :lines="8" /><ErrorState
-      v-else-if="error && !product"
-      :description="error"
-    />
+    >
+      <template #actions>
+        <Button v-if="product && canEdit && !editing" variant="secondary" @click="editing = true">
+          Editar datos comerciales
+        </Button>
+      </template>
+    </PageHeader>
+    <LoadingSkeleton v-if="loading" :lines="8" />
+    <ErrorState v-else-if="error && !product" :description="error" />
     <div v-else-if="product" class="layout">
-      <Card
-        ><ProductImage
+      <Card>
+        <ProductImage
           :image="product.imagen_principal"
           :alt="product.nombre"
           sizes="(max-width: 768px) 100vw, 50vw"
-          eager /></Card
-      ><Card
-        ><p v-if="success" class="success">{{ success }}</p>
+          eager
+        />
+      </Card>
+      <Card>
+        <p v-if="success" class="success" role="status">{{ success }}</p>
         <form v-if="editing" @submit.prevent="save">
-          <TextField v-model="form.sku" name="sku" label="SKU" :error="fields.sku?.[0]" /><TextField
+          <TextField v-model="form.sku" name="sku" label="SKU" :error="fields.sku?.[0]" />
+          <TextField
             v-model="form.nombre"
             name="nombre"
             label="Nombre"
             :error="fields.nombre?.[0]"
-          /><TextField
+          />
+          <TextField
             v-model="form.precio_lista"
             name="precio_lista"
             label="Precio de lista (BOB)"
             type="number"
             :error="fields.precio_lista?.[0]"
-          /><TextField
+          />
+          <TextField
             v-model="form.observaciones"
             name="observaciones"
             label="Observaciones"
             :error="fields.observaciones?.[0]"
-          /><label><input v-model="form.activo" type="checkbox" /> Producto activo</label>
+          />
+          <label><input v-model="form.activo" type="checkbox" /> Producto activo</label>
           <p v-if="error" class="form-error" role="alert">{{ error }}</p>
           <div class="actions">
-            <Button type="submit" :disabled="saving">{{ saving ? 'Guardando…' : 'Guardar' }}</Button
-            ><Button variant="secondary" @click="cancelEdit">Cancelar</Button>
+            <Button type="submit" :disabled="saving">{{ saving ? 'Guardando…' : 'Guardar' }}</Button>
+            <Button variant="secondary" @click="cancelEdit">Cancelar</Button>
           </div>
         </form>
         <dl v-else>
@@ -150,18 +145,16 @@ onMounted(load)
             <dd>{{ product.sku || 'Sin SKU' }}</dd>
           </div>
           <div>
-            <dt>Tipo</dt>
-            <dd>{{ info?.type }}</dd>
+            <dt>Categoría registrada</dt>
+            <dd>#{{ product.categoria }}</dd>
           </div>
           <div>
-            <dt>Presentación</dt>
-            <dd>{{ info?.detail || 'Sin detalle adicional' }}</dd>
+            <dt>Unidad registrada</dt>
+            <dd>#{{ product.unidad_stock }}</dd>
           </div>
           <div>
             <dt>Precio vigente</dt>
-            <dd>
-              {{ money(product.precio_vigente) }} <small v-if="discount">Promoción vigente</small>
-            </dd>
+            <dd>{{ money(product.precio_vigente) }}</dd>
           </div>
           <div>
             <dt>Stock actual</dt>
@@ -181,12 +174,13 @@ onMounted(load)
           </div>
         </dl>
         <p class="stock-note">
-          El stock es informativo y no puede modificarse desde esta pantalla.
-        </p></Card
-      >
+          El stock, la disponibilidad y el precio vigente son informativos y provienen del backend.
+        </p>
+      </Card>
     </div>
   </div>
 </template>
+
 <style scoped>
 .layout {
   display: grid;
@@ -213,8 +207,7 @@ dd {
   display: flex;
   gap: var(--space-3);
 }
-.success,
-dd small {
+.success {
   color: var(--color-success);
 }
 .form-error {

@@ -30,7 +30,7 @@ const form = reactive({
   observaciones: '',
   activo: true,
 })
-const canEdit = computed(() => session.can('comercial.administrar'))
+const canEdit = computed(() => session.can('comercial.operar'))
 function fill(value: Cliente) {
   form.nombres = value.nombres ?? ''
   form.apellidos = value.apellidos ?? ''
