@@ -2,102 +2,142 @@
 
 ## Estado
 
-Implementación local completa en `feat/fe03-clientes-productos`, creada desde FE02 cerrada en
-`f6fb16da40901767cbb87d495a908e083c902046`. El contrato backend permanece fijado en
-`b4a9b35bd1ca60559299cd8943b6712b955fb9c2` y no presenta drift.
+**FE03 funcionalmente cerrada y validada.**
 
-## Contrato respetado
+La implementación vive en `feat/fe03-clientes-productos`. La primera versión de la fase se creó
+mientras el backend terminaba el contrato de listados, por lo que fue necesario sincronizarla antes
+del cierre. El frontend queda fijado al backend:
 
-FE03 consume exclusivamente los DTO generados y estos endpoints:
+`adb949268277da4361f37c96b786c5cdd0265750`
 
-- `GET /api/v1/clientes/` y `GET/PATCH /api/v1/clientes/{id}/`;
-- `GET /api/v1/catalogo/productos/` y `GET/PATCH /api/v1/catalogo/productos/{id}/`;
-- listados de sillas, pisos y descuentos para enriquecer la presentación visual.
+El snapshot `contracts/backend-openapi.yaml` y los tipos de `src/generated/api/` corresponden a
+ese contrato y el gate de contract drift queda verde.
 
-El OpenAPI actual devuelve arreglos completos y declara `query?: never`: no admite todavía
-búsqueda, filtros ni paginación del servidor. Por ello estas operaciones se aplican localmente al
-arreglo recibido y se reflejan en query params de Vue, sin enviar parámetros inventados. Cuando el
-backend publique parámetros reales, esta capa debe migrar a paginación de servidor.
+## Contrato consumido
 
-El contrato tampoco expone un endpoint de valores estructurales para seleccionar
-`tipo_cliente`, `categoria` o `unidad_stock`. FE03 permite editar registros existentes conservando
-esas relaciones, pero no presenta altas que obliguen a inventar IDs de catálogo.
+FE03 usa únicamente contratos publicados por backend:
+
+- `GET /api/v1/clientes/`;
+- `GET/PATCH /api/v1/clientes/{id}/`;
+- `GET /api/v1/catalogo/productos/`;
+- `GET/PATCH /api/v1/catalogo/productos/{id}/`.
+
+Los listados ya no descargan colecciones completas para filtrarlas en Vue. El frontend envía los
+parámetros soportados por OpenAPI y consume el envelope paginado
+`count/next/previous/results`.
+
+Clientes usa:
+
+- `search`;
+- `activo`;
+- `page`;
+- `page_size`.
+
+Productos usa:
+
+- `search`;
+- `activo`;
+- `page`;
+- `page_size`.
+
+El contrato también admite `tipo_cliente` y `categoria`, pero el backend todavía no publica un
+catálogo de opciones/etiquetas estructurales para construir selectores seguros. FE03 no inventa IDs
+ni mapeos semánticos en Vue.
 
 ## Clientes
 
-- listado responsive con estado, contacto y enlace accesible al detalle;
-- búsqueda por los campos realmente disponibles: nombre, empresa, celular y dirección;
-- filtro activo/inactivo y paginación;
-- estados loading, error, vacío y sin resultados;
-- detalle con datos contractuales;
-- edición para `comercial.administrar`;
-- validaciones por campo y errores 403 procedentes del backend;
-- el tipo estructural se muestra como referencia, sin inventar una etiqueta no publicada.
+- listado responsive y paginado por servidor;
+- búsqueda y filtro de estado realizados por backend;
+- estado de carga, error, vacío y sin resultados;
+- detalle;
+- edición de los clientes accesibles al vendedor, respetando que el backend aplica
+  `EsVendedor` y aislamiento por propietario;
+- errores de validación por campo y 403 conservados;
+- `tipo_cliente` se muestra como referencia registrada cuando no existe etiqueta pública;
+- no se implementa alta que requiera inventar valores estructurales no descubribles.
 
 ## Productos
 
-- cuadrícula comercial y lista administrativa;
-- búsqueda por SKU, nombre y presentación;
-- filtros por presentación real derivada de silla/piso y por estado;
-- paginación y query params;
-- detalle y edición de SKU, nombre, precio de lista, observaciones y estado para
-  `comercial.administrar`;
-- stock, demanda pendiente y disponibilidad referencial siempre de sólo lectura;
-- `precio_vigente` mostrado como autoridad backend;
-- promociones activas detectadas por vigencia contractual, sin recalcular importes;
-- presentación de silla por modelo y de piso por `m2_por_caja` cuando existe.
+- vista cuadrícula y lista;
+- búsqueda y filtro de estado por servidor;
+- paginación real;
+- detalle;
+- edición comercial sólo con `comercial.administrar`, alineada con backend;
+- `precio_vigente`, stock, demanda pendiente y disponibilidad referencial se muestran como
+  valores autoritativos del backend;
+- stock y disponibilidad permanecen de sólo lectura;
+- no se infieren promociones en el navegador: el contrato actual no expone metadatos públicos
+  suficientes para etiquetar una promoción vigente;
+- no se consultan `/catalogo/sillas/`, `/catalogo/pisos/` ni `/catalogo/descuentos/` desde el
+  flujo de vendedor, porque esos ViewSets son administrativos;
+- categoría y unidad se muestran mediante sus identificadores registrados hasta que exista un
+  contrato público de etiquetas.
 
 ## Imágenes
 
 `ProductImage` consume únicamente `Producto.imagen_principal`:
 
-- toma URLs exclusivamente de `variantes`;
-- ordena anchos y construye `srcset`;
-- configura `sizes` para grid y detalle responsive;
-- utiliza la variante menor como `src` y nunca solicita `original` normalmente;
-- reserva proporción con las dimensiones publicadas;
-- usa `loading="lazy"` en catálogo y carga prioritaria sólo en detalle;
-- fallback estable para ausencia, URL inválida o fallo de carga;
-- contraste validado en temas claro y oscuro.
-
-No existe SDK, credencial, bucket, key ni construcción de URL de Cloudflare R2/AWS en el bundle.
+- construye `srcset` con variantes WebP;
+- usa `sizes` responsive;
+- usa la variante menor como `src`;
+- no descarga el original como recurso normal del catálogo;
+- usa lazy loading donde corresponde;
+- mantiene fallback para ausencia, URL inválida y fallo de carga;
+- no expone SDK, credenciales, bucket ni claves R2.
 
 ## Autorización
 
-Las rutas `/clientes`, `/clientes/:id`, `/productos` y `/productos/:id` exigen
-`comercial.operar`. Las acciones de edición se muestran únicamente con
-`comercial.administrar`. El backend continúa validando cada operación y sus respuestas 401/403 se
-procesan en el cliente HTTP común.
+Las rutas de clientes y productos requieren `comercial.operar`.
 
-## Pruebas
+La UX sigue la autorización efectiva del backend:
 
-Cobertura añadida:
+- un vendedor puede consultar y editar los clientes dentro de su queryset autorizado;
+- la edición de producto requiere `comercial.administrar`;
+- los endpoints administrativos auxiliares del catálogo no se usan para construir la vista de un
+  vendedor;
+- 401/403 continúan procesándose mediante el cliente HTTP compartido.
 
-- búsqueda, filtro, paginación y estado vacío de clientes;
-- edición sin campos autoritativos de stock;
-- 403 y errores server-side por campo;
-- presentación y promoción sin recálculo;
-- imagen con variantes, `srcset`, ausencia de original y fallback roto;
-- rutas y navegación real;
-- clientes y productos a 360, 390, 768, 1024 y 1440 px;
-- ausencia de overflow global;
-- Axe sin fallos serios/críticos;
-- tema oscuro del catálogo;
-- regresiones completas FE01 y FE02.
+Los tests E2E modelan explícitamente un vendedor con sólo `comercial.operar` y responden 403 en
+los endpoints administrativos de sillas, pisos y descuentos; además verifican que la pantalla de
+productos no los llame.
 
-## Evidencia local
+## Accesibilidad y responsive
 
-- type-check: correcto;
-- lint Oxlint + ESLint: correcto;
-- formato: correcto;
+FE03 mantiene operación en 360, 390, 768, 1024 y 1440 px, sin overflow global y con Axe sin
+violaciones serious/critical en los escenarios cubiertos.
+
+También se corrigió el contraste del botón de reintento de `ErrorState` para que los estados de
+error sean utilizables en tema oscuro.
+
+## Pruebas y evidencia remota
+
+Commit funcional corregido y validado:
+
+`240e7580f0e6e2f368a39c3043659111162bed68`
+
+GitHub Actions:
+
+`36098476262` — **success**
+
+Resultado:
+
+- install: verde;
+- type-check: verde;
+- lint: verde;
+- format: verde;
 - unit/component/integration: `23 passed`;
-- contract drift: cero;
-- build productivo: correcto;
-- Playwright: `19 passed`;
-- auditoría completa: cero vulnerabilidades;
-- `git diff --check`: limpio.
+- contract drift: verde;
+- build: verde;
+- Playwright: `20 passed`;
+- dependency audit: cero vulnerabilidades reportadas.
 
-## Cierre remoto
+La suite incluye regresiones de FE01 y FE02 además de las pruebas propias de FE03.
 
-No se creó commit ni push automáticamente. FE03 queda lista localmente y se declarará cerrada
-formalmente cuando estos cambios se publiquen y los nueve jobs de GitHub Actions terminen verdes.
+## Decisiones de cierre
+
+FE03 no hardcodea catálogos estructurales ni reutiliza endpoints administrativos para suplir
+información que el contrato de vendedor no publica. Las altas o filtros que necesiten opciones
+estructurales con etiquetas quedan condicionados a un contrato backend explícito y descubrible.
+
+Con listados paginados reales, permisos alineados, imagen definitiva, contrato generado y CI
+remoto verde, FE03 queda lista para integración posterior a `main`.
