@@ -2,16 +2,15 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type {
-  Cliente,
   DetalleProforma,
   DetalleProformaWritable,
   Proforma,
   ValorCatalogoPublico,
 } from '@/generated/api'
-import { clientesService, nombreCliente } from '@/modules/clientes/services/clientesService'
 import { ApiError } from '@/shared/api'
 import { proformasService } from '../services/proformasService'
 import AdjuntosDetalle from '../components/AdjuntosDetalle.vue'
+import ClienteSelector from '../components/ClienteSelector.vue'
 import DetalleForm from '../components/DetalleForm.vue'
 import EspecificacionForm from '../components/EspecificacionForm.vue'
 import Button from '@/shared/ui/Button.vue'
@@ -45,8 +44,7 @@ const emit = defineEmits<{ openMenu: [] }>(),
   tipos = ref<ValorCatalogoPublico[]>([]),
   unidades = ref<ValorCatalogoPublico[]>([]),
   tiposMueble = ref<ValorCatalogoPublico[]>([]),
-  monedas = ref<ValorCatalogoPublico[]>([]),
-  clients = ref<Cliente[]>([])
+  monedas = ref<ValorCatalogoPublico[]>([])
 const header = reactive({
   cliente: '',
   moneda: '',
@@ -220,18 +218,16 @@ async function loadReferences() {
   referenceLoading.value = true
   referenceError.value = ''
   try {
-    const [a, b, c, d, e] = await Promise.all([
+    const [a, b, c, d] = await Promise.all([
       proformasService.options('TIPO_ITEM'),
       proformasService.options('UNIDAD_MEDIDA'),
       proformasService.options('TIPO_MUEBLE'),
       proformasService.options('MONEDA'),
-      clientesService.list({ activo: true, page_size: 20, page: 1 }),
     ])
     tipos.value = a
     unidades.value = b
     tiposMueble.value = c
     monedas.value = d
-    clients.value = e.results
   } catch (e) {
     referenceError.value =
       e instanceof Error ? e.message : 'No se pudieron cargar los datos auxiliares.'
@@ -302,15 +298,7 @@ onMounted(() => {
       </section>
       <Card v-if="editingHeader"
         ><form class="header-form" :aria-busy="processing" @submit.prevent="saveHeader">
-          <Select
-            v-model="header.cliente"
-            name="cliente-proforma"
-            label="Cliente"
-            :options="[
-              { label: 'Prospecto', value: '' },
-              ...clients.map((x) => ({ label: nombreCliente(x), value: String(x.id) })),
-            ]"
-          /><Select
+          <ClienteSelector v-model="header.cliente" label="Cliente" prospect-label="Prospecto" /><Select
             v-model="header.moneda"
             name="moneda-proforma"
             label="Moneda"
