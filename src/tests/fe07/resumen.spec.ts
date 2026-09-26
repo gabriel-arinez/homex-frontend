@@ -110,10 +110,7 @@ describe('FE07 resumen operativo', () => {
   })
   it('recupera un indicador fallido al actualizar y restaura el total completo', async () => {
     let failing = true
-    mock(
-      { BORRADOR: 2, ENVIADA: 3, APROBADA: 1 },
-      (state) => failing && state === 'ENVIADA',
-    )
+    mock({ BORRADOR: 2, ENVIADA: 3, APROBADA: 1 }, (state) => failing && state === 'ENVIADA')
     const w = await render()
     await flushPromises()
     expect(w.text()).toContain('1 indicador no pudo actualizarse')
