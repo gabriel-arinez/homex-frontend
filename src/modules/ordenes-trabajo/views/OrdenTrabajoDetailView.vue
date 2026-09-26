@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import type { OrdenTrabajo } from '@/generated/api'
 import { ordenesTrabajoService } from '../services/ordenesTrabajoService'
@@ -45,6 +45,15 @@ async function downloadDocument() {
   }
 }
 onMounted(load)
+
+const detailRows = computed(() =>
+  (item.value?.detalles ?? []).map((line) => ({
+    ...line,
+    unidadLabel: line.unidad_info.nombre,
+    modoLabel: String(line.modo_calculo).replace(/_/g, ' '),
+    totalLabel: `Bs ${Number(line.total).toFixed(2)}`,
+  })),
+)
 
 const columns = [
   { key: 'nombre', label: 'Ítem' },
@@ -115,11 +124,11 @@ const columns = [
       <section class="details">
         <h2>Detalle de trabajo</h2>
         <p>Estas líneas provienen de la proforma aprobada que originó el pedido.</p>
-        <DataTable caption="Detalle de la orden de trabajo" :columns="columns" :rows="item.detalles">
+        <DataTable caption="Detalle de la orden de trabajo" :columns="columns" :rows="detailRows">
           <template #cell-nombre="{ row }"><strong>{{ row.nombre }}</strong></template>
-          <template #cell-unidad="{ row }">{{ row.unidad_info.nombre }}</template>
-          <template #cell-modo="{ row }">{{ String(row.modo_calculo).replace(/_/g, ' ') }}</template>
-          <template #cell-total="{ row }">Bs {{ Number(row.total).toFixed(2) }}</template>
+          <template #cell-unidad="{ row }">{{ row.unidadLabel }}</template>
+          <template #cell-modo="{ row }">{{ row.modoLabel }}</template>
+          <template #cell-total="{ row }">{{ row.totalLabel }}</template>
         </DataTable>
       </section>
     </template>
