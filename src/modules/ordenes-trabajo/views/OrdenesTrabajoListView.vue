@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { OrdenTrabajo } from '@/generated/api'
 import { ordenesTrabajoService } from '../services/ordenesTrabajoService'
@@ -27,6 +27,13 @@ async function load() {
 }
 onMounted(load)
 
+const tableRows = computed(() =>
+  rows.value.map((item) => ({
+    ...item,
+    estadoLabel: item.estado_info.nombre,
+  })),
+)
+
 const columns = [
   { key: 'numero', label: 'Número' },
   { key: 'pedido', label: 'Pedido' },
@@ -53,12 +60,12 @@ const columns = [
       title="Sin órdenes"
       description="No hay órdenes de trabajo para mostrar."
     />
-    <DataTable v-else caption="Órdenes de trabajo" :columns="columns" :rows="rows">
+    <DataTable v-else caption="Órdenes de trabajo" :columns="columns" :rows="tableRows">
       <template #cell-numero="{ row }">OT #{{ row.numero }}</template>
       <template #cell-pedido="{ row }">
         <RouterLink :to="`/pedidos/${row.pedido}`">#{{ row.pedido }}</RouterLink>
       </template>
-      <template #cell-estado="{ row }">{{ row.estado_info.nombre }}</template>
+      <template #cell-estado="{ row }">{{ row.estadoLabel }}</template>
       <template #cell-acciones="{ row }">
         <RouterLink :to="`/ordenes-trabajo/${row.id}`">Ver detalle</RouterLink>
       </template>
