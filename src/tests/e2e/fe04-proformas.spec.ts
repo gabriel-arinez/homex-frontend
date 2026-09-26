@@ -437,9 +437,7 @@ test('FE04 representa acceso directo a proforma de otro vendedor como 404', asyn
   await expect(page.getByRole('alert')).toContainText('No encontrado')
 })
 
-test(
-  'FE04 refresca la autoridad tras 409 de edición y congela inmediatamente',
-  async ({ page }) => {
+test('FE04 refresca autoridad tras 409 y congela la edición', async ({ page }) => {
   const state = await mockBackend(page)
   await page.goto('/proformas/1')
   await expect(page.getByRole('button', { name: 'Editar cabecera' })).toBeEnabled()
@@ -458,13 +456,10 @@ test(
   await page.getByRole('button', { name: 'Guardar cambios' }).click()
   await expect(page.getByRole('alert')).toContainText('La proforma ya fue enviada')
   await expect(page.getByText(/modo lectura/)).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Editar cabecera' })).toHaveCount(0)
-  },
-)
+  await expect(page.getByRole('button', { name: 'Editar cabecera' })).toHaveCount(0)
+})
 
-test(
-  'FE04 mantiene visible la proforma si fallan catálogos y permite reintentar',
-  async ({ page }) => {
+test('FE04 conserva detalle si fallan catálogos y permite reintentar', async ({ page }) => {
   await mockBackend(page)
   let failed = false
   await page.route('**/api/v1/catalogo/opciones/**', (route) => {
@@ -485,13 +480,10 @@ test(
   await expect(page.getByRole('button', { name: 'Agregar línea' })).toBeDisabled()
   await page.getByRole('button', { name: 'Reintentar datos auxiliares' }).click()
   await expect(page.getByRole('button', { name: 'Reintentar datos auxiliares' })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: 'Agregar línea' })).toBeEnabled()
-  },
-)
+  await expect(page.getByRole('button', { name: 'Agregar línea' })).toBeEnabled()
+})
 
-test(
-  'FE04 permite seleccionar cliente y producto más allá de la primera página',
-  async ({ page }) => {
+test('FE04 selecciona cliente y producto fuera de la primera página', async ({ page }) => {
   const state = await mockBackend(page)
   const clientPageTwo = { ...client, id: 200, nombres: 'Beatriz', apellidos: 'Segunda página' }
   const productPageTwo = {
@@ -548,9 +540,8 @@ test(
   await page.getByRole('button', { name: 'Cargar más productos' }).click()
   await expect(page.locator('#producto-linea option[value="200"]')).toHaveCount(1)
   await page.locator('#producto-linea').selectOption('200')
-    await expect(page.getByLabel('Nombre comercial')).toHaveValue('Silla segunda página')
-  },
-)
+  await expect(page.getByLabel('Nombre comercial')).toHaveValue('Silla segunda página')
+})
 
 for (const width of [360, 390, 768, 1024, 1440])
   test(`@a11y FE04 proforma operable a ${width}px`, async ({ page }) => {
