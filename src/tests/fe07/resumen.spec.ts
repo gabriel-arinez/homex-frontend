@@ -5,18 +5,21 @@ import { http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, it } from 'vitest'
 import ResumenView from '@/modules/resumen/views/ResumenView.vue'
 import { resumenService } from '@/modules/resumen/services/resumenService'
+import { useSessionStore } from '@/app/stores/useSessionStore'
+import type { Capability } from '@/modules/auth/types/session'
 import { server } from '@/tests/msw/server'
 const states = [
   { id: 1, codigo: 'BORRADOR', nombre: 'Borrador', concepto_codigo: 'ESTADO_PROFORMA' },
   { id: 2, codigo: 'ENVIADA', nombre: 'Enviada', concepto_codigo: 'ESTADO_PROFORMA' },
   { id: 3, codigo: 'APROBADA', nombre: 'Aprobada', concepto_codigo: 'ESTADO_PROFORMA' },
 ]
-function mock(counts: Record<string, number>, failure?: string) {
+function mock(counts: Record<string, number>, failure?: string | ((state: string) => boolean)) {
   server.use(
     http.get('http://localhost:8000/api/v1/catalogo/opciones/', () => HttpResponse.json(states)),
     http.get('http://localhost:8000/api/v1/proformas/', ({ request }) => {
       const state = new URL(request.url).searchParams.get('estado') ?? ''
-      if (state === failure)
+      const shouldFail = typeof failure === 'function' ? failure(state) : state === failure
+      if (shouldFail)
         return HttpResponse.json(
           { detail: 'Métrica temporalmente no disponible.' },
           { status: 503 },
@@ -30,7 +33,11 @@ function mock(counts: Record<string, number>, failure?: string) {
     }),
   )
 }
-async function render() {
+async function render(capabilities: Capability[] = ['comercial.operar']) {
+  const pinia = createPinia()
+  setActivePinia(pinia)
+  const session = useSessionStore()
+  session.capabilities = capabilities
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -40,7 +47,7 @@ async function render() {
   })
   await router.push('/resumen')
   await router.isReady()
-  return mount(ResumenView, { global: { plugins: [createPinia(), router] } })
+  return mount(ResumenView, { global: { plugins: [pinia, router] } })
 }
 beforeEach(() => setActivePinia(createPinia()))
 describe('FE07 resumen operativo', () => {
@@ -73,6 +80,8 @@ describe('FE07 resumen operativo', () => {
     expect(w.text()).toContain('1 indicador no pudo actualizarse')
     expect(w.text()).toContain('No disponible')
     expect(w.text()).toContain('Borradores2')
+    expect(w.find('table').text()).toContain('Subtotal disponible3')
+    expect(w.find('table').text()).not.toContain('Total consultado3')
   })
   it('representa estado vacío real con conteos cero', async () => {
     mock({})
@@ -80,16 +89,40 @@ describe('FE07 resumen operativo', () => {
     await flushPromises()
     expect(w.text()).toContain('Total consultado0')
     expect(w.text()).not.toContain('Sin métricas disponibles')
+    expect(w.findAll('.bar-row i')).toHaveLength(3)
+    for (const bar of w.findAll('.bar-row i')) expect(bar.attributes('style')).toContain('width: 0%')
   })
-  it('expone enlaces operativos sin métricas inventadas', async () => {
+  it('adapta accesos a capacidades sin métricas inventadas', async () => {
     mock({})
-    const w = await render()
+    const seller = await render()
     await flushPromises()
-    expect(w.findAll('nav a').map((x) => x.text())).toEqual([
+    expect(seller.findAll('nav a').map((x) => x.text())).toEqual([
       'Revisar proformas',
       'Consultar pedidos',
       'Nueva captura asistida',
     ])
-    expect(w.text()).not.toMatch(/99\.9|eficiencia|stock valorizado/i)
+    expect(seller.text()).not.toMatch(/99\.9|eficiencia|stock valorizado/i)
+
+    const admin = await render(['comercial.operar', 'comercial.administrar'])
+    await flushPromises()
+    expect(admin.findAll('nav a').map((x) => x.text())).toContain('Administrar catálogo')
+  })
+  it('recupera un indicador fallido al actualizar y restaura el total completo', async () => {
+    let failing = true
+    mock(
+      { BORRADOR: 2, ENVIADA: 3, APROBADA: 1 },
+      (state) => failing && state === 'ENVIADA',
+    )
+    const w = await render()
+    await flushPromises()
+    expect(w.text()).toContain('1 indicador no pudo actualizarse')
+    expect(w.find('table').text()).toContain('Subtotal disponible3')
+
+    failing = false
+    await w.find('button').trigger('click')
+    await flushPromises()
+
+    expect(w.find('[role="status"]').exists()).toBe(false)
+    expect(w.find('table').text()).toContain('Total consultado6')
   })
 })

@@ -11,7 +11,7 @@ async function mock(
   {
     capabilities = ['comercial.operar'],
     counts = { BORRADOR: 2, ENVIADA: 3, APROBADA: 1 } as Record<string, number>,
-    failure = '',
+    failure = '' as string | ((state: string) => boolean),
   } = {},
 ) {
   await page.addInitScript(
@@ -28,7 +28,8 @@ async function mock(
   await page.route('**/api/v1/catalogo/opciones/**', (r) => r.fulfill({ json: states }))
   await page.route(/\/api\/v1\/proformas\/(?:\?.*)?$/, (r) => {
     const state = new URL(r.request().url()).searchParams.get('estado') ?? ''
-    return state === failure
+    const shouldFail = typeof failure === 'function' ? failure(state) : state === failure
+    return shouldFail
       ? r.fulfill({ status: 503, json: { detail: 'Métrica temporalmente no disponible.' } })
       : r.fulfill({ json: { count: counts[state] ?? 0, next: null, previous: null, results: [] } })
   })
@@ -42,21 +43,26 @@ test('FE07 muestra distribución y fallback textual con datos del servidor', asy
   ).toContainText('Total consultado6')
   await expect(page.getByText(/99.9|stock valorizado|eficiencia/i)).toHaveCount(0)
 })
-test('FE07 conserva datos parciales y permite actualizar', async ({ page }) => {
-  await mock(page, { failure: 'ENVIADA' })
+test('FE07 conserva datos parciales y recupera el total al actualizar', async ({ page }) => {
+  let failing = true
+  await mock(page, { failure: (state) => failing && state === 'ENVIADA' })
   await page.goto('/resumen')
   await expect(page.getByRole('status')).toContainText('1 indicador no pudo actualizarse')
   await expect(page.getByText('No disponible')).toBeVisible()
-  await expect(page.getByText('2', { exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('table')).toContainText('Subtotal disponible3')
+
+  failing = false
   await page.getByRole('button', { name: 'Actualizar' }).click()
-  await expect(
-    page.getByRole('heading', { name: 'Distribución actual de proformas' }),
-  ).toBeVisible()
+
+  await expect(page.getByRole('status')).toHaveCount(0)
+  await expect(page.getByRole('table')).toContainText('Total consultado6')
 })
 test('FE07 representa cero sin fabricar actividad', async ({ page }) => {
   await mock(page, { counts: {} })
   await page.goto('/resumen')
   await expect(page.getByRole('table')).toContainText('Total consultado0')
+  await expect(page.locator('.bar-row i')).toHaveCount(3)
+  for (const bar of await page.locator('.bar-row i').all()) await expect(bar).toHaveCSS('width', '0px')
   await expect(page.getByText('Revisar proformas')).toBeVisible()
 })
 test('FE07 usa el mismo contrato para vendedor y administrador', async ({ page }) => {
@@ -64,6 +70,7 @@ test('FE07 usa el mismo contrato para vendedor y administrador', async ({ page }
   await page.goto('/resumen')
   await expect(page.getByRole('heading', { name: 'Resumen' })).toBeVisible()
   await expect(page.getByText('Vista operativa de María HOMEX.')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Administrar catálogo' })).toBeVisible()
 })
 test('@a11y FE07 funciona en tema oscuro y mantiene valores sin hover', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('homex.theme', 'dark'))

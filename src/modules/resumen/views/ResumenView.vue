@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { FileText, ClipboardList, AudioLines, RefreshCw } from '@lucide/vue'
+import { FileText, ClipboardList, AudioLines, PackageOpen, RefreshCw } from '@lucide/vue'
 import type { ConteoEstado } from '../services/resumenService'
 import { resumenService } from '../services/resumenService'
 import PageHeader from '@/shared/ui/PageHeader.vue'
@@ -24,11 +24,16 @@ const value = (code: string) => {
   failed = computed(() => rows.value.filter((x) => x.error)),
   available = computed(() => rows.value.filter((x) => x.conteo !== null)),
   total = computed(() => available.value.reduce((sum, x) => sum + (x.conteo ?? 0), 0)),
+  totalLabel = computed(() => (failed.value.length ? 'Subtotal disponible' : 'Total consultado')),
+  isAdmin = computed(() => session.can('comercial.administrar')),
   max = computed(() => Math.max(1, ...available.value.map((x) => x.conteo ?? 0))),
   bars = computed(() =>
     rows.value.map((x) => ({
       ...x,
-      width: x.conteo === null ? 0 : Math.max(2, Math.round((x.conteo / max.value) * 100)),
+      width:
+        x.conteo === null || x.conteo === 0
+          ? 0
+          : Math.max(2, Math.round((x.conteo / max.value) * 100)),
     })),
   )
 async function load() {
@@ -115,7 +120,7 @@ onMounted(load)
                   <td>{{ row.conteo ?? 'No disponible' }}</td>
                 </tr>
                 <tr>
-                  <th scope="row">Total consultado</th>
+                  <th scope="row">{{ totalLabel }}</th>
                   <td>{{ total }}</td>
                 </tr>
               </tbody>
@@ -126,7 +131,10 @@ onMounted(load)
           <nav aria-label="Accesos desde el resumen">
             <RouterLink to="/proformas"><FileText />Revisar proformas</RouterLink
             ><RouterLink to="/pedidos"><ClipboardList />Consultar pedidos</RouterLink
-            ><RouterLink to="/capturas"><AudioLines />Nueva captura asistida</RouterLink>
+            ><RouterLink to="/capturas"><AudioLines />Nueva captura asistida</RouterLink
+            ><RouterLink v-if="isAdmin" to="/productos"
+              ><PackageOpen />Administrar catálogo</RouterLink
+            >
           </nav>
           <p class="description">
             Los módulos y datos visibles respetan las capacidades y el alcance que aplica el backend
