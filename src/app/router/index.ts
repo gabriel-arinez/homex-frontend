@@ -119,6 +119,24 @@ const router = createRouter({
           meta: { capability: 'comercial.operar' },
         },
         {
+          path: 'capturas',
+          name: 'capturas',
+          component: () => import('@/modules/capturas/views/CapturasHomeView.vue'),
+          meta: { capability: 'comercial.operar' },
+        },
+        {
+          path: 'capturas/nueva',
+          name: 'captura-create',
+          component: () => import('@/modules/capturas/views/CapturaCreateView.vue'),
+          meta: { capability: 'comercial.operar' },
+        },
+        {
+          path: 'capturas/:id',
+          name: 'captura-detail',
+          component: () => import('@/modules/capturas/views/CapturaDetailView.vue'),
+          meta: { capability: 'comercial.operar' },
+        },
+        {
           path: 'forbidden',
           name: 'forbidden',
           component: () => import('@/modules/errors/views/ForbiddenView.vue'),
