@@ -1,77 +1,171 @@
-# FE05 — Pedidos, órdenes de trabajo, recibos y notas
+# FE05 — Pedidos, órdenes de trabajo, stock, recibos, notas y documentos
 
 ## Estado
 
-**Implementación local completada para el contrato backend publicado.**
+**Implementación funcional completada / validación remota final en curso.**
 
 Rama: `refactor/fe05-operaciones`.
 
-Punto de partida: `main` en `9374c2f73b5496dc79fd70dbb250ac4f645f8ec5`.
+Punto de partida: `main` en
+`9374c2f73b5496dc79fd70dbb250ac4f645f8ec5`.
 
-Contrato backend fijado: `9fac22ecc4f471237e6611b5a226532ab2a037ab`.
+Contrato backend FE05 fijado en:
+
+`7f1d06abc768e272e1f9f630619bff105b7bb75e`
+
+Rama backend correspondiente:
+
+`feat/fe05-contrato-operaciones`.
 
 ## Implementación
 
-- listado y detalle de pedidos;
-- nombres comerciales de estados resueltos desde `ESTADO_PEDIDO`;
-- cambio de estado enviado como código y validado por backend;
-- cancelación explícita con confirmación y recarga de autoridad;
-- conservación del mensaje comercial después de errores 400/409;
-- emisión de recibo desde pedido `CONFIRMADO`;
-- medios de pago obtenidos desde `TIPO_PAGO`;
-- campos de cheque visibles sólo para el medio correspondiente;
-- decimales enviados como cadenas, sin recalcular saldo en Vue;
-- emisión de nota exclusivamente cuando el estado conocido es `LISTO_ENTREGA`;
-- listados y detalles de órdenes de trabajo, recibos y notas de entrega;
-- anulación `EMITIDO → ANULADO`, sin edición ni DELETE;
-- navegación y rutas protegidas por `comercial.operar`;
-- responsive, teclado y accesibilidad en 360, 390, 768, 1024 y 1440 px;
-- ningún porcentaje de progreso inventado.
+### Pedidos
 
-## Límites contractuales verificados
+- listado y detalle;
+- estados obtenidos desde `ESTADO_PEDIDO`;
+- transición enviada por código semántico;
+- cancelación explícita con confirmación;
+- conservación de errores comerciales `400/409` después de refrescar la autoridad;
+- emisión contextual de recibo;
+- emisión contextual de nota de entrega;
+- ningún cálculo de stock, saldo o transición realizado en Vue.
 
-El OpenAPI fijado no publica endpoints de movimientos de stock ni recursos de visualización/descarga para proforma, OT, recibo o nota. Tampoco publica líneas dentro de `OrdenTrabajo`. FE05 no crea rutas, botones, DTO ni llamadas ficticias para esas capacidades. Se incorporarán cuando `homex-backend` las publique y el snapshot contractual sea aprobado.
+### Órdenes de trabajo
 
-Las listas FE05 vigentes son arrays sin parámetros de búsqueda, filtros ni paginación. El frontend no simula paginación de servidor. El filtro visual de pedido trabaja únicamente sobre la colección autorizada que entrega el endpoint actual.
+- listado y detalle;
+- estado y estado de saldo leídos directamente de
+  `estado_info` / `estado_saldo_info`;
+- líneas reales de la proforma aprobada incluidas en el detalle;
+- sin porcentajes de avance inventados;
+- descarga del documento generado por backend.
 
-## Reglas comerciales preservadas
+### Movimientos de stock
 
-- Vue no calcula stock, saldo, acumulado, transición válida ni reversa;
-- cancelar puede ser rechazado cuando existe un recibo `EMITIDO`;
-- un recibo erróneo se anula y conserva evidencia;
-- no existe DELETE de recibos;
-- la nota no se crea al aprobar la proforma;
-- una nota corresponde al pedido completo;
-- el backend continúa como autoridad ante concurrencia y conflictos.
+Ruta:
 
-## Matriz Nielsen
+`/movimientos-stock`
 
-| Heurística | Aplicación                                                        | Evidencia            |
-| ---------- | ----------------------------------------------------------------- | -------------------- |
-| H1         | loading, processing, éxito y error visibles                       | Unit + E2E           |
-| H2         | estados y pagos con nombres de catálogo                           | MSW + E2E            |
-| H3         | confirmación de cancelación, anulación y nota                     | Componentes + E2E    |
-| H4         | patrones compartidos de tablas, cards y diálogos                  | Snapshot + regresión |
-| H5         | acciones contextuales por estado conocido y doble envío bloqueado | Unit                 |
-| H6         | pedido, proforma, saldo y estado permanecen visibles              | E2E                  |
-| H7         | navegación directa entre documentos relacionados                  | E2E                  |
-| H8         | sin porcentajes, documentos ni acciones inexistentes              | Unit + E2E           |
-| H9         | 400/409 explican el bloqueo y recargan autoridad                  | Unit                 |
-| H10        | textos breves explican cancelación, anulación y nota              | Revisión versionada  |
+Consume exclusivamente:
 
-## Validación local
+`GET /api/v1/movimientos-stock/`
 
-- TypeScript: verde;
-- Oxlint + ESLint: verde;
-- Prettier: verde;
-- unit/component/integration: **47 passed**;
-- Playwright: **51 escenarios**;
-- gate a11y: **17 escenarios**;
-- build: verde;
-- contract drift: verde;
-- auditoría de dependencias: sin vulnerabilidades reportadas;
-- `git diff --check`: limpio.
+Incluye:
 
-## Evidencia remota
+- búsqueda por SKU, producto u observación;
+- filtro por tipo de movimiento;
+- filtro por pedido;
+- filtro por producto;
+- rango de fechas;
+- paginación del servidor;
+- nombre semántico del tipo de movimiento;
+- producto y SKU;
+- cantidad positiva/negativa según el movimiento real.
 
-Commit final y GitHub Actions quedan pendientes de publicación; el usuario administra commits y push.
+El frontend no publica operaciones de alta, modificación o eliminación de
+movimientos. `VENTA`, `REVERSA_VENTA`, `CARGA_INICIAL` y demás efectos
+siguen bajo autoridad del backend/PostgreSQL.
+
+### Recibos
+
+- listado y detalle;
+- medios de pago desde `TIPO_PAGO`;
+- emisión desde pedido `CONFIRMADO`;
+- campos de cheque sólo cuando corresponde;
+- importes enviados como cadenas decimales;
+- anulación `EMITIDO → ANULADO`;
+- sin DELETE ni edición de evidencia;
+- descarga del documento real.
+
+### Notas de entrega
+
+- listado y detalle;
+- emisión sólo desde pedido `LISTO_ENTREGA`;
+- una nota representa el pedido completo;
+- descarga del documento real.
+
+### Documentos
+
+El frontend consume los cuatro endpoints publicados:
+
+- `GET /api/v1/proformas/{id}/documento/`;
+- `GET /api/v1/ordenes-trabajo/{id}/documento/`;
+- `GET /api/v1/recibos/{id}/documento/`;
+- `GET /api/v1/notas-entrega/{id}/documento/`.
+
+Las respuestas se descargan como `Blob`; Vue no reconstruye ni falsifica el
+contenido documental.
+
+## Contrato y autoridad
+
+FE05 utiliza el snapshot de OpenAPI versionado en:
+
+- `contracts/backend-openapi.yaml`;
+- `contracts/backend-ref.txt`.
+
+Los DTO TypeScript de `src/generated/api/` fueron regenerados desde ese
+contrato.
+
+Reglas preservadas:
+
+- backend/PostgreSQL es autoridad de stock;
+- backend valida transiciones de pedido;
+- backend calcula acumulado y saldo;
+- backend controla sobrepago;
+- backend genera reversas;
+- backend controla unicidad y momento de emisión de nota;
+- frontend no simula estados, movimientos, porcentajes ni documentos.
+
+## Permisos
+
+Todas las rutas FE05 se protegen con:
+
+`comercial.operar`
+
+Esto sólo controla navegación/UX. La autorización definitiva permanece en los
+querysets, permisos y servicios del backend.
+
+## Responsive y accesibilidad
+
+Cobertura objetivo y verificada por la suite FE05:
+
+- 360 px;
+- 390 px;
+- 768 px;
+- 1024 px;
+- 1440 px.
+
+Se reutilizan los componentes accesibles del design system y el gate Axe.
+
+## Regresión específica
+
+La cobertura FE05 comprueba, entre otros puntos:
+
+- código semántico al cambiar estado;
+- conflicto de cancelación con recibo emitido;
+- refresco de autoridad después de error;
+- nota sólo en `LISTO_ENTREGA`;
+- anulación de recibo sin DELETE;
+- importes decimales sin cálculo local;
+- movimientos de stock sólo lectura;
+- filtros reales del endpoint de movimientos;
+- OT con líneas persistidas;
+- descarga de documento de OT;
+- navegación de los módulos operativos;
+- ausencia de porcentajes inventados.
+
+## Validación
+
+Los resultados definitivos se registran únicamente después de que el HEAD final
+de la rama complete todos los jobs de GitHub Actions:
+
+- lint;
+- format;
+- type-check;
+- build;
+- unit/component/integration;
+- E2E;
+- a11y;
+- contract-drift;
+- dependency-audit.
+
+No se considera FE05 cerrada con un gate remoto rojo.
