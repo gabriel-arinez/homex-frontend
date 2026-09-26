@@ -298,7 +298,11 @@ onMounted(() => {
       </section>
       <Card v-if="editingHeader"
         ><form class="header-form" :aria-busy="processing" @submit.prevent="saveHeader">
-          <ClienteSelector v-model="header.cliente" label="Cliente" prospect-label="Prospecto" /><Select
+          <ClienteSelector
+            v-model="header.cliente"
+            label="Cliente"
+            prospect-label="Prospecto"
+          /><Select
             v-model="header.moneda"
             name="moneda-proforma"
             label="Moneda"
