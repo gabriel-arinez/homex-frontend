@@ -25,6 +25,7 @@ const emit = defineEmits<{ openMenu: [] }>(),
   page = ref(1),
   total = ref(0),
   size = 10
+let requestId = 0
 const pages = computed(() => Math.max(1, Math.ceil(total.value / size)))
 const displayRows = computed(() =>
     rows.value.map((row) => ({
@@ -48,6 +49,7 @@ const displayRows = computed(() =>
 const money = (v: string, c: string) =>
   new Intl.NumberFormat('es-BO', { style: 'currency', currency: c }).format(Number(v))
 async function load() {
+  const currentRequest = ++requestId
   loading.value = true
   error.value = ''
   try {
@@ -57,12 +59,14 @@ async function load() {
       page: page.value,
       page_size: size,
     })
+    if (currentRequest !== requestId) return
     rows.value = r.results
     total.value = r.count
   } catch (e) {
+    if (currentRequest !== requestId) return
     error.value = e instanceof Error ? e.message : 'No se pudieron cargar las proformas.'
   } finally {
-    loading.value = false
+    if (currentRequest === requestId) loading.value = false
   }
 }
 function remove(k: string) {
