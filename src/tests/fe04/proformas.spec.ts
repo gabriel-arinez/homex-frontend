@@ -283,7 +283,6 @@ describe('FE04 proformas manuales', () => {
     server.use(
       http.patch('http://localhost:8000/api/v1/proformas/1/', () => {
         current.estado_info = { id: 3, codigo: 'ENVIADA', nombre: 'Enviada' }
-        current.estado = 3
         return HttpResponse.json({ detail: 'La proforma ya fue enviada.' }, { status: 409 })
       }),
     )
@@ -413,12 +412,19 @@ describe('FE04 proformas manuales', () => {
         if (!search)
           return HttpResponse.json({ count: 0, next: null, previous: null, results: [] })
         const current = quote()
-        current.titulo = search === 'lenta' ? 'Respuesta lenta' : 'Respuesta rápida'
         return HttpResponse.json({
           count: 1,
           next: null,
           previous: null,
-          results: [current],
+          results: [
+            {
+              ...current,
+              cliente_resumen: {
+                ...current.cliente_resumen,
+                nombre: search === 'lenta' ? 'Respuesta lenta' : 'Respuesta rápida',
+              },
+            },
+          ],
         })
       }),
     )
