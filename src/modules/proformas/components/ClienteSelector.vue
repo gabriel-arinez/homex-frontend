@@ -98,11 +98,7 @@ onMounted(() => {
 <template>
   <div class="remote-select">
     <div class="search-row">
-      <SearchField
-        v-model="search"
-        label="Buscar cliente"
-        @keydown.enter.prevent="load(true)"
-      />
+      <SearchField v-model="search" label="Buscar cliente" @keydown.enter.prevent="load(true)" />
       <Button type="button" variant="secondary" :processing="loading" @click="load(true)">
         Buscar
       </Button>
