@@ -2,7 +2,7 @@
 
 ## Estado
 
-**Implementación funcional completada / validación remota final en curso.**
+**Implementación funcional completada y validada remotamente.**
 
 Rama: `refactor/fe05-operaciones`.
 
@@ -153,19 +153,50 @@ La cobertura FE05 comprueba, entre otros puntos:
 - navegación de los módulos operativos;
 - ausencia de porcentajes inventados.
 
-## Validación
+## Validación final
 
-Los resultados definitivos se registran únicamente después de que el HEAD final
-de la rama complete todos los jobs de GitHub Actions:
+### Backend
 
-- lint;
-- format;
-- type-check;
-- build;
-- unit/component/integration;
-- E2E;
-- a11y;
-- contract-drift;
-- dependency-audit.
+Contrato FE05:
 
-No se considera FE05 cerrada con un gate remoto rojo.
+`7f1d06abc768e272e1f9f630619bff105b7bb75e`
+
+GitHub Actions:
+
+`36223737823`
+
+Resultado:
+
+- **9/9 jobs verdes**;
+- suite PostgreSQL: **175 passed**;
+- concurrencia PostgreSQL: **12 passed**;
+- migraciones: verde;
+- privilegios runtime: verde;
+- OpenAPI drift: verde;
+- integración real F08: verde.
+
+### Frontend
+
+HEAD funcional validado:
+
+`b43175b39ce229e20ba010c8c03aca663f41708d`
+
+GitHub Actions:
+
+`36224898192`
+
+Resultado:
+
+- **10/10 jobs verdes**;
+- unit/component/integration: **47 passed**;
+- E2E Playwright: **52 passed**;
+- accesibilidad: **17 passed**;
+- lint: verde;
+- format: verde;
+- type-check: verde;
+- build: verde;
+- contract-drift: verde;
+- dependency audit: **0 vulnerabilidades**.
+
+FE05 queda cerrada respecto al contrato backend publicado: movimientos de
+stock, líneas de OT y documentos comerciales ya no son límites pendientes.
