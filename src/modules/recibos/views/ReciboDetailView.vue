@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import type { Recibo, ValorCatalogoPublico } from '@/generated/api'
 import { recibosService } from '../services/recibosService'
+import { downloadBlob } from '@/shared/download/downloadBlob'
 import PageHeader from '@/shared/ui/PageHeader.vue'
 import Card from '@/shared/ui/Card.vue'
 import Button from '@/shared/ui/Button.vue'
@@ -15,6 +16,7 @@ const emit = defineEmits<{ openMenu: [] }>(),
   types = ref<ValorCatalogoPublico[]>([]),
   loading = ref(true),
   processing = ref(false),
+  downloading = ref(false),
   error = ref(''),
   confirm = ref(false),
   notice = ref(''),
@@ -31,6 +33,18 @@ async function load() {
     error.value = e instanceof Error ? e.message : 'No se pudo cargar el recibo.'
   } finally {
     loading.value = false
+  }
+}
+async function downloadDocument() {
+  if (!item.value || downloading.value) return
+  downloading.value = true
+  error.value = ''
+  try {
+    downloadBlob(await recibosService.document(id), `recibo-${item.value.numero}.html`)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'No se pudo descargar el recibo.'
+  } finally {
+    downloading.value = false
   }
 }
 async function annul() {
@@ -54,7 +68,12 @@ onMounted(load)
       description="Evidencia inmutable del cobro."
       show-menu
       @menu="emit('openMenu')"
-      ><template #actions><RouterLink to="/recibos">Volver</RouterLink></template></PageHeader
+      ><template #actions
+        ><RouterLink to="/recibos">Volver</RouterLink
+        ><Button v-if="item" variant="secondary" :processing="downloading" @click="downloadDocument"
+          >Descargar</Button
+        ></template
+      ></PageHeader
     ><LoadingSkeleton v-if="loading" :lines="7" /><ErrorState
       v-else-if="error && !item"
       :description="error"
