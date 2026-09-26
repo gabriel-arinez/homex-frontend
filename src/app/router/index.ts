@@ -35,6 +35,24 @@ const router = createRouter({
           meta: { capability: 'comercial.operar' },
         },
         {
+          path: 'proformas',
+          name: 'proformas',
+          component: () => import('@/modules/proformas/views/ProformasListView.vue'),
+          meta: { capability: 'comercial.operar' },
+        },
+        {
+          path: 'proformas/nueva',
+          name: 'proforma-create',
+          component: () => import('@/modules/proformas/views/ProformaCreateView.vue'),
+          meta: { capability: 'comercial.operar' },
+        },
+        {
+          path: 'proformas/:id',
+          name: 'proforma-detail',
+          component: () => import('@/modules/proformas/views/ProformaDetailView.vue'),
+          meta: { capability: 'comercial.operar' },
+        },
+        {
           path: 'productos',
           name: 'productos',
           component: () => import('@/modules/productos/views/ProductosListView.vue'),

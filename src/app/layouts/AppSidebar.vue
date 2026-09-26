@@ -5,6 +5,7 @@ import { RouterLink } from 'vue-router'
 import {
   ChevronLeft,
   ChevronRight,
+  FileText,
   LayoutDashboard,
   Moon,
   PackageOpen,
@@ -46,6 +47,7 @@ const groups: Array<{
     label: 'Comercial',
     items: [
       { label: 'Clientes', to: '/clientes', icon: Users, capability: 'comercial.operar' },
+      { label: 'Proformas', to: '/proformas', icon: FileText, capability: 'comercial.operar' },
       { label: 'Productos', to: '/productos', icon: PackageOpen, capability: 'comercial.operar' },
     ],
   },
