@@ -399,41 +399,41 @@ describe('FE04 proformas manuales', () => {
     expect(products.find('option[value="200"]').exists()).toBe(true)
   })
   it('ignora respuestas obsoletas del listado', async () => {
-      server.use(
-        http.get('http://localhost:8000/api/v1/catalogo/opciones/', () =>
-          HttpResponse.json(options.ESTADO_PROFORMA),
-        ),
-        http.get('http://localhost:8000/api/v1/proformas/', async ({ request }) => {
-          const search = new URL(request.url).searchParams.get('search')
-          if (search === 'lenta') await new Promise((resolve) => setTimeout(resolve, 50))
-          if (!search)
-            return HttpResponse.json({ count: 0, next: null, previous: null, results: [] })
-          const current = quote()
-          return HttpResponse.json({
-            count: 1,
-            next: null,
-            previous: null,
-            results: [
-              {
-                ...current,
-                cliente_resumen: {
-                  ...current.cliente_resumen,
-                  nombre: search === 'lenta' ? 'Respuesta lenta' : 'Respuesta rápida',
-                },
+    server.use(
+      http.get('http://localhost:8000/api/v1/catalogo/opciones/', () =>
+        HttpResponse.json(options.ESTADO_PROFORMA),
+      ),
+      http.get('http://localhost:8000/api/v1/proformas/', async ({ request }) => {
+        const search = new URL(request.url).searchParams.get('search')
+        if (search === 'lenta') await new Promise((resolve) => setTimeout(resolve, 50))
+        if (!search)
+          return HttpResponse.json({ count: 0, next: null, previous: null, results: [] })
+        const current = quote()
+        return HttpResponse.json({
+          count: 1,
+          next: null,
+          previous: null,
+          results: [
+            {
+              ...current,
+              cliente_resumen: {
+                ...current.cliente_resumen,
+                nombre: search === 'lenta' ? 'Respuesta lenta' : 'Respuesta rápida',
               },
-            ],
-          })
-        }),
-      )
-      const r = await router('/proformas')
-      const wrapper = mount(ProformasListView, { global: { plugins: [createPinia(), r] } })
-      await flushPromises()
-      const search = wrapper.get('input[type=search]')
-      await search.setValue('lenta')
-      await search.setValue('rápida')
-      await new Promise((resolve) => setTimeout(resolve, 80))
-      await flushPromises()
-      expect(wrapper.text()).toContain('Respuesta rápida')
+            },
+          ],
+        })
+      }),
+    )
+    const r = await router('/proformas')
+    const wrapper = mount(ProformasListView, { global: { plugins: [createPinia(), r] } })
+    await flushPromises()
+    const search = wrapper.get('input[type=search]')
+    await search.setValue('lenta')
+    await search.setValue('rápida')
+    await new Promise((resolve) => setTimeout(resolve, 80))
+    await flushPromises()
+    expect(wrapper.text()).toContain('Respuesta rápida')
     expect(wrapper.text()).not.toContain('Respuesta lenta')
   })
 })
