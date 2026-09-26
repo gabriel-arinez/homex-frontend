@@ -6,4 +6,6 @@ export const recibosService = {
   annul: (id: number) => apiRequest<Recibo>(`/api/v1/recibos/${id}/anular/`, { method: 'POST' }),
   paymentTypes: () =>
     apiRequest<ValorCatalogoPublico[]>('/api/v1/catalogo/opciones/?concepto=TIPO_PAGO'),
+  document: (id: number) =>
+    apiRequest<Blob>(`/api/v1/recibos/${id}/documento/`, { responseType: 'blob' }),
 }
