@@ -30,10 +30,7 @@ async function downloadDocument() {
   downloading.value = true
   error.value = ''
   try {
-    downloadBlob(
-      await notasEntregaService.document(id),
-      `nota-entrega-${item.value.numero}.html`,
-    )
+    downloadBlob(await notasEntregaService.document(id), `nota-entrega-${item.value.numero}.html`)
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'No se pudo descargar la nota.'
   } finally {

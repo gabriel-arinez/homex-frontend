@@ -15,7 +15,12 @@ const states = [
 const payment = [{ id: 7, codigo: 'EFECTIVO', nombre: 'Efectivo', concepto_codigo: 'TIPO_PAGO' }]
 const movementTypes = [
   { id: 12, codigo: 'VENTA', nombre: 'Venta', concepto_codigo: 'TIPO_MOVIMIENTO' },
-  { id: 13, codigo: 'REVERSA_VENTA', nombre: 'Reversa de venta', concepto_codigo: 'TIPO_MOVIMIENTO' },
+  {
+    id: 13,
+    codigo: 'REVERSA_VENTA',
+    nombre: 'Reversa de venta',
+    concepto_codigo: 'TIPO_MOVIMIENTO',
+  },
 ]
 const pedido = {
   id: 9,

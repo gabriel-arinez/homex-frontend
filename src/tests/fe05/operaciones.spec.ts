@@ -184,10 +184,12 @@ describe('FE05 operaciones', () => {
           ],
         })
       }),
-      http.get('http://localhost:8000/api/v1/recibos/5/documento/', () =>
-        new HttpResponse('<html>Recibo 18</html>', {
-          headers: { 'Content-Type': 'text/html; charset=utf-8' },
-        }),
+      http.get(
+        'http://localhost:8000/api/v1/recibos/5/documento/',
+        () =>
+          new HttpResponse('<html>Recibo 18</html>', {
+            headers: { 'Content-Type': 'text/html; charset=utf-8' },
+          }),
       ),
     )
 

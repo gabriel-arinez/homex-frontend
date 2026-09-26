@@ -264,7 +264,11 @@ onMounted(() => {
       @menu="emit('openMenu')"
       ><template #actions
         ><Button variant="secondary" @click="router.push('/proformas')">Volver</Button
-        ><Button v-if="quote" variant="secondary" :processing="downloading" @click="downloadDocument"
+        ><Button
+          v-if="quote"
+          variant="secondary"
+          :processing="downloading"
+          @click="downloadDocument"
           >Descargar</Button
         ><Button
           v-if="quote && editable && !editingHeader"

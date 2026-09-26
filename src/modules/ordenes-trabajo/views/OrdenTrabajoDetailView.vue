@@ -89,7 +89,9 @@ const columns = [
         <dl>
           <div>
             <dt>Pedido</dt>
-            <dd><RouterLink :to="`/pedidos/${item.pedido}`">#{{ item.pedido }}</RouterLink></dd>
+            <dd>
+              <RouterLink :to="`/pedidos/${item.pedido}`">#{{ item.pedido }}</RouterLink>
+            </dd>
           </div>
           <div>
             <dt>Proforma</dt>
@@ -125,7 +127,9 @@ const columns = [
         <h2>Detalle de trabajo</h2>
         <p>Estas líneas provienen de la proforma aprobada que originó el pedido.</p>
         <DataTable caption="Detalle de la orden de trabajo" :columns="columns" :rows="detailRows">
-          <template #cell-nombre="{ row }"><strong>{{ row.nombre }}</strong></template>
+          <template #cell-nombre="{ row }"
+            ><strong>{{ row.nombre }}</strong></template
+          >
           <template #cell-unidad="{ row }">{{ row.unidadLabel }}</template>
           <template #cell-modo="{ row }">{{ row.modoLabel }}</template>
           <template #cell-total="{ row }">{{ row.totalLabel }}</template>
