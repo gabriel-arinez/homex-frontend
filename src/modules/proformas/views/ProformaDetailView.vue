@@ -31,6 +31,8 @@ const emit = defineEmits<{ openMenu: [] }>(),
   quote = ref<Proforma | null>(null),
   loading = ref(true),
   error = ref(''),
+  referenceError = ref(''),
+  referenceLoading = ref(true),
   lineError = ref(''),
   specError = ref(''),
   success = ref(''),
@@ -87,17 +89,39 @@ function fill() {
     prospecto_direccion: quote.value.prospecto_direccion ?? '',
   })
 }
+async function refreshQuote() {
+  quote.value = await proformasService.get(id)
+  fill()
+  if (!editable.value) {
+    editingHeader.value = false
+    lineModal.value = false
+    editingLine.value = null
+    specLine.value = null
+  }
+}
 async function load() {
   loading.value = true
   error.value = ''
   try {
-    quote.value = await proformasService.get(id)
-    fill()
+    await refreshQuote()
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'No se pudo cargar la proforma.'
   } finally {
     loading.value = false
   }
+}
+async function recoverConflict(e: unknown, fallback: string) {
+  const message = conflict(e, fallback)
+  if (e instanceof ApiError && e.status === 409) {
+    try {
+      await refreshQuote()
+    } catch (reloadError) {
+      return `${message} No se pudo refrescar el estado actual: ${
+        reloadError instanceof Error ? reloadError.message : 'error desconocido'
+      }`
+    }
+  }
+  return message
 }
 async function saveHeader() {
   processing.value = true
@@ -119,7 +143,7 @@ async function saveHeader() {
     editingHeader.value = false
     success.value = 'Datos comerciales actualizados.'
   } catch (e) {
-    error.value = conflict(e, 'No se pudo actualizar.')
+    error.value = await recoverConflict(e, 'No se pudo actualizar.')
   } finally {
     processing.value = false
   }
@@ -136,7 +160,7 @@ async function saveLine(body: DetalleProformaWritable) {
     editingLine.value = null
     await load()
   } catch (e) {
-    lineError.value = conflict(e, 'No se pudo guardar la línea.')
+    lineError.value = await recoverConflict(e, 'No se pudo guardar la línea.')
   } finally {
     processing.value = false
   }
@@ -150,7 +174,7 @@ async function saveSpec(body: Parameters<typeof proformasService.addSpec>[1]) {
     specLine.value = null
     await load()
   } catch (e) {
-    specError.value = conflict(e, 'No se pudo guardar la especificación.')
+    specError.value = await recoverConflict(e, 'No se pudo guardar la especificación.')
   } finally {
     processing.value = false
   }
@@ -192,20 +216,32 @@ function closeLine() {
   lineModal.value = false
   editingLine.value = null
 }
-onMounted(async () => {
-  const [a, b, c, d, e] = await Promise.all([
-    proformasService.options('TIPO_ITEM'),
-    proformasService.options('UNIDAD_MEDIDA'),
-    proformasService.options('TIPO_MUEBLE'),
-    proformasService.options('MONEDA'),
-    clientesService.list({ activo: true, page_size: 100 }),
-  ])
-  tipos.value = a
-  unidades.value = b
-  tiposMueble.value = c
-  monedas.value = d
-  clients.value = e.results
-  await load()
+async function loadReferences() {
+  referenceLoading.value = true
+  referenceError.value = ''
+  try {
+    const [a, b, c, d, e] = await Promise.all([
+      proformasService.options('TIPO_ITEM'),
+      proformasService.options('UNIDAD_MEDIDA'),
+      proformasService.options('TIPO_MUEBLE'),
+      proformasService.options('MONEDA'),
+      clientesService.list({ activo: true, page_size: 20, page: 1 }),
+    ])
+    tipos.value = a
+    unidades.value = b
+    tiposMueble.value = c
+    monedas.value = d
+    clients.value = e.results
+  } catch (e) {
+    referenceError.value =
+      e instanceof Error ? e.message : 'No se pudieron cargar los datos auxiliares.'
+  } finally {
+    referenceLoading.value = false
+  }
+}
+onMounted(() => {
+  void load()
+  void loadReferences()
 })
 </script>
 <template>
@@ -220,6 +256,7 @@ onMounted(async () => {
         ><Button
           v-if="quote && editable && !editingHeader"
           variant="secondary"
+          :disabled="referenceLoading || Boolean(referenceError)"
           @click="editingHeader = true"
           >Editar cabecera</Button
         ><Button
@@ -238,6 +275,10 @@ onMounted(async () => {
     ><template v-else-if="quote"
       ><p v-if="success" class="success" role="status">{{ success }}</p>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
+      <p v-if="referenceError" class="error reference-error" role="alert">
+        {{ referenceError }}
+        <button type="button" @click="loadReferences">Reintentar datos auxiliares</button>
+      </p>
       <section class="summary" aria-label="Resumen de proforma">
         <div>
           <span>Estado</span><strong>{{ quote.estado_info.nombre }}</strong>
@@ -358,7 +399,12 @@ onMounted(async () => {
             <h2>Líneas</h2>
             <p>Los importes y promociones mostrados son los devueltos por el backend.</p>
           </div>
-          <Button v-if="editable" @click="lineModal = true">Agregar línea</Button>
+          <Button
+            v-if="editable"
+            :disabled="referenceLoading || Boolean(referenceError)"
+            @click="lineModal = true"
+            >Agregar línea</Button
+          >
         </div>
         <article v-for="line in quote.detalles" :key="line.id" class="line">
           <header>
@@ -387,6 +433,7 @@ onMounted(async () => {
             ><Button
               v-if="line.tipo_item_info.codigo === 'MUEBLE_MEDIDA' && !line.especificacion"
               variant="secondary"
+              :disabled="referenceLoading || Boolean(referenceError)"
               @click="specLine = line"
               >Agregar especificación</Button
             >
@@ -542,6 +589,9 @@ dd {
 .error,
 [role='alert'] {
   color: var(--color-danger);
+}
+.reference-error button {
+  margin-left: var(--space-2);
 }
 @media (max-width: 63.99rem) {
   .summary {
