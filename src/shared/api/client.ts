@@ -25,7 +25,8 @@ export async function apiRequest<T>(path: string, options: ApiRequest = {}): Pro
   } = options
   const headers = new Headers(init.headers)
   headers.set('Accept', 'application/json')
-  if (body !== undefined) headers.set('Content-Type', 'application/json')
+  const isFormData = body instanceof FormData
+  if (body !== undefined && !isFormData) headers.set('Content-Type', 'application/json')
   const token = authenticated ? authHooks?.accessToken() : null
   if (token) headers.set('Authorization', `Bearer ${token}`)
   const timeout = AbortSignal.timeout(timeoutMs)
@@ -36,7 +37,7 @@ export async function apiRequest<T>(path: string, options: ApiRequest = {}): Pro
       ...init,
       headers,
       signal,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
     })
   } catch (error) {
     if (error instanceof DOMException && error.name === 'TimeoutError')

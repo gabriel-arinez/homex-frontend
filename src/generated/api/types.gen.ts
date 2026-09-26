@@ -63,6 +63,13 @@ export type Cliente = {
   readonly updated_by: number | null
 }
 
+export type ClienteResumenProforma = {
+  id: number
+  nombre: string | null
+  empresa: string | null
+  celular: string | null
+}
+
 export type ConfirmacionHitlRespuesta = {
   readonly captura_id: number
   readonly detalle_id: number
@@ -125,11 +132,13 @@ export type DetalleProforma = {
   readonly id: number
   readonly proforma: number
   tipo_item: number
+  tipo_item_info: ValorCatalogoResumen
   producto?: number | null
   nombre: string
   descripcion?: string | null
   cantidad: number
   unidad: number
+  unidad_info: ValorCatalogoResumen
   modo_calculo?: string
   precio_unitario?: string
   importe_negociado?: string | null
@@ -152,6 +161,9 @@ export type EmitirRecibo = {
 
 export type EspecificacionMueble = {
   readonly id: number
+  readonly proforma_detalle: number
+  tipo_mueble?: number | null
+  tipo_mueble_info: ValorCatalogoResumen | null
   schema_version?: number
   espesor?: unknown
   color_principal?: string | null
@@ -159,8 +171,6 @@ export type EspecificacionMueble = {
   dimensiones?: unknown
   accesorios?: unknown
   observaciones?: string | null
-  readonly proforma_detalle: number
-  tipo_mueble?: number | null
 }
 
 /**
@@ -273,6 +283,13 @@ export type PaginatedProductoList = {
   results: Array<Producto>
 }
 
+export type PaginatedProformaListadoList = {
+  count: number
+  next?: string | null
+  previous?: string | null
+  results: Array<ProformaListado>
+}
+
 export type PatchedCliente = {
   readonly id?: number
   tipo_cliente?: number
@@ -301,11 +318,13 @@ export type PatchedDetalleProforma = {
   readonly id?: number
   readonly proforma?: number
   tipo_item?: number
+  tipo_item_info?: ValorCatalogoResumen
   producto?: number | null
   nombre?: string
   descripcion?: string | null
   cantidad?: number
   unidad?: number
+  unidad_info?: ValorCatalogoResumen
   modo_calculo?: string
   precio_unitario?: string
   importe_negociado?: string | null
@@ -361,14 +380,17 @@ export type PatchedProforma = {
   readonly id?: number
   readonly numero?: number
   cliente?: number | null
+  cliente_resumen?: ClienteResumenProforma | null
   readonly vendedor?: number
   readonly estado?: number
+  estado_info?: ValorCatalogoResumen
   titulo?: string | null
   readonly fecha?: string
   plazo_entrega?: string | null
   validez_oferta?: number | null
   porcentaje_adelanto?: string | null
   moneda?: number
+  moneda_info?: ValorCatalogoResumen
   readonly subtotal?: string
   readonly descuento_total?: string
   readonly total?: string
@@ -440,14 +462,17 @@ export type Proforma = {
   readonly id: number
   readonly numero: number
   cliente?: number | null
+  cliente_resumen: ClienteResumenProforma | null
   readonly vendedor: number
   readonly estado: number
+  estado_info: ValorCatalogoResumen
   titulo?: string | null
   readonly fecha: string
   plazo_entrega?: string | null
   validez_oferta?: number | null
   porcentaje_adelanto?: string | null
   moneda: number
+  moneda_info: ValorCatalogoResumen
   readonly subtotal: string
   readonly descuento_total: string
   readonly total: string
@@ -463,6 +488,26 @@ export type Proforma = {
   readonly created_by: number | null
   readonly updated_by: number | null
   readonly detalles: Array<DetalleProforma>
+}
+
+export type ProformaListado = {
+  readonly id: number
+  readonly numero: number
+  cliente?: number | null
+  cliente_resumen: ClienteResumenProforma | null
+  readonly vendedor: number
+  readonly estado: number
+  estado_info: ValorCatalogoResumen
+  titulo?: string | null
+  readonly fecha: string
+  plazo_entrega?: string | null
+  validez_oferta?: number | null
+  porcentaje_adelanto?: string | null
+  moneda: number
+  moneda_info: ValorCatalogoResumen
+  readonly subtotal: string
+  readonly descuento_total: string
+  readonly total: string
 }
 
 export type Recibo = {
@@ -495,6 +540,19 @@ export type TokenObtainPair = {
 export type TokenRefresh = {
   readonly access: string
   refresh: string
+}
+
+export type ValorCatalogoPublico = {
+  readonly id: number
+  readonly concepto_codigo: string
+  readonly codigo: string
+  readonly nombre: string
+}
+
+export type ValorCatalogoResumen = {
+  readonly id: number
+  readonly codigo: string
+  readonly nombre: string
 }
 
 export type ClienteWritable = {
@@ -556,6 +614,7 @@ export type DetalleProformaWritable = {
 }
 
 export type EspecificacionMuebleWritable = {
+  tipo_mueble?: number | null
   schema_version?: number
   espesor?: unknown
   color_principal?: string | null
@@ -563,7 +622,6 @@ export type EspecificacionMuebleWritable = {
   dimensiones?: unknown
   accesorios?: unknown
   observaciones?: string | null
-  tipo_mueble?: number | null
 }
 
 export type PaginatedClienteListWritable = {
@@ -578,6 +636,13 @@ export type PaginatedProductoListWritable = {
   next?: string | null
   previous?: string | null
   results: Array<ProductoWritable>
+}
+
+export type PaginatedProformaListadoListWritable = {
+  count: number
+  next?: string | null
+  previous?: string | null
+  results: Array<ProformaListadoWritable>
 }
 
 export type PatchedClienteWritable = {
@@ -659,6 +724,15 @@ export type ProformaWritable = {
   prospecto_empresa?: string | null
   prospecto_celular?: string | null
   prospecto_direccion?: string | null
+}
+
+export type ProformaListadoWritable = {
+  cliente?: number | null
+  titulo?: string | null
+  plazo_entrega?: string | null
+  validez_oferta?: number | null
+  porcentaje_adelanto?: string | null
+  moneda: number
 }
 
 export type V1AuthMeRetrieveData = {
@@ -887,6 +961,29 @@ export type V1CatalogoDescuentosUpdateResponses = {
 
 export type V1CatalogoDescuentosUpdateResponse =
   V1CatalogoDescuentosUpdateResponses[keyof V1CatalogoDescuentosUpdateResponses]
+
+export type V1CatalogoOpcionesListData = {
+  body?: never
+  path?: never
+  query: {
+    /**
+     * * `ESTADO_PROFORMA` - ESTADO_PROFORMA
+     * * `MONEDA` - MONEDA
+     * * `TIPO_ITEM` - TIPO_ITEM
+     * * `UNIDAD_MEDIDA` - UNIDAD_MEDIDA
+     * * `TIPO_MUEBLE` - TIPO_MUEBLE
+     */
+    concepto: 'ESTADO_PROFORMA' | 'MONEDA' | 'TIPO_ITEM' | 'UNIDAD_MEDIDA' | 'TIPO_MUEBLE'
+  }
+  url: '/api/v1/catalogo/opciones/'
+}
+
+export type V1CatalogoOpcionesListResponses = {
+  200: Array<ValorCatalogoPublico>
+}
+
+export type V1CatalogoOpcionesListResponse =
+  V1CatalogoOpcionesListResponses[keyof V1CatalogoOpcionesListResponses]
 
 export type V1CatalogoPisosListData = {
   body?: never
@@ -1559,12 +1656,30 @@ export type V1PedidosEmitirReciboCreateResponse =
 export type V1ProformasListData = {
   body?: never
   path?: never
-  query?: never
+  query?: {
+    cliente?: number
+    estado?: string
+    fecha_desde?: string
+    fecha_hasta?: string
+    moneda?: string
+    /**
+     * Un número de página dentro del conjunto de resultados paginado.
+     */
+    page?: number
+    /**
+     * Número de resultados a devolver por página.
+     */
+    page_size?: number
+    /**
+     * Número de proforma, título o datos del cliente.
+     */
+    search?: string
+  }
   url: '/api/v1/proformas/'
 }
 
 export type V1ProformasListResponses = {
-  200: Array<Proforma>
+  200: PaginatedProformaListadoList
 }
 
 export type V1ProformasListResponse = V1ProformasListResponses[keyof V1ProformasListResponses]
@@ -1577,7 +1692,7 @@ export type V1ProformasCreateData = {
 }
 
 export type V1ProformasCreateResponses = {
-  201: CrearProforma
+  201: Proforma
 }
 
 export type V1ProformasCreateResponse = V1ProformasCreateResponses[keyof V1ProformasCreateResponses]
@@ -1594,6 +1709,13 @@ export type V1ProformasDetallePartialUpdateData = {
   url: '/api/v1/proformas-detalle/{id}/'
 }
 
+export type V1ProformasDetallePartialUpdateErrors = {
+  /**
+   * Conflicto con el estado actual o con una regla comercial concurrente.
+   */
+  409: unknown
+}
+
 export type V1ProformasDetallePartialUpdateResponses = {
   200: DetalleProforma
 }
@@ -1602,7 +1724,7 @@ export type V1ProformasDetallePartialUpdateResponse =
   V1ProformasDetallePartialUpdateResponses[keyof V1ProformasDetallePartialUpdateResponses]
 
 export type V1ProformasDetalleEspecificacionCreateData = {
-  body: DetalleProformaWritable
+  body?: EspecificacionMuebleWritable
   path: {
     /**
      * Un valor de entero único que identifique este detalle proforma.
@@ -1613,34 +1735,19 @@ export type V1ProformasDetalleEspecificacionCreateData = {
   url: '/api/v1/proformas-detalle/{id}/especificacion/'
 }
 
+export type V1ProformasDetalleEspecificacionCreateErrors = {
+  /**
+   * Conflicto con el estado actual o con una regla comercial concurrente.
+   */
+  409: unknown
+}
+
 export type V1ProformasDetalleEspecificacionCreateResponses = {
-  200: DetalleProforma
+  201: EspecificacionMueble
 }
 
 export type V1ProformasDetalleEspecificacionCreateResponse =
   V1ProformasDetalleEspecificacionCreateResponses[keyof V1ProformasDetalleEspecificacionCreateResponses]
-
-export type V1ProformasDestroyData = {
-  body?: never
-  path: {
-    /**
-     * Un valor de entero único que identifique este proforma.
-     */
-    id: number
-  }
-  query?: never
-  url: '/api/v1/proformas/{id}/'
-}
-
-export type V1ProformasDestroyResponses = {
-  /**
-   * No response body
-   */
-  204: void
-}
-
-export type V1ProformasDestroyResponse =
-  V1ProformasDestroyResponses[keyof V1ProformasDestroyResponses]
 
 export type V1ProformasRetrieveData = {
   body?: never
@@ -1673,6 +1780,13 @@ export type V1ProformasPartialUpdateData = {
   url: '/api/v1/proformas/{id}/'
 }
 
+export type V1ProformasPartialUpdateErrors = {
+  /**
+   * Conflicto con el estado actual o con una regla comercial concurrente.
+   */
+  409: unknown
+}
+
 export type V1ProformasPartialUpdateResponses = {
   200: Proforma
 }
@@ -1690,6 +1804,13 @@ export type V1ProformasUpdateData = {
   }
   query?: never
   url: '/api/v1/proformas/{id}/'
+}
+
+export type V1ProformasUpdateErrors = {
+  /**
+   * Conflicto con el estado actual o con una regla comercial concurrente.
+   */
+  409: unknown
 }
 
 export type V1ProformasUpdateResponses = {
@@ -1710,6 +1831,13 @@ export type V1ProformasAprobarCreateData = {
   url: '/api/v1/proformas/{id}/aprobar/'
 }
 
+export type V1ProformasAprobarCreateErrors = {
+  /**
+   * Conflicto con el estado actual o con una regla comercial concurrente.
+   */
+  409: unknown
+}
+
 export type V1ProformasAprobarCreateResponses = {
   200: AprobarProformaRespuesta
 }
@@ -1718,7 +1846,7 @@ export type V1ProformasAprobarCreateResponse =
   V1ProformasAprobarCreateResponses[keyof V1ProformasAprobarCreateResponses]
 
 export type V1ProformasDetallesCreateData = {
-  body: ProformaWritable
+  body: DetalleProformaWritable
   path: {
     /**
      * Un valor de entero único que identifique este proforma.
@@ -1729,8 +1857,15 @@ export type V1ProformasDetallesCreateData = {
   url: '/api/v1/proformas/{id}/detalles/'
 }
 
+export type V1ProformasDetallesCreateErrors = {
+  /**
+   * Conflicto con el estado actual o con una regla comercial concurrente.
+   */
+  409: unknown
+}
+
 export type V1ProformasDetallesCreateResponses = {
-  200: Proforma
+  201: DetalleProforma
 }
 
 export type V1ProformasDetallesCreateResponse =
@@ -1751,7 +1886,6 @@ export type V1ProformasDetallesArchivosListData = {
 
 export type V1ProformasDetallesArchivosListResponses = {
   200: Array<ArchivoAdjunto>
-  201: ArchivoAdjunto
 }
 
 export type V1ProformasDetallesArchivosListResponse =
@@ -1770,8 +1904,14 @@ export type V1ProformasDetallesArchivosCreateData = {
   url: '/api/v1/proformas/{id}/detalles/{detalle_id}/archivos/'
 }
 
+export type V1ProformasDetallesArchivosCreateErrors = {
+  /**
+   * Conflicto con el estado actual o con una regla comercial concurrente.
+   */
+  409: unknown
+}
+
 export type V1ProformasDetallesArchivosCreateResponses = {
-  200: Array<ArchivoAdjunto>
   201: ArchivoAdjunto
 }
 
@@ -1792,6 +1932,13 @@ export type V1ProformasDetallesArchivosDestroyData = {
   url: '/api/v1/proformas/{id}/detalles/{detalle_id}/archivos/{archivo_id}/'
 }
 
+export type V1ProformasDetallesArchivosDestroyErrors = {
+  /**
+   * Conflicto con el estado actual o con una regla comercial concurrente.
+   */
+  409: unknown
+}
+
 export type V1ProformasDetallesArchivosDestroyResponses = {
   /**
    * No response body
@@ -1803,7 +1950,7 @@ export type V1ProformasDetallesArchivosDestroyResponse =
   V1ProformasDetallesArchivosDestroyResponses[keyof V1ProformasDetallesArchivosDestroyResponses]
 
 export type V1ProformasEnviarCreateData = {
-  body: ProformaWritable
+  body?: never
   path: {
     /**
      * Un valor de entero único que identifique este proforma.
@@ -1812,6 +1959,13 @@ export type V1ProformasEnviarCreateData = {
   }
   query?: never
   url: '/api/v1/proformas/{id}/enviar/'
+}
+
+export type V1ProformasEnviarCreateErrors = {
+  /**
+   * Conflicto con el estado actual o con una regla comercial concurrente.
+   */
+  409: unknown
 }
 
 export type V1ProformasEnviarCreateResponses = {

@@ -99,14 +99,14 @@ for (const width of [360, 390, 768, 1024, 1440]) {
   })
 }
 
-test('FE03.5 expone filtros, permite retirarlos y evita navegación prematura', async ({ page }) => {
+test('FE03.5 expone filtros y mantiene navegación sólo a módulos disponibles', async ({ page }) => {
   await mockApp(page)
   await page.goto('/clientes')
   await page.getByRole('searchbox', { name: 'Buscar por nombre, empresa o celular' }).fill('Ana')
   await expect(page.getByLabel('Filtros activos')).toContainText('Búsqueda: Ana')
   await page.getByRole('button', { name: 'Quitar filtro: Búsqueda: Ana' }).click()
   await expect(page.getByLabel('Filtros activos')).toHaveCount(0)
-  await expect(page.getByRole('link', { name: 'Proformas' })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Proformas' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Pedidos' })).toHaveCount(0)
 })
 
