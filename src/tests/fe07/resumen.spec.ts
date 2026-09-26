@@ -13,10 +13,7 @@ const states = [
   { id: 2, codigo: 'ENVIADA', nombre: 'Enviada', concepto_codigo: 'ESTADO_PROFORMA' },
   { id: 3, codigo: 'APROBADA', nombre: 'Aprobada', concepto_codigo: 'ESTADO_PROFORMA' },
 ]
-function mock(
-  counts: Record<string, number>,
-  failure?: string | ((state: string) => boolean),
-) {
+function mock(counts: Record<string, number>, failure?: string | ((state: string) => boolean)) {
   server.use(
     http.get('http://localhost:8000/api/v1/catalogo/opciones/', () => HttpResponse.json(states)),
     http.get('http://localhost:8000/api/v1/proformas/', ({ request }) => {
