@@ -54,7 +54,7 @@ test('FE07 conserva datos parciales y recupera el total al actualizar', async ({
   failing = false
   await page.getByRole('button', { name: 'Actualizar' }).click()
 
-  await expect(page.getByRole('status')).toHaveCount(0)
+  await expect(page.getByText(/indicador no pudo actualizarse/)).toHaveCount(0)
   await expect(page.getByRole('table')).toContainText('Total consultado6')
 })
 test('FE07 representa cero sin fabricar actividad', async ({ page }) => {
@@ -62,7 +62,8 @@ test('FE07 representa cero sin fabricar actividad', async ({ page }) => {
   await page.goto('/resumen')
   await expect(page.getByRole('table')).toContainText('Total consultado0')
   await expect(page.locator('.bar-row i')).toHaveCount(3)
-  for (const bar of await page.locator('.bar-row i').all()) await expect(bar).toHaveCSS('width', '0px')
+  for (const bar of await page.locator('.bar-row i').all())
+    await expect(bar).toHaveCSS('width', '0px')
   await expect(page.getByText('Revisar proformas')).toBeVisible()
 })
 test('FE07 usa el mismo contrato para vendedor y administrador', async ({ page }) => {

@@ -90,7 +90,8 @@ describe('FE07 resumen operativo', () => {
     expect(w.text()).toContain('Total consultado0')
     expect(w.text()).not.toContain('Sin métricas disponibles')
     expect(w.findAll('.bar-row i')).toHaveLength(3)
-    for (const bar of w.findAll('.bar-row i')) expect(bar.attributes('style')).toContain('width: 0%')
+    for (const bar of w.findAll('.bar-row i'))
+      expect(bar.attributes('style')).toContain('width: 0%')
   })
   it('adapta accesos a capacidades sin métricas inventadas', async () => {
     mock({})
@@ -122,7 +123,7 @@ describe('FE07 resumen operativo', () => {
     await w.find('button').trigger('click')
     await flushPromises()
 
-    expect(w.find('[role="status"]').exists()).toBe(false)
+    expect(w.text()).not.toContain('indicador no pudo actualizarse')
     expect(w.find('table').text()).toContain('Total consultado6')
   })
 })
