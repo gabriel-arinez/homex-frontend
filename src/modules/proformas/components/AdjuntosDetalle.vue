@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { ArchivoAdjunto } from '@/generated/api'
 import { proformasService } from '../services/proformasService'
 import Button from '@/shared/ui/Button.vue'
@@ -21,8 +21,16 @@ async function load() {
 function revoke(item: { url: string }) {
   URL.revokeObjectURL(item.url)
 }
+function clearPreviews() {
+  previews.value.forEach(revoke)
+  previews.value = []
+}
 function select(event: Event) {
   const input = event.target as HTMLInputElement
+  if (!props.editable) {
+    input.value = ''
+    return
+  }
   for (const file of Array.from(input.files ?? [])) {
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
       error.value = `${file.name}: usa JPEG, PNG o WebP.`
@@ -33,6 +41,11 @@ function select(event: Event) {
   input.value = ''
 }
 async function upload(item: (typeof previews.value)[number]) {
+  if (!props.editable) {
+    item.state = 'error'
+    item.error = 'La proforma ya no admite cambios.'
+    return
+  }
   item.state = 'uploading'
   try {
     files.value.push(await proformasService.upload(props.proformaId, props.detalleId, item.file))
@@ -54,8 +67,14 @@ async function remove() {
     deleting.value = null
   }
 }
+watch(
+  () => props.editable,
+  (editable) => {
+    if (!editable) clearPreviews()
+  },
+)
 onMounted(load)
-onBeforeUnmount(() => previews.value.forEach(revoke))
+onBeforeUnmount(clearPreviews)
 </script>
 <template>
   <section class="attachments">
@@ -83,7 +102,7 @@ onBeforeUnmount(() => previews.value.forEach(revoke))
               : 'Lista para subir'
         }}</span
         ><small v-if="item.error">{{ item.error }}</small
-        ><Button v-if="item.state !== 'uploading'" variant="secondary" @click="upload(item)"
+        ><Button v-if="editable && item.state !== 'uploading'" variant="secondary" @click="upload(item)"
           >Subir</Button
         >
       </article>
