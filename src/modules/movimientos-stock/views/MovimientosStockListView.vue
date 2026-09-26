@@ -33,6 +33,15 @@ const pageSize = 20
 let requestId = 0
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
+const tableRows = computed(() =>
+  rows.value.map((item) => ({
+    ...item,
+    tipo: item.tipo_movimiento_info.nombre,
+    productoNombre: item.producto_resumen.nombre,
+    productoSku: item.producto_resumen.sku || `#${item.producto}`,
+    pedidoLabel: item.pedido ? `#${item.pedido}` : 'Sin pedido',
+  })),
+)
 const activeFilters = computed(() => [
   ...(search.value.trim() ? [{ key: 'search', label: `Búsqueda: ${search.value.trim()}` }] : []),
   ...(type.value
@@ -173,21 +182,21 @@ const columns = [
     />
     <template v-else>
       <p class="results">{{ total }} movimiento{{ total === 1 ? '' : 's' }}</p>
-      <DataTable caption="Historial de movimientos de stock" :columns="columns" :rows="rows">
+      <DataTable caption="Historial de movimientos de stock" :columns="columns" :rows="tableRows">
         <template #cell-fecha="{ row }">{{
           new Date(String(row.fecha)).toLocaleString('es-BO')
         }}</template>
-        <template #cell-tipo="{ row }">{{ row.tipo_movimiento_info.nombre }}</template>
+        <template #cell-tipo="{ row }">{{ row.tipo }}</template>
         <template #cell-producto="{ row }">
-          <strong>{{ row.producto_resumen.nombre }}</strong>
-          <small>{{ row.producto_resumen.sku || `#${row.producto}` }}</small>
+          <strong>{{ row.productoNombre }}</strong>
+          <small>{{ row.productoSku }}</small>
         </template>
         <template #cell-cantidad="{ row }">
           <strong :class="Number(row.cantidad) < 0 ? 'out' : 'in'">
             {{ Number(row.cantidad) > 0 ? '+' : '' }}{{ row.cantidad }}
           </strong>
         </template>
-        <template #cell-pedido="{ row }">{{ row.pedido ? `#${row.pedido}` : 'Sin pedido' }}</template>
+        <template #cell-pedido="{ row }">{{ row.pedidoLabel }}</template>
         <template #cell-observaciones="{ row }">{{ row.observaciones || '—' }}</template>
       </DataTable>
       <Pagination :page="page" :total-pages="totalPages" @change="page = $event" />
