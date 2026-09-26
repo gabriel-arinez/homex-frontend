@@ -109,12 +109,18 @@ async function mockBackend(page: Page) {
       body: JSON.stringify(options[c] ?? []),
     })
   })
+  await page.route('**/api/v1/clientes/1/', (r) =>
+    r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(client) }),
+  )
   await page.route(/\/api\/v1\/clientes\/(?:\?.*)?$/, (r) =>
     r.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ count: 1, next: null, previous: null, results: [client] }),
     }),
+  )
+  await page.route('**/api/v1/catalogo/productos/4/', (r) =>
+    r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(product) }),
   )
   await page.route(/\/api\/v1\/catalogo\/productos\/(?:\?.*)?$/, (r) =>
     r.fulfill({
@@ -241,7 +247,10 @@ test('FE04 crea, agrega total negociado, envía, congela y aprueba', async ({ pa
   await mockBackend(page)
   await page.goto('/proformas')
   await page.getByRole('button', { name: 'Nueva proforma' }).click()
-  await page.getByLabel('Cliente').selectOption('1')
+  await expect(page).toHaveURL(/\/proformas\/nueva$/)
+  await expect(page.getByRole('heading', { name: 'Nueva proforma' })).toBeVisible()
+  await expect(page.locator('#cliente-proforma option[value="1"]')).toHaveCount(1)
+  await page.locator('#cliente-proforma').selectOption('1')
   await page.getByLabel('Título').fill('Oficina nueva')
   await page.getByRole('button', { name: 'Crear borrador' }).click()
   await expect(page).toHaveURL(/\/proformas\/1$/)
@@ -380,6 +389,8 @@ test('FE04 sube imagen válida, rechaza tipo inválido y representa eliminación
   await page.getByRole('button', { name: 'Enviar' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Enviar' }).click()
   await expect(page.getByRole('button', { name: 'Eliminar' })).toHaveCount(0)
+  await expect(page.getByAltText('Preview de grande.png')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Subir' })).toHaveCount(0)
   await page.reload()
   await expect(page.getByAltText('Preview de grande.png')).toHaveCount(0)
   expect(
@@ -426,11 +437,124 @@ test('FE04 representa acceso directo a proforma de otro vendedor como 404', asyn
   await expect(page.getByRole('alert')).toContainText('No encontrado')
 })
 
+
+test('FE04 refresca la autoridad tras 409 de edición y congela inmediatamente', async ({ page }) => {
+  const state = await mockBackend(page)
+  await page.goto('/proformas/1')
+  await expect(page.getByRole('button', { name: 'Editar cabecera' })).toBeEnabled()
+  await page.getByRole('button', { name: 'Editar cabecera' }).click()
+  await page.getByLabel('Título').fill('Cambio concurrente')
+  await page.route('**/api/v1/proformas/1/', async (route) => {
+    if (route.request().method() !== 'PATCH') return route.fallback()
+    state.quote().estado = 3
+    state.quote().estado_info = { id: 3, codigo: 'ENVIADA', nombre: 'Enviada' }
+    return route.fulfill({
+      status: 409,
+      contentType: 'application/json',
+      body: JSON.stringify({ detail: 'La proforma ya fue enviada por otra operación.' }),
+    })
+  })
+  await page.getByRole('button', { name: 'Guardar cambios' }).click()
+  await expect(page.getByRole('alert')).toContainText('La proforma ya fue enviada')
+  await expect(page.getByText(/modo lectura/)).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Editar cabecera' })).toHaveCount(0)
+})
+
+test('FE04 mantiene visible la proforma si fallan catálogos y permite reintentar', async ({ page }) => {
+  await mockBackend(page)
+  let failed = false
+  await page.route('**/api/v1/catalogo/opciones/**', (route) => {
+    const concepto = new URL(route.request().url()).searchParams.get('concepto')
+    if (concepto === 'TIPO_ITEM' && !failed) {
+      failed = true
+      return route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'Catálogo temporalmente no disponible.' }),
+      })
+    }
+    return route.fallback()
+  })
+  await page.goto('/proformas/1')
+  await expect(page.getByRole('heading', { name: 'Proforma #101' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Reintentar datos auxiliares' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Agregar línea' })).toBeDisabled()
+  await page.getByRole('button', { name: 'Reintentar datos auxiliares' }).click()
+  await expect(page.getByRole('button', { name: 'Reintentar datos auxiliares' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Agregar línea' })).toBeEnabled()
+})
+
+test('FE04 permite seleccionar cliente y producto más allá de la primera página', async ({ page }) => {
+  const state = await mockBackend(page)
+  const clientPageTwo = { ...client, id: 200, nombres: 'Beatriz', apellidos: 'Segunda página' }
+  const productPageTwo = {
+    ...product,
+    id: 200,
+    sku: 'S-200',
+    nombre: 'Silla segunda página',
+    precio_vigente: '950.00',
+  }
+  await page.route(/\/api\/v1\/clientes\/(?:\?.*)?$/, (route) => {
+    const pageNumber = new URL(route.request().url()).searchParams.get('page')
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        pageNumber === '2'
+          ? { count: 21, next: null, previous: 'page=1', results: [clientPageTwo] }
+          : {
+              count: 21,
+              next: 'http://localhost:8000/api/v1/clientes/?page=2',
+              previous: null,
+              results: [client],
+            },
+      ),
+    })
+  })
+  await page.goto('/proformas/nueva')
+  await expect(page.getByRole('heading', { name: 'Nueva proforma' })).toBeVisible()
+  await page.getByRole('button', { name: 'Cargar más clientes' }).click()
+  await expect(page.locator('#cliente-proforma option[value="200"]')).toHaveCount(1)
+  await page.locator('#cliente-proforma').selectOption('200')
+
+  state.quote().detalles = []
+  await page.route(/\/api\/v1\/catalogo\/productos\/(?:\?.*)?$/, (route) => {
+    const pageNumber = new URL(route.request().url()).searchParams.get('page')
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        pageNumber === '2'
+          ? { count: 21, next: null, previous: 'page=1', results: [productPageTwo] }
+          : {
+              count: 21,
+              next: 'http://localhost:8000/api/v1/catalogo/productos/?page=2',
+              previous: null,
+              results: [product],
+            },
+      ),
+    })
+  })
+  await page.goto('/proformas/1')
+  await page.getByRole('button', { name: 'Agregar línea' }).click()
+  await page.getByLabel('Tipo de línea').selectOption('11')
+  await page.getByRole('button', { name: 'Cargar más productos' }).click()
+  await expect(page.locator('#producto-linea option[value="200"]')).toHaveCount(1)
+  await page.locator('#producto-linea').selectOption('200')
+  await expect(page.getByLabel('Nombre comercial')).toHaveValue('Silla segunda página')
+})
+
 for (const width of [360, 390, 768, 1024, 1440])
   test(`@a11y FE04 proforma operable a ${width}px`, async ({ page }) => {
     await mockBackend(page)
     if (width === 1440) await page.addInitScript(() => localStorage.setItem('homex.theme', 'dark'))
     await page.setViewportSize({ width, height: 900 })
+    await page.goto('/proformas')
+    await expect(page.getByRole('heading', { name: 'Proformas' })).toBeVisible()
+    await noOverflow(page)
+    await page.goto('/proformas/nueva')
+    await expect(page.getByRole('heading', { name: 'Nueva proforma' })).toBeVisible()
+    await noOverflow(page)
     await page.goto('/proformas/1')
     await expect(page.getByRole('heading', { name: 'Proforma #101' })).toBeVisible()
     await noOverflow(page)
