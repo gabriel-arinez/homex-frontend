@@ -6,6 +6,7 @@ import PedidoDetailView from '@/modules/pedidos/views/PedidoDetailView.vue'
 import ReciboDetailView from '@/modules/recibos/views/ReciboDetailView.vue'
 import { pedidosService } from '@/modules/pedidos/services/pedidosService'
 import { recibosService } from '@/modules/recibos/services/recibosService'
+import { movimientosStockService } from '@/modules/movimientos-stock/services/movimientosStockService'
 import { server } from '@/tests/msw/server'
 const states = [
   { id: 1, codigo: 'CONFIRMADO', nombre: 'Confirmado', concepto_codigo: 'ESTADO_PEDIDO' },
@@ -157,9 +158,54 @@ describe('FE05 operaciones', () => {
     expect(body.pago_actual).toBe('100.00')
     expect(body.tipo_pago).toBe(7)
   })
-  it('no fabrica endpoints para stock o documentos', () => {
-    expect(Object.keys(pedidosService)).not.toContain('download')
-    expect(Object.keys(pedidosService)).not.toContain('stock')
-    expect(Object.keys(recibosService)).not.toContain('remove')
+  it('consume el historial read-only de stock y documentos publicados', async () => {
+    let query = ''
+    server.use(
+      http.get('http://localhost:8000/api/v1/movimientos-stock/', ({ request }) => {
+        query = new URL(request.url).search
+        return HttpResponse.json({
+          count: 1,
+          next: null,
+          previous: null,
+          results: [
+            {
+              id: 11,
+              fecha: '2026-09-26T12:00:00Z',
+              tipo_movimiento: 4,
+              tipo_movimiento_info: { id: 4, codigo: 'VENTA', nombre: 'Venta' },
+              cantidad: -1,
+              producto: 8,
+              producto_resumen: { id: 8, sku: 'SILLA-01', nombre: 'Silla' },
+              pedido: 9,
+              movimiento_referencia: null,
+              observaciones: null,
+              created_by: 2,
+            },
+          ],
+        })
+      }),
+      http.get('http://localhost:8000/api/v1/recibos/5/documento/', () =>
+        new HttpResponse('<html>Recibo 18</html>', {
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        }),
+      ),
+    )
+
+    const stock = await movimientosStockService.list({
+      tipo_movimiento: 'VENTA',
+      pedido: 9,
+      page: 2,
+      page_size: 20,
+    })
+    const documento = await recibosService.document(5)
+
+    expect(stock.results[0]?.tipo_movimiento_info.codigo).toBe('VENTA')
+    expect(query).toContain('tipo_movimiento=VENTA')
+    expect(query).toContain('pedido=9')
+    expect(query).toContain('page=2')
+    expect(documento).toBeInstanceOf(Blob)
+    expect(Object.keys(movimientosStockService)).not.toContain('create')
+    expect(Object.keys(movimientosStockService)).not.toContain('update')
+    expect(Object.keys(movimientosStockService)).not.toContain('remove')
   })
 })
