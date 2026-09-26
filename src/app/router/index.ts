@@ -19,7 +19,7 @@ const router = createRouter({
         {
           path: 'resumen',
           name: 'resumen',
-          component: () => import('@/modules/resumen/views/DesignSystemView.vue'),
+          component: () => import('@/modules/resumen/views/ResumenView.vue'),
           meta: { capability: 'comercial.operar' },
         },
         {

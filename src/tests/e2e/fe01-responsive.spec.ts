@@ -14,6 +14,20 @@ test.beforeEach(async ({ page }) => {
       body: JSON.stringify({ access: e2eAccess, refresh: 'e2e-refresh' }),
     }),
   )
+  await page.route('**/api/v1/catalogo/opciones/**', (route) =>
+    route.fulfill({
+      json: [
+        { id: 1, codigo: 'BORRADOR', nombre: 'Borrador', concepto_codigo: 'ESTADO_PROFORMA' },
+        { id: 2, codigo: 'ENVIADA', nombre: 'Enviada', concepto_codigo: 'ESTADO_PROFORMA' },
+        { id: 3, codigo: 'APROBADA', nombre: 'Aprobada', concepto_codigo: 'ESTADO_PROFORMA' },
+      ],
+    }),
+  )
+  await page.route(/\/api\/v1\/proformas\/(?:\?.*)?$/, (route) => {
+    const estado = new URL(route.request().url()).searchParams.get('estado')
+    const count = estado === 'BORRADOR' ? 2 : estado === 'ENVIADA' ? 3 : 1
+    return route.fulfill({ json: { count, next: null, previous: null, results: [] } })
+  })
   await page.route('**/api/v1/auth/me/', (route) =>
     route.fulfill({
       status: 200,
@@ -154,7 +168,7 @@ test('FE01 no bloquea las acciones del contenido en tablet', async ({ page }) =>
   await page.setViewportSize({ width: 768, height: 900 })
   await page.goto('/resumen')
 
-  await page.getByRole('button', { name: 'Acción contextual' }).click({
+  await page.getByRole('button', { name: 'Actualizar' }).click({
     timeout: 3_000,
   })
 

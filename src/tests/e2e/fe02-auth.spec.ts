@@ -44,7 +44,7 @@ test('FE02 protege rutas, carga identidad real y permite cerrar sesión', async 
   await page.getByLabel('Contraseña').fill('correcta')
   await page.getByRole('button', { name: 'Ingresar' }).click()
   await expect(page).toHaveURL(/\/resumen$/)
-  await expect(page.getByText('María Vendedora')).toBeVisible()
+  await expect(page.getByText('María Vendedora', { exact: true })).toBeVisible()
   await expect(page.getByText('vendedor', { exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Clientes' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Catálogos' })).toHaveCount(0)
@@ -70,7 +70,7 @@ test('FE02 restaura la sesión consultando /auth/me/ y representa 404', async ({
     { token: access },
   )
   await page.goto('/ruta-inexistente')
-  await expect(page.getByText('María Vendedora')).toBeVisible()
+  await expect(page.getByText('María Vendedora', { exact: true })).toBeVisible()
   await expect(page.getByRole('alert').getByText('Página no encontrada')).toBeVisible()
 })
 
