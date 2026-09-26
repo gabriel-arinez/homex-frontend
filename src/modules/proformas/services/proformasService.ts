@@ -55,4 +55,6 @@ export const proformasService = {
   },
   removeAttachment: (p: number, d: number, a: number) =>
     apiRequest<void>(`/api/v1/proformas/${p}/detalles/${d}/archivos/${a}/`, { method: 'DELETE' }),
+  document: (id: number) =>
+    apiRequest<Blob>(`/api/v1/proformas/${id}/documento/`, { responseType: 'blob' }),
 }

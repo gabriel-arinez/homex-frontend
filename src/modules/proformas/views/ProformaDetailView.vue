@@ -21,6 +21,7 @@ import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
 import Modal from '@/shared/ui/Modal.vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
+import { downloadBlob } from '@/shared/download/downloadBlob'
 import Select from '@/shared/ui/Select.vue'
 import TextField from '@/shared/ui/TextField.vue'
 const emit = defineEmits<{ openMenu: [] }>(),
@@ -36,6 +37,7 @@ const emit = defineEmits<{ openMenu: [] }>(),
   specError = ref(''),
   success = ref(''),
   processing = ref(false),
+  downloading = ref(false),
   editingHeader = ref(false),
   lineModal = ref(false),
   specLine = ref<DetalleProforma | null>(null),
@@ -200,6 +202,19 @@ async function transition() {
     processing.value = false
   }
 }
+async function downloadDocument() {
+  if (!quote.value || downloading.value) return
+  downloading.value = true
+  error.value = ''
+  try {
+    const blob = await proformasService.document(id)
+    downloadBlob(blob, `proforma-${quote.value.numero}.html`)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'No se pudo descargar la proforma.'
+  } finally {
+    downloading.value = false
+  }
+}
 function cancelHeader() {
   editingHeader.value = false
   fill()
@@ -249,6 +264,12 @@ onMounted(() => {
       @menu="emit('openMenu')"
       ><template #actions
         ><Button variant="secondary" @click="router.push('/proformas')">Volver</Button
+        ><Button
+          v-if="quote"
+          variant="secondary"
+          :processing="downloading"
+          @click="downloadDocument"
+          >Descargar</Button
         ><Button
           v-if="quote && editable && !editingHeader"
           variant="secondary"

@@ -242,6 +242,20 @@ export type ModoCalculoEnum = 'PRECIO_UNITARIO' | 'TOTAL_NEGOCIADO'
  */
 export type MonedaCodigoEnum = 'BOB' | 'USD'
 
+export type MovimientoStock = {
+  readonly id: number
+  readonly fecha: string
+  readonly tipo_movimiento: number
+  tipo_movimiento_info: ValorCatalogoMovimiento
+  readonly cantidad: number
+  readonly producto: number
+  producto_resumen: ProductoResumenMovimiento
+  readonly pedido: number | null
+  readonly movimiento_referencia: number | null
+  readonly observaciones: string | null
+  readonly created_by: number | null
+}
+
 export type NotaEntrega = {
   readonly id: number
   readonly numero: number
@@ -254,6 +268,9 @@ export type NotaEntrega = {
 
 export type OrdenTrabajo = {
   readonly id: number
+  readonly pedido: number
+  readonly proforma_numero: number
+  readonly jefe_taller: number | null
   readonly numero: number
   readonly fecha: string
   readonly fecha_inicio: string | null
@@ -261,12 +278,13 @@ export type OrdenTrabajo = {
   readonly responsable_recepcion: string | null
   readonly fecha_entrega: string | null
   readonly lugar_entrega: string | null
-  readonly pedido: number
-  readonly jefe_taller: number | null
   readonly estado_saldo: number | null
+  estado_saldo_info: ValorCatalogoResumen | null
   readonly estado: number
+  estado_info: ValorCatalogoResumen
   readonly created_by: number | null
   readonly updated_by: number | null
+  readonly detalles: Array<DetalleProforma>
 }
 
 export type PaginatedClienteList = {
@@ -274,6 +292,13 @@ export type PaginatedClienteList = {
   next?: string | null
   previous?: string | null
   results: Array<Cliente>
+}
+
+export type PaginatedMovimientoStockList = {
+  count: number
+  next?: string | null
+  previous?: string | null
+  results: Array<MovimientoStock>
 }
 
 export type PaginatedProductoList = {
@@ -449,6 +474,12 @@ export type ProductoPiso = {
   acabado?: number | null
 }
 
+export type ProductoResumenMovimiento = {
+  readonly id: number
+  readonly sku: string | null
+  readonly nombre: string
+}
+
 export type ProductoSilla = {
   producto: number
   modelo?: string | null
@@ -542,6 +573,12 @@ export type TokenRefresh = {
   refresh: string
 }
 
+export type ValorCatalogoMovimiento = {
+  readonly id: number
+  readonly codigo: string
+  readonly nombre: string
+}
+
 export type ValorCatalogoPublico = {
   readonly id: number
   readonly concepto_codigo: string
@@ -624,11 +661,22 @@ export type EspecificacionMuebleWritable = {
   observaciones?: string | null
 }
 
+export type OrdenTrabajoWritable = {
+  [key: string]: unknown
+}
+
 export type PaginatedClienteListWritable = {
   count: number
   next?: string | null
   previous?: string | null
   results: Array<ClienteWritable>
+}
+
+export type PaginatedMovimientoStockListWritable = {
+  count: number
+  next?: string | null
+  previous?: string | null
+  results: Array<unknown>
 }
 
 export type PaginatedProductoListWritable = {
@@ -972,8 +1020,21 @@ export type V1CatalogoOpcionesListData = {
      * * `TIPO_ITEM` - TIPO_ITEM
      * * `UNIDAD_MEDIDA` - UNIDAD_MEDIDA
      * * `TIPO_MUEBLE` - TIPO_MUEBLE
+     * * `ESTADO_PEDIDO` - ESTADO_PEDIDO
+     * * `ESTADO_ORDEN_TRABAJO` - ESTADO_ORDEN_TRABAJO
+     * * `TIPO_PAGO` - TIPO_PAGO
+     * * `TIPO_MOVIMIENTO` - TIPO_MOVIMIENTO
      */
-    concepto: 'ESTADO_PROFORMA' | 'MONEDA' | 'TIPO_ITEM' | 'UNIDAD_MEDIDA' | 'TIPO_MUEBLE'
+    concepto:
+      | 'ESTADO_PROFORMA'
+      | 'MONEDA'
+      | 'TIPO_ITEM'
+      | 'UNIDAD_MEDIDA'
+      | 'TIPO_MUEBLE'
+      | 'ESTADO_PEDIDO'
+      | 'ESTADO_ORDEN_TRABAJO'
+      | 'TIPO_PAGO'
+      | 'TIPO_MOVIMIENTO'
   }
   url: '/api/v1/catalogo/opciones/'
 }
@@ -1480,6 +1541,54 @@ export type V1ClientesUpdateResponses = {
 
 export type V1ClientesUpdateResponse = V1ClientesUpdateResponses[keyof V1ClientesUpdateResponses]
 
+export type V1MovimientosStockListData = {
+  body?: never
+  path?: never
+  query?: {
+    fecha_desde?: string
+    fecha_hasta?: string
+    /**
+     * Un número de página dentro del conjunto de resultados paginado.
+     */
+    page?: number
+    /**
+     * Número de resultados a devolver por página.
+     */
+    page_size?: number
+    pedido?: number
+    producto?: number
+    search?: string
+    tipo_movimiento?: string
+  }
+  url: '/api/v1/movimientos-stock/'
+}
+
+export type V1MovimientosStockListResponses = {
+  200: PaginatedMovimientoStockList
+}
+
+export type V1MovimientosStockListResponse =
+  V1MovimientosStockListResponses[keyof V1MovimientosStockListResponses]
+
+export type V1MovimientosStockRetrieveData = {
+  body?: never
+  path: {
+    /**
+     * Un valor de entero único que identifique este movimiento stock.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/movimientos-stock/{id}/'
+}
+
+export type V1MovimientosStockRetrieveResponses = {
+  200: MovimientoStock
+}
+
+export type V1MovimientosStockRetrieveResponse =
+  V1MovimientosStockRetrieveResponses[keyof V1MovimientosStockRetrieveResponses]
+
 export type V1NotasEntregaListData = {
   body?: never
   path?: never
@@ -1513,6 +1622,25 @@ export type V1NotasEntregaRetrieveResponses = {
 export type V1NotasEntregaRetrieveResponse =
   V1NotasEntregaRetrieveResponses[keyof V1NotasEntregaRetrieveResponses]
 
+export type V1NotasEntregaDocumentoRetrieveData = {
+  body?: never
+  path: {
+    /**
+     * Un valor de entero único que identifique este nota entrega.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/notas-entrega/{id}/documento/'
+}
+
+export type V1NotasEntregaDocumentoRetrieveResponses = {
+  200: string
+}
+
+export type V1NotasEntregaDocumentoRetrieveResponse =
+  V1NotasEntregaDocumentoRetrieveResponses[keyof V1NotasEntregaDocumentoRetrieveResponses]
+
 export type V1OrdenesTrabajoListData = {
   body?: never
   path?: never
@@ -1545,6 +1673,25 @@ export type V1OrdenesTrabajoRetrieveResponses = {
 
 export type V1OrdenesTrabajoRetrieveResponse =
   V1OrdenesTrabajoRetrieveResponses[keyof V1OrdenesTrabajoRetrieveResponses]
+
+export type V1OrdenesTrabajoDocumentoRetrieveData = {
+  body?: never
+  path: {
+    /**
+     * Un valor de entero único que identifique este orden trabajo.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/ordenes-trabajo/{id}/documento/'
+}
+
+export type V1OrdenesTrabajoDocumentoRetrieveResponses = {
+  200: string
+}
+
+export type V1OrdenesTrabajoDocumentoRetrieveResponse =
+  V1OrdenesTrabajoDocumentoRetrieveResponses[keyof V1OrdenesTrabajoDocumentoRetrieveResponses]
 
 export type V1PedidosListData = {
   body?: never
@@ -1949,6 +2096,25 @@ export type V1ProformasDetallesArchivosDestroyResponses = {
 export type V1ProformasDetallesArchivosDestroyResponse =
   V1ProformasDetallesArchivosDestroyResponses[keyof V1ProformasDetallesArchivosDestroyResponses]
 
+export type V1ProformasDocumentoRetrieveData = {
+  body?: never
+  path: {
+    /**
+     * Un valor de entero único que identifique este proforma.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/proformas/{id}/documento/'
+}
+
+export type V1ProformasDocumentoRetrieveResponses = {
+  200: string
+}
+
+export type V1ProformasDocumentoRetrieveResponse =
+  V1ProformasDocumentoRetrieveResponses[keyof V1ProformasDocumentoRetrieveResponses]
+
 export type V1ProformasEnviarCreateData = {
   body?: never
   path: {
@@ -2024,3 +2190,22 @@ export type V1RecibosAnularCreateResponses = {
 
 export type V1RecibosAnularCreateResponse =
   V1RecibosAnularCreateResponses[keyof V1RecibosAnularCreateResponses]
+
+export type V1RecibosDocumentoRetrieveData = {
+  body?: never
+  path: {
+    /**
+     * Un valor de entero único que identifique este recibo.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/recibos/{id}/documento/'
+}
+
+export type V1RecibosDocumentoRetrieveResponses = {
+  200: string
+}
+
+export type V1RecibosDocumentoRetrieveResponse =
+  V1RecibosDocumentoRetrieveResponses[keyof V1RecibosDocumentoRetrieveResponses]

@@ -94,7 +94,7 @@ describe('design system FE01', () => {
     expect(wrapper.text()).toContain('vendedor')
     expect(wrapper.text()).toContain('Clientes')
     expect(wrapper.text()).not.toContain('Catálogos')
-    expect(wrapper.text()).not.toContain('Movimientos de stock')
+    expect(wrapper.text()).toContain('Movimientos de stock')
     expect(wrapper.text()).not.toContain('Usuario HOMEX')
     expect(wrapper.text()).not.toContain('Perfil local')
     expect(wrapper.text()).toContain('Tema oscuro')

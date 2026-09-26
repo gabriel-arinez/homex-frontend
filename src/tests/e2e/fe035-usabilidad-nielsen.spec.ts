@@ -107,7 +107,7 @@ test('FE03.5 expone filtros y mantiene navegación sólo a módulos disponibles'
   await page.getByRole('button', { name: 'Quitar filtro: Búsqueda: Ana' }).click()
   await expect(page.getByLabel('Filtros activos')).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'Proformas' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Pedidos' })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Pedidos' })).toBeVisible()
 })
 
 test('FE03.5 activa el skip-link y mueve el foco al contenido principal', async ({ page }) => {

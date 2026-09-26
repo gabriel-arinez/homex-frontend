@@ -14,6 +14,7 @@ export type ApiRequest = Omit<RequestInit, 'body'> & {
   authenticated?: boolean
   retryAfterRefresh?: boolean
   timeoutMs?: number
+  responseType?: 'json' | 'blob' | 'text'
 }
 export async function apiRequest<T>(path: string, options: ApiRequest = {}): Promise<T> {
   const {
@@ -21,10 +22,14 @@ export async function apiRequest<T>(path: string, options: ApiRequest = {}): Pro
     authenticated = true,
     retryAfterRefresh = true,
     timeoutMs = 15_000,
+    responseType = 'json',
     ...init
   } = options
   const headers = new Headers(init.headers)
-  headers.set('Accept', 'application/json')
+  headers.set(
+    'Accept',
+    responseType === 'json' ? 'application/json' : responseType === 'blob' ? '*/*' : 'text/plain',
+  )
   const isFormData = body instanceof FormData
   if (body !== undefined && !isFormData) headers.set('Content-Type', 'application/json')
   const token = authenticated ? authHooks?.accessToken() : null
@@ -53,6 +58,8 @@ export async function apiRequest<T>(path: string, options: ApiRequest = {}): Pro
   if (!response.ok)
     throw normalizeApiError(response.status, await response.json().catch(() => null))
   if (response.status === 204) return undefined as T
+  if (responseType === 'blob') return (await response.blob()) as T
+  if (responseType === 'text') return (await response.text()) as T
   try {
     return (await response.json()) as T
   } catch {
