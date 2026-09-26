@@ -31,7 +31,8 @@ async function loadReferences() {
   try {
     currencies.value = await proformasService.options('MONEDA')
   } catch (e) {
-    referenceError.value = e instanceof Error ? e.message : 'No se pudo cargar el catálogo de monedas.'
+    referenceError.value =
+      e instanceof Error ? e.message : 'No se pudo cargar el catálogo de monedas.'
   } finally {
     referenceLoading.value = false
   }
