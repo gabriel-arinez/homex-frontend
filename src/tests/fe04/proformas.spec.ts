@@ -4,7 +4,10 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it, vi } from 'vitest'
 import type { DetalleProforma, Proforma } from '@/generated/api'
+import AdjuntosDetalle from '@/modules/proformas/components/AdjuntosDetalle.vue'
+import ClienteSelector from '@/modules/proformas/components/ClienteSelector.vue'
 import DetalleForm from '@/modules/proformas/components/DetalleForm.vue'
+import ProductoSelector from '@/modules/proformas/components/ProductoSelector.vue'
 import ProformaDetailView from '@/modules/proformas/views/ProformaDetailView.vue'
 import ProformasListView from '@/modules/proformas/views/ProformasListView.vue'
 import { proformasService } from '@/modules/proformas/services/proformasService'
@@ -83,6 +86,17 @@ function common(current = quote()) {
       HttpResponse.json(
         options[new URL(request.url).searchParams.get('concepto') as keyof typeof options] ?? [],
       ),
+    ),
+    http.get('http://localhost:8000/api/v1/clientes/1/', () =>
+      HttpResponse.json({
+        id: 1,
+        tipo_cliente: 1,
+        nombres: 'Ana',
+        apellidos: 'Pérez',
+        activo: true,
+        created_by: 7,
+        updated_by: 7,
+      }),
     ),
     http.get('http://localhost:8000/api/v1/clientes/', () =>
       HttpResponse.json({
@@ -263,4 +277,161 @@ describe('FE04 proformas manuales', () => {
     expect(create).toHaveBeenCalled()
     expect(revoke).toHaveBeenCalledWith('blob:preview')
   })
+  it('recarga la autoridad backend después de un 409 de edición y congela la UI', async () => {
+    const current = quote()
+    common(current)
+    server.use(
+      http.patch('http://localhost:8000/api/v1/proformas/1/', () => {
+        current.estado_info = { id: 3, codigo: 'ENVIADA', nombre: 'Enviada' }
+        current.estado = 3
+        return HttpResponse.json({ detail: 'La proforma ya fue enviada.' }, { status: 409 })
+      }),
+    )
+    const r = await router()
+    const wrapper = mount(ProformaDetailView, {
+      global: { plugins: [createPinia(), r], stubs: { Teleport: true } },
+    })
+    await flushPromises()
+    const edit = wrapper.findAll('button').find((button) => button.text() === 'Editar cabecera')
+    expect(edit).toBeDefined()
+    await edit!.trigger('click')
+    await wrapper.get('#titulo-proforma').setValue('Cambio concurrente')
+    await wrapper.get('.header-form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.text()).toContain('La proforma ya fue enviada')
+    expect(wrapper.text()).toContain('modo lectura')
+    expect(wrapper.find('.header-form').exists()).toBe(false)
+  })
+
+  it('revoca y elimina previews pendientes cuando la proforma deja de ser editable', async () => {
+    const create = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:freeze'),
+      revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    common()
+    const wrapper = mount(AdjuntosDetalle, {
+      props: { proformaId: 1, detalleId: 10, editable: true },
+      global: { stubs: { Teleport: true } },
+    })
+    await flushPromises()
+    const input = wrapper.get('input[type=file]')
+    Object.defineProperty(input.element, 'files', {
+      value: [new File(['x'], 'pendiente.png', { type: 'image/png' })],
+    })
+    await input.trigger('change')
+    expect(wrapper.html()).toContain('blob:freeze')
+    await wrapper.setProps({ editable: false })
+    await flushPromises()
+    expect(wrapper.html()).not.toContain('blob:freeze')
+    expect(wrapper.findAll('button').map((button) => button.text())).not.toContain('Subir')
+    expect(revoke).toHaveBeenCalledWith('blob:freeze')
+    create.mockRestore()
+    revoke.mockRestore()
+  })
+
+  it('pagina clientes y productos sin limitar la selección a los primeros 100', async () => {
+    const clientPageTwo = {
+      id: 200,
+      tipo_cliente: 1,
+      nombres: 'Cliente',
+      apellidos: 'Página dos',
+      activo: true,
+      created_by: 7,
+      updated_by: 7,
+    }
+    const productPageTwo = {
+      id: 200,
+      categoria: 1,
+      sku: 'P-200',
+      nombre: 'Producto página dos',
+      precio_lista: '50.00',
+      precio_vigente: '45.00',
+      stock: 3,
+      demanda_pendiente: 0,
+      disponibilidad_referencial: 3,
+      unidad_stock: 5,
+      activo: true,
+      observaciones: null,
+      imagen_principal: null,
+      created_by: 7,
+      updated_by: 7,
+    }
+    server.use(
+      http.get('http://localhost:8000/api/v1/clientes/', ({ request }) => {
+        const page = new URL(request.url).searchParams.get('page')
+        return HttpResponse.json(
+          page === '2'
+            ? { count: 21, next: null, previous: 'page=1', results: [clientPageTwo] }
+            : {
+                count: 21,
+                next: 'http://localhost:8000/api/v1/clientes/?page=2',
+                previous: null,
+                results: [],
+              },
+        )
+      }),
+      http.get('http://localhost:8000/api/v1/catalogo/productos/', ({ request }) => {
+        const page = new URL(request.url).searchParams.get('page')
+        return HttpResponse.json(
+          page === '2'
+            ? { count: 21, next: null, previous: 'page=1', results: [productPageTwo] }
+            : {
+                count: 21,
+                next: 'http://localhost:8000/api/v1/catalogo/productos/?page=2',
+                previous: null,
+                results: [],
+              },
+        )
+      }),
+    )
+
+    const clients = mount(ClienteSelector)
+    await flushPromises()
+    await clients
+      .findAll('button')
+      .find((button) => button.text() === 'Cargar más clientes')!
+      .trigger('click')
+    await flushPromises()
+    expect(clients.find('option[value="200"]').exists()).toBe(true)
+
+    const products = mount(ProductoSelector)
+    await flushPromises()
+    await products
+      .findAll('button')
+      .find((button) => button.text() === 'Cargar más productos')!
+      .trigger('click')
+    await flushPromises()
+    expect(products.find('option[value="200"]').exists()).toBe(true)
+  })
+
+  it('ignora una respuesta antigua del listado cuando llega después de una búsqueda nueva', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/catalogo/opciones/', () =>
+        HttpResponse.json(options.ESTADO_PROFORMA),
+      ),
+      http.get('http://localhost:8000/api/v1/proformas/', async ({ request }) => {
+        const search = new URL(request.url).searchParams.get('search')
+        if (search === 'lenta') await new Promise((resolve) => setTimeout(resolve, 50))
+        if (!search)
+          return HttpResponse.json({ count: 0, next: null, previous: null, results: [] })
+        const current = quote()
+        current.titulo = search === 'lenta' ? 'Respuesta lenta' : 'Respuesta rápida'
+        return HttpResponse.json({
+          count: 1,
+          next: null,
+          previous: null,
+          results: [current],
+        })
+      }),
+    )
+    const r = await router('/proformas')
+    const wrapper = mount(ProformasListView, { global: { plugins: [createPinia(), r] } })
+    await flushPromises()
+    const search = wrapper.get('input[type=search]')
+    await search.setValue('lenta')
+    await search.setValue('rápida')
+    await new Promise((resolve) => setTimeout(resolve, 80))
+    await flushPromises()
+    expect(wrapper.text()).toContain('Respuesta rápida')
+    expect(wrapper.text()).not.toContain('Respuesta lenta')
+  })
+
 })
