@@ -301,7 +301,6 @@ describe('FE04 proformas manuales', () => {
     expect(wrapper.text()).toContain('modo lectura')
     expect(wrapper.find('.header-form').exists()).toBe(false)
   })
-
   it('revoca y elimina previews pendientes cuando la proforma deja de ser editable', async () => {
     const create = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:freeze'),
       revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
@@ -325,7 +324,6 @@ describe('FE04 proformas manuales', () => {
     create.mockRestore()
     revoke.mockRestore()
   })
-
   it('pagina clientes y productos sin limitar la selección a los primeros 100', async () => {
     const clientPageTwo = {
       id: 200,
@@ -400,10 +398,7 @@ describe('FE04 proformas manuales', () => {
     await flushPromises()
     expect(products.find('option[value="200"]').exists()).toBe(true)
   })
-
-  it(
-    'ignora una respuesta antigua del listado cuando llega después de una búsqueda nueva',
-    async () => {
+  it('ignora respuestas obsoletas del listado', async () => {
       server.use(
         http.get('http://localhost:8000/api/v1/catalogo/opciones/', () =>
           HttpResponse.json(options.ESTADO_PROFORMA),
@@ -439,7 +434,6 @@ describe('FE04 proformas manuales', () => {
       await new Promise((resolve) => setTimeout(resolve, 80))
       await flushPromises()
       expect(wrapper.text()).toContain('Respuesta rápida')
-      expect(wrapper.text()).not.toContain('Respuesta lenta')
-    },
-  )
+    expect(wrapper.text()).not.toContain('Respuesta lenta')
+  })
 })
