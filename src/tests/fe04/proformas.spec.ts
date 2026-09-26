@@ -406,8 +406,7 @@ describe('FE04 proformas manuales', () => {
       http.get('http://localhost:8000/api/v1/proformas/', async ({ request }) => {
         const search = new URL(request.url).searchParams.get('search')
         if (search === 'lenta') await new Promise((resolve) => setTimeout(resolve, 50))
-        if (!search)
-          return HttpResponse.json({ count: 0, next: null, previous: null, results: [] })
+        if (!search) return HttpResponse.json({ count: 0, next: null, previous: null, results: [] })
         const current = quote()
         return HttpResponse.json({
           count: 1,
