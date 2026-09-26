@@ -4,6 +4,7 @@ defineProps<{
   label: string
   name: string
   options: Array<{ label: string; value: string }>
+  disabled?: boolean
 }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 </script>
@@ -14,6 +15,7 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
       :id="name"
       :name
       :value="modelValue"
+      :disabled
       @change="emit('update:modelValue', ($event.target as HTMLSelectElement).value)"
     >
       <option v-for="option in options" :key="option.value" :value="option.value">
@@ -35,5 +37,9 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
   background: var(--color-surface);
+}
+.select select:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 </style>
