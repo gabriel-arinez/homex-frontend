@@ -2,7 +2,7 @@
 
 ## Estado
 
-**Implementación local completada para el contrato backend publicado.**
+**Fase cerrada, publicada y verificada remotamente para el contrato backend publicado.**
 
 - Rama: `feat/fe06-capturas-hitl`.
 - Base frontend: `6b8cf675740c8c545d934b0284b967ecd655ecc1`.
@@ -102,4 +102,30 @@ Cobertura específica:
 
 ## Evidencia remota
 
-Commit, push y GitHub Actions quedan pendientes de publicación; el usuario administra esos pasos.
+Implementación funcional publicada:
+
+- commit: `92ba0947b5be15576b81b63e7dfb4e9d92dcc3be`;
+- GitHub Actions: run `36246137184`;
+- resultado: **10/10 jobs verdes**.
+
+Jobs validados:
+
+- `install`;
+- `type-check`;
+- `lint`;
+- `format`;
+- `unit-component`;
+- `build`;
+- `e2e`;
+- `a11y`;
+- `contract-drift`;
+- `dependency-audit`.
+
+Resultados remotos:
+
+- unit/component/integration: **59 passed**;
+- Playwright E2E: **61 passed**;
+- accesibilidad: **22 passed**;
+- auditoría de dependencias: **0 vulnerabilidades**.
+
+Con la CI remota completamente verde, FE06 queda formalmente cerrada y lista para fusionarse a `main`.
