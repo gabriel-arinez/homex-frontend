@@ -6,7 +6,7 @@ import type {
   Producto,
   ValorCatalogoPublico,
 } from '@/generated/api'
-import { productosService } from '@/modules/productos/services/productosService'
+import ProductoSelector from './ProductoSelector.vue'
 import Button from '@/shared/ui/Button.vue'
 import Select from '@/shared/ui/Select.vue'
 import TextField from '@/shared/ui/TextField.vue'
@@ -23,8 +23,7 @@ const props = defineProps<{
 const emit = defineEmits<{ save: [body: DetalleProformaWritable]; cancel: [] }>()
 const saving = ref(false),
   error = ref(''),
-  fields = ref<Record<string, string[]>>({}),
-  products = ref<Producto[]>([])
+  fields = ref<Record<string, string[]>>({})
 const form = reactive({
   tipo_item: String(props.detail?.tipo_item ?? props.tipos[0]?.id ?? ''),
   producto: String(props.detail?.producto ?? ''),
@@ -39,16 +38,10 @@ const form = reactive({
 const catalogItem = computed(
   () => props.tipos.find((x) => String(x.id) === form.tipo_item)?.codigo !== 'MUEBLE_MEDIDA',
 )
-async function loadProducts() {
-  const r = await productosService.list({ activo: true, page_size: 100 })
-  products.value = r.results
-}
-loadProducts()
-function selectProduct() {
-  const p = products.value.find((x) => String(x.id) === form.producto)
-  if (p) {
-    form.nombre = p.nombre
-    if (props.moneda === 'BOB') form.precio_unitario = p.precio_vigente
+function selectProduct(product: Producto | null) {
+  if (product) {
+    form.nombre = product.nombre
+    if (props.moneda === 'BOB') form.precio_unitario = product.precio_vigente
   }
 }
 async function submit() {
@@ -85,19 +78,10 @@ async function submit() {
       name="tipo-item"
       label="Tipo de línea"
       :options="tipos.map((x) => ({ label: x.nombre, value: String(x.id) }))"
-    /><Select
+    /><ProductoSelector
       v-if="catalogItem"
       v-model="form.producto"
-      name="producto-linea"
-      label="Producto de catálogo"
-      :options="[
-        { label: 'Seleccionar producto', value: '' },
-        ...products.map((x) => ({
-          label: `${x.sku || 'Sin SKU'} · ${x.nombre}`,
-          value: String(x.id),
-        })),
-      ]"
-      @update:model-value="selectProduct"
+      @select="selectProduct"
     /><TextField
       v-model="form.nombre"
       name="nombre-linea"
