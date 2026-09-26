@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import type { Cliente, ValorCatalogoPublico } from '@/generated/api'
-import { clientesService, nombreCliente } from '@/modules/clientes/services/clientesService'
+import type { ValorCatalogoPublico } from '@/generated/api'
 import { proformasService } from '../services/proformasService'
+import ClienteSelector from '../components/ClienteSelector.vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
 import Card from '@/shared/ui/Card.vue'
 import TextField from '@/shared/ui/TextField.vue'
@@ -12,8 +12,9 @@ import Button from '@/shared/ui/Button.vue'
 import { ApiError } from '@/shared/api'
 const emit = defineEmits<{ openMenu: [] }>(),
   router = useRouter(),
-  clients = ref<Cliente[]>([]),
   currencies = ref<ValorCatalogoPublico[]>([]),
+  referenceLoading = ref(true),
+  referenceError = ref(''),
   saving = ref(false),
   error = ref(''),
   fields = ref<Record<string, string[]>>({}),
@@ -24,13 +25,19 @@ const emit = defineEmits<{ openMenu: [] }>(),
     plazo_entrega: '',
     observaciones: '',
   })
-onMounted(async () => {
-  const [clientResponse, currencyOptions] = await Promise.all([
-    clientesService.list({ activo: true, page_size: 100 }),
-    proformasService.options('MONEDA'),
-  ])
-  clients.value = clientResponse.results
-  currencies.value = currencyOptions
+async function loadReferences() {
+  referenceLoading.value = true
+  referenceError.value = ''
+  try {
+    currencies.value = await proformasService.options('MONEDA')
+  } catch (e) {
+    referenceError.value = e instanceof Error ? e.message : 'No se pudo cargar el catálogo de monedas.'
+  } finally {
+    referenceLoading.value = false
+  }
+}
+onMounted(() => {
+  void loadReferences()
 })
 async function save() {
   if (saving.value) return
@@ -63,14 +70,10 @@ async function save() {
       @menu="emit('openMenu')"
     /><Card
       ><form :aria-busy="saving" @submit.prevent="save">
-        <Select
+        <ClienteSelector
           v-model="form.cliente"
-          name="cliente"
           label="Cliente"
-          :options="[
-            { label: 'Prospecto sin registrar', value: '' },
-            ...clients.map((x) => ({ label: nombreCliente(x), value: String(x.id) })),
-          ]"
+          prospect-label="Prospecto sin registrar"
         /><TextField
           v-model="form.titulo"
           name="titulo"
@@ -88,9 +91,17 @@ async function save() {
           name="observaciones"
           label="Observaciones"
         />
+        <p v-if="referenceError" role="alert">
+          {{ referenceError }}
+          <button type="button" @click="loadReferences">Reintentar catálogo</button>
+        </p>
         <p v-if="error" role="alert">{{ error }}</p>
         <div class="actions">
-          <Button type="submit" :processing="saving" processing-label="Creando…"
+          <Button
+            type="submit"
+            :processing="saving"
+            :disabled="referenceLoading || Boolean(referenceError) || currencies.length === 0"
+            processing-label="Creando…"
             >Crear borrador</Button
           ><Button variant="secondary" @click="router.push('/proformas')">Cancelar</Button>
         </div>
@@ -107,6 +118,12 @@ form {
 .actions {
   display: flex;
   gap: var(--space-3);
+}
+[role='alert'] {
+  color: var(--color-danger);
+}
+[role='alert'] button {
+  margin-left: var(--space-2);
 }
 @media (max-width: 35rem) {
   .actions {
