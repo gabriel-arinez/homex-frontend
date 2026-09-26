@@ -102,7 +102,10 @@ onBeforeUnmount(clearPreviews)
               : 'Lista para subir'
         }}</span
         ><small v-if="item.error">{{ item.error }}</small
-        ><Button v-if="editable && item.state !== 'uploading'" variant="secondary" @click="upload(item)"
+        ><Button
+          v-if="editable && item.state !== 'uploading'"
+          variant="secondary"
+          @click="upload(item)"
           >Subir</Button
         >
       </article>
