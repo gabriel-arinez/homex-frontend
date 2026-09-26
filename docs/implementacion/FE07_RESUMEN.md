@@ -2,7 +2,7 @@
 
 ## Estado
 
-**Implementación local completada para el contrato backend publicado.**
+**Implementación completada y verificada remotamente para el contrato backend publicado.**
 
 - Rama: `feat/fe07-resumen-metricas`.
 - Base frontend: `df4e93db7f0df167d1d72a71471ea564ca6fea01`.
@@ -17,13 +17,13 @@ La vista incluye:
 - KPI de proformas `BORRADOR`, `ENVIADA` y `APROBADA`;
 - distribución por todos los estados activos publicados en `ESTADO_PROFORMA`;
 - tabla textual equivalente siempre visible;
-- total del conjunto de conteos consultados;
+- total completo cuando todas las métricas están disponibles y subtotal explícito ante fallos parciales;
 - fallos independientes por estado sin ocultar métricas sanas;
 - estado con todos los conteos en cero;
 - reintento general mediante “Actualizar”;
 - accesos a Proformas, Pedidos y Capturas;
 - identidad real del usuario autenticado;
-- mismo contrato para vendedor y administrador, respetando el queryset backend;
+- mismo contrato de métricas para vendedor y administrador, respetando el queryset backend, con acceso contextual adicional al catálogo para `comercial.administrar`;
 - rutas y contenido protegidos por `comercial.operar`.
 
 ## Definición de la métrica
@@ -59,7 +59,7 @@ Todos los estados aparecen con conteo cero y total cero. No se interpreta como e
 
 ### Error parcial
 
-Cada estado se consulta de forma independiente. Si una consulta falla, se muestra “No disponible”, se comunica cuántos indicadores fallaron y se conservan los restantes.
+Cada estado se consulta de forma independiente. Si una consulta falla, se muestra “No disponible”, se comunica cuántos indicadores fallaron y se conservan los restantes. Mientras exista un fallo parcial, la fila final se denomina “Subtotal disponible” para no presentar un agregado incompleto como total general.
 
 ## Decisión de visualización
 
@@ -71,7 +71,7 @@ No se instaló Chart.js ni otra dependencia. La única visualización requerida 
 - no incorpora JavaScript gráfico en rutas ajenas al resumen;
 - no aumenta el bundle con una librería innecesaria.
 
-Las barras son decorativas y usan `aria-hidden`; la tabla es la fuente accesible.
+Las barras son decorativas y usan `aria-hidden`; la tabla es la fuente accesible. Un conteo igual a cero produce una barra de ancho `0%`, evitando sugerir actividad inexistente.
 
 ## Métricas deliberadamente ausentes
 
@@ -111,8 +111,8 @@ Cobertura FE07:
 - fallback textual;
 - todos los conteos en cero;
 - fallo parcial;
-- reintento;
-- vendedor y administrador;
+- reintento real desde fallo parcial hasta recuperación completa;
+- vendedor y administrador, incluido acceso contextual administrativo;
 - usuario sin capacidad mediante guards existentes;
 - ausencia de valores ficticios;
 - light y dark;
@@ -123,7 +123,7 @@ Cobertura FE07:
 
 ## Validación local
 
-- unit/component/integration: **64 passed**;
+- unit/component/integration: **65 passed**;
 - Playwright: **66 passed**;
 - a11y: **23 escenarios**;
 - type-check: verde;
@@ -136,4 +136,29 @@ Cobertura FE07:
 
 ## Evidencia remota
 
-Commit, push, PR y GitHub Actions quedan pendientes de publicación; el usuario administra esos pasos.
+Correcciones finales verificadas en la rama `feat/fe07-resumen-metricas`:
+
+- barras con conteo cero: `0%`;
+- fallos parciales: uso de “Subtotal disponible”;
+- acceso contextual “Administrar catálogo” para `comercial.administrar`;
+- prueba de recuperación real fallo → “Actualizar” → total completo;
+- formato validado con Prettier 3.9.6.
+
+Commit funcional verificado:
+
+- `858e64c128766203a9ad6f34ba3beb4ecbb786e9`.
+
+GitHub Actions:
+
+- run `36257977475`;
+- resultado: **10/10 jobs verdes**.
+
+Resultados remotos:
+
+- unit/component/integration: **65 passed**;
+- Playwright E2E: **66 passed**;
+- accesibilidad: **23 passed**;
+- type-check, lint, format, build y contract drift: verdes;
+- dependency audit: **0 vulnerabilidades**.
+
+FE07 queda lista para revisión final y posterior merge a `main`.
