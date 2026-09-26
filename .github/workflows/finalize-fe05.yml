@@ -35,8 +35,8 @@ jobs:
           src/tests/fe05
           src/tests/e2e/fe05-operaciones.spec.ts
           src/tests/components
-      - name: Update unit snapshots
-        run: npm run test:unit -- --run -u
+      - name: Update navigation snapshots only
+        run: npx vitest run src/tests/components/design-system.spec.ts -u
       - name: Reformat updated snapshots
         run: npx prettier --write src/tests/components
       - name: Commit formatter output
