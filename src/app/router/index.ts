@@ -101,6 +101,12 @@ const router = createRouter({
           meta: { capability: 'comercial.operar' },
         },
         {
+          path: 'movimientos-stock',
+          name: 'movimientos-stock',
+          component: () => import('@/modules/movimientos-stock/views/MovimientosStockListView.vue'),
+          meta: { capability: 'comercial.operar' },
+        },
+        {
           path: 'productos',
           name: 'productos',
           component: () => import('@/modules/productos/views/ProductosListView.vue'),
