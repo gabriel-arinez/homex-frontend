@@ -13,7 +13,10 @@ const states = [
   { id: 2, codigo: 'ENVIADA', nombre: 'Enviada', concepto_codigo: 'ESTADO_PROFORMA' },
   { id: 3, codigo: 'APROBADA', nombre: 'Aprobada', concepto_codigo: 'ESTADO_PROFORMA' },
 ]
-function mock(counts: Record<string, number>, failure?: string | ((state: string) => boolean)) {
+function mock(
+  counts: Record<string, number>,
+  failure?: string | ((state: string) => boolean),
+) {
   server.use(
     http.get('http://localhost:8000/api/v1/catalogo/opciones/', () => HttpResponse.json(states)),
     http.get('http://localhost:8000/api/v1/proformas/', ({ request }) => {
@@ -120,7 +123,9 @@ describe('FE07 resumen operativo', () => {
     expect(w.find('table').text()).toContain('Subtotal disponible3')
 
     failing = false
-    await w.find('button').trigger('click')
+    const actualizar = w.findAll('button').find((button) => button.text().includes('Actualizar'))
+    expect(actualizar).toBeDefined()
+    await actualizar!.trigger('click')
     await flushPromises()
 
     expect(w.text()).not.toContain('indicador no pudo actualizarse')
