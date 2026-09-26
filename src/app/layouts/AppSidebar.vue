@@ -9,6 +9,10 @@ import {
   LayoutDashboard,
   Moon,
   PackageOpen,
+  ClipboardList,
+  Hammer,
+  Truck,
+  ReceiptText,
   Sun,
   Users,
   X,
@@ -49,6 +53,30 @@ const groups: Array<{
       { label: 'Clientes', to: '/clientes', icon: Users, capability: 'comercial.operar' },
       { label: 'Proformas', to: '/proformas', icon: FileText, capability: 'comercial.operar' },
       { label: 'Productos', to: '/productos', icon: PackageOpen, capability: 'comercial.operar' },
+    ],
+  },
+  {
+    label: 'Operaciones',
+    items: [
+      { label: 'Pedidos', to: '/pedidos', icon: ClipboardList, capability: 'comercial.operar' },
+      {
+        label: 'Órdenes de trabajo',
+        to: '/ordenes-trabajo',
+        icon: Hammer,
+        capability: 'comercial.operar',
+      },
+      {
+        label: 'Notas de entrega',
+        to: '/notas-entrega',
+        icon: Truck,
+        capability: 'comercial.operar',
+      },
+    ],
+  },
+  {
+    label: 'Finanzas',
+    items: [
+      { label: 'Recibos', to: '/recibos', icon: ReceiptText, capability: 'comercial.operar' },
     ],
   },
 ]
