@@ -14,6 +14,7 @@ import {
   Truck,
   ReceiptText,
   History,
+  AudioLines,
   Sun,
   Users,
   X,
@@ -84,6 +85,12 @@ const groups: Array<{
     label: 'Finanzas',
     items: [
       { label: 'Recibos', to: '/recibos', icon: ReceiptText, capability: 'comercial.operar' },
+    ],
+  },
+  {
+    label: 'Inteligencia',
+    items: [
+      { label: 'Capturas', to: '/capturas', icon: AudioLines, capability: 'comercial.operar' },
     ],
   },
 ]

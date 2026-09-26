@@ -38,6 +38,11 @@ exports[`design system FE01 > renderiza navegación autorizada e identidad real 
         <!--teleport start-->
         <!--teleport end-->
       </section>
+      <section data-v-69f24f92="">
+        <h2 data-v-69f24f92="">Inteligencia</h2><span data-v-bd015e50="" class="tooltip tooltip--block"><a data-v-69f24f92="" href="/capturas" class="" aria-label="Capturas"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-audio-lines" aria-hidden="true"><path d="M2 10v3"></path><path d="M6 6v11"></path><path d="M10 3v18"></path><path d="M14 8v7"></path><path d="M18 5v13"></path><path d="M22 10v3"></path></svg><span data-v-69f24f92="">Capturas</span></a></span>
+        <!--teleport start-->
+        <!--teleport end-->
+      </section>
     </nav>
     <div data-v-69f24f92="" class="sidebar__footer"><button data-v-69f24f92="" type="button"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-moon" aria-hidden="true">
           <path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"></path>
@@ -94,6 +99,11 @@ exports[`design system FE01 > renderiza navegación autorizada e identidad real 
         <!--teleport start-->
         <!--teleport end-->
       </section>
+      <section data-v-69f24f92="">
+        <h2 data-v-69f24f92="">Inteligencia</h2><span data-v-bd015e50="" class="tooltip tooltip--block"><a data-v-69f24f92="" href="/capturas" class=""><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-audio-lines" aria-hidden="true"><path d="M2 10v3"></path><path d="M6 6v11"></path><path d="M10 3v18"></path><path d="M14 8v7"></path><path d="M18 5v13"></path><path d="M22 10v3"></path></svg><span data-v-69f24f92="">Capturas</span></a></span>
+        <!--teleport start-->
+        <!--teleport end-->
+      </section>
     </nav>
     <div data-v-69f24f92="" class="sidebar__footer"><button data-v-69f24f92="" type="button"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-moon" aria-hidden="true">
           <path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"></path>
@@ -147,6 +157,11 @@ exports[`design system FE01 > renderiza navegación autorizada e identidad real 
       </section>
       <section data-v-69f24f92="">
         <h2 data-v-69f24f92="">Finanzas</h2><span data-v-bd015e50="" class="tooltip tooltip--block"><a data-v-69f24f92="" href="/recibos" class="" aria-label="Recibos"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-receipt-text" aria-hidden="true"><path d="M13 16H8"></path><path d="M14 8H8"></path><path d="M16 12H8"></path><path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z"></path></svg><span data-v-69f24f92="">Recibos</span></a></span>
+        <!--teleport start-->
+        <!--teleport end-->
+      </section>
+      <section data-v-69f24f92="">
+        <h2 data-v-69f24f92="">Inteligencia</h2><span data-v-bd015e50="" class="tooltip tooltip--block"><a data-v-69f24f92="" href="/capturas" class="" aria-label="Capturas"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-audio-lines" aria-hidden="true"><path d="M2 10v3"></path><path d="M6 6v11"></path><path d="M10 3v18"></path><path d="M14 8v7"></path><path d="M18 5v13"></path><path d="M22 10v3"></path></svg><span data-v-69f24f92="">Capturas</span></a></span>
         <!--teleport start-->
         <!--teleport end-->
       </section>
