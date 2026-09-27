@@ -158,6 +158,8 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 24.12.0, cache: npm }
       - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: false
       - uses: actions/cache@v4
         with:
           path: .cache/fe08-asr
