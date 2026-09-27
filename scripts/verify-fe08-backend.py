@@ -13,6 +13,7 @@ from apps.movimientos_stock.models import MovimientoStock
 from apps.notas_entrega.models import NotaEntrega
 from apps.ordenes_trabajo.models import OrdenTrabajo
 from apps.pedidos.models import Pedido
+from apps.proformas.models import EspecificacionMueble
 from apps.recibos.models import Recibo
 assert Pedido.objects.exists(), "El flujo comercial no creó pedidos."
 assert OrdenTrabajo.objects.exists(), "No se creó la OT automática."
@@ -23,6 +24,10 @@ assert NotaEntrega.objects.exists()
 assert Captura.objects.filter(estado="COMPLETADA", texto_transcrito__isnull=False).exists()
 assert IntentoCaptura.objects.filter(estado="FINALIZADO", modelo_asr_version__isnull=False, resultado_raw__isnull=False).exists()
 assert ItemHumano.objects.exists(), "La revisión HITL no persistió evidencia humana."
+assert EspecificacionMueble.objects.exists(), "HITL no persistió la especificación del mueble."
+assert Captura.objects.filter(proforma_detalle__isnull=False).exists(), (
+    "La captura confirmada no quedó vinculada al detalle comercial."
+)
 temporales = [p for p in settings.HOMEX_AUDIO_TEMP_ROOT.glob("*") if p.is_file()]
 assert temporales == [], f"Quedaron audios temporales: {temporales}"
 print("fe08-backend-evidence-ok")

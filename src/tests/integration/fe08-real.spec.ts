@@ -1,8 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
-import { randomUUID } from 'node:crypto'
-
-const api = 'http://127.0.0.1:8000/api/v1'
 
 async function login(page: Page) {
   const consoleErrors: string[] = []
@@ -117,7 +114,9 @@ test.describe.serial('FE08 backend real', () => {
     await page.getByRole('dialog').getByRole('button', { name: 'Emitir nota' }).click()
     await expect(page.getByRole('status')).toContainText('Nota de entrega emitida')
     await page.goto('/notas-entrega')
-    await expect(page.getByText(`#${pedidoId}`, { exact: true })).toBeVisible()
+    await expect(
+      page.getByRole('table').getByRole('cell', { name: `#${pedidoId}`, exact: true }).first(),
+    ).toBeVisible()
 
     const cancelableId = await createApprovedOrder(page, 'Cancelación válida FE08')
     await page.goto(`/pedidos/${cancelableId}`)
@@ -142,27 +141,61 @@ test.describe.serial('FE08 backend real', () => {
   test('audio real pasa por worker, ASR, NLP y confirmación HITL', async ({ page }) => {
     const consoleErrors = await login(page)
     const proformaId = await createDraft(page, 'Captura de voz FE08')
-    const session = JSON.parse(
-      await page.evaluate(() => sessionStorage.getItem('homex.session.v1') ?? '{}'),
-    ) as { access: string }
     const audioPath = process.env.FE08_AUDIO_FIXTURE
     if (!audioPath) throw new Error('FE08_AUDIO_FIXTURE es obligatorio para el gate real.')
-    const response = await page.request.post(`${api}/capturas/`, {
-      headers: { Authorization: `Bearer ${session.access}` },
-      multipart: {
-        clave_idempotencia: randomUUID(),
-        proforma: String(proformaId),
-        audio: {
-          name: 'cotizacion-fe08.wav',
-          mimeType: 'audio/wav',
-          buffer: await readFile(audioPath),
-        },
-      },
-    })
-    expect(response.status()).toBe(202)
-    const accepted = (await response.json()) as { id: number }
+    const audioBase64 = (await readFile(audioPath)).toString('base64')
+    await page.addInitScript(
+      ({ fixture }) => {
+        const binary = atob(fixture)
+        const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
+        class FixtureMediaRecorder {
+          static isTypeSupported() {
+            return false
+          }
 
-    await page.goto(`/capturas/${accepted.id}`)
+          state = 'inactive'
+          mimeType = 'audio/wav'
+          ondataavailable: ((event: BlobEvent) => void) | null = null
+          onstop: (() => void) | null = null
+
+          constructor(_stream: MediaStream) {}
+
+          start() {
+            this.state = 'recording'
+          }
+
+          stop() {
+            this.state = 'inactive'
+            const data = new Blob([bytes], { type: 'audio/wav' })
+            this.ondataavailable?.({ data } as BlobEvent)
+            this.onstop?.()
+          }
+        }
+
+        Object.defineProperty(navigator, 'mediaDevices', {
+          configurable: true,
+          value: {
+            getUserMedia: async () => ({
+              getTracks: () => [{ stop() {} }],
+            }),
+          },
+        })
+        Object.defineProperty(window, 'MediaRecorder', {
+          configurable: true,
+          value: FixtureMediaRecorder,
+        })
+      },
+      { fixture: audioBase64 },
+    )
+
+    await page.goto('/capturas/nueva')
+    await page.getByLabel('Proforma').fill(String(proformaId))
+    await page.getByRole('button', { name: 'Grabar' }).click()
+    await expect(page.getByRole('status')).toContainText('Grabando')
+    await page.getByRole('button', { name: 'Detener' }).click()
+    await expect(page.getByRole('status')).toContainText('Audio listo para enviar')
+    await page.getByRole('button', { name: 'Enviar a procesamiento' }).click()
+    await expect(page).toHaveURL(/\/capturas\/\d+$/)
     await expect(page.getByText('Propuesta IA · requiere revisión')).toBeVisible()
     await expect(page.locator('blockquote')).toContainText(/mesas/i)
     const total = page.getByRole('spinbutton', { name: 'Total negociado' })
