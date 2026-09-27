@@ -115,7 +115,10 @@ test.describe.serial('FE08 backend real', () => {
     await expect(page.getByRole('status')).toContainText('Nota de entrega emitida')
     await page.goto('/notas-entrega')
     await expect(
-      page.getByRole('table').getByRole('cell', { name: `#${pedidoId}`, exact: true }).first(),
+      page
+        .getByRole('table')
+        .getByRole('cell', { name: `#${pedidoId}`, exact: true })
+        .first(),
     ).toBeVisible()
 
     const cancelableId = await createApprovedOrder(page, 'Cancelación válida FE08')
