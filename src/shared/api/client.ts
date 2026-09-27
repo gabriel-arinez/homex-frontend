@@ -45,7 +45,7 @@ export async function apiRequest<T>(path: string, options: ApiRequest = {}): Pro
       body: body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
     })
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'TimeoutError')
+    if (timeout.aborted && !init.signal?.aborted)
       throw new ApiError('El servidor tardó demasiado en responder.', null, 'timeout')
     if (error instanceof DOMException && error.name === 'AbortError') throw error
     throw new ApiError('No se pudo conectar con el servidor.', null, 'network')

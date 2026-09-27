@@ -19,6 +19,7 @@
     "format:check": "prettier --check .",
     "format": "prettier --write .",
     "test:e2e": "playwright test",
+    "test:integration": "playwright test --config playwright.integration.config.ts",
     "api:generate": "openapi-ts -i ./contracts/backend-openapi.yaml -o ./src/generated/api -p @hey-api/typescript",
     "contract:check": "node scripts/check-contract.mjs",
     "test:a11y": "playwright test --grep @a11y"
