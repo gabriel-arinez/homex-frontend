@@ -7,6 +7,9 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [vue(), vueDevTools()],
+  test: {
+    exclude: ['node_modules/**', 'src/tests/e2e/**', 'src/tests/integration/**'],
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

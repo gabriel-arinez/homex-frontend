@@ -17,11 +17,9 @@ export function normalizeApiError(status: number, body: unknown): ApiError {
   const detail = typeof data.detail === 'string' ? data.detail : undefined
   const fields: FieldErrors = {}
   for (const [field, value] of Object.entries(data)) {
-    if (
-      field !== 'detail' &&
-      Array.isArray(value) &&
-      value.every((item) => typeof item === 'string')
-    )
+    if (field === 'detail') continue
+    if (typeof value === 'string') fields[field] = [value]
+    else if (Array.isArray(value) && value.every((item) => typeof item === 'string'))
       fields[field] = value
   }
   return new ApiError(
