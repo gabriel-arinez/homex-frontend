@@ -2,7 +2,7 @@
 
 ## Estado
 
-**Implementación completada y validada localmente.** La evidencia remota queda pendiente de la publicación de la rama por parte del responsable del repositorio.
+**Implementación completada y validada local y remotamente.**
 
 - Rama: `feat/fe08-hardening-integracion`.
 - Base frontend: `e44f46944f868ecffd072953caac809d595e2ffa`.
@@ -28,7 +28,8 @@ El job `integration-real` de GitHub Actions prepara un entorno aislado:
 7. genera un WAV efímero en español;
 8. levanta API, worker y publicador outbox;
 9. ejecuta Playwright contra el frontend y backend reales;
-10. verifica en PostgreSQL los efectos comerciales y NLP, además de la eliminación del audio temporal.
+10. en el flujo de voz, inyecta el WAV determinista en un `MediaRecorder` controlado del navegador para recorrer la UI real de captura, `FormData` y `capturasService.createAudio()`, sin sustituir backend, worker, ASR, NLP ni HITL;
+11. verifica en PostgreSQL los efectos comerciales y NLP, la especificación de mueble persistida, el vínculo captura→detalle y la eliminación del audio temporal.
 
 El audio se genera durante el job, no se versiona ni se publica como artefacto. La comprobación final exige que el directorio temporal quede vacío.
 
@@ -63,7 +64,10 @@ La segunda prueba integrada cubre:
 ```text
 login
 → proforma BORRADOR
-→ carga multipart de audio WAV
+→ /capturas/nueva
+→ Grabar / Detener en la UI
+→ MediaRecorder controlado con WAV real
+→ multipart mediante capturasService
 → HTTP 202
 → outbox
 → Celery
@@ -76,7 +80,7 @@ login
 → proforma continúa BORRADOR
 ```
 
-El verificador exige una captura `COMPLETADA`, intento `FINALIZADO`, evidencia IA, corrección humana y transcripción ASR persistida. Así se evita que una interfaz aparentemente correcta o una respuesta mockeada oculten un fallo del pipeline.
+El verificador exige una captura `COMPLETADA`, intento `FINALIZADO`, evidencia IA, corrección humana, transcripción ASR, `EspecificacionMueble` y vínculo entre la captura confirmada y el detalle comercial. Así se evita que una interfaz aparentemente correcta o una respuesta mockeada oculten un fallo del pipeline.
 
 ## Hardening del cliente HTTP
 
@@ -132,8 +136,36 @@ El build mantiene división por rutas y componentes. FE08 no añadió una depend
 - auditoría de dependencias: **0 vulnerabilidades**;
 - migraciones backend desde base vacía para el gate: verde.
 
+## Evidencia remota final
+
+Correcciones de cierre aplicadas:
+
+- selector de nota de entrega acotado semánticamente para evitar colisiones de texto en Playwright;
+- flujo NLP real ya no crea la captura mediante `page.request`: el audio atraviesa la pantalla `/capturas/nueva`, el recorder, el formulario multipart y el servicio real del frontend;
+- PostgreSQL verifica además `EspecificacionMueble` y el vínculo de la captura con el detalle comercial;
+- `setup-uv` usa `enable-cache: false` en el gate real para evitar bloqueos de post-job por caché automática concurrente; el modelo ASR conserva su caché explícita independiente.
+
+Commit funcional final verificado:
+
+- `1693ef622255b111677026d8a485e6d53f6bb2c5`.
+
+GitHub Actions:
+
+- run `36327844337`;
+- resultado: **11/11 jobs verdes**, incluido `integration-real`.
+
+Resultados remotos:
+
+- unit/component/integration MSW: **71 passed**;
+- Playwright funcional y visual: **68 passed**;
+- accesibilidad Axe: **23 passed**;
+- integración backend/worker/ASR/NLP/HITL real: **2 passed**;
+- verificación PostgreSQL y eliminación de audio: `fe08-backend-evidence-ok`;
+- type-check, lint, format, build y contract drift: verdes;
+- dependency audit: **0 vulnerabilidades**.
+
 ## Cierre y límite de fase
 
-FE08 deja automatizada la evidencia equivalente a la integración F09 del backend. El cierre remoto podrá registrarse cuando la rama sea publicada y el nuevo job `integration-real`, junto con los diez gates existentes, termine verde en GitHub Actions.
+FE08 deja automatizada y verificada remotamente la evidencia equivalente a la integración F09 del backend. La fase queda lista para revisión final y merge a `main`.
 
 Release, despliegue, HTTPS, headers, CSP, reverse proxy y piloto pertenecen a FE09 y no se adelantan en esta fase.
