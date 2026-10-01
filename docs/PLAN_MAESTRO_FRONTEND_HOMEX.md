@@ -1,7 +1,7 @@
 # Plan maestro de implementación e integración — HOMEX Frontend
 
-**Fecha de revisión:** 25 de septiembre de 2026  
-**Versión del plan:** 1.4 — usabilidad Nielsen + contrato FE04 actualizado  
+**Fecha de revisión:** 30 de septiembre de 2026  
+**Versión del plan:** 1.5 — media desacoplada + despliegue privado  
 **Repositorio:** <code>gabriel-arinez/homex-frontend</code>  
 **Rama rectora:** <code>main</code>  
 **Baseline de código previo al plan:** <code>187670fe59da077311d9d3edea32cb1c4532cad4</code>  
@@ -921,96 +921,79 @@ La imagen:
 
 ## 16.1. Contrato definitivo de imágenes y media
 
-La decisión ya no está pendiente.
+El frontend queda **independiente del proveedor físico de almacenamiento**. Producción inicial
+utiliza filesystem persistente servido por el reverse proxy; S3/R2 queda como alternativa futura
+del backend/deploy.
 
-Producción utilizará **Cloudflare R2 Standard** como almacenamiento persistente de media, gestionado exclusivamente por <code>homex-backend</code> mediante Django <code>STORAGES</code>. El frontend no conoce credenciales, buckets, endpoint S3 ni reglas internas del proveedor.
-
-Arquitectura congelada:
+Arquitectura vigente:
 
 ~~~text
 Vue
- │
  │ multipart/form-data
  ▼
 Django/DRF
  │
- ├── valida y procesa con Pillow
+ ├── valida/procesa con Pillow
  ├── genera WebP 320/640/1280
- └── Cloudflare R2 Standard
-       └── homex-public-media
-            ├── productos/ → catálogo
-            └── proformas/ → referencias de muebles a pedido
+ └── Django STORAGES
+       ├── filesystem persistente  ← producción inicial
+       └── S3-compatible           ← alternativa futura
+
+Lectura inicial:
+Vue ← /media/... ← Nginx ← filesystem persistente
 ~~~
+
+Vue nunca conoce `HOMEX_MEDIA_ROOT`, paths del host, credenciales, buckets ni SDK del proveedor.
 
 ### Imagen principal de producto
 
-Cada producto puede tener **cero o una** imagen principal. No existe galería en la primera versión.
+Cada producto puede tener cero o una imagen principal. El backend expone el recurso OpenAPI con
+variantes disponibles, dimensiones y URL utilizable. La URL puede ser relativa same-origin o
+absoluta; Vue la trata como dato opaco.
 
-El backend expone la imagen principal como recurso OpenAPI; Vue nunca construye rutas de R2.
+Se mantienen:
 
-La respuesta debe permitir generar <code>srcset</code> a partir de variantes disponibles. Cada variante expuesta incluye al menos:
-
-- URL;
-- ancho real;
-- alto real;
-- formato WebP.
-
-El original no se carga por defecto en tarjetas/listados.
-
-Reglas frontend:
-
-- <code>loading="lazy"</code> fuera de contenido inmediatamente visible;
-- <code>srcset</code> + <code>sizes</code>;
-- dimensiones/aspect ratio reservados para evitar layout shift;
-- <code>object-fit: contain</code> cuando corresponda;
-- alt basado en nombre/contexto del producto;
-- fallback estable cuando <code>imagen_principal = null</code>;
-- error de red/imagen rota cae a fallback sin romper la card.
+- `loading="lazy"` fuera del contenido inmediatamente visible;
+- `srcset` + `sizes`;
+- dimensiones/aspect ratio reservados;
+- `object-fit: contain` cuando corresponda;
+- alt contextual;
+- fallback cuando no hay imagen o falla su carga.
 
 ### Archivos de referencia de proforma
 
 Una línea de mueble a pedido puede tener múltiples imágenes de referencia persistentes.
 
-El flujo es exclusivamente:
-
 ~~~text
-Vue → Django/DRF → R2 público
+Vue → Django/DRF → storage activo
 ~~~
 
-No existe subida directa navegador → R2.
+No existe subida directa navegador → filesystem, R2 u otro proveedor.
 
-Vue puede crear una preview local efímera con <code>URL.createObjectURL()</code> antes de enviar, pero:
+Vue puede crear una preview efímera con `URL.createObjectURL()`, pero debe revocarla y nunca
+persistirla en Pinia, localStorage o IndexedDB.
 
-- se revoca al dejar de necesitarla;
-- no se persiste en Pinia;
-- no se persiste en localStorage/IndexedDB;
-- no se trata como confirmación de subida.
-
-Los adjuntos persistentes de proforma se sirven mediante URL pública estable/cacheable del dominio de medios. **La lectura de la imagen no requiere autenticación una vez que alguien conoce su URL**; esta es una decisión explícita del producto. La creación, reemplazo y eliminación continúan pasando por Django y respetan autenticación, permisos y estado comercial.
+En la instalación inicial los adjuntos se sirven por `/media/` dentro de la red privada. La
+creación, reemplazo y eliminación continúan pasando por Django y respetan autenticación, permisos y
+estado comercial. La lectura está limitada por el perímetro privado definido por deploy.
 
 ### Formatos aceptados
 
-La UI permite seleccionar únicamente:
-
-- JPEG;
-- PNG;
-- WebP.
-
-SVG no se admite en la primera versión.
-
-La validación del navegador es de UX; la validación autoritativa siempre pertenece al backend.
+JPEG, PNG y WebP. SVG permanece fuera de alcance. La validación del navegador es únicamente UX; el
+backend es autoritativo.
 
 ### Regla de independencia del proveedor
 
-Vue consume solo el contrato OpenAPI. Está prohibido:
+Está prohibido:
 
-- importar SDK de Cloudflare/AWS para media;
+- importar SDK de Cloudflare/AWS/storage para media;
 - usar access keys o secrets;
-- conocer nombres de buckets como requisito funcional;
+- conocer el nombre de bucket o la ruta física del servidor como requisito funcional;
 - construir URLs del proveedor o derivar keys/rutas;
-- guardar imagen en Base64 como dato comercial.
+- guardar imagen en Base64 como dato comercial;
+- crear código distinto de renderizado para filesystem y S3.
 
-FE01 y FE02 no dependen del storage. **FE03 y FE04 sí requieren F07.7 del backend cerrado y OpenAPI actualizado.**
+FE03/FE04 dependen del **contrato de media de backend**, no de un proveedor específico.
 
 ---
 
@@ -1962,7 +1945,7 @@ Implementar el contrato definitivo de §16.1:
 - lazy loading cuando corresponda;
 - fallback para producto sin imagen;
 - fallback ante URL inválida/fallo de carga;
-- no exponer detalles R2 en estado, logs o UI.
+- no exponer detalles del proveedor de storage en estado, logs o UI.
 
 FE03 **no puede cerrarse** con un placeholder permanente si F07.7 está disponible: debe integrar el recurso real.
 
@@ -1979,7 +1962,7 @@ FE03 **no puede cerrarse** con un placeholder permanente si F07.7 está disponib
 - card sin imagen;
 - imagen rota;
 - variante responsive correcta sin descargar original innecesariamente;
-- ninguna dependencia/SDK de R2 en bundle;
+- ninguna dependencia/SDK de proveedor de storage en bundle;
 - dark/light;
 - stock no alterable desde frontend salvo endpoint explícito;
 - promociones no recalculadas arbitrariamente;
@@ -2162,7 +2145,7 @@ Debe incluir:
 17. Consumir `estado_info`, `moneda_info`, `cliente_resumen`, `tipo_item_info`, `unidad_info` y `tipo_mueble_info` en lugar de inferir semántica por IDs.
 18. Consumir `GET /api/v1/catalogo/opciones/?concepto=...` para ESTADO_PROFORMA, MONEDA, TIPO_ITEM, UNIDAD_MEDIDA y TIPO_MUEBLE; no hardcodear IDs.
 19. Acción <code>Nueva proforma</code> solo dentro de contexto de proformas/cliente.
-20. Gestionar imágenes de referencia de muebles a pedido por <code>DetalleProforma</code> mediante el API de media pública.
+20. Gestionar imágenes de referencia de muebles a pedido por <code>DetalleProforma</code> mediante el API de media persistente.
 
 ## Imágenes de referencia por detalle
 
@@ -2534,14 +2517,15 @@ FE08 representa el cumplimiento práctico de la integración frontend equivalent
 
 # 41. FE09 — Release, despliegue y piloto
 
-**Objetivo:** entregar el frontend al repositorio de despliegue y validar el uso real.
+**Objetivo:** entregar el frontend al repositorio de despliegue y validar el uso real en el
+perímetro privado de HOMEX.
 
-**Precondición:** FE08 cerrada.
+**Precondición:** FE08 cerrada y backend F09.1 disponible para la release candidata.
 
 ## Release
 
 - versión/tag;
-- <code>npm ci</code>;
+- `npm ci`;
 - build reproducible;
 - contrato backend fijado por commit/tag;
 - variables de entorno documentadas;
@@ -2555,17 +2539,24 @@ Coordinar:
 
 - build de frontend;
 - servidor estático/reverse proxy;
-- HTTPS;
-- CSP;
-- HSTS;
+- acceso privado mediante la capa de red definida por deploy;
+- funcionamiento desde PC, tablet y móvil autorizados;
+- mismo origen para Vue, `/api/` y `/media/` en la instalación inicial;
+- CSP/headers coherentes con el endpoint real;
 - cache de assets con hash;
-- fallback SPA correcto;
-- API base;
-- health externo del servicio;
+- fallback SPA;
+- health externo;
 - compresión;
-- headers.
+- no exigir dominio público sólo para servir HOMEX.
 
-No duplicar infraestructura dentro de este repo.
+HTTPS/HSTS se aplican cuando la topología final exponga un hostname HTTPS. No se simula seguridad
+con headers que no correspondan a una ruta privada cifrada real.
+
+## Actualización operativa
+
+La primera versión no requiere WebSockets. Las acciones propias refrescan estado inmediatamente y
+las vistas operativas pueden usar polling controlado de baja frecuencia según el contrato ya
+implementado. No añadir infraestructura push sin necesidad medida.
 
 ## Piloto
 
@@ -2573,19 +2564,21 @@ Validar con usuarios reales:
 
 - creación manual;
 - navegación;
-- tiempos;
+- tiempos percibidos;
 - errores frecuentes;
-- captura NLP;
-- HITL;
+- captura NLP/HITL;
 - light/dark;
 - legibilidad de catálogo;
-- sidebar expandido/compacto.
+- sidebar expandido/compacto;
+- acceso desde escritorio, tablet y móvil;
+- actualización operativa sin depender de refresco manual del navegador.
 
-No cambiar arquitectura durante piloto por una preferencia aislada; clasificar feedback en defecto, mejora o requisito nuevo.
+No cambiar arquitectura durante piloto por una preferencia aislada; clasificar feedback como
+defecto, mejora o requisito nuevo.
 
 ## Cierre
 
-<code>docs/implementacion/FE09_RELEASE.md</code>
+`docs/implementacion/FE09_RELEASE.md`
 
 ---
 
@@ -2757,9 +2750,9 @@ Además de FE00–FE09:
 - [ ] light/dark;
 - [ ] sidebar expandido/compacto;
 - [ ] catálogo visual con imagen principal real, variantes WebP y fallback;
-- [ ] adjuntos públicos de muebles a pedido operativos por detalle;
+- [ ] adjuntos persistentes de muebles a pedido operativos por detalle;
 - [ ] ninguna imagen comercial persistida en Base64/localStorage/IndexedDB;
-- [ ] ninguna credencial, SDK R2 ni construcción manual de URLs/keys presente en frontend;
+- [ ] ninguna credencial, SDK de storage ni construcción manual de URLs/keys presente en frontend;
 - [ ] no topbar global;
 - [ ] no search global;
 - [ ] no notificaciones ficticias;
@@ -2787,10 +2780,10 @@ Dependencias conocidas:
 2. Matriz real de permisos.
 3. Contrato de autenticación definitivo.
 4. Media persistente:
-   - arquitectura cerrada en backend F07.7;
-   - Cloudflare R2 Standard productivo;
-   - OpenAPI de imagen principal y adjuntos públicos debe estar disponible antes de cerrar FE03/FE04;
-   - credenciales/dominio R2 son responsabilidad de backend/deploy y nunca del frontend.
+   - contrato funcional cerrado en backend F07.7 y alineado para producción en F09.1;
+   - filesystem persistente es el proveedor inicial; S3/R2 queda como alternativa futura;
+   - OpenAPI de imagen principal y adjuntos debe permanecer estable;
+   - rutas físicas, credenciales y configuración del proveedor son responsabilidad de backend/deploy.
 5. Datos reales de catálogo:
    - SKU;
    - precio;
@@ -2808,29 +2801,11 @@ Una fase puede cerrar como “implementación validada; integración real bloque
 # 49. Secuencia de ejecución
 
 ~~~text
-MAIN + Plan Frontend 1.4
+FE00 ... FE08                            CERRADAS
         ↓
-FE00 baseline + CI + convenciones
+backend F09                             CERRADA
         ↓
-FE01 design system + light/dark + sidebar
-        ↓
-FE02 OpenAPI + auth + permisos + routing
-        ↓
-backend F07.7 media + OpenAPI cerrado
-        ↓
-FE03 clientes + productos visuales
-        ↓
-FE03.5 refactor de usabilidad + Nielsen H1–H10
-        ↓
-FE04 proformas manuales
-        ↓
-FE05 pedidos + OT + stock + recibos + notas
-        ↓
-FE06 captura + NLP + HITL
-        ↓
-FE07 resumen y métricas reales
-        ↓
-FE08 hardening + E2E real + integración
+backend F09.1 storage/deploy privado    SIGUIENTE DEPENDENCIA
         ↓
 FE09 release + homex-deploy + piloto
 ~~~
@@ -2841,7 +2816,7 @@ Dependencias inter-repositorio:
 homex-backend F07.0/F07.2… ─────→ FE02/FE03/FE04/FE05
 homex-backend F08 + homex-nlp ───→ FE06
 homex-backend F09 ←─────────────── FE08
-homex-deploy F10 ←──────────────── FE09
+homex-deploy D04–D08 ←────────────── FE09
 ~~~
 
 FE00 y FE01 pueden avanzar sin esperar al backend comercial completo.
