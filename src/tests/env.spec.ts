@@ -12,9 +12,10 @@ describe('getApiBaseUrl', () => {
     expect(() => getApiBaseUrl('ftp://api.homex.test')).toThrow('HTTP o HTTPS')
   })
 
-  it('rechaza credenciales, query y fragmentos en la configuración pública', () => {
+  it('rechaza rutas, credenciales, query y fragmentos en la configuración pública', () => {
     expect(() => getApiBaseUrl('https://usuario:secreto@homex.test')).toThrow('credenciales')
     expect(() => getApiBaseUrl('https://homex.test?token=secreto')).toThrow('query')
     expect(() => getApiBaseUrl('https://homex.test#privado')).toThrow('fragmento')
+    expect(() => getApiBaseUrl('https://homex.test/api/v1')).toThrow('sin rutas')
   })
 })
