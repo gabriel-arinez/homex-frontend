@@ -29,7 +29,7 @@ exige:
 - bundle total menor a 3 MB como guardrail de regresión;
 - única variable pública de aplicación: `VITE_API_BASE_URL`;
 - ausencia de indicadores de secretos, DSN, claves privadas o credenciales cloud;
-- URL HTTP(S) sin credenciales, query ni fragmento.
+- URL HTTP(S) limitada al origen (sin rutas, credenciales, query ni fragmentos), cuya presencia se comprueba en cada bundle construido.
 
 Se retiró `vite-plugin-vue-devtools` del build y se actualizó la configuración ESLint a
 `typescript-eslint` directa. Los overrides transitivos corrigen los avisos de seguridad vigentes.
@@ -108,13 +108,13 @@ Backend F10, Celery, ASR local, NLP y Playwright.
 
 ## Evidencia local
 
-La tabla se completa después de ejecutar todos los gates sobre el cambio final.
+Evidencia de la implementación inicial; los gates del HEAD corregido se verifican en CI antes de integrar.
 
 | Gate                                | Resultado                                                      |
 | ----------------------------------- | -------------------------------------------------------------- |
-| type-check / lint / format          | pendiente de corrida final                                     |
-| unit/component/integration          | pendiente de corrida final                                     |
-| contrato Backend F10 / OpenAPI      | pendiente de corrida final                                     |
+| type-check / lint / format          | aprobado en CI inicial; revalidación del HEAD requerida                                     |
+| unit/component/integration          | aprobado en CI inicial; revalidación del HEAD requerida                                     |
+| contrato Backend F10 / OpenAPI      | aprobado en CI inicial; revalidación del HEAD requerida                                     |
 | build / reproducibilidad / secretos | 96 archivos, 515124 bytes, dos builds idénticos, 0 source maps |
 | E2E / a11y / navegadores de release | 68 / 23 / 10 verdes                                            |
 | auditoría                           | 0 vulnerabilidades                                             |
@@ -131,7 +131,7 @@ La implementación fue publicada en `feat/fe09-release` con el commit
 `ffd1a3c27b4ec039760baddfd9649af4f4c3f100` y abierta como PR
 [#13](https://github.com/gabriel-arinez/homex-frontend/pull/13).
 
-Ambos workflows sobre ese commit terminaron con **11/11 jobs verdes**:
+Ambos workflows iniciales finalizaron correctamente (12 jobs en el workflow de PR):
 
 - [push 37975993776](https://github.com/gabriel-arinez/homex-frontend/actions/runs/37975993776);
 - [pull request 37976032352](https://github.com/gabriel-arinez/homex-frontend/actions/runs/37976032352).
@@ -141,3 +141,7 @@ Redis → Celery → ASR/NLP → HITL, incluida la persistencia comercial y elim
 temporal. GitHub informa avisos de mantenimiento futuro para las versiones de actions y la imagen
 `ubuntu-latest`; no son fallos de aplicación ni del gate de release y deben actualizarse antes de
 que el runner retire su compatibilidad actual.
+
+## Ajustes de auditoría FE09
+
+Se rechazaron rutas en `VITE_API_BASE_URL` tanto en la aplicación como en el gate de release; el validador de distribución comprueba además que el origen configurado quedó embebido en ambos bundles. El smoke de Playwright continúa aislado con un origen HTTP local; no pretende demostrar configuración ni TLS productivos. Esa frontera queda validada en el bundle release de CI y se ensayará extremo a extremo en D07. Los resultados de esta revisión se acreditan con los checks del HEAD del PR, no con las ejecuciones históricas anteriores.
