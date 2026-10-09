@@ -18,5 +18,9 @@ export function getApiBaseUrl(value = import.meta.env.VITE_API_BASE_URL): string
     throw new Error('VITE_API_BASE_URL no debe incluir credenciales, query ni fragmento.')
   }
 
-  return url.toString().replace(/\/$/, '')
+  if (url.pathname !== '/') {
+    throw new Error('VITE_API_BASE_URL debe contener únicamente el origen, sin rutas.')
+  }
+
+  return url.origin
 }
