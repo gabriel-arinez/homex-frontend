@@ -29,7 +29,8 @@ exige:
 - bundle total menor a 3 MB como guardrail de regresión;
 - única variable pública de aplicación: `VITE_API_BASE_URL`;
 - ausencia de indicadores de secretos, DSN, claves privadas o credenciales cloud;
-- URL HTTP(S) limitada al origen (sin rutas, credenciales, query ni fragmentos), cuya presencia se comprueba en cada bundle construido.
+- URL HTTP(S) limitada al origen, sin rutas, credenciales, query ni fragmentos;
+- presencia del origen configurado en ambos bundles construidos.
 
 Se retiró `vite-plugin-vue-devtools` del build y se actualizó la configuración ESLint a
 `typescript-eslint` directa. Los overrides transitivos corrigen los avisos de seguridad vigentes.
@@ -108,13 +109,14 @@ Backend F10, Celery, ASR local, NLP y Playwright.
 
 ## Evidencia local
 
-Evidencia de la implementación inicial; los gates del HEAD corregido se verifican en CI antes de integrar.
+Evidencia de la implementación inicial. Los gates del HEAD corregido se verifican en CI antes
+de integrar.
 
 | Gate                                | Resultado                                                      |
 | ----------------------------------- | -------------------------------------------------------------- |
-| type-check / lint / format          | aprobado en CI inicial; revalidación del HEAD requerida                                     |
-| unit/component/integration          | aprobado en CI inicial; revalidación del HEAD requerida                                     |
-| contrato Backend F10 / OpenAPI      | aprobado en CI inicial; revalidación del HEAD requerida                                     |
+| type-check / lint / format          | aprobado en CI inicial; revalidación requerida                                     |
+| unit/component/integration          | aprobado en CI inicial; revalidación requerida                                     |
+| contrato Backend F10 / OpenAPI      | aprobado en CI inicial; revalidación requerida                                     |
 | build / reproducibilidad / secretos | 96 archivos, 515124 bytes, dos builds idénticos, 0 source maps |
 | E2E / a11y / navegadores de release | 68 / 23 / 10 verdes                                            |
 | auditoría                           | 0 vulnerabilidades                                             |
@@ -144,4 +146,9 @@ que el runner retire su compatibilidad actual.
 
 ## Ajustes de auditoría FE09
 
-Se rechazaron rutas en `VITE_API_BASE_URL` tanto en la aplicación como en el gate de release; el validador de distribución comprueba además que el origen configurado quedó embebido en ambos bundles. El smoke de Playwright continúa aislado con un origen HTTP local; no pretende demostrar configuración ni TLS productivos. Esa frontera queda validada en el bundle release de CI y se ensayará extremo a extremo en D07. Los resultados de esta revisión se acreditan con los checks del HEAD del PR, no con las ejecuciones históricas anteriores.
+Se rechazaron rutas en `VITE_API_BASE_URL` tanto en la aplicación como en el gate de release.
+El validador de distribución comprueba además que el origen configurado quedó embebido en ambos
+bundles. El smoke de Playwright continúa aislado con un origen HTTP local; no pretende demostrar
+configuración ni TLS productivos. Esa frontera queda validada en el bundle release de CI y se
+ensayará extremo a extremo en D07. Los resultados de esta revisión se acreditan con los checks
+del HEAD del PR, no con las ejecuciones históricas anteriores.
