@@ -124,3 +124,20 @@ La tabla se completa después de ejecutar todos los gates sobre el cambio final.
 La implementación FE09 puede integrarse cuando CI quede completamente verde. La validación
 productiva queda condicionada a D07; el cierre definitivo de FE09 requiere el piloto posterior con
 usuarios reales definido por el plan maestro.
+
+## Evidencia remota del PR
+
+La implementación fue publicada en `feat/fe09-release` con el commit
+`ffd1a3c27b4ec039760baddfd9649af4f4c3f100` y abierta como PR
+[#13](https://github.com/gabriel-arinez/homex-frontend/pull/13).
+
+Ambos workflows sobre ese commit terminaron con **11/11 jobs verdes**:
+
+- [push 37975993776](https://github.com/gabriel-arinez/homex-frontend/actions/runs/37975993776);
+- [pull request 37976032352](https://github.com/gabriel-arinez/homex-frontend/actions/runs/37976032352).
+
+Además de los gates locales, CI confirmó la integración real Vue → Backend F10 → PostgreSQL →
+Redis → Celery → ASR/NLP → HITL, incluida la persistencia comercial y eliminación del audio
+temporal. GitHub informa avisos de mantenimiento futuro para las versiones de actions y la imagen
+`ubuntu-latest`; no son fallos de aplicación ni del gate de release y deben actualizarse antes de
+que el runner retire su compatibilidad actual.
