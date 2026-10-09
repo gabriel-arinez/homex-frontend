@@ -42,3 +42,7 @@ son `npm run lint:fix` y `npm run format`.
 - `src/tests`: pruebas reutilizables.
 
 La planificación y el estado de fase están en `docs/`.
+
+## Release FE09
+
+La validación de release se ejecuta con `npm run release:check`, `npm run backend:check -- <checkout-backend>` y `npm run test:release`. Consulte `docs/implementacion/FE09_RELEASE.md`.

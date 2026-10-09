@@ -2517,6 +2517,8 @@ FE08 representa el cumplimiento práctico de la integración frontend equivalent
 
 # 41. FE09 — Release, despliegue y piloto
 
+**Estado:** implementación FE09 completada en aplicación; su promoción productiva depende de D07 y su cierre definitivo del piloto.
+
 **Objetivo:** entregar el frontend al repositorio de despliegue y validar el uso real en el
 perímetro privado de HOMEX.
 

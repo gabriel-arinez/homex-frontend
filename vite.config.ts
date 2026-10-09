@@ -2,13 +2,20 @@ import { fileURLToPath, URL } from 'node:url'
 
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import vueDevTools from 'vite-plugin-vue-devtools'
 
-// https://vite.dev/config/
+// El artefacto productivo es estático: sin source maps ni plugins de desarrollo.
 export default defineConfig({
-  plugins: [vue(), vueDevTools()],
+  plugins: [vue()],
+  build: {
+    sourcemap: false,
+  },
   test: {
-    exclude: ['node_modules/**', 'src/tests/e2e/**', 'src/tests/integration/**'],
+    exclude: [
+      'node_modules/**',
+      'src/tests/e2e/**',
+      'src/tests/integration/**',
+      'src/tests/release/**',
+    ],
   },
   resolve: {
     alias: {

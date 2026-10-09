@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0",
+  "frontend": {
+    "package_version": "0.1.0",
+    "base_revision": "deba1de244395dbdcb266f03026630b403768d71"
+  },
+  "contracts": {
+    "backend_revision": "bc375894036d30cefbc8cdf7c512315aaf1ab971",
+    "nlp_revision": "79efeaf6a8ca738eb3abce414850f973b1962fd8",
+    "deploy_revision": "fb9c321324cfc621ac07cc42fdeb1e3257a968ab"
+  },
+  "release": {
+    "build": "npm ci && npm run build",
+    "api_environment": "VITE_API_BASE_URL",
+    "source_maps": false,
+    "d07_pending": true,
+    "pilot_pending": true
+  },
+  "boundaries": {
+    "frontend": ["static_bundle", "browser_contract", "ux_resilience"],
+    "deploy": ["manifest", "container_image", "reverse_proxy", "tls", "headers", "rollback"]
+  }
+}
