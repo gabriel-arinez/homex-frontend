@@ -15,7 +15,9 @@ if (
   parsed.hash ||
   parsed.pathname !== '/'
 )
-  throw new Error('VITE_API_BASE_URL debe ser HTTP(S), sin rutas, credenciales, query ni fragmento.')
+  throw new Error(
+    'VITE_API_BASE_URL debe ser HTTP(S), sin rutas, credenciales, query ni fragmento.',
+  )
 
 const root = mkdtempSync(join(tmpdir(), 'homex-fe09-'))
 const builds = [join(root, 'a'), join(root, 'b')]
