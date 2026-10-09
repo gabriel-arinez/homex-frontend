@@ -114,9 +114,9 @@ de integrar.
 
 | Gate                                | Resultado                                                      |
 | ----------------------------------- | -------------------------------------------------------------- |
-| type-check / lint / format          | aprobado en CI inicial; revalidación requerida                                     |
-| unit/component/integration          | aprobado en CI inicial; revalidación requerida                                     |
-| contrato Backend F10 / OpenAPI      | aprobado en CI inicial; revalidación requerida                                     |
+| type-check / lint / format          | aprobado en CI inicial; revalidación requerida                 |
+| unit/component/integration          | aprobado en CI inicial; revalidación requerida                 |
+| contrato Backend F10 / OpenAPI      | aprobado en CI inicial; revalidación requerida                 |
 | build / reproducibilidad / secretos | 96 archivos, 515124 bytes, dos builds idénticos, 0 source maps |
 | E2E / a11y / navegadores de release | 68 / 23 / 10 verdes                                            |
 | auditoría                           | 0 vulnerabilidades                                             |
