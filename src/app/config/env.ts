@@ -14,6 +14,9 @@ export function getApiBaseUrl(value = import.meta.env.VITE_API_BASE_URL): string
   if (!['http:', 'https:'].includes(url.protocol)) {
     throw new Error('VITE_API_BASE_URL debe usar HTTP o HTTPS.')
   }
+  if (url.username || url.password || url.search || url.hash) {
+    throw new Error('VITE_API_BASE_URL no debe incluir credenciales, query ni fragmento.')
+  }
 
   return url.toString().replace(/\/$/, '')
 }
