@@ -12,9 +12,10 @@ if (
   parsed.username ||
   parsed.password ||
   parsed.search ||
-  parsed.hash
+  parsed.hash ||
+  parsed.pathname !== '/'
 )
-  throw new Error('VITE_API_BASE_URL debe ser HTTP(S), sin credenciales, query ni fragmento.')
+  throw new Error('VITE_API_BASE_URL debe ser HTTP(S), sin rutas, credenciales, query ni fragmento.')
 
 const root = mkdtempSync(join(tmpdir(), 'homex-fe09-'))
 const builds = [join(root, 'a'), join(root, 'b')]
@@ -46,6 +47,14 @@ try {
   const second = manifest(builds[1])
   if (JSON.stringify(first) !== JSON.stringify(second))
     throw new Error('Dos builds limpios con el mismo lock y entorno no son idénticos.')
+
+  for (const build of builds) {
+    const bundleContainsOrigin = files(build).some((file) =>
+      readFileSync(file).includes(Buffer.from(parsed.origin)),
+    )
+    if (!bundleContainsOrigin)
+      throw new Error('El bundle no incorpora el origen público configurado para la release.')
+  }
 
   const paths = first.map(({ path }) => path)
   if (!paths.includes('index.html')) throw new Error('La release no contiene index.html.')
