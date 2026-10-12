@@ -4,13 +4,13 @@
 
 ## Identidad reproducible de la candidata
 
-| Componente | Revisión incluida en la candidata |
-| --- | --- |
-| Deploy D07 | PR [#8](https://github.com/gabriel-arinez/homex-deploy/pull/8), merge `1870f1646f977045ce4ffa7762d9f8dd759fcd2c` |
-| Backend F10 + protección RC2 | `3e05362ac49c170963a8dc1d32b4d612e491112f` |
-| Frontend FE09 | `479a092462b36a90006eb1c52f9570ea63084bab` |
-| NLP F10 | `79efeaf6a8ca738eb3abce414850f973b1962fd8` |
-| Release | `0.7.0-d07-rc2`, **`candidate`** |
+| Componente                   | Revisión incluida en la candidata                                                                                |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Deploy D07                   | PR [#8](https://github.com/gabriel-arinez/homex-deploy/pull/8), merge `1870f1646f977045ce4ffa7762d9f8dd759fcd2c` |
+| Backend F10 + protección RC2 | `3e05362ac49c170963a8dc1d32b4d612e491112f`                                                                       |
+| Frontend FE09                | `479a092462b36a90006eb1c52f9570ea63084bab`                                                                       |
+| NLP F10                      | `79efeaf6a8ca738eb3abce414850f973b1962fd8`                                                                       |
+| Release                      | `0.7.0-d07-rc2`, **`candidate`**                                                                                 |
 
 Imágenes inmutables fijadas por el manifiesto deploy:
 
