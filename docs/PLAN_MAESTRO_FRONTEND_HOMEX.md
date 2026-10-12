@@ -2852,3 +2852,11 @@ FE02 en adelante no debe programarse contra endpoints imaginarios.
 21. **Si una prueba revela una contradicción, se corrige el diseño antes de consolidar la siguiente fase.**
 
 El objetivo no es completar pantallas lo más rápido posible. El objetivo es que cada fase aceptada se convierta en una base estable, comprobable y coherente con <code>homex-backend</code>, <code>homex-nlp</code> y <code>homex-deploy</code>.
+
+---
+
+## Actualización coordinada al 11-10-2026 — D07 RC2
+
+FE09 implementada y fusionada; D07 RC2 referencia frontend 479a092462b36a90006eb1c52f9570ea63084bab e imagen frontend-proxy fijada por digest. D07 se fusionó en main de deploy como implementación; dispositivos físicos, perímetro privado completo y piloto mantienen el cierre productivo pendiente.
+
+La descripción completa, los gates ejecutados, sus límites y el orden de reanudación están en [trazabilidad D07 RC2](D07_TRAZABILIDAD_INTERREPOSITORIO_20261011.md). Este registro actualiza el **estado** de las fases sin reemplazar sus requisitos originales ni atribuir éxito a puertas todavía pendientes.
