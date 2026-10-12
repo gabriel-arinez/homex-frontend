@@ -152,3 +152,9 @@ bundles. El smoke de Playwright continúa aislado con un origen HTTP local; no p
 configuración ni TLS productivos. Esa frontera queda validada en el bundle release de CI y se
 ensayará extremo a extremo en D07. Los resultados de esta revisión se acreditan con los checks
 del HEAD del PR, no con las ejecuciones históricas anteriores.
+
+## Adenda de integración D07 RC2 — 2026-10-11
+
+El frontend fijado por la candidata D07 RC2 es `479a092462b36a90006eb1c52f9570ea63084bab`; la imagen frontend-proxy publicada y comprobada está inmovilizada por digest `sha256:023cad7b1d64520e5e3d2d407d27ed6224c88ae1c2f4bcbd0b74c24b0bebe15c` en el manifiesto de deploy. Las pruebas Playwright de escritorio, tablet y móvil de FE09 prueban renderizado/recorridos en CI, **no** la autorización ni la compatibilidad física de esos dispositivos con Zero Trust y CA HOMEX.
+
+D07 fue fusionada como implementación, no desplegada, el 11-10-2026 (PR deploy #8). FE09 conserva la dependencia de validación en dispositivos reales y del piloto. Véanse [trazabilidad D07 RC2](../D07_TRAZABILIDAD_INTERREPOSITORIO_20261011.md) y [pendientes de deploy](https://github.com/gabriel-arinez/homex-deploy/blob/main/docs/implementacion/D07_CIERRE_PENDIENTES_20261011.md).
