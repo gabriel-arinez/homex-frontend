@@ -41,7 +41,8 @@ async function addCatalogLine(page: Page) {
 async function approveCurrentQuote(page: Page) {
   await page.getByRole('button', { name: 'Enviar' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Enviar' }).click()
-  await expect(page.getByText(/modo lectura/)).toBeVisible()
+  await expect(page.getByText('En revisión', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Aprobar' })).toBeVisible()
   await page.getByRole('button', { name: 'Aprobar' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Aprobar' }).click()
   const status = page.getByRole('status').filter({ hasText: /Pedido #\d+/ })
