@@ -189,6 +189,12 @@ async function mockBackend(page: Page) {
     quote.detalles[0] = { ...quote.detalles[0], especificacion: spec }
     return r.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(spec) })
   })
+  await page.route('**/api/v1/proformas-detalle/10/especificacion/editar/', async (r) => {
+    const body = r.request().postDataJSON()
+    const spec = { ...quote.detalles[0].especificacion, ...body }
+    quote.detalles[0] = { ...quote.detalles[0], especificacion: spec }
+    return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(spec) })
+  })
   await page.route('**/api/v1/proformas/1/enviar/', (r) => {
     quote.estado_info = { id: 3, codigo: 'EN_REVISION', nombre: 'En revisión' }
     return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(quote) })
@@ -277,9 +283,17 @@ test('FE04 crea con unitario y descuento, revisa y aprueba', async ({ page }) =>
   await expect(page.getByRole('heading', { name: 'Tres escritorios ejecutivos' })).toBeVisible()
   await page.getByRole('button', { name: 'Agregar especificación' }).click()
   await page.locator('#tipo-mueble').selectOption('30')
-  await page.getByLabel('Dimensiones (JSON opcional)').fill('{"ancho":1.2}')
+  await page.locator('#componente-nombre-0').fill('Mesón')
+  await page.locator('#componente-material-0').fill('Melamina')
+  await page.locator('#componente-espesor-0').fill('25 mm')
+  await page.locator('#componente-dimensiones-0').fill('{"ancho":"1.2 m"}')
   await page.getByRole('button', { name: 'Guardar especificación' }).click()
   await expect(page.getByText('Escritorio', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Editar especificación' }).click()
+  await expect(page.locator('#componente-nombre-0')).toHaveValue('Mesón')
+  await page.locator('#componente-color-0').fill('Nogal')
+  await page.getByRole('button', { name: 'Guardar especificación' }).click()
+  await expect(page.getByRole('button', { name: 'Editar especificación' })).toBeVisible()
   await page.getByRole('button', { name: 'Enviar' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Enviar' }).click()
   await expect(page.getByText('En revisión', { exact: true })).toBeVisible()
