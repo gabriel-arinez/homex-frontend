@@ -174,7 +174,11 @@ async function saveSpec(body: Parameters<typeof proformasService.addSpec>[1]) {
   processing.value = true
   specError.value = ''
   try {
-    await proformasService.addSpec(specLine.value.id, body)
+    if (specLine.value.especificacion) {
+      await proformasService.updateSpec(specLine.value.id, body)
+    } else {
+      await proformasService.addSpec(specLine.value.id, body)
+    }
     specLine.value = null
     await load()
   } catch (e) {
@@ -310,7 +314,7 @@ onMounted(() => {
           @click="editingHeader = true"
           >Editar cabecera</Button
         ><Button
-          v-if="quote && editable"
+          v-if="quote?.estado_info.codigo === 'BORRADOR'"
           :disabled="!quote.detalles.length"
           @click="confirmAction = 'send'"
           >Enviar</Button
@@ -497,11 +501,11 @@ onMounted(() => {
             <Button variant="secondary" @click="openEdit(line)">Editar línea</Button
             ><Button variant="secondary" @click="removeLine(line)">Eliminar línea</Button
             ><Button
-              v-if="line.tipo_item_info.codigo === 'MUEBLE_MEDIDA' && !line.especificacion"
+              v-if="line.tipo_item_info.codigo === 'MUEBLE_MEDIDA'"
               variant="secondary"
               :disabled="referenceLoading || Boolean(referenceError)"
               @click="specLine = line"
-              >Agregar especificación</Button
+              >{{ line.especificacion ? 'Editar especificación' : 'Agregar especificación' }}</Button
             >
           </div>
           <AdjuntosDetalle
@@ -548,7 +552,9 @@ onMounted(() => {
         @cancel="closeLine" /></Modal
     ><Modal :open="Boolean(specLine)" title="Especificación del mueble" @close="specLine = null"
       ><EspecificacionForm
+         :key="specLine?.id"
         :tipos="tiposMueble"
+        :especificacion="specLine?.especificacion"
         :processing="processing"
         :external-error="specError"
         @save="saveSpec"
