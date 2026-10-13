@@ -43,6 +43,7 @@ const form = reactive({
   precio_unitario: props.detail?.precio_unitario ?? '',
   descuento: props.detail?.descuento ?? '0.00',
 })
+const unidadCatalogo = ref<string | null>(null)
 const catalogItem = computed(
   () => props.tipos.find((x) => String(x.id) === form.tipo_item)?.codigo !== 'MUEBLE_MEDIDA',
 )
@@ -63,8 +64,12 @@ function selectProduct(product: Producto | null) {
       return
     }
     form.familia_producto = ''
+    unidadCatalogo.value = String(product.unidad_stock)
+    form.unidad = String(product.unidad_stock)
     form.nombre = product.nombre
     if (props.moneda === 'BOB') form.precio_unitario = product.precio_vigente
+  } else {
+    unidadCatalogo.value = null
   }
 }
 async function submit() {
@@ -73,6 +78,9 @@ async function submit() {
   error.value = ''
   fields.value = {}
   try {
+    if (catalogItem.value && form.producto && unidadCatalogo.value) {
+      form.unidad = unidadCatalogo.value
+    }
     const body: DetalleProformaWritable = {
       tipo_item: Number(form.tipo_item),
       producto: catalogItem.value && form.producto ? Number(form.producto) : null,
@@ -136,6 +144,7 @@ async function submit() {
         v-model="form.unidad"
         name="unidad-linea"
         label="Unidad"
+        :disabled="Boolean(form.producto)"
         :options="unidades.map((x) => ({ label: x.nombre, value: String(x.id) }))"
       />
     </div>
