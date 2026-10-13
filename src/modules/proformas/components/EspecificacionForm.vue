@@ -136,8 +136,8 @@ function submit() {
       ]"
     />
     <p class="hint">
-      Cada parte puede tener su propio material, espesor, color y dimensiones. Puedes escribir
-      «a elección» si la característica aún no está definida.
+      Cada parte puede tener su propio material, espesor, color y dimensiones. Puedes escribir «a
+      elección» si la característica aún no está definida.
     </p>
     <section v-for="(componente, indice) in componentes" :key="indice" class="component">
       <div class="component-header">
@@ -168,11 +168,7 @@ function submit() {
           label="Espesor"
           placeholder="18 mm"
         />
-        <TextField
-          v-model="componente.color"
-          :name="`componente-color-${indice}`"
-          label="Color"
-        />
+        <TextField v-model="componente.color" :name="`componente-color-${indice}`" label="Color" />
         <TextField
           v-model="componente.dimensiones"
           :name="`componente-dimensiones-${indice}`"
