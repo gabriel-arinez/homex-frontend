@@ -48,6 +48,11 @@ export const proformasService = {
       method: 'POST',
       body,
     }),
+  updateSpec: (id: number, body: EspecificacionMuebleWritable) =>
+    apiRequest<EspecificacionMueble>(`/api/v1/proformas-detalle/${id}/especificacion/editar/`, {
+      method: 'PATCH',
+      body,
+    }),
   options: (concepto: Concepto) =>
     apiRequest<ValorCatalogoPublico[]>(`/api/v1/catalogo/opciones/${qs({ concepto })}`),
   families: () =>
