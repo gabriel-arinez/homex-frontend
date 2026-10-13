@@ -5,7 +5,7 @@
     "base_revision": "deba1de244395dbdcb266f03026630b403768d71"
   },
   "contracts": {
-    "backend_revision": "bc375894036d30cefbc8cdf7c512315aaf1ab971",
+    "backend_revision": "3007f12d282e34b33d1dbfdb9198f3deb8d8e603",
     "nlp_revision": "79efeaf6a8ca738eb3abce414850f973b1962fd8",
     "deploy_revision": "fb9c321324cfc621ac07cc42fdeb1e3257a968ab"
   },

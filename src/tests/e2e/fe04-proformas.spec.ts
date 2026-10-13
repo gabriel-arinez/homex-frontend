@@ -8,7 +8,7 @@ const options = {
   ],
   ESTADO_PROFORMA: [
     { id: 2, concepto_codigo: 'ESTADO_PROFORMA', codigo: 'BORRADOR', nombre: 'Borrador' },
-    { id: 3, concepto_codigo: 'ESTADO_PROFORMA', codigo: 'ENVIADA', nombre: 'Enviada' },
+    { id: 3, concepto_codigo: 'ESTADO_PROFORMA', codigo: 'EN_REVISION', nombre: 'En revisión' },
   ],
   TIPO_ITEM: [
     { id: 10, concepto_codigo: 'TIPO_ITEM', codigo: 'MUEBLE_MEDIDA', nombre: 'Mueble a medida' },
@@ -129,6 +129,13 @@ async function mockBackend(page: Page) {
       body: JSON.stringify({ count: 1, next: null, previous: null, results: [product] }),
     }),
   )
+  await page.route(/\/api\/v1\/catalogo\/familias\/(?:\?.*)?$/, (r) =>
+    r.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ count: 0, next: null, previous: null, results: [] }),
+    }),
+  )
   await page.route(/\/api\/v1\/proformas\/(?:\?.*)?$/, async (r) => {
     if (r.request().method() === 'POST') {
       const body = r.request().postDataJSON()
@@ -159,7 +166,7 @@ async function mockBackend(page: Page) {
       unidad_info: options.UNIDAD_MEDIDA[0],
       precio_antes_snapshot: null,
       precio_ahora_snapshot: null,
-      total: body.modo_calculo === 'TOTAL_NEGOCIADO' ? body.importe_negociado : '300.00',
+      total: String(Number(body.cantidad) * Number(body.precio_unitario) - Number(body.descuento)),
       especificacion: null,
     }
     quote.detalles = [line]
@@ -182,17 +189,24 @@ async function mockBackend(page: Page) {
     quote.detalles[0] = { ...quote.detalles[0], especificacion: spec }
     return r.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(spec) })
   })
+  await page.route('**/api/v1/proformas-detalle/10/especificacion/editar/', async (r) => {
+    const body = r.request().postDataJSON()
+    const spec = Object.assign({}, quote.detalles[0]?.especificacion, body)
+    quote.detalles[0] = { ...quote.detalles[0], especificacion: spec }
+    return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(spec) })
+  })
   await page.route('**/api/v1/proformas/1/enviar/', (r) => {
-    quote.estado_info = { id: 3, codigo: 'ENVIADA', nombre: 'Enviada' }
+    quote.estado_info = { id: 3, codigo: 'EN_REVISION', nombre: 'En revisión' }
     return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(quote) })
   })
-  await page.route('**/api/v1/proformas/1/aprobar/', (r) =>
-    r.fulfill({
+  await page.route('**/api/v1/proformas/1/aprobar/', (r) => {
+    quote.estado_info = { id: 4, codigo: 'APROBADA', nombre: 'Aprobada' }
+    return r.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ pedido_id: 55, estado: 'CONFIRMADO' }),
-    }),
-  )
+    })
+  })
   await page.route('**/api/v1/proformas/1/detalles/10/archivos/', (r) => {
     if (r.request().method() === 'POST') {
       const file = {
@@ -243,7 +257,7 @@ async function noOverflow(page: Page) {
   ).toBe(true)
 }
 
-test('FE04 crea, agrega total negociado, envía, congela y aprueba', async ({ page }) => {
+test('FE04 crea con unitario y descuento, revisa y aprueba', async ({ page }) => {
   await mockBackend(page)
   await page.goto('/proformas')
   await page.getByRole('button', { name: 'Nueva proforma' }).click()
@@ -259,23 +273,31 @@ test('FE04 crea, agrega total negociado, envía, congela y aprueba', async ({ pa
   await page.getByLabel('Nombre comercial').fill('Tres escritorios')
   await page.getByLabel('Cantidad', { exact: true }).fill('3')
   await page.locator('#unidad-linea').selectOption('20')
-  await page.locator('#modo-calculo').selectOption('TOTAL_NEGOCIADO')
-  await page.getByLabel('Total negociado (BOB)').fill('100.00')
+  await page.getByLabel('Precio unitario (BOB)').fill('34.00')
+  await page.getByLabel('Descuento de la línea (BOB)').fill('2.00')
   await page.getByRole('button', { name: 'Guardar línea' }).click()
-  await expect(page.getByText(/total negociado exacto/)).toContainText('Bs 100,00')
+  await expect(page.getByText(/3 ×/)).toContainText('Bs 34,00')
   await page.getByRole('button', { name: 'Editar línea' }).click()
   await page.getByLabel('Nombre comercial').fill('Tres escritorios ejecutivos')
   await page.getByRole('button', { name: 'Guardar línea' }).click()
   await expect(page.getByRole('heading', { name: 'Tres escritorios ejecutivos' })).toBeVisible()
   await page.getByRole('button', { name: 'Agregar especificación' }).click()
   await page.locator('#tipo-mueble').selectOption('30')
-  await page.getByLabel('Dimensiones (JSON opcional)').fill('{"ancho":1.2}')
+  await page.locator('#componente-nombre-0').fill('Mesón')
+  await page.locator('#componente-material-0').fill('Melamina')
+  await page.locator('#componente-espesor-0').fill('25 mm')
+  await page.locator('#componente-dimensiones-0').fill('{"ancho":"1.2 m"}')
   await page.getByRole('button', { name: 'Guardar especificación' }).click()
   await expect(page.getByText('Escritorio', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Editar especificación' }).click()
+  await expect(page.locator('#componente-nombre-0')).toHaveValue('Mesón')
+  await page.locator('#componente-color-0').fill('Nogal')
+  await page.getByRole('button', { name: 'Guardar especificación' }).click()
+  await expect(page.getByRole('button', { name: 'Editar especificación' })).toBeVisible()
   await page.getByRole('button', { name: 'Enviar' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Enviar' }).click()
-  await expect(page.getByText(/modo lectura/)).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Agregar línea' })).toHaveCount(0)
+  await expect(page.getByText('En revisión', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Agregar línea' })).toBeVisible()
   await page.getByRole('button', { name: 'Aprobar' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Aprobar' }).click()
   await expect(page.getByRole('status')).toContainText('Pedido #55')
@@ -324,9 +346,7 @@ test('FE04 representa conflicto de stock y doble aprobación sin éxito aparente
   await expect(page.getByText(/Pedido #/)).toHaveCount(0)
 })
 
-test('FE04 sube imagen válida, rechaza tipo inválido y representa eliminación bloqueada', async ({
-  page,
-}) => {
+test('FE04 mantiene adjuntos editables en revisión y los congela al aprobar', async ({ page }) => {
   const state = await mockBackend(page)
   state.quote().detalles = [
     {
@@ -388,6 +408,9 @@ test('FE04 sube imagen válida, rechaza tipo inválido y representa eliminación
   await expect(page.getByText('La imagen supera el máximo de 10 MiB.')).toBeVisible()
   await page.getByRole('button', { name: 'Enviar' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Enviar' }).click()
+  await expect(page.getByRole('button', { name: 'Eliminar' })).toHaveCount(2)
+  await page.getByRole('button', { name: 'Aprobar' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Aprobar' }).click()
   await expect(page.getByRole('button', { name: 'Eliminar' })).toHaveCount(0)
   await expect(page.getByAltText('Preview de grande.png')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Subir' })).toHaveCount(0)

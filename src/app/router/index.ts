@@ -68,13 +68,13 @@ const router = createRouter({
           path: 'ordenes-trabajo',
           name: 'ordenes-trabajo',
           component: () => import('@/modules/ordenes-trabajo/views/OrdenesTrabajoListView.vue'),
-          meta: { capability: 'comercial.operar' },
+          meta: { capabilitiesAny: ['comercial.operar', 'taller.operar'] },
         },
         {
           path: 'ordenes-trabajo/:id',
           name: 'orden-trabajo-detail',
           component: () => import('@/modules/ordenes-trabajo/views/OrdenTrabajoDetailView.vue'),
-          meta: { capability: 'comercial.operar' },
+          meta: { capabilitiesAny: ['comercial.operar', 'taller.operar'] },
         },
         {
           path: 'recibos',
@@ -157,6 +157,8 @@ export const authGuard: NavigationGuard = async (to) => {
   if (to.meta.requiresAuth && !session.isAuthenticated)
     return { name: 'login', query: { redirect: to.fullPath } }
   if (to.meta.capability && !session.can(to.meta.capability)) return { name: 'forbidden' }
+  if (to.meta.capabilitiesAny && !to.meta.capabilitiesAny.some((value) => session.can(value)))
+    return { name: 'forbidden' }
 }
 router.beforeEach(authGuard)
 export default router

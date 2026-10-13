@@ -150,6 +150,7 @@ describe('FE06 capturas y HITL', () => {
     )
     const w = await view()
     await flushPromises()
+    await w.get('#unitario').setValue('33.34')
     await w.get('form').trigger('submit')
     await w
       .findAll('button')
@@ -160,7 +161,7 @@ describe('FE06 capturas y HITL', () => {
     expect(body).toMatchObject({
       intento_id: 8,
       item_ia_id: 20,
-      linea_comercial: { modo_calculo: 'TOTAL_NEGOCIADO', importe_negociado: '100.00' },
+      linea_comercial: { modo_calculo: 'PRECIO_UNITARIO', precio_unitario: '33.34' },
     })
   })
   it('bloquea una captura ya confirmada', async () => {

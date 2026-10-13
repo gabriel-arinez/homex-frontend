@@ -2860,3 +2860,9 @@ El objetivo no es completar pantallas lo más rápido posible. El objetivo es qu
 FE09 implementada y fusionada; D07 RC2 referencia frontend 479a092462b36a90006eb1c52f9570ea63084bab e imagen frontend-proxy fijada por digest. D07 se fusionó en main de deploy como implementación; dispositivos físicos, perímetro privado completo y piloto mantienen el cierre productivo pendiente.
 
 La descripción completa, los gates ejecutados, sus límites y el orden de reanudación están en [trazabilidad D07 RC2](D07_TRAZABILIDAD_INTERREPOSITORIO_20261011.md). Este registro actualiza el **estado** de las fases sin reemplazar sus requisitos originales ni atribuir éxito a puertas todavía pendientes.
+
+## Actualización AP6 — editor comercial
+
+El editor AP6, la adaptación HITL y el acceso por capacidad de taller se documentan en
+[AP6_EDITOR_COMERCIAL.md](implementacion/AP6_EDITOR_COMERCIAL.md). Esta actualización consume el
+OpenAPI autoritativo y no calcula stock, totales ni permisos en Vue.

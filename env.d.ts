@@ -16,5 +16,6 @@ declare module 'vue-router' {
     public?: boolean
     requiresAuth?: boolean
     capability?: import('@/modules/auth/types/session').Capability
+    capabilitiesAny?: import('@/modules/auth/types/session').Capability[]
   }
 }

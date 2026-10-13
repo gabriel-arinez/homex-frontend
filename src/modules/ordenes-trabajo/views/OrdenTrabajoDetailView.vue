@@ -50,8 +50,10 @@ const detailRows = computed(() =>
   (item.value?.detalles ?? []).map((line) => ({
     ...line,
     unidadLabel: line.unidad_info.nombre,
-    modoLabel: String(line.modo_calculo).replace(/_/g, ' '),
-    totalLabel: `Bs ${Number(line.total).toFixed(2)}`,
+    trabajoLabel: line.especificacion ? 'Fabricación' : 'Preparación y verificación',
+    detalleLabel: line.especificacion
+      ? line.especificacion.color_principal || 'Características a elección'
+      : 'Ítem de catálogo',
   })),
 )
 
@@ -59,8 +61,8 @@ const columns = [
   { key: 'nombre', label: 'Ítem' },
   { key: 'cantidad', label: 'Cantidad' },
   { key: 'unidad', label: 'Unidad' },
-  { key: 'modo', label: 'Cálculo' },
-  { key: 'total', label: 'Total' },
+  { key: 'trabajo', label: 'Trabajo' },
+  { key: 'detalle', label: 'Detalle de taller' },
 ]
 </script>
 
@@ -131,8 +133,8 @@ const columns = [
             ><strong>{{ row.nombre }}</strong></template
           >
           <template #cell-unidad="{ row }">{{ row.unidadLabel }}</template>
-          <template #cell-modo="{ row }">{{ row.modoLabel }}</template>
-          <template #cell-total="{ row }">{{ row.totalLabel }}</template>
+          <template #cell-trabajo="{ row }">{{ row.trabajoLabel }}</template>
+          <template #cell-detalle="{ row }">{{ row.detalleLabel }}</template>
         </DataTable>
       </section>
     </template>

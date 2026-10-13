@@ -6,6 +6,7 @@ import type {
   DetalleProformaWritable,
   EspecificacionMueble,
   EspecificacionMuebleWritable,
+  PaginatedFamiliaProductoList,
   PaginatedProformaListadoList,
   PatchedDetalleProformaWritable,
   PatchedProformaWritable,
@@ -30,19 +31,32 @@ export const proformasService = {
   update: (id: number, body: PatchedProformaWritable) =>
     apiRequest<Proforma>(`/api/v1/proformas/${id}/`, { method: 'PATCH', body }),
   send: (id: number) => apiRequest<Proforma>(`/api/v1/proformas/${id}/enviar/`, { method: 'POST' }),
+  markNotCompleted: (id: number) =>
+    apiRequest<Proforma>(`/api/v1/proformas/${id}/no-concretar/`, { method: 'POST' }),
+  reopen: (id: number) =>
+    apiRequest<Proforma>(`/api/v1/proformas/${id}/reabrir/`, { method: 'POST' }),
   approve: (id: number) =>
     apiRequest<AprobarProformaRespuesta>(`/api/v1/proformas/${id}/aprobar/`, { method: 'POST' }),
   addDetail: (id: number, body: DetalleProformaWritable) =>
     apiRequest<DetalleProforma>(`/api/v1/proformas/${id}/detalles/`, { method: 'POST', body }),
   updateDetail: (id: number, body: PatchedDetalleProformaWritable) =>
     apiRequest<DetalleProforma>(`/api/v1/proformas-detalle/${id}/`, { method: 'PATCH', body }),
+  removeDetail: (id: number) =>
+    apiRequest<void>(`/api/v1/proformas-detalle/${id}/`, { method: 'DELETE' }),
   addSpec: (id: number, body: EspecificacionMuebleWritable) =>
     apiRequest<EspecificacionMueble>(`/api/v1/proformas-detalle/${id}/especificacion/`, {
       method: 'POST',
       body,
     }),
+  updateSpec: (id: number, body: EspecificacionMuebleWritable) =>
+    apiRequest<EspecificacionMueble>(`/api/v1/proformas-detalle/${id}/especificacion/editar/`, {
+      method: 'PATCH',
+      body,
+    }),
   options: (concepto: Concepto) =>
     apiRequest<ValorCatalogoPublico[]>(`/api/v1/catalogo/opciones/${qs({ concepto })}`),
+  families: () =>
+    apiRequest<PaginatedFamiliaProductoList>('/api/v1/catalogo/familias/?page_size=100'),
   attachments: (p: number, d: number) =>
     apiRequest<ArchivoAdjunto[]>(`/api/v1/proformas/${p}/detalles/${d}/archivos/`),
   upload: (p: number, d: number, file: File) => {

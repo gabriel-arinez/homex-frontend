@@ -41,56 +41,71 @@ useFocusTrap(
 )
 const groups: Array<{
   label: string
-  items: Array<{ label: string; to: string; icon: unknown; capability?: Capability }>
+  items: Array<{
+    label: string
+    to: string
+    icon: unknown
+    capabilities?: Capability[]
+  }>
 }> = [
   {
     label: 'General',
     items: [
-      { label: 'Resumen', to: '/resumen', icon: LayoutDashboard, capability: 'comercial.operar' },
+      {
+        label: 'Resumen',
+        to: '/resumen',
+        icon: LayoutDashboard,
+        capabilities: ['comercial.operar'],
+      },
     ],
   },
   {
     label: 'Comercial',
     items: [
-      { label: 'Clientes', to: '/clientes', icon: Users, capability: 'comercial.operar' },
-      { label: 'Proformas', to: '/proformas', icon: FileText, capability: 'comercial.operar' },
-      { label: 'Productos', to: '/productos', icon: PackageOpen, capability: 'comercial.operar' },
+      { label: 'Clientes', to: '/clientes', icon: Users, capabilities: ['comercial.operar'] },
+      { label: 'Proformas', to: '/proformas', icon: FileText, capabilities: ['comercial.operar'] },
+      {
+        label: 'Productos',
+        to: '/productos',
+        icon: PackageOpen,
+        capabilities: ['comercial.operar'],
+      },
     ],
   },
   {
     label: 'Operaciones',
     items: [
-      { label: 'Pedidos', to: '/pedidos', icon: ClipboardList, capability: 'comercial.operar' },
+      { label: 'Pedidos', to: '/pedidos', icon: ClipboardList, capabilities: ['comercial.operar'] },
       {
         label: 'Órdenes de trabajo',
         to: '/ordenes-trabajo',
         icon: Hammer,
-        capability: 'comercial.operar',
+        capabilities: ['comercial.operar', 'taller.operar'],
       },
       {
         label: 'Notas de entrega',
         to: '/notas-entrega',
         icon: Truck,
-        capability: 'comercial.operar',
+        capabilities: ['comercial.operar'],
       },
       {
         label: 'Movimientos de stock',
         to: '/movimientos-stock',
         icon: History,
-        capability: 'comercial.operar',
+        capabilities: ['comercial.operar'],
       },
     ],
   },
   {
     label: 'Finanzas',
     items: [
-      { label: 'Recibos', to: '/recibos', icon: ReceiptText, capability: 'comercial.operar' },
+      { label: 'Recibos', to: '/recibos', icon: ReceiptText, capabilities: ['comercial.operar'] },
     ],
   },
   {
     label: 'Inteligencia',
     items: [
-      { label: 'Capturas', to: '/capturas', icon: AudioLines, capability: 'comercial.operar' },
+      { label: 'Capturas', to: '/capturas', icon: AudioLines, capabilities: ['comercial.operar'] },
     ],
   },
 ]
@@ -107,7 +122,9 @@ const visibleGroups = computed(() =>
   groups
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => session.can(item.capability)),
+      items: group.items.filter(
+        (item) => !item.capabilities || item.capabilities.some((value) => session.can(value)),
+      ),
     }))
     .filter((group) => group.items.length > 0),
 )

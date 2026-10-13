@@ -128,15 +128,28 @@ export type DescuentoProducto = {
   producto: number
 }
 
+export type DetalleOrdenTrabajo = {
+  readonly id: number
+  tipo_item_info: ValorCatalogoResumen
+  readonly producto: number | null
+  readonly familia_producto: number | null
+  readonly nombre: string
+  readonly descripcion: string | null
+  readonly cantidad: string
+  unidad_info: ValorCatalogoResumen
+  especificacion: EspecificacionMueble | null
+}
+
 export type DetalleProforma = {
   readonly id: number
   readonly proforma: number
   tipo_item: number
   tipo_item_info: ValorCatalogoResumen
   producto?: number | null
+  familia_producto?: number | null
   nombre: string
   descripcion?: string | null
-  cantidad: number
+  cantidad: string
   unidad: number
   unidad_info: ValorCatalogoResumen
   modo_calculo?: string
@@ -171,6 +184,9 @@ export type EspecificacionMueble = {
   dimensiones?: unknown
   accesorios?: unknown
   observaciones?: string | null
+  componentes?: unknown
+  texto_original?: string | null
+  advertencias?: unknown
 }
 
 /**
@@ -179,6 +195,14 @@ export type EspecificacionMueble = {
  * * `ENTREGADO` - ENTREGADO
  */
 export type EstadoCodigoEnum = 'EN_PRODUCCION' | 'LISTO_ENTREGA' | 'ENTREGADO'
+
+export type FamiliaProducto = {
+  readonly id: number
+  codigo: string
+  nombre: string
+  descripcion?: string | null
+  activo?: boolean
+}
 
 export type IdentidadActual = {
   readonly id: number
@@ -225,16 +249,14 @@ export type LineaComercialHitl = {
   unidad_id: number
   modo_calculo: ModoCalculoEnum
   precio_unitario?: string | null
-  importe_negociado?: string | null
   descripcion?: string | null
   tipo_mueble_id?: number | null
 }
 
 /**
  * * `PRECIO_UNITARIO` - PRECIO_UNITARIO
- * * `TOTAL_NEGOCIADO` - TOTAL_NEGOCIADO
  */
-export type ModoCalculoEnum = 'PRECIO_UNITARIO' | 'TOTAL_NEGOCIADO'
+export type ModoCalculoEnum = 'PRECIO_UNITARIO'
 
 /**
  * * `BOB` - BOB
@@ -247,7 +269,7 @@ export type MovimientoStock = {
   readonly fecha: string
   readonly tipo_movimiento: number
   tipo_movimiento_info: ValorCatalogoMovimiento
-  readonly cantidad: number
+  readonly cantidad: string
   readonly producto: number
   producto_resumen: ProductoResumenMovimiento
   readonly pedido: number | null
@@ -284,7 +306,7 @@ export type OrdenTrabajo = {
   estado_info: ValorCatalogoResumen
   readonly created_by: number | null
   readonly updated_by: number | null
-  readonly detalles: Array<DetalleProforma>
+  readonly detalles: Array<DetalleOrdenTrabajo>
 }
 
 export type PaginatedClienteList = {
@@ -292,6 +314,13 @@ export type PaginatedClienteList = {
   next?: string | null
   previous?: string | null
   results: Array<Cliente>
+}
+
+export type PaginatedFamiliaProductoList = {
+  count: number
+  next?: string | null
+  previous?: string | null
+  results: Array<FamiliaProducto>
 }
 
 export type PaginatedMovimientoStockList = {
@@ -345,9 +374,10 @@ export type PatchedDetalleProforma = {
   tipo_item?: number
   tipo_item_info?: ValorCatalogoResumen
   producto?: number | null
+  familia_producto?: number | null
   nombre?: string
   descripcion?: string | null
-  cantidad?: number
+  cantidad?: string
   unidad?: number
   unidad_info?: ValorCatalogoResumen
   modo_calculo?: string
@@ -360,16 +390,42 @@ export type PatchedDetalleProforma = {
   especificacion?: EspecificacionMueble
 }
 
+export type PatchedEspecificacionMueble = {
+  readonly id?: number
+  readonly proforma_detalle?: number
+  tipo_mueble?: number | null
+  tipo_mueble_info?: ValorCatalogoResumen | null
+  schema_version?: number
+  espesor?: unknown
+  color_principal?: string | null
+  color_secundario?: string | null
+  dimensiones?: unknown
+  accesorios?: unknown
+  observaciones?: string | null
+  componentes?: unknown
+  texto_original?: string | null
+  advertencias?: unknown
+}
+
+export type PatchedFamiliaProducto = {
+  readonly id?: number
+  codigo?: string
+  nombre?: string
+  descripcion?: string | null
+  activo?: boolean
+}
+
 export type PatchedProducto = {
   readonly id?: number
   categoria?: number
+  familia?: number | null
   sku?: string | null
   nombre?: string
   precio_lista?: string
   readonly precio_vigente?: string
-  readonly stock?: number
-  readonly demanda_pendiente?: number
-  readonly disponibilidad_referencial?: number
+  readonly stock?: string
+  readonly demanda_pendiente?: string
+  readonly disponibilidad_referencial?: string
   unidad_stock?: number
   activo?: boolean
   observaciones?: string | null
@@ -445,13 +501,14 @@ export type Pedido = {
 export type Producto = {
   readonly id: number
   categoria: number
+  familia?: number | null
   sku?: string | null
   nombre: string
   precio_lista?: string
   readonly precio_vigente: string
-  readonly stock: number
-  readonly demanda_pendiente: number
-  readonly disponibilidad_referencial: number
+  readonly stock: string
+  readonly demanda_pendiente: string
+  readonly disponibilidad_referencial: string
   unidad_stock: number
   activo?: boolean
   observaciones?: string | null
@@ -637,12 +694,17 @@ export type DescuentoProductoWritable = {
   producto: number
 }
 
+export type DetalleOrdenTrabajoWritable = {
+  [key: string]: unknown
+}
+
 export type DetalleProformaWritable = {
   tipo_item: number
   producto?: number | null
+  familia_producto?: number | null
   nombre: string
   descripcion?: string | null
-  cantidad: number
+  cantidad: string
   unidad: number
   modo_calculo?: string
   precio_unitario?: string
@@ -659,6 +721,16 @@ export type EspecificacionMuebleWritable = {
   dimensiones?: unknown
   accesorios?: unknown
   observaciones?: string | null
+  componentes?: unknown
+  texto_original?: string | null
+  advertencias?: unknown
+}
+
+export type FamiliaProductoWritable = {
+  codigo: string
+  nombre: string
+  descripcion?: string | null
+  activo?: boolean
 }
 
 export type OrdenTrabajoWritable = {
@@ -670,6 +742,13 @@ export type PaginatedClienteListWritable = {
   next?: string | null
   previous?: string | null
   results: Array<ClienteWritable>
+}
+
+export type PaginatedFamiliaProductoListWritable = {
+  count: number
+  next?: string | null
+  previous?: string | null
+  results: Array<FamiliaProductoWritable>
 }
 
 export type PaginatedMovimientoStockListWritable = {
@@ -716,9 +795,10 @@ export type PatchedDescuentoProductoWritable = {
 export type PatchedDetalleProformaWritable = {
   tipo_item?: number
   producto?: number | null
+  familia_producto?: number | null
   nombre?: string
   descripcion?: string | null
-  cantidad?: number
+  cantidad?: string
   unidad?: number
   modo_calculo?: string
   precio_unitario?: string
@@ -726,8 +806,30 @@ export type PatchedDetalleProformaWritable = {
   descuento?: string
 }
 
+export type PatchedEspecificacionMuebleWritable = {
+  tipo_mueble?: number | null
+  schema_version?: number
+  espesor?: unknown
+  color_principal?: string | null
+  color_secundario?: string | null
+  dimensiones?: unknown
+  accesorios?: unknown
+  observaciones?: string | null
+  componentes?: unknown
+  texto_original?: string | null
+  advertencias?: unknown
+}
+
+export type PatchedFamiliaProductoWritable = {
+  codigo?: string
+  nombre?: string
+  descripcion?: string | null
+  activo?: boolean
+}
+
 export type PatchedProductoWritable = {
   categoria?: number
+  familia?: number | null
   sku?: string | null
   nombre?: string
   precio_lista?: string
@@ -752,6 +854,7 @@ export type PatchedProformaWritable = {
 
 export type ProductoWritable = {
   categoria: number
+  familia?: number | null
   sku?: string | null
   nombre: string
   precio_lista?: string
@@ -1009,6 +1112,122 @@ export type V1CatalogoDescuentosUpdateResponses = {
 
 export type V1CatalogoDescuentosUpdateResponse =
   V1CatalogoDescuentosUpdateResponses[keyof V1CatalogoDescuentosUpdateResponses]
+
+export type V1CatalogoFamiliasListData = {
+  body?: never
+  path?: never
+  query?: {
+    /**
+     * Un número de página dentro del conjunto de resultados paginado.
+     */
+    page?: number
+    /**
+     * Número de resultados a devolver por página.
+     */
+    page_size?: number
+  }
+  url: '/api/v1/catalogo/familias/'
+}
+
+export type V1CatalogoFamiliasListResponses = {
+  200: PaginatedFamiliaProductoList
+}
+
+export type V1CatalogoFamiliasListResponse =
+  V1CatalogoFamiliasListResponses[keyof V1CatalogoFamiliasListResponses]
+
+export type V1CatalogoFamiliasCreateData = {
+  body: FamiliaProductoWritable
+  path?: never
+  query?: never
+  url: '/api/v1/catalogo/familias/'
+}
+
+export type V1CatalogoFamiliasCreateResponses = {
+  201: FamiliaProducto
+}
+
+export type V1CatalogoFamiliasCreateResponse =
+  V1CatalogoFamiliasCreateResponses[keyof V1CatalogoFamiliasCreateResponses]
+
+export type V1CatalogoFamiliasDestroyData = {
+  body?: never
+  path: {
+    /**
+     * Un valor de entero único que identifique este familia producto.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/catalogo/familias/{id}/'
+}
+
+export type V1CatalogoFamiliasDestroyResponses = {
+  /**
+   * No response body
+   */
+  204: void
+}
+
+export type V1CatalogoFamiliasDestroyResponse =
+  V1CatalogoFamiliasDestroyResponses[keyof V1CatalogoFamiliasDestroyResponses]
+
+export type V1CatalogoFamiliasRetrieveData = {
+  body?: never
+  path: {
+    /**
+     * Un valor de entero único que identifique este familia producto.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/catalogo/familias/{id}/'
+}
+
+export type V1CatalogoFamiliasRetrieveResponses = {
+  200: FamiliaProducto
+}
+
+export type V1CatalogoFamiliasRetrieveResponse =
+  V1CatalogoFamiliasRetrieveResponses[keyof V1CatalogoFamiliasRetrieveResponses]
+
+export type V1CatalogoFamiliasPartialUpdateData = {
+  body?: PatchedFamiliaProductoWritable
+  path: {
+    /**
+     * Un valor de entero único que identifique este familia producto.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/catalogo/familias/{id}/'
+}
+
+export type V1CatalogoFamiliasPartialUpdateResponses = {
+  200: FamiliaProducto
+}
+
+export type V1CatalogoFamiliasPartialUpdateResponse =
+  V1CatalogoFamiliasPartialUpdateResponses[keyof V1CatalogoFamiliasPartialUpdateResponses]
+
+export type V1CatalogoFamiliasUpdateData = {
+  body: FamiliaProductoWritable
+  path: {
+    /**
+     * Un valor de entero único que identifique este familia producto.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/catalogo/familias/{id}/'
+}
+
+export type V1CatalogoFamiliasUpdateResponses = {
+  200: FamiliaProducto
+}
+
+export type V1CatalogoFamiliasUpdateResponse =
+  V1CatalogoFamiliasUpdateResponses[keyof V1CatalogoFamiliasUpdateResponses]
 
 export type V1CatalogoOpcionesListData = {
   body?: never
@@ -1844,6 +2063,35 @@ export type V1ProformasCreateResponses = {
 
 export type V1ProformasCreateResponse = V1ProformasCreateResponses[keyof V1ProformasCreateResponses]
 
+export type V1ProformasDetalleDestroyData = {
+  body?: never
+  path: {
+    /**
+     * Un valor de entero único que identifique este detalle proforma.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/proformas-detalle/{id}/'
+}
+
+export type V1ProformasDetalleDestroyErrors = {
+  /**
+   * Conflicto con el estado actual o con una regla comercial concurrente.
+   */
+  409: unknown
+}
+
+export type V1ProformasDetalleDestroyResponses = {
+  /**
+   * No response body
+   */
+  204: void
+}
+
+export type V1ProformasDetalleDestroyResponse =
+  V1ProformasDetalleDestroyResponses[keyof V1ProformasDetalleDestroyResponses]
+
 export type V1ProformasDetallePartialUpdateData = {
   body?: PatchedDetalleProformaWritable
   path: {
@@ -1895,6 +2143,32 @@ export type V1ProformasDetalleEspecificacionCreateResponses = {
 
 export type V1ProformasDetalleEspecificacionCreateResponse =
   V1ProformasDetalleEspecificacionCreateResponses[keyof V1ProformasDetalleEspecificacionCreateResponses]
+
+export type V1ProformasDetalleEspecificacionEditarPartialUpdateData = {
+  body?: PatchedEspecificacionMuebleWritable
+  path: {
+    /**
+     * Un valor de entero único que identifique este detalle proforma.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/proformas-detalle/{id}/especificacion/editar/'
+}
+
+export type V1ProformasDetalleEspecificacionEditarPartialUpdateErrors = {
+  /**
+   * Conflicto con el estado actual o con una regla comercial concurrente.
+   */
+  409: unknown
+}
+
+export type V1ProformasDetalleEspecificacionEditarPartialUpdateResponses = {
+  200: EspecificacionMueble
+}
+
+export type V1ProformasDetalleEspecificacionEditarPartialUpdateResponse =
+  V1ProformasDetalleEspecificacionEditarPartialUpdateResponses[keyof V1ProformasDetalleEspecificacionEditarPartialUpdateResponses]
 
 export type V1ProformasRetrieveData = {
   body?: never
@@ -2140,6 +2414,58 @@ export type V1ProformasEnviarCreateResponses = {
 
 export type V1ProformasEnviarCreateResponse =
   V1ProformasEnviarCreateResponses[keyof V1ProformasEnviarCreateResponses]
+
+export type V1ProformasNoConcretarCreateData = {
+  body?: never
+  path: {
+    /**
+     * Un valor de entero único que identifique este proforma.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/proformas/{id}/no-concretar/'
+}
+
+export type V1ProformasNoConcretarCreateErrors = {
+  /**
+   * Conflicto con el estado actual o con una regla comercial concurrente.
+   */
+  409: unknown
+}
+
+export type V1ProformasNoConcretarCreateResponses = {
+  200: Proforma
+}
+
+export type V1ProformasNoConcretarCreateResponse =
+  V1ProformasNoConcretarCreateResponses[keyof V1ProformasNoConcretarCreateResponses]
+
+export type V1ProformasReabrirCreateData = {
+  body?: never
+  path: {
+    /**
+     * Un valor de entero único que identifique este proforma.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/proformas/{id}/reabrir/'
+}
+
+export type V1ProformasReabrirCreateErrors = {
+  /**
+   * Conflicto con el estado actual o con una regla comercial concurrente.
+   */
+  409: unknown
+}
+
+export type V1ProformasReabrirCreateResponses = {
+  200: Proforma
+}
+
+export type V1ProformasReabrirCreateResponse =
+  V1ProformasReabrirCreateResponses[keyof V1ProformasReabrirCreateResponses]
 
 export type V1RecibosListData = {
   body?: never
