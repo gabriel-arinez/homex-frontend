@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type {
   DetalleProforma,
   DetalleProformaWritable,
+  FamiliaProducto,
   Proforma,
   ValorCatalogoPublico,
 } from '@/generated/api'
@@ -42,11 +43,12 @@ const emit = defineEmits<{ openMenu: [] }>(),
   lineModal = ref(false),
   specLine = ref<DetalleProforma | null>(null),
   editingLine = ref<DetalleProforma | null>(null),
-  confirmAction = ref<'send' | 'approve' | null>(null),
+  confirmAction = ref<'send' | 'approve' | 'not-completed' | 'reopen' | null>(null),
   tipos = ref<ValorCatalogoPublico[]>([]),
   unidades = ref<ValorCatalogoPublico[]>([]),
   tiposMueble = ref<ValorCatalogoPublico[]>([]),
   monedas = ref<ValorCatalogoPublico[]>([])
+const familias = ref<FamiliaProducto[]>([])
 const header = reactive({
   cliente: '',
   moneda: '',
@@ -60,8 +62,10 @@ const header = reactive({
   prospecto_celular: '',
   prospecto_direccion: '',
 })
-const editable = computed(() => quote.value?.estado_info.codigo === 'BORRADOR'),
-  sent = computed(() => quote.value?.estado_info.codigo === 'ENVIADA'),
+const editable = computed(() =>
+    ['BORRADOR', 'EN_REVISION'].includes(quote.value?.estado_info.codigo ?? ''),
+  ),
+  sent = computed(() => ['EN_REVISION', 'ENVIADA'].includes(quote.value?.estado_info.codigo ?? '')),
   money = (v: string) =>
     new Intl.NumberFormat('es-BO', {
       style: 'currency',
@@ -188,11 +192,17 @@ async function transition() {
   try {
     if (action === 'send') {
       quote.value = await proformasService.send(id)
-      success.value = 'Proforma enviada. Sus datos quedaron congelados.'
-    } else {
+      success.value = 'Proforma enviada a revisión.'
+    } else if (action === 'approve') {
       const result = await proformasService.approve(id)
       success.value = `Proforma aprobada. Pedido #${result.pedido_id} confirmado.`
       await load()
+    } else if (action === 'not-completed') {
+      quote.value = await proformasService.markNotCompleted(id)
+      success.value = 'Proforma marcada como no concretada.'
+    } else {
+      quote.value = await proformasService.reopen(id)
+      success.value = 'Proforma reabierta en revisión.'
     }
   } catch (e) {
     const message = conflict(e, 'No se pudo completar la transición.')
@@ -229,20 +239,43 @@ function closeLine() {
   lineModal.value = false
   editingLine.value = null
 }
+async function focusDuplicate(productId: number) {
+  const line = quote.value?.detalles.find((item) => item.producto === productId)
+  if (!line) return
+  closeLine()
+  success.value = 'La variante ya estaba incluida; no se modificó su cantidad ni su precio.'
+  await nextTick()
+  document.querySelector<HTMLElement>(`#linea-${line.id}`)?.focus()
+}
+async function removeLine(line: DetalleProforma) {
+  if (processing.value) return
+  processing.value = true
+  try {
+    await proformasService.removeDetail(line.id)
+    success.value = 'Línea eliminada.'
+    await load()
+  } catch (e) {
+    error.value = await recoverConflict(e, 'No se pudo eliminar la línea.')
+  } finally {
+    processing.value = false
+  }
+}
 async function loadReferences() {
   referenceLoading.value = true
   referenceError.value = ''
   try {
-    const [a, b, c, d] = await Promise.all([
+    const [a, b, c, d, e] = await Promise.all([
       proformasService.options('TIPO_ITEM'),
       proformasService.options('UNIDAD_MEDIDA'),
       proformasService.options('TIPO_MUEBLE'),
       proformasService.options('MONEDA'),
+      proformasService.families(),
     ])
     tipos.value = a
     unidades.value = b
     tiposMueble.value = c
     monedas.value = d
+    familias.value = e.results
   } catch (e) {
     referenceError.value =
       e instanceof Error ? e.message : 'No se pudieron cargar los datos auxiliares.'
@@ -283,6 +316,16 @@ onMounted(() => {
           >Enviar</Button
         ><Button v-if="quote && sent" :disabled="processing" @click="confirmAction = 'approve'"
           >Aprobar</Button
+        ><Button
+          v-if="quote?.estado_info.codigo === 'EN_REVISION'"
+          variant="secondary"
+          @click="confirmAction = 'not-completed'"
+          >No concretada</Button
+        ><Button
+          v-if="quote?.estado_info.codigo === 'NO_CONCRETADA'"
+          variant="secondary"
+          @click="confirmAction = 'reopen'"
+          >Reabrir</Button
         ></template
       ></PageHeader
     ><LoadingSkeleton v-if="loading" :lines="8" /><ErrorState
@@ -402,8 +445,8 @@ onMounted(() => {
           </div>
         </dl>
         <p v-if="!editable" class="freeze">
-          Esta proforma está {{ quote.estado_info.nombre.toLowerCase() }}. Los datos comerciales y
-          adjuntos están en modo lectura.
+          Esta proforma está {{ quote.estado_info.nombre.toLowerCase() }} y permanece en modo
+          lectura.
         </p></Card
       >
       <section class="lines">
@@ -419,7 +462,13 @@ onMounted(() => {
             >Agregar línea</Button
           >
         </div>
-        <article v-for="line in quote.detalles" :key="line.id" class="line">
+        <article
+          v-for="line in quote.detalles"
+          :id="`linea-${line.id}`"
+          :key="line.id"
+          class="line"
+          tabindex="-1"
+        >
           <header>
             <div>
               <small>{{ line.tipo_item_info.nombre }} · {{ line.unidad_info.nombre }}</small>
@@ -433,6 +482,9 @@ onMounted(() => {
               >total negociado exacto {{ money(line.importe_negociado || line.total) }}</template
             ><template v-else>{{ money(line.precio_unitario ?? '0') }}</template>
           </p>
+          <p v-if="line.familia_producto && !line.producto" class="promotion">
+            Variante pendiente de selección antes de aprobar. No reserva existencias.
+          </p>
           <p v-if="line.precio_antes_snapshot" class="promotion">
             Promoción aplicada: antes {{ money(line.precio_antes_snapshot) }}, ahora
             {{ money(line.precio_ahora_snapshot || line.precio_unitario || '0') }} por unidad.
@@ -443,6 +495,7 @@ onMounted(() => {
           </div>
           <div v-if="editable" class="actions">
             <Button variant="secondary" @click="openEdit(line)">Editar línea</Button
+            ><Button variant="secondary" @click="removeLine(line)">Eliminar línea</Button
             ><Button
               v-if="line.tipo_item_info.codigo === 'MUEBLE_MEDIDA' && !line.especificacion"
               variant="secondary"
@@ -482,11 +535,16 @@ onMounted(() => {
       ><DetalleForm
         :tipos
         :unidades
+        :familias
+        :existing-product-ids="
+          quote?.detalles.flatMap((line) => (line.producto ? [line.producto] : []))
+        "
         :moneda="quote?.moneda_info.codigo || 'BOB'"
         :detail="editingLine || undefined"
         :processing="processing"
         :external-error="lineError"
         @save="saveLine"
+        @duplicate-product="focusDuplicate"
         @cancel="closeLine" /></Modal
     ><Modal :open="Boolean(specLine)" title="Especificación del mueble" @close="specLine = null"
       ><EspecificacionForm
@@ -497,13 +555,27 @@ onMounted(() => {
         @cancel="specLine = null" /></Modal
     ><ConfirmDialog
       :open="Boolean(confirmAction)"
-      :title="confirmAction === 'approve' ? 'Aprobar proforma' : 'Enviar proforma'"
+      :title="
+        confirmAction === 'approve'
+          ? 'Aprobar proforma'
+          : confirmAction === 'not-completed'
+            ? 'Marcar no concretada'
+            : confirmAction === 'reopen'
+              ? 'Reabrir proforma'
+              : 'Enviar proforma'
+      "
       :description="
         confirmAction === 'approve'
           ? 'Se confirmará el pedido y se descontará el stock disponible.'
-          : 'La información quedará congelada y lista para aprobación.'
+          : confirmAction === 'not-completed'
+            ? 'La cotización quedará registrada como no concretada y podrá reabrirse.'
+            : confirmAction === 'reopen'
+              ? 'La proforma volverá a borrador.'
+              : 'La información quedará disponible para revisión y posterior aprobación.'
       "
-      :confirm-label="confirmAction === 'approve' ? 'Aprobar' : 'Enviar'"
+      :confirm-label="
+        confirmAction === 'approve' ? 'Aprobar' : confirmAction === 'send' ? 'Enviar' : 'Confirmar'
+      "
       @close="confirmAction = null"
       @confirm="transition"
     />

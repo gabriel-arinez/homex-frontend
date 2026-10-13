@@ -35,9 +35,8 @@ const emit = defineEmits<{ openMenu: [] }>(),
     tipo_item_id: '',
     unidad_id: '',
     tipo_mueble_id: '',
-    modo_calculo: 'TOTAL_NEGOCIADO',
+    modo_calculo: 'PRECIO_UNITARIO',
     precio_unitario: '',
-    importe_negociado: '',
     descripcion: '',
   })
 let poll: number | undefined,
@@ -73,7 +72,7 @@ function initialize() {
     dimensiones: json(x.dimensiones),
     accesorios: json(x.accesorios),
     observaciones: x.observaciones ?? '',
-    importe_negociado: x.precio_total ?? '',
+    precio_unitario: '',
   }
   const t = types.value.find((x) => x.codigo === 'MUEBLE_MEDIDA'),
     u = units.value.find((x) => x.codigo === 'PIEZA')
@@ -126,11 +125,8 @@ async function submit() {
         tipo_item_id: Number(form.value.tipo_item_id),
         unidad_id: Number(form.value.unidad_id),
         tipo_mueble_id: form.value.tipo_mueble_id ? Number(form.value.tipo_mueble_id) : null,
-        modo_calculo: form.value.modo_calculo as 'PRECIO_UNITARIO' | 'TOTAL_NEGOCIADO',
-        precio_unitario:
-          form.value.modo_calculo === 'PRECIO_UNITARIO' ? form.value.precio_unitario : null,
-        importe_negociado:
-          form.value.modo_calculo === 'TOTAL_NEGOCIADO' ? form.value.importe_negociado : null,
+        modo_calculo: 'PRECIO_UNITARIO',
+        precio_unitario: form.value.precio_unitario,
         descripcion: form.value.descripcion || null,
       },
     }
@@ -240,6 +236,10 @@ onBeforeUnmount(() => {
               La captura ya está vinculada a una línea comercial y no puede confirmarse otra vez.
             </p>
             <form v-else @submit.prevent="confirmOpen = true">
+              <p v-if="capture.item_ia?.precio_total" class="hint">
+                La IA propuso un total de {{ capture.item_ia.precio_total }}. Define el precio
+                unitario comercial explícitamente; el sistema no convertirá ni redondeará ese total.
+              </p>
               <TextField
                 v-model="form.nombre"
                 label="Nombre del mueble"
@@ -309,25 +309,7 @@ onBeforeUnmount(() => {
                   { label: 'Sin clasificar', value: '' },
                   ...furniture.map((x) => ({ label: x.nombre, value: String(x.id) })),
                 ]"
-              /><Select
-                v-model="form.modo_calculo"
-                name="modo"
-                label="Forma comercial"
-                :options="[
-                  { label: 'Total negociado', value: 'TOTAL_NEGOCIADO' },
-                  { label: 'Precio unitario', value: 'PRECIO_UNITARIO' },
-                ]"
               /><TextField
-                v-if="form.modo_calculo === 'TOTAL_NEGOCIADO'"
-                v-model="form.importe_negociado"
-                label="Total negociado"
-                name="total"
-                type="number"
-                min="0"
-                step="0.01"
-                required
-              /><TextField
-                v-else
                 v-model="form.precio_unitario"
                 label="Precio unitario"
                 name="unitario"

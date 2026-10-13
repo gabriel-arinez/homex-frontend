@@ -3,6 +3,7 @@ import { computed, reactive, ref } from 'vue'
 import type {
   DetalleProforma,
   DetalleProformaWritable,
+  FamiliaProducto,
   Producto,
   ValorCatalogoPublico,
 } from '@/generated/api'
@@ -15,31 +16,53 @@ import { ApiError } from '@/shared/api'
 const props = defineProps<{
   tipos: ValorCatalogoPublico[]
   unidades: ValorCatalogoPublico[]
+  familias?: FamiliaProducto[]
   moneda: string
   detail?: DetalleProforma
   processing?: boolean
   externalError?: string
+  existingProductIds?: number[]
 }>()
-const emit = defineEmits<{ save: [body: DetalleProformaWritable]; cancel: [] }>()
+const emit = defineEmits<{
+  save: [body: DetalleProformaWritable]
+  cancel: []
+  duplicateProduct: [productId: number]
+}>()
 const saving = ref(false),
   error = ref(''),
   fields = ref<Record<string, string[]>>({})
 const form = reactive({
   tipo_item: String(props.detail?.tipo_item ?? props.tipos[0]?.id ?? ''),
   producto: String(props.detail?.producto ?? ''),
+  familia_producto: String(props.detail?.familia_producto ?? ''),
   nombre: props.detail?.nombre ?? '',
   descripcion: props.detail?.descripcion ?? '',
   cantidad: String(props.detail?.cantidad ?? 1),
   unidad: String(props.detail?.unidad ?? props.unidades[0]?.id ?? ''),
   modo_calculo: props.detail?.modo_calculo ?? 'PRECIO_UNITARIO',
   precio_unitario: props.detail?.precio_unitario ?? '',
-  importe_negociado: props.detail?.importe_negociado ?? '',
+  descuento: props.detail?.descuento ?? '0.00',
 })
 const catalogItem = computed(
   () => props.tipos.find((x) => String(x.id) === form.tipo_item)?.codigo !== 'MUEBLE_MEDIDA',
 )
+const selectedUnit = computed(
+  () => props.unidades.find((x) => String(x.id) === form.unidad)?.codigo,
+)
+const quantityStep = computed(() => (selectedUnit.value === 'M2' ? '0.0001' : '1'))
+const quantityMin = computed(() => (selectedUnit.value === 'M2' ? '0.0001' : '1'))
 function selectProduct(product: Producto | null) {
   if (product) {
+    if (
+      product.id !== props.detail?.producto &&
+      (props.existingProductIds ?? []).includes(product.id)
+    ) {
+      form.producto = ''
+      error.value = 'Esta variante ya está incluida. Se enfocará la línea existente.'
+      emit('duplicateProduct', product.id)
+      return
+    }
+    form.familia_producto = ''
     form.nombre = product.nombre
     if (props.moneda === 'BOB') form.precio_unitario = product.precio_vigente
   }
@@ -53,14 +76,18 @@ async function submit() {
     const body: DetalleProformaWritable = {
       tipo_item: Number(form.tipo_item),
       producto: catalogItem.value && form.producto ? Number(form.producto) : null,
+      familia_producto:
+        catalogItem.value && !form.producto && form.familia_producto
+          ? Number(form.familia_producto)
+          : null,
       nombre: form.nombre,
       descripcion: form.descripcion || null,
-      cantidad: Number(form.cantidad),
+      cantidad: form.cantidad,
       unidad: Number(form.unidad),
-      modo_calculo: form.modo_calculo,
-      precio_unitario: form.modo_calculo === 'PRECIO_UNITARIO' ? form.precio_unitario : '0',
-      importe_negociado: form.modo_calculo === 'TOTAL_NEGOCIADO' ? form.importe_negociado : null,
-      descuento: '0',
+      modo_calculo: 'PRECIO_UNITARIO',
+      precio_unitario: form.precio_unitario,
+      importe_negociado: null,
+      descuento: form.descuento || '0.00',
     }
     emit('save', body)
   } catch (e) {
@@ -78,11 +105,20 @@ async function submit() {
       name="tipo-item"
       label="Tipo de línea"
       :options="tipos.map((x) => ({ label: x.nombre, value: String(x.id) }))"
-    /><ProductoSelector
-      v-if="catalogItem"
-      v-model="form.producto"
-      @select="selectProduct"
-    /><TextField
+    /><ProductoSelector v-if="catalogItem" v-model="form.producto" @select="selectProduct" /><Select
+      v-if="catalogItem && !form.producto"
+      v-model="form.familia_producto"
+      name="familia-producto"
+      label="Familia pendiente (opcional)"
+      :options="[
+        { label: 'Sin familia pendiente', value: '' },
+        ...(familias ?? []).map((x) => ({ label: x.nombre, value: String(x.id) })),
+      ]"
+    />
+    <p v-if="catalogItem && form.familia_producto && !form.producto" class="hint">
+      La variante física deberá elegirse antes de aprobar; esta selección no reserva stock.
+    </p>
+    <TextField
       v-model="form.nombre"
       name="nombre-linea"
       label="Nombre comercial"
@@ -94,8 +130,8 @@ async function submit() {
         name="cantidad-linea"
         label="Cantidad"
         type="number"
-        min="1"
-        step="1"
+        :min="quantityMin"
+        :step="quantityStep"
       /><Select
         v-model="form.unidad"
         name="unidad-linea"
@@ -103,16 +139,7 @@ async function submit() {
         :options="unidades.map((x) => ({ label: x.nombre, value: String(x.id) }))"
       />
     </div>
-    <Select
-      v-model="form.modo_calculo"
-      name="modo-calculo"
-      label="Forma de precio"
-      :options="[
-        { label: 'Precio por unidad', value: 'PRECIO_UNITARIO' },
-        { label: 'Total negociado de la línea', value: 'TOTAL_NEGOCIADO' },
-      ]"
-    /><TextField
-      v-if="form.modo_calculo === 'PRECIO_UNITARIO'"
+    <TextField
       v-model="form.precio_unitario"
       name="precio-unitario"
       min="0"
@@ -121,14 +148,13 @@ async function submit() {
       type="number"
       hint="El backend calcula cantidad × precio unitario."
     /><TextField
-      v-else
-      v-model="form.importe_negociado"
-      name="importe-negociado"
+      v-model="form.descuento"
+      name="descuento-linea"
       min="0"
       step="0.01"
-      :label="`Total negociado (${moneda})`"
+      :label="`Descuento de la línea (${moneda})`"
       type="number"
-      hint="Este total exacto es autoritativo; no se recalcula desde un unitario redondeado."
+      hint="Opcional. El backend calcula y protege el subtotal y el total."
     />
     <p v-if="error || externalError" role="alert">{{ error || externalError }}</p>
     <div class="actions">

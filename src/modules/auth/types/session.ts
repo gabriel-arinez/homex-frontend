@@ -1,6 +1,6 @@
 import type { IdentidadActual } from '@/generated/api'
 
-export const CAPABILITIES = ['comercial.operar', 'comercial.administrar'] as const
+export const CAPABILITIES = ['comercial.operar', 'comercial.administrar', 'taller.operar'] as const
 export type Capability = (typeof CAPABILITIES)[number]
 export type SessionIdentity = Pick<IdentidadActual, 'id' | 'username' | 'display_name'>
 

@@ -27,7 +27,7 @@ const detail: DetalleProforma = {
   producto: null,
   nombre: 'Escritorio',
   descripcion: null,
-  cantidad: 3,
+  cantidad: '3.0000',
   unidad: 5,
   unidad_info: { id: 5, codigo: 'PIEZA', nombre: 'Pieza' },
   modo_calculo: 'TOTAL_NEGOCIADO',
@@ -119,6 +119,9 @@ function common(current = quote()) {
     http.get('http://localhost:8000/api/v1/catalogo/productos/', () =>
       HttpResponse.json({ count: 0, next: null, previous: null, results: [] }),
     ),
+    http.get('http://localhost:8000/api/v1/catalogo/familias/', () =>
+      HttpResponse.json({ count: 0, next: null, previous: null, results: [] }),
+    ),
     http.get('http://localhost:8000/api/v1/proformas/1/', () => HttpResponse.json(current)),
     http.get('http://localhost:8000/api/v1/proformas/1/detalles/10/archivos/', () =>
       HttpResponse.json([]),
@@ -137,7 +140,7 @@ function router(path = '/proformas/1') {
 }
 
 describe('FE04 proformas manuales', () => {
-  it('conserva 3 por 100 como total negociado exacto', async () => {
+  it('crea nuevos ítems únicamente con precio unitario y descuento explícito', async () => {
     common()
     const wrapper = mount(DetalleForm, {
       props: { tipos: options.TIPO_ITEM, unidades: options.UNIDAD_MEDIDA, moneda: 'BOB' },
@@ -145,16 +148,19 @@ describe('FE04 proformas manuales', () => {
     })
     await wrapper.get('#nombre-linea').setValue('Mueble')
     await wrapper.get('#cantidad-linea').setValue('3')
-    await wrapper.get('#modo-calculo').setValue('TOTAL_NEGOCIADO')
-    await wrapper.get('#importe-negociado').setValue('100.00')
+    expect(wrapper.find('#modo-calculo').exists()).toBe(false)
+    expect(wrapper.find('#importe-negociado').exists()).toBe(false)
+    await wrapper.get('#precio-unitario').setValue('34.00')
+    await wrapper.get('#descuento-linea').setValue('2.00')
     await wrapper.get('form').trigger('submit')
     const body = wrapper.emitted('save')?.[0]?.[0] as Record<string, unknown>
     expect(body).toMatchObject({
-      cantidad: 3,
-      modo_calculo: 'TOTAL_NEGOCIADO',
-      importe_negociado: '100.00',
+      cantidad: '3',
+      modo_calculo: 'PRECIO_UNITARIO',
+      precio_unitario: '34.00',
+      descuento: '2.00',
+      importe_negociado: null,
     })
-    expect(body.precio_unitario).toBe('0')
   })
   it('mantiene el decimal USD sin convertirlo ni recalcularlo', async () => {
     common()
@@ -167,7 +173,7 @@ describe('FE04 proformas manuales', () => {
     await wrapper.get('form').trigger('submit')
     const body = wrapper.emitted('save')?.[0]?.[0] as Record<string, unknown>
     expect(body).toMatchObject({
-      cantidad: 3,
+      cantidad: '3',
       modo_calculo: 'PRECIO_UNITARIO',
       precio_unitario: '33.33',
       importe_negociado: null,
