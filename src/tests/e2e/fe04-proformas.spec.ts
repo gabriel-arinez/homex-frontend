@@ -191,7 +191,7 @@ async function mockBackend(page: Page) {
   })
   await page.route('**/api/v1/proformas-detalle/10/especificacion/editar/', async (r) => {
     const body = r.request().postDataJSON()
-    const spec = { ...quote.detalles[0].especificacion, ...body }
+    const spec = { ...(quote.detalles[0]?.especificacion ?? {}), ...body }
     quote.detalles[0] = { ...quote.detalles[0], especificacion: spec }
     return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(spec) })
   })
