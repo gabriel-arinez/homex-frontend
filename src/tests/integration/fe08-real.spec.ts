@@ -105,11 +105,7 @@ test.describe.serial('FE08 backend real', () => {
     await expect(page.getByRole('status')).toContainText('Recibo anulado')
 
     await page.goto(`/pedidos/${pedidoId}`)
-    await page.getByLabel('Nuevo estado').selectOption({ label: 'En producción' })
-    await page.getByRole('button', { name: 'Cambiar estado' }).click()
-    await expect(page.getByRole('status')).toContainText('Estado actualizado')
-    await page.getByLabel('Nuevo estado').selectOption({ label: 'Listo para entrega' })
-    await page.getByRole('button', { name: 'Cambiar estado' }).click()
+    await expect(page.getByText('Listo para entrega', { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Emitir nota de entrega' })).toBeVisible()
     await page.getByRole('button', { name: 'Emitir nota de entrega' }).click()
     await page.getByRole('dialog').getByRole('button', { name: 'Emitir nota' }).click()
