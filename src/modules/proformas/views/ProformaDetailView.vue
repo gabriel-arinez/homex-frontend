@@ -505,7 +505,9 @@ onMounted(() => {
               variant="secondary"
               :disabled="referenceLoading || Boolean(referenceError)"
               @click="specLine = line"
-              >{{ line.especificacion ? 'Editar especificación' : 'Agregar especificación' }}</Button
+              >{{
+                line.especificacion ? 'Editar especificación' : 'Agregar especificación'
+              }}</Button
             >
           </div>
           <AdjuntosDetalle
@@ -552,7 +554,7 @@ onMounted(() => {
         @cancel="closeLine" /></Modal
     ><Modal :open="Boolean(specLine)" title="Especificación del mueble" @close="specLine = null"
       ><EspecificacionForm
-         :key="specLine?.id"
+        :key="specLine?.id"
         :tipos="tiposMueble"
         :especificacion="specLine?.especificacion"
         :processing="processing"
