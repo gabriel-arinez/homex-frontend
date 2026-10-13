@@ -33,7 +33,8 @@ async function addCatalogLine(page: Page) {
   await expect(page.locator('#producto-linea option')).toContainText(['FE08-SILLA-001'])
   await page.locator('#producto-linea').selectOption({ index: 1 })
   await page.getByLabel('Cantidad', { exact: true }).fill('1')
-  await page.locator('#unidad-linea').selectOption({ label: 'Pieza' })
+  await expect(page.locator('#unidad-linea')).toBeDisabled()
+  await expect(page.locator('#unidad-linea option:checked')).toHaveText('Pieza')
   await page.getByRole('button', { name: 'Guardar línea' }).click()
   await expect(page.getByRole('heading', { name: 'Silla integración FE08' })).toBeVisible()
 }
