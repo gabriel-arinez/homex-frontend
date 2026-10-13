@@ -46,6 +46,14 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 24.12.0, cache: npm }
       - run: npm ci
+      - name: Capturar formato AP6 para auditoría (temporal)
+        run: |
+          for file in src/modules/proformas/components/EspecificacionForm.vue src/modules/proformas/views/ProformaDetailView.vue src/tests/fe04/ap6-correcciones.spec.ts src/tests/e2e/fe04-proformas.spec.ts src/modules/proformas/components/DetalleForm.vue; do
+            echo "AP6_PRETTIER_BEGIN:$file"
+            npx prettier "$file" | base64 -w0
+            echo
+            echo "AP6_PRETTIER_END:$file"
+          done
       - run: npm run format:check
 
   unit-component:
