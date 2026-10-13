@@ -6,7 +6,7 @@ import EspecificacionForm from '@/modules/proformas/components/EspecificacionFor
 import ProductoSelector from '@/modules/proformas/components/ProductoSelector.vue'
 
 const opcion = (id: number, codigo: string, nombre: string) =>
-  ({ id, codigo, nombre } as ValorCatalogoPublico)
+  ({ id, codigo, nombre }) as ValorCatalogoPublico
 
 describe('AP6 correcciones funcionales', () => {
   it('sincroniza y bloquea la unidad de una variante física del catálogo', async () => {
