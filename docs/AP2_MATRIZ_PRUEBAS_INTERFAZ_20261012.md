@@ -6,13 +6,11 @@ CI de `main` [38330085332](https://github.com/gabriel-arinez/homex-frontend/acti
 
 ## Riesgos comprobados
 
-| Riesgo | Pruebas y verificación |
-| --- | --- |
-| Permiso 401/403 no comunicado al usuario/servicio | `src/tests/fe08/ap2-http-regression.spec.ts`: preserva HTTP, código y mensaje; no permite interpretar 403 como datos válidos |
-| Un error 409/500 reenvía silenciosamente un POST comercial | mismo archivo: cuenta peticiones MSW y exige **exactamente una** en cada caso |
-| Evidencia NER pierde caracteres Unicode (emoji/combining) | mismo archivo: offsets Python→UTF-16 mantienen rango y cadena fuente |
-| Decimales, propuestas IA y revisión humana | `fe04/proformas.spec.ts` y `fe06/capturas-hitl.spec.ts` existentes; conservar |
-| Estados carga/error, UX responsive, a11y, distintos roles | rutas FE02–FE08 y suites E2E/real vigentes; no sustituir por mocks como única prueba |
+- **Permiso 401/403:** `src/tests/fe08/ap2-http-regression.spec.ts` conserva estado HTTP, código y mensaje; no interpreta 403 como datos válidos.
+- **Un error 409/500 reenvía un POST:** el mismo archivo cuenta peticiones MSW y exige **exactamente una** por intento.
+- **Evidencia NER Unicode:** los offsets Python→UTF-16 conservan el rango y la cadena fuente con caracteres astrales y combinados.
+- **Decimales y corrección humana:** `fe04/proformas.spec.ts` y `fe06/capturas-hitl.spec.ts` siguen protegiendo los contratos existentes.
+- **Carga/error, responsive, accesibilidad y roles:** conservados los tests FE02–FE08, Playwright y el gate de integración real; los mocks no los reemplazan.
 
 ## Comprobación
 
