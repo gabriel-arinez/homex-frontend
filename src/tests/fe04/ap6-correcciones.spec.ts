@@ -1,6 +1,11 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
-import type { EspecificacionMueble, Producto, ValorCatalogoPublico } from '@/generated/api'
+import type {
+  EspecificacionMueble,
+  EspecificacionMuebleWritable,
+  Producto,
+  ValorCatalogoPublico,
+} from '@/generated/api'
 import DetalleForm from '@/modules/proformas/components/DetalleForm.vue'
 import EspecificacionForm from '@/modules/proformas/components/EspecificacionForm.vue'
 import ProductoSelector from '@/modules/proformas/components/ProductoSelector.vue'
@@ -101,8 +106,8 @@ describe('AP6 correcciones funcionales', () => {
     })
     await wrapper.get('#componente-color-0').setValue('Blanco')
     await wrapper.get('form').trigger('submit')
-    const body = wrapper.emitted('save')?.[0]?.[0]
-    expect(body?.datos_tecnicos).toMatchObject({
+    const body = wrapper.emitted('save')?.[0]?.[0] as EspecificacionMuebleWritable
+    expect(body.datos_tecnicos).toMatchObject({
       instrucciones_montaje: { pared: true, distancia: 20 },
       garantia_acabado: '12 meses',
       descripcion_original: 'Escritorio de madera',
