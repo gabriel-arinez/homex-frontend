@@ -74,22 +74,10 @@ function initialize() {
     accesorios: json(x.accesorios),
     observaciones: x.observaciones ?? '',
     precio_unitario: '',
-    datos_tecnicos: JSON.stringify(
-      {
-        componentes: [
-          {
-            nombre: x.nombre ?? 'Mueble',
-            ...(x.espesor ? { espesor: x.espesor } : {}),
-            ...(x.color_principal ? { color: x.color_principal } : {}),
-            ...(x.color_secundario ? { color_secundario: x.color_secundario } : {}),
-            ...(x.dimensiones ? { dimensiones: x.dimensiones } : {}),
-          },
-        ],
-        ...(Array.isArray(x.accesorios) ? { accesorios: x.accesorios } : {}),
-      },
-      null,
-      2,
-    ),
+    // La IA v1 identifica un mueble, no la relación entre sus piezas.
+    // Las correcciones humanas se proyectan a características generales
+    // en el backend; sólo el vendedor puede vincularlas a componentes.
+    datos_tecnicos: JSON.stringify({ componentes: [] }, null, 2),
   }
   const t = types.value.find((x) => x.codigo === 'MUEBLE_MEDIDA'),
     u = units.value.find((x) => x.codigo === 'PIEZA')

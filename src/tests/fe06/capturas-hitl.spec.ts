@@ -165,15 +165,7 @@ describe('FE06 capturas y HITL', () => {
         modo_calculo: 'PRECIO_UNITARIO',
         precio_unitario: '33.34',
         datos_tecnicos: {
-          componentes: [
-            {
-              nombre: 'Escritorio',
-              color: 'Negro',
-              espesor: { espesor: '18 mm' },
-              dimensiones: { ancho: '1.20 m' },
-            },
-          ],
-          accesorios: ['cajón'],
+          componentes: [],
         },
       },
     })

@@ -1,6 +1,11 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
-import type { Producto, ValorCatalogoPublico } from '@/generated/api'
+import type {
+  EspecificacionMueble,
+  EspecificacionMuebleWritable,
+  Producto,
+  ValorCatalogoPublico,
+} from '@/generated/api'
 import DetalleForm from '@/modules/proformas/components/DetalleForm.vue'
 import EspecificacionForm from '@/modules/proformas/components/EspecificacionForm.vue'
 import ProductoSelector from '@/modules/proformas/components/ProductoSelector.vue'
@@ -72,5 +77,49 @@ describe('AP6 correcciones funcionales', () => {
       },
     })
     expect(wrapper.emitted('save')?.[0]?.[0]).not.toHaveProperty('schema_version')
+  })
+
+  it('conserva claves JSON abiertas al editar sin borrar información previa', async () => {
+    const wrapper = mount(EspecificacionForm, {
+      props: {
+        tipos: [opcion(5, 'ESCRITORIO', 'Escritorio')],
+        especificacion: {
+          id: 91,
+          tipo_mueble: 5,
+          proforma_detalle: 1,
+          datos_tecnicos: {
+            componentes: [
+              {
+                nombre: 'Mesón',
+                color: 'Nogal',
+                cantidad_interna: 2,
+                herrajes: { tornillos: 8 },
+              },
+            ],
+            descripcion_original: 'Escritorio de madera',
+            caracteristicas_generales: { medidas: 'a elección' },
+            instrucciones_montaje: { pared: true, distancia: 20 },
+            garantia_acabado: '12 meses',
+          },
+        } as EspecificacionMueble,
+      },
+    })
+    await wrapper.get('#componente-color-0').setValue('Blanco')
+    await wrapper.get('form').trigger('submit')
+    const body = wrapper.emitted('save')?.[0]?.[0] as EspecificacionMuebleWritable
+    expect(body.datos_tecnicos).toMatchObject({
+      instrucciones_montaje: { pared: true, distancia: 20 },
+      garantia_acabado: '12 meses',
+      descripcion_original: 'Escritorio de madera',
+      caracteristicas_generales: { medidas: 'a elección' },
+      componentes: [
+        {
+          nombre: 'Mesón',
+          color: 'Blanco',
+          cantidad_interna: 2,
+          herrajes: { tornillos: 8 },
+        },
+      ],
+    })
   })
 })
