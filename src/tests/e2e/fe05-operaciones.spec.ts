@@ -196,6 +196,58 @@ test('FE05 OT muestra líneas reales y permite descargar su documento', async ({
   expect(download.suggestedFilename()).toBe('orden-trabajo-40.html')
 })
 
+test('AP6.0.21 OT muestra ficha técnica completa sólo si el backend la entrega', async ({ page }) => {
+  await mock(page)
+  await page.route('**/api/v1/auth/me/', (route) =>
+    route.fulfill({
+      json: {
+        id: 7,
+        username: 'jefe',
+        display_name: 'Jefe de taller',
+        capabilities: ['taller.operar'],
+      },
+    }),
+  )
+  await page.route('**/api/v1/ordenes-trabajo/3/', (route) =>
+    route.fulfill({
+      json: {
+        ...orden,
+        detalles: [
+          detalleOt,
+          {
+            id: 88,
+            nombre: 'Escritorio a medida',
+            descripcion: 'Color pendiente',
+            cantidad: '1.0000',
+            unidad_info: { id: 2, codigo: 'PIEZA', nombre: 'Pieza' },
+            tipo_item_info: { id: 9, codigo: 'MUEBLE_MEDIDA', nombre: 'A medida' },
+            producto: null,
+            familia_producto: null,
+            especificacion: {
+              tipo_mueble_info: null,
+              observaciones: 'Conservar pieza original',
+              datos_tecnicos: {
+                componentes: [
+                  { nombre: 'Mesón', color: 'Nogal' },
+                  { nombre: 'Estructura', espesor: '18 mm' },
+                ],
+                advertencias: ['color a elección'],
+              },
+            },
+          },
+        ],
+      },
+    }),
+  )
+  await page.goto('/ordenes-trabajo/3')
+  await expect(page.getByText('Escritorio a medida')).toBeVisible()
+  await page.getByText('2 componentes').click()
+  await expect(page.getByText('Conservar pieza original')).toBeVisible()
+  await expect(page.getByText(/color a elección/)).toBeVisible()
+  await expect(page.getByText('Silla ejecutiva')).toBeVisible()
+  await expect(page.getByText('precio_unitario')).toHaveCount(0)
+})
+
 for (const width of [360, 390, 768, 1024, 1440])
   test(`@a11y FE05 responsive ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 })
