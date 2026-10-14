@@ -161,7 +161,21 @@ describe('FE06 capturas y HITL', () => {
     expect(body).toMatchObject({
       intento_id: 8,
       item_ia_id: 20,
-      linea_comercial: { modo_calculo: 'PRECIO_UNITARIO', precio_unitario: '33.34' },
+      linea_comercial: {
+        modo_calculo: 'PRECIO_UNITARIO',
+        precio_unitario: '33.34',
+        datos_tecnicos: {
+          componentes: [
+            {
+              nombre: 'Escritorio',
+              color: 'Negro',
+              espesor: { espesor: '18 mm' },
+              dimensiones: { ancho: '1.20 m' },
+            },
+          ],
+          accesorios: ['cajón'],
+        },
+      },
     })
   })
   it('bloquea una captura ya confirmada', async () => {

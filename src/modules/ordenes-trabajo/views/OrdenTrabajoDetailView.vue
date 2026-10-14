@@ -52,7 +52,13 @@ const detailRows = computed(() =>
     unidadLabel: line.unidad_info.nombre,
     trabajoLabel: line.especificacion ? 'Fabricación' : 'Preparación y verificación',
     detalleLabel: line.especificacion
-      ? line.especificacion.color_principal || 'Características a elección'
+      ? (() => {
+          const datos = line.especificacion.datos_tecnicos as Record<string, unknown>
+          const componentes = Array.isArray(datos.componentes) ? datos.componentes : []
+          return componentes.length
+            ? `${componentes.length} componente${componentes.length === 1 ? '' : 's'}`
+            : 'Ficha técnica registrada'
+        })()
       : 'Ítem de catálogo',
   })),
 )

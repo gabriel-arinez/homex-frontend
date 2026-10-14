@@ -16,6 +16,7 @@ type ComponenteEditable = {
   color: string
   dimensiones: string
   acabado: string
+  adicionales: string
 }
 const props = defineProps<{
   tipos: ValorCatalogoPublico[]
@@ -28,8 +29,9 @@ const saving = ref(false)
 const error = ref('')
 const stringify = (value: unknown) =>
   typeof value === 'string' ? value : value == null ? '' : JSON.stringify(value)
-const initial = Array.isArray(props.especificacion?.componentes)
-  ? (props.especificacion.componentes as Array<Record<string, unknown>>)
+const datosIniciales = (props.especificacion?.datos_tecnicos ?? {}) as Record<string, unknown>
+const initial = Array.isArray(datosIniciales.componentes)
+  ? (datosIniciales.componentes as Array<Record<string, unknown>>)
   : []
 const componentes = reactive<ComponenteEditable[]>(
   (initial.length ? initial : [{ nombre: '' }]).map((item) => ({
@@ -39,17 +41,29 @@ const componentes = reactive<ComponenteEditable[]>(
     color: stringify(item.color),
     dimensiones: stringify(item.dimensiones),
     acabado: stringify(item.acabado),
+    adicionales: stringify(
+      Object.fromEntries(
+        Object.entries(item).filter(
+          ([clave]) =>
+            !['nombre', 'material', 'espesor', 'color', 'dimensiones', 'acabado'].includes(clave),
+        ),
+      ),
+    ),
   })),
 )
 const form = reactive({
   tipo_mueble: String(props.especificacion?.tipo_mueble ?? ''),
-  texto_original: props.especificacion?.texto_original ?? '',
-  accesorios: Array.isArray(props.especificacion?.accesorios)
-    ? props.especificacion.accesorios.join('\n')
-    : stringify(props.especificacion?.accesorios),
-  advertencias: Array.isArray(props.especificacion?.advertencias)
-    ? props.especificacion.advertencias.join('\n')
+  texto_original:
+    typeof datosIniciales.descripcion_original === 'string'
+      ? datosIniciales.descripcion_original
+      : '',
+  accesorios: Array.isArray(datosIniciales.accesorios)
+    ? datosIniciales.accesorios.join('\n')
+    : stringify(datosIniciales.accesorios),
+  advertencias: Array.isArray(datosIniciales.advertencias)
+    ? datosIniciales.advertencias.join('\n')
     : '',
+  generales: stringify(datosIniciales.caracteristicas_generales),
   observaciones: props.especificacion?.observaciones ?? '',
 })
 function agregarComponente() {
@@ -60,6 +74,7 @@ function agregarComponente() {
     color: '',
     dimensiones: '',
     acabado: '',
+    adicionales: '',
   })
 }
 function interpretar(valor: string): unknown {
@@ -92,6 +107,14 @@ function construirComponente(item: ComponenteEditable) {
     const valor = interpretar(item[clave])
     if (valor !== null) componente[clave] = valor
   }
+  const adicionales = interpretar(item.adicionales)
+  if (adicionales !== null) {
+    if (typeof adicionales !== 'object' || Array.isArray(adicionales)) {
+      throw new Error('Los atributos adicionales deben ser un objeto JSON.')
+    }
+    Object.assign(componente, adicionales)
+    componente.nombre = item.nombre.trim()
+  }
   return componente
 }
 function submit() {
@@ -102,19 +125,20 @@ function submit() {
     if (componentes.some((item) => !item.nombre.trim())) {
       throw new Error('Cada componente debe tener un nombre.')
     }
+    const generales = interpretar(form.generales)
+    if (generales !== null && (typeof generales !== 'object' || Array.isArray(generales))) {
+      throw new Error('Las características generales deben ser un objeto JSON.')
+    }
     emit('save', {
       tipo_mueble: form.tipo_mueble ? Number(form.tipo_mueble) : null,
-      schema_version: 2,
-      componentes: componentes.map(construirComponente),
-      texto_original: form.texto_original || null,
-      advertencias: listaDeTextos(form.advertencias),
-      accesorios: accesorios(),
+      datos_tecnicos: {
+        componentes: componentes.map(construirComponente),
+        ...(form.texto_original ? { descripcion_original: form.texto_original } : {}),
+        advertencias: listaDeTextos(form.advertencias),
+        accesorios: accesorios(),
+        ...(generales ? { caracteristicas_generales: generales } : {}),
+      },
       observaciones: form.observaciones || null,
-      // Se conservan los campos heredados si se edita una ficha V1.
-      espesor: props.especificacion?.espesor ?? null,
-      color_principal: props.especificacion?.color_principal ?? null,
-      color_secundario: props.especificacion?.color_secundario ?? null,
-      dimensiones: props.especificacion?.dimensiones ?? null,
     })
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : 'Datos inválidos.'
@@ -180,11 +204,23 @@ function submit() {
           :name="`componente-acabado-${indice}`"
           label="Acabado"
         />
+        <TextField
+          v-model="componente.adicionales"
+          :name="`componente-adicionales-${indice}`"
+          label="Otros atributos JSON"
+          hint='Objeto libre, por ejemplo {"cantidad_interna":2,"tirador":"negro"}'
+        />
       </div>
     </section>
     <Button variant="secondary" :disabled="processing" @click="agregarComponente">
       Agregar componente
     </Button>
+    <TextField
+      v-model="form.generales"
+      name="caracteristicas-generales"
+      label="Características generales JSON"
+      hint="Objeto libre para medidas o atributos del mueble completo."
+    />
     <TextField
       v-model="form.texto_original"
       name="texto-original"

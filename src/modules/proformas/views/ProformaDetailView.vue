@@ -77,6 +77,13 @@ const conflict = (e: unknown, fallback: string) =>
     : e instanceof Error
       ? e.message
       : fallback
+function resumenEspecificacion(linea: DetalleProforma) {
+  const datos = (linea.especificacion?.datos_tecnicos ?? {}) as Record<string, unknown>
+  const componentes = Array.isArray(datos.componentes) ? datos.componentes : []
+  if (componentes.length)
+    return `${componentes.length} componente${componentes.length === 1 ? '' : 's'}`
+  return 'Ficha técnica registrada'
+}
 function fill() {
   if (!quote.value) return
   Object.assign(header, {
@@ -495,7 +502,7 @@ onMounted(() => {
           </p>
           <div v-if="line.especificacion" class="spec-summary">
             <strong>{{ line.especificacion.tipo_mueble_info?.nombre || 'Mueble a medida' }}</strong
-            ><span>{{ line.especificacion.color_principal || 'Sin color definido' }}</span>
+            ><span>{{ resumenEspecificacion(line) }}</span>
           </div>
           <div v-if="editable" class="actions">
             <Button variant="secondary" @click="openEdit(line)">Editar línea</Button

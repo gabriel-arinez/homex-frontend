@@ -23,14 +23,26 @@ pero el vendedor debe ingresar el unitario comercial: no existe división/redond
 - Al seleccionar un producto de catálogo, la unidad se fija a su `unidad_stock` y el selector
   queda bloqueado para impedir una venta por una unidad distinta a la del inventario. La
   validación definitiva permanece en PostgreSQL.
-- La ficha de mueble del editor trabaja con `schema_version: 2`: componentes independientes
-  para mesón, estructura, cajonera, etc.; material, espesor, color, dimensiones y acabado para
-  cada uno, con descripción original, accesorios incluidos y advertencias separados. Los
-  campos pendientes se pueden declarar «a elección», sin inventar información.
+- Desde AP6.0.21 la ficha envía un único `datos_tecnicos`: componentes independientes para mesón,
+  estructura, cajonera, etc.; material, espesor, color, dimensiones, acabado y atributos JSON
+  adicionales para cada uno. Descripción original, accesorios, advertencias y características
+  generales viven dentro del mismo objeto. No se muestra ni se envía `schema_version` comercial.
+  Los campos pendientes se pueden declarar «a elección», sin inventar información.
 - Una ficha existente puede editarse con PATCH mientras la proforma siga editable.
   Las aprobadas no habilitan edición. Los documentos de OT incluyen todas las líneas y
   muestran detalles técnicos sólo si el backend reconoce el rol de jefe de taller.
 - `Enviar` sólo aparece en `BORRADOR`; una proforma `EN_REVISION` conserva edición
   sin proponer un segundo envío rechazado.
-- Pruebas de componente y Playwright ejercitan el editor V2, la edición y el bloqueo
+- Pruebas de componente y Playwright ejercitan el editor JSONB, la edición y el bloqueo
   de unidades asociadas al stock.
+
+## AP6.0.21 — adaptación de pantallas
+
+`EspecificacionForm.vue` conserva controles separados por componente, pero compone exclusivamente
+`datos_tecnicos`. También permite atributos abiertos por componente y características generales,
+sin listas cerradas. El resumen de proforma y la OT describen la cantidad de componentes y dejan de
+depender de `color_principal`. La revisión HITL inicia el JSON a partir de la evidencia NLP, permite
+al vendedor organizarlo antes de confirmar y lo envía bajo `linea_comercial.datos_tecnicos`.
+
+El snapshot OpenAPI y los tipos TypeScript fueron regenerados desde el backend AP6.0.21. El contrato
+externo NLP v1 y los campos de evidencia IA visibles durante HITL permanecen sin cambios.

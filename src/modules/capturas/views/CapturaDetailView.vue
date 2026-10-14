@@ -38,6 +38,7 @@ const emit = defineEmits<{ openMenu: [] }>(),
     modo_calculo: 'PRECIO_UNITARIO',
     precio_unitario: '',
     descripcion: '',
+    datos_tecnicos: '',
   })
 let poll: number | undefined,
   initialized = false
@@ -73,6 +74,22 @@ function initialize() {
     accesorios: json(x.accesorios),
     observaciones: x.observaciones ?? '',
     precio_unitario: '',
+    datos_tecnicos: JSON.stringify(
+      {
+        componentes: [
+          {
+            nombre: x.nombre ?? 'Mueble',
+            ...(x.espesor ? { espesor: x.espesor } : {}),
+            ...(x.color_principal ? { color: x.color_principal } : {}),
+            ...(x.color_secundario ? { color_secundario: x.color_secundario } : {}),
+            ...(x.dimensiones ? { dimensiones: x.dimensiones } : {}),
+          },
+        ],
+        ...(Array.isArray(x.accesorios) ? { accesorios: x.accesorios } : {}),
+      },
+      null,
+      2,
+    ),
   }
   const t = types.value.find((x) => x.codigo === 'MUEBLE_MEDIDA'),
     u = units.value.find((x) => x.codigo === 'PIEZA')
@@ -108,6 +125,10 @@ async function submit() {
   processing.value = true
   error.value = ''
   try {
+    const datosTecnicos = parse(form.value.datos_tecnicos, 'Datos técnicos')
+    if (!datosTecnicos || typeof datosTecnicos !== 'object' || Array.isArray(datosTecnicos)) {
+      throw new Error('Datos técnicos debe contener un objeto JSON.')
+    }
     const body: ConfirmarCaptura = {
       intento_id: capture.value.intento_id,
       item_ia_id: capture.value.item_ia.id,
@@ -128,6 +149,7 @@ async function submit() {
         modo_calculo: 'PRECIO_UNITARIO',
         precio_unitario: form.value.precio_unitario,
         descripcion: form.value.descripcion || null,
+        datos_tecnicos: datosTecnicos,
       },
     }
     const r = await capturasService.confirm(id, body)
@@ -283,7 +305,19 @@ onBeforeUnmount(() => {
                 v-model="form.observaciones"
                 label="Observaciones"
                 name="observaciones"
-              /><Select
+              /><label
+                >Datos técnicos comerciales JSON<textarea
+                  v-model="form.datos_tecnicos"
+                  rows="10"
+                  required
+                  aria-describedby="datos-tecnicos-ayuda"
+                />
+              </label>
+              <p id="datos-tecnicos-ayuda" class="hint">
+                Organiza cada parte en componentes. Puedes conservar atributos pendientes como «a
+                elección» y agregar características sin una lista cerrada.
+              </p>
+              <Select
                 v-model="form.tipo_item_id"
                 name="tipo-item"
                 label="Tipo de ítem"
