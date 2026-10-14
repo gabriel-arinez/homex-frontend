@@ -302,9 +302,8 @@ onBeforeUnmount(() => {
                 />
               </label>
               <p id="datos-tecnicos-ayuda" class="hint">
-                Puedes asignar atributos a cada componente sin inventar asociaciones. Los campos
-                de corrección humana se conservan como características generales al confirmar;
-                cualquier dato que los contradiga en este JSON será rechazado.
+                Organiza cada parte en componentes. Puedes conservar atributos pendientes como «a
+                elección» y agregar características sin una lista cerrada.
               </p>
               <Select
                 v-model="form.tipo_item_id"
