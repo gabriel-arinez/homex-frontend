@@ -66,3 +66,7 @@ atómica y solicita conciliación. Se conserva la transcripción externa.
 `schema_version` permanece solamente en el contrato NLP v1.
 
 No se rediseñaron pantallas generales; no se modificó D07 RC2 ni producción.
+
+La vista de orden de trabajo permite desplegar y leer el JSON completo de cada
+ficha técnica sólo si el backend lo entrega al usuario autorizado. La ficha
+no incluye precios, y los elementos de catálogo mantienen su resumen habitual.
