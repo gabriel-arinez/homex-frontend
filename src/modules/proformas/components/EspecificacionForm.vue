@@ -30,6 +30,18 @@ const error = ref('')
 const stringify = (value: unknown) =>
   typeof value === 'string' ? value : value == null ? '' : JSON.stringify(value)
 const datosIniciales = (props.especificacion?.datos_tecnicos ?? {}) as Record<string, unknown>
+// El formato comercial permite propiedades de nivel raíz desconocidas. Una
+// edición parcial del formulario no debe borrarlas silenciosamente.
+const clavesEditables = new Set([
+  'componentes',
+  'descripcion_original',
+  'advertencias',
+  'accesorios',
+  'caracteristicas_generales',
+])
+const datosAdicionales = Object.fromEntries(
+  Object.entries(datosIniciales).filter(([clave]) => !clavesEditables.has(clave)),
+)
 const initial = Array.isArray(datosIniciales.componentes)
   ? (datosIniciales.componentes as Array<Record<string, unknown>>)
   : []
@@ -132,6 +144,7 @@ function submit() {
     emit('save', {
       tipo_mueble: form.tipo_mueble ? Number(form.tipo_mueble) : null,
       datos_tecnicos: {
+        ...datosAdicionales,
         componentes: componentes.map(construirComponente),
         ...(form.texto_original ? { descripcion_original: form.texto_original } : {}),
         advertencias: listaDeTextos(form.advertencias),
