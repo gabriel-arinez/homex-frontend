@@ -46,3 +46,23 @@ al vendedor organizarlo antes de confirmar y lo envía bajo `linea_comercial.dat
 
 El snapshot OpenAPI y los tipos TypeScript fueron regenerados desde el backend AP6.0.21. El contrato
 externo NLP v1 y los campos de evidencia IA visibles durante HITL permanecen sin cambios.
+
+
+## AP6.0.21 — Protección contra pérdida y asociaciones inferidas
+
+Al editar `EspecificacionForm.vue`, las claves adicionales desconocidas de
+`datos_tecnicos` se conservan y se mezclan con los campos que sí controla el
+formulario. Los atributos adicionales por componente y las características
+generales continúan disponibles sin listas cerradas. Una prueba de componente
+comprueba que editar un color no borra instrucciones, garantías u otros valores
+JSON existentes.
+
+La revisión HITL **no asigna automáticamente atributos de IA a una pieza**.
+Inicializa `componentes` vacío y permite al vendedor asociar explícitamente
+materiales, colores, dimensiones y acabados. El backend proyecta las correcciones
+humanas no atribuidas bajo `caracteristicas_generales`; si el JSON introduce
+un atributo general o accesorio contradictorio, bloquea la confirmación
+atómica y solicita conciliación. Se conserva la transcripción externa.
+`schema_version` permanece solamente en el contrato NLP v1.
+
+No se rediseñaron pantallas generales; no se modificó D07 RC2 ni producción.
