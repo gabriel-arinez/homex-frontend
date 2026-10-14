@@ -196,7 +196,7 @@ test('FE05 OT muestra líneas reales y permite descargar su documento', async ({
   expect(download.suggestedFilename()).toBe('orden-trabajo-40.html')
 })
 
-test('AP6.0.21 OT muestra ficha técnica completa sólo si el backend la entrega', async ({ page }) => {
+test('AP6.0.21 OT muestra ficha técnica autorizada', async ({ page }) => {
   await mock(page)
   await page.route('**/api/v1/auth/me/', (route) =>
     route.fulfill({
