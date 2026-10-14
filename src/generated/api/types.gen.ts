@@ -177,16 +177,8 @@ export type EspecificacionMueble = {
   readonly proforma_detalle: number
   tipo_mueble?: number | null
   tipo_mueble_info: ValorCatalogoResumen | null
-  schema_version?: number
-  espesor?: unknown
-  color_principal?: string | null
-  color_secundario?: string | null
-  dimensiones?: unknown
-  accesorios?: unknown
+  datos_tecnicos?: unknown
   observaciones?: string | null
-  componentes?: unknown
-  texto_original?: string | null
-  advertencias?: unknown
 }
 
 /**
@@ -251,6 +243,7 @@ export type LineaComercialHitl = {
   precio_unitario?: string | null
   descripcion?: string | null
   tipo_mueble_id?: number | null
+  datos_tecnicos: unknown
 }
 
 /**
@@ -395,16 +388,8 @@ export type PatchedEspecificacionMueble = {
   readonly proforma_detalle?: number
   tipo_mueble?: number | null
   tipo_mueble_info?: ValorCatalogoResumen | null
-  schema_version?: number
-  espesor?: unknown
-  color_principal?: string | null
-  color_secundario?: string | null
-  dimensiones?: unknown
-  accesorios?: unknown
+  datos_tecnicos?: unknown
   observaciones?: string | null
-  componentes?: unknown
-  texto_original?: string | null
-  advertencias?: unknown
 }
 
 export type PatchedFamiliaProducto = {
@@ -714,16 +699,8 @@ export type DetalleProformaWritable = {
 
 export type EspecificacionMuebleWritable = {
   tipo_mueble?: number | null
-  schema_version?: number
-  espesor?: unknown
-  color_principal?: string | null
-  color_secundario?: string | null
-  dimensiones?: unknown
-  accesorios?: unknown
+  datos_tecnicos?: unknown
   observaciones?: string | null
-  componentes?: unknown
-  texto_original?: string | null
-  advertencias?: unknown
 }
 
 export type FamiliaProductoWritable = {
@@ -808,16 +785,8 @@ export type PatchedDetalleProformaWritable = {
 
 export type PatchedEspecificacionMuebleWritable = {
   tipo_mueble?: number | null
-  schema_version?: number
-  espesor?: unknown
-  color_principal?: string | null
-  color_secundario?: string | null
-  dimensiones?: unknown
-  accesorios?: unknown
+  datos_tecnicos?: unknown
   observaciones?: string | null
-  componentes?: unknown
-  texto_original?: string | null
-  advertencias?: unknown
 }
 
 export type PatchedFamiliaProductoWritable = {

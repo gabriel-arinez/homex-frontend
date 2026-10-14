@@ -42,7 +42,7 @@ describe('AP6 correcciones funcionales', () => {
     })
   })
 
-  it('registra fichas V2 por componente sin mezclar materiales ni inventar atributos', async () => {
+  it('registra datos técnicos únicos por componente sin mezclar atributos', async () => {
     const wrapper = mount(EspecificacionForm, {
       props: { tipos: [opcion(5, 'ESCRITORIO', 'Escritorio')] },
     })
@@ -59,15 +59,18 @@ describe('AP6 correcciones funcionales', () => {
     await wrapper.get('#componente-nombre-1').setValue('Estructura')
     await wrapper.get('#componente-espesor-1').setValue('18 mm')
     await wrapper.get('#componente-color-1').setValue('Blanco')
+    await wrapper.get('#componente-adicionales-1').setValue('{"cantidad_interna":2}')
     await wrapper.get('form').trigger('submit')
     expect(wrapper.emitted('save')?.[0]?.[0]).toMatchObject({
-      schema_version: 2,
-      texto_original: 'Escritorio con cajonera a elección',
-      accesorios: ['Pasacables incorporado'],
-      componentes: [
-        { nombre: 'Mesón', material: 'Melamina', espesor: '25 mm', color: 'Nogal' },
-        { nombre: 'Estructura', espesor: '18 mm', color: 'Blanco' },
-      ],
+      datos_tecnicos: {
+        descripcion_original: 'Escritorio con cajonera a elección',
+        accesorios: ['Pasacables incorporado'],
+        componentes: [
+          { nombre: 'Mesón', material: 'Melamina', espesor: '25 mm', color: 'Nogal' },
+          { nombre: 'Estructura', espesor: '18 mm', color: 'Blanco', cantidad_interna: 2 },
+        ],
+      },
     })
+    expect(wrapper.emitted('save')?.[0]?.[0]).not.toHaveProperty('schema_version')
   })
 })

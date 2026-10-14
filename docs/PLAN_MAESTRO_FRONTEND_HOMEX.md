@@ -2866,3 +2866,11 @@ La descripción completa, los gates ejecutados, sus límites y el orden de reanu
 El editor AP6, la adaptación HITL y el acceso por capacidad de taller se documentan en
 [AP6_EDITOR_COMERCIAL.md](implementacion/AP6_EDITOR_COMERCIAL.md). Esta actualización consume el
 OpenAPI autoritativo y no calcula stock, totales ni permisos en Vue.
+
+### AP6.0.21 — ficha técnica comercial única
+
+El frontend consume y envía exclusivamente `datos_tecnicos` para especificaciones de muebles. Los
+controles visuales pueden seguir separados por componente, pero `schema_version` y los antiguos
+campos técnicos paralelos no forman parte de la API comercial. La revisión HITL organiza la
+propuesta en el mismo objeto antes de persistirla. Véase
+[AP6_EDITOR_COMERCIAL.md](implementacion/AP6_EDITOR_COMERCIAL.md).
