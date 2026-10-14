@@ -51,6 +51,10 @@ const detailRows = computed(() =>
     ...line,
     unidadLabel: line.unidad_info.nombre,
     trabajoLabel: line.especificacion ? 'Fabricación' : 'Preparación y verificación',
+    fichaLegible: line.especificacion
+      ? JSON.stringify(line.especificacion.datos_tecnicos, null, 2)
+      : null,
+    observacionesTecnicas: line.especificacion?.observaciones ?? null,
     detalleLabel: line.especificacion
       ? (() => {
           const datos = line.especificacion.datos_tecnicos as Record<string, unknown>
@@ -140,7 +144,14 @@ const columns = [
           >
           <template #cell-unidad="{ row }">{{ row.unidadLabel }}</template>
           <template #cell-trabajo="{ row }">{{ row.trabajoLabel }}</template>
-          <template #cell-detalle="{ row }">{{ row.detalleLabel }}</template>
+          <template #cell-detalle="{ row }">
+            <details v-if="row.fichaLegible" class="ficha-ot">
+              <summary>{{ row.detalleLabel }}</summary>
+              <pre>{{ row.fichaLegible }}</pre>
+              <p v-if="row.observacionesTecnicas">{{ row.observacionesTecnicas }}</p>
+            </details>
+            <span v-else>{{ row.detalleLabel }}</span>
+          </template>
         </DataTable>
       </section>
     </template>
@@ -171,6 +182,20 @@ a {
 }
 .details {
   margin-top: var(--space-6);
+}
+.ficha-ot summary {
+  cursor: pointer;
+}
+.ficha-ot pre {
+  max-width: 35rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--color-surface-soft);
+  border-radius: var(--radius-control);
+  padding: var(--space-3);
+}
+.ficha-ot p {
+  white-space: pre-wrap;
 }
 .error {
   color: var(--color-danger);
