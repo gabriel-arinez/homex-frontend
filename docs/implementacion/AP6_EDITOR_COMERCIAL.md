@@ -47,7 +47,6 @@ al vendedor organizarlo antes de confirmar y lo envía bajo `linea_comercial.dat
 El snapshot OpenAPI y los tipos TypeScript fueron regenerados desde el backend AP6.0.21. El contrato
 externo NLP v1 y los campos de evidencia IA visibles durante HITL permanecen sin cambios.
 
-
 ## AP6.0.21 — Protección contra pérdida y asociaciones inferidas
 
 Al editar `EspecificacionForm.vue`, las claves adicionales desconocidas de
