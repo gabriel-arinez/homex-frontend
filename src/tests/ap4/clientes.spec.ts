@@ -240,4 +240,43 @@ describe('AP4 clientes consolidados', () => {
     )
     expect(wrapper.text()).toContain('Descartar cambios y recargar ficha')
   })
+  it('solicita descartar cambios antes de cambiar el ID de cliente', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/clientes/:id/', ({ params }) =>
+        HttpResponse.json({
+          id: Number(params.id),
+          tipo_cliente: 2,
+          tipo_cliente_info: typeInfo,
+          nombres: `Nombre ${params.id}`,
+          apellidos: 'Flores',
+          empresa: 'Muebles Flores',
+          revision: 'a'.repeat(64),
+          activo: true,
+        }),
+      ),
+    )
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/clientes/:id', component: ClienteDetailView }],
+    })
+    await router.push('/clientes/41')
+    const pinia = createPinia()
+    useSessionStore(pinia).capabilities = ['comercial.operar']
+    const wrapper = mount(ClienteDetailView, { global: { plugins: [pinia, router] } })
+    await flushPromises()
+    const editar = wrapper.findAll('button').find((button) => button.text() === 'Editar')
+    await editar!.trigger('click')
+    await wrapper.get('input[name="nombres"]').setValue('Cambio local')
+    const navigation = router.push('/clientes/42')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/clientes/41')
+    expect(wrapper.text()).toContain('Descartar cambios')
+    const confirmar = wrapper.findAll('button').find((button) => button.text() === 'Descartar')
+    await confirmar!.trigger('click')
+    await navigation
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/clientes/42')
+    expect(wrapper.text()).toContain('Nombre 42')
+  })
+
 })
