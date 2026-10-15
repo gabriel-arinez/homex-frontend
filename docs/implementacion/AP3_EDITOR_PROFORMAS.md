@@ -55,8 +55,9 @@ No se modifican AP4/AP5, catálogo, inventario, NLP ni infraestructura productiv
   proformas en revisión, sin perder acceso al editor integral.
 - Los adjuntos existentes se gestionan desde la vista de detalle, después
   de guardar el primer borrador (no hay ID definitivo para una línea local).
-- Para nuevos clientes empresariales la emisión comprueba la razón social;
-  para personas naturales comprueba nombres y apellidos.
+- Para nuevos clientes empresariales la emisión exige razón social y
+  nombres y apellidos del contacto, conforme a la validación PostgreSQL.
+  Para personas naturales también exige nombres y apellidos.
 - El evento de variante duplicada cierra el modal y enfoca la línea existente
   en lugar de convertir accidentalmente la selección en otra línea.
 - La vista previa sigue siendo informativa; PostgreSQL conserva el total
