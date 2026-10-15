@@ -43,12 +43,18 @@ const router = createRouter({
         {
           path: 'proformas/nueva',
           name: 'proforma-create',
-          component: () => import('@/modules/proformas/views/ProformaCreateView.vue'),
+          component: () => import('@/modules/proformas/views/ProformaEditorView.vue'),
+          meta: { capability: 'comercial.operar' },
+        },
+        {
+          path: 'proformas/:id/editar',
+          name: 'proforma-edit',
+          component: () => import('@/modules/proformas/views/ProformaEditorView.vue'),
           meta: { capability: 'comercial.operar' },
         },
         {
           path: 'proformas/:id',
-          name: 'proforma-detail',
+          name: 'proforma-readonly',
           component: () => import('@/modules/proformas/views/ProformaDetailView.vue'),
           meta: { capability: 'comercial.operar' },
         },
