@@ -18,17 +18,20 @@ async function login(page: Page) {
 
 async function createDraft(page: Page, title: string) {
   await page.goto('/proformas/nueva')
+  await page.getByRole('button', { name: /2Cliente/ }).click()
   await expect(page.locator('#cliente-proforma option')).toContainText(['Cliente Integración FE08'])
   await page.locator('#cliente-proforma').selectOption({ label: 'Cliente Integración FE08' })
+  await page.getByRole('button', { name: /3Condiciones/ }).click()
   await page.getByLabel('Título').fill(title)
-  await page.getByRole('button', { name: 'Crear borrador' }).click()
-  await expect(page).toHaveURL(/\/proformas\/\d+$/)
+  await page.getByRole('button', { name: 'Guardar borrador' }).click()
+  await expect(page).toHaveURL(/\/proformas\/\d+\/editar$/)
   const segments = new URL(page.url()).pathname.split('/').filter(Boolean)
-  return Number(segments[segments.length - 1])
+  return Number(segments[segments.length - 2])
 }
 
 async function addCatalogLine(page: Page) {
-  await page.getByRole('button', { name: 'Agregar línea' }).click()
+  await page.getByRole('button', { name: /1Productos/ }).click()
+  await page.getByRole('button', { name: 'Agregar producto' }).click()
   await page.getByLabel('Tipo de línea').selectOption({ label: 'Otro producto' })
   await expect(page.locator('#producto-linea option')).toContainText(['FE08-SILLA-001'])
   await page.locator('#producto-linea').selectOption({ index: 1 })
@@ -40,9 +43,11 @@ async function addCatalogLine(page: Page) {
 }
 
 async function approveCurrentQuote(page: Page) {
-  await page.getByRole('button', { name: 'Enviar' }).click()
-  await page.getByRole('dialog').getByRole('button', { name: 'Enviar' }).click()
+  await page.getByRole('button', { name: 'Emitir proforma' }).click()
   await expect(page.getByText('En revisión', { exact: true })).toBeVisible()
+  const segments = new URL(page.url()).pathname.split('/').filter(Boolean)
+  const proformaId = Number(segments[segments.length - 2])
+  await page.goto(`/proformas/${proformaId}`)
   await expect(page.getByRole('button', { name: 'Aprobar' })).toBeVisible()
   await page.getByRole('button', { name: 'Aprobar' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Aprobar' }).click()
