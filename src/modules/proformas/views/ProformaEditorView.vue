@@ -99,9 +99,8 @@ const canEmit = computed(() => {
   if (clienteMode.value !== 'nuevo' || !nuevoCliente.tipo_cliente) return false
   const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
   const esEmpresa = /EMPRESA|JURID/.test(tipo?.codigo ?? '')
-  return esEmpresa
-    ? Boolean(nuevoCliente.empresa.trim() && nuevoCliente.nombres.trim() && nuevoCliente.apellidos.trim())
-    : Boolean(nuevoCliente.nombres.trim() && nuevoCliente.apellidos.trim())
+  const contacto = Boolean(nuevoCliente.nombres.trim() && nuevoCliente.apellidos.trim())
+  return esEmpresa ? contacto && Boolean(nuevoCliente.empresa.trim()) : contacto
 })
 
 function markDirty() {
