@@ -158,7 +158,11 @@ async function changeStatus() {
   error.value = ''
   try {
     if (client.value.activo === false) {
-      client.value = await clientesService.update(client.value.id, { activo: true }, client.value.revision)
+      client.value = await clientesService.update(
+        client.value.id,
+        { activo: true },
+        client.value.revision,
+      )
     } else {
       await clientesService.deactivate(client.value.id, client.value.revision)
       client.value = await clientesService.get(client.value.id)
@@ -176,7 +180,10 @@ onMounted(() => {
   window.addEventListener('beforeunload', beforeUnload)
   void load()
 })
-watch(() => route.params.id, () => void load())
+watch(
+  () => route.params.id,
+  () => void load(),
+)
 onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 </script>
 
