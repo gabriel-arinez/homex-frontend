@@ -144,7 +144,10 @@ describe('AP4 clientes consolidados', () => {
           id: Number(params.id),
           tipo_cliente: 1,
           tipo_cliente_info: {
-            id: 1, concepto_codigo: 'TIPO_CLIENTE', codigo: 'PERSONA', nombre: 'Persona',
+            id: 1,
+            concepto_codigo: 'TIPO_CLIENTE',
+            codigo: 'PERSONA',
+            nombre: 'Persona',
           },
           nombres: `Nombre ${params.id}`,
           apellidos: 'HOMEX',
@@ -191,7 +194,10 @@ describe('AP4 clientes consolidados', () => {
     await flushPromises()
     const query = new URL(queries[queries.length - 1] ?? '').searchParams
     expect(Object.fromEntries(query)).toMatchObject({
-      search: 'Flores', activo: 'false', tipo_cliente: '2', page: '2',
+      search: 'Flores',
+      activo: 'false',
+      tipo_cliente: '2',
+      page: '2',
     })
     expect(wrapper.text()).toContain('Flores')
   })
@@ -200,9 +206,14 @@ describe('AP4 clientes consolidados', () => {
     server.use(
       http.get('http://localhost:8000/api/v1/clientes/41/', () =>
         HttpResponse.json({
-          id: 41, tipo_cliente: 2, tipo_cliente_info: typeInfo,
-          nombres: 'María', apellidos: 'Flores', empresa: 'Muebles Flores',
-          revision: 'a'.repeat(64), activo: true,
+          id: 41,
+          tipo_cliente: 2,
+          tipo_cliente_info: typeInfo,
+          nombres: 'María',
+          apellidos: 'Flores',
+          empresa: 'Muebles Flores',
+          revision: 'a'.repeat(64),
+          activo: true,
         }),
       ),
       http.patch('http://localhost:8000/api/v1/clientes/41/', () =>
@@ -229,5 +240,4 @@ describe('AP4 clientes consolidados', () => {
     )
     expect(wrapper.text()).toContain('Descartar cambios y recargar ficha')
   })
-
 })
