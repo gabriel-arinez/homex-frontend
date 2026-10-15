@@ -16,6 +16,18 @@ El módulo permite listar, buscar, filtrar por estado y tipo, registrar, consult
 
 La autorización sigue dependiendo exclusivamente de `comercial.operar` y de las respuestas del backend. La interfaz no intenta ampliar el alcance de la cartera ni reconstruir snapshots.
 
+## Auditoría correctiva AP4 (H01–H08)
+
+- El componente compartido descarta `empresa` al cambiar a PERSONA.
+- La ficha se recarga al cambiar el identificador en la ruta y descarta respuestas antiguas.
+- El listado observa cambios de URL sin duplicar solicitudes ni perder parámetros.
+- `Cliente.revision` se transmite mediante `If-Match` en PATCH y DELETE; la
+  respuesta 409 preserva los cambios y solo una acción explícita los descarta.
+- La referencia comercial protege la opacidad del cliente ajeno/inexistente,
+  la vinculación de clientes inactivos históricos y los snapshots de emisión.
+- La matriz de brechas se encuentra versionada en el
+  [repositorio backend](https://github.com/gabriel-arinez/homex-backend/blob/main/docs/implementacion/AP4_MATRIZ_BRECHAS.md).
+
 ## Contrato
 
 El snapshot OpenAPI corresponde al backend AP4 y los tipos TypeScript se regeneraron. `Cliente.tipo_cliente_info` reemplaza la presentación numérica. El frontend no altera reglas comerciales ni calcula autoridad histórica.
