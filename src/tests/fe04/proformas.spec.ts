@@ -42,6 +42,7 @@ const detail: DetalleProforma = {
 const quote = (state = 'BORRADOR'): Proforma => ({
   id: 1,
   numero: 25,
+  revision: 'a'.repeat(64),
   cliente: 1,
   cliente_resumen: { id: 1, nombre: 'Ana Pérez', empresa: null, celular: '7000' },
   vendedor: 7,
