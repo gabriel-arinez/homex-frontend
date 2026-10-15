@@ -142,6 +142,8 @@ const columns = [
           ><RouterLink
             :to="editable(row) ? `/proformas/${row.id}/editar` : `/proformas/${row.id}`"
             >{{ editable(row) ? 'Continuar edición' : 'Ver detalle' }}</RouterLink
+          ><RouterLink v-if="editable(row)" :to="`/proformas/${row.id}`"
+            >Ver detalle y acciones</RouterLink
           ></template
         ></DataTable
       ><Pagination :page :total-pages="pages" @change="page = $event"
