@@ -7,6 +7,7 @@ import ClienteCreateView from '@/modules/clientes/views/ClienteCreateView.vue'
 import ClienteDetailView from '@/modules/clientes/views/ClienteDetailView.vue'
 import ClientesListView from '@/modules/clientes/views/ClientesListView.vue'
 import ClienteFormFields from '@/modules/clientes/components/ClienteFormFields.vue'
+import { useSessionStore } from '@/app/stores/useSessionStore'
 import { clientesService } from '@/modules/clientes/services/clientesService'
 import { server } from '@/tests/msw/server'
 
@@ -193,6 +194,40 @@ describe('AP4 clientes consolidados', () => {
       search: 'Flores', activo: 'false', tipo_cliente: '2', page: '2',
     })
     expect(wrapper.text()).toContain('Flores')
+  })
+
+  it('conserva campos locales ante 409 por otro editor', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/clientes/41/', () =>
+        HttpResponse.json({
+          id: 41, tipo_cliente: 2, tipo_cliente_info: typeInfo,
+          nombres: 'María', apellidos: 'Flores', empresa: 'Muebles Flores',
+          revision: 'a'.repeat(64), activo: true,
+        }),
+      ),
+      http.patch('http://localhost:8000/api/v1/clientes/41/', () =>
+        HttpResponse.json({ detail: 'Edición obsoleta' }, { status: 409 }),
+      ),
+    )
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/clientes/:id', component: ClienteDetailView }],
+    })
+    await router.push('/clientes/41')
+    const pinia = createPinia()
+    useSessionStore(pinia).capabilities = ['comercial.operar']
+    const wrapper = mount(ClienteDetailView, { global: { plugins: [pinia, router] } })
+    await flushPromises()
+    const editar = wrapper.findAll('button').find((button) => button.text() === 'Editar')
+    expect(editar).toBeDefined()
+    await editar!.trigger('click')
+    await wrapper.get('input[name="nombres"]').setValue('Cambio no guardado')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect((wrapper.get('input[name="nombres"]').element as HTMLInputElement).value).toBe(
+      'Cambio no guardado',
+    )
+    expect(wrapper.text()).toContain('Descartar cambios y recargar ficha')
   })
 
 })
