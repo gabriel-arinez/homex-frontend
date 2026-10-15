@@ -41,3 +41,26 @@ autoridad en Vue.
 ## Fuera de alcance
 
 No se modifican AP4/AP5, catálogo, inventario, NLP ni infraestructura productiva.
+
+## Correcciones de auditoría H03–H10
+
+- Los guardados de proformas existentes envían `revision_esperada` obtenida
+  del GET. Ante un 409, el editor conserva sus entradas, muestra el conflicto
+  y ofrece una acción explícita para descartar el borrador local y recargar.
+- La edición del importe `TOTAL_NEGOCIADO` histórico queda bloqueada en
+  el formulario nuevo para evitar conversiones automáticas. La línea sigue
+  apareciendo en la revisión y se envía al backend sin alterar su modo.
+- Tras el primer guardado se muestra «Ver detalle, aprobar y gestionar
+  adjuntos». El listado ofrece «Ver detalle y acciones» para borradores y
+  proformas en revisión, sin perder acceso al editor integral.
+- Los adjuntos existentes se gestionan desde la vista de detalle, después
+  de guardar el primer borrador (no hay ID definitivo para una línea local).
+- Para nuevos clientes empresariales la emisión comprueba la razón social;
+  para personas naturales comprueba nombres y apellidos.
+- El evento de variante duplicada cierra el modal y enfoca la línea existente
+  en lugar de convertir accidentalmente la selección en otra línea.
+- La vista previa sigue siendo informativa; PostgreSQL conserva el total
+  monetario definitivo.
+
+Las pruebas del editor incluyen la conservación del texto local ante 409 y
+los recorridos FE04 cubren el acceso a aprobación desde el editor.
