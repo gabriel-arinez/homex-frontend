@@ -29,6 +29,12 @@ const router = createRouter({
           meta: { capability: 'comercial.operar' },
         },
         {
+          path: 'clientes/nuevo',
+          name: 'cliente-create',
+          component: () => import('@/modules/clientes/views/ClienteCreateView.vue'),
+          meta: { capability: 'comercial.operar' },
+        },
+        {
           path: 'clientes/:id',
           name: 'cliente-detail',
           component: () => import('@/modules/clientes/views/ClienteDetailView.vue'),
