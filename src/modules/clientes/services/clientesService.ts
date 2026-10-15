@@ -26,11 +26,14 @@ export const clientesService = {
     apiRequest<Cliente>('/api/v1/clientes/', { method: 'POST', body }),
   update: (id: number, body: PatchedClienteWritable, revision: string) =>
     apiRequest<Cliente>(`/api/v1/clientes/${id}/`, {
-      method: 'PATCH', body, headers: { 'If-Match': revision },
+      method: 'PATCH',
+      body,
+      headers: { 'If-Match': revision },
     }),
   deactivate: (id: number, revision: string) =>
     apiRequest<void>(`/api/v1/clientes/${id}/`, {
-      method: 'DELETE', headers: { 'If-Match': revision },
+      method: 'DELETE',
+      headers: { 'If-Match': revision },
     }),
 }
 
