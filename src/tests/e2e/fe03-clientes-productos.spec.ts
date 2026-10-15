@@ -5,6 +5,12 @@ const access = 'eyJhbGciOiJub25lIn0.eyJ1c2VyX2lkIjo3fQ.signature'
 const clients = Array.from({ length: 12 }, (_, index) => ({
   id: index + 1,
   tipo_cliente: 1,
+  tipo_cliente_info: {
+    id: 1,
+    concepto_codigo: 'TIPO_CLIENTE',
+    codigo: 'PERSONA',
+    nombre: 'Persona',
+  },
   nombres: `Cliente ${index + 1}`,
   apellidos: 'HOMEX',
   celular: `70000${index}`,
@@ -64,7 +70,39 @@ async function mockBackend(page: Page) {
       }),
     }),
   )
+  await page.route('**/api/v1/catalogo/opciones/**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        { id: 1, concepto_codigo: 'TIPO_CLIENTE', codigo: 'PERSONA', nombre: 'Persona' },
+        { id: 2, concepto_codigo: 'TIPO_CLIENTE', codigo: 'EMPRESA', nombre: 'Empresa' },
+      ]),
+    }),
+  )
   await page.route(/\/api\/v1\/clientes\/(?:\?.*)?$/, (route) => {
+    if (route.request().method() === 'POST') {
+      return route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 21,
+          tipo_cliente: 2,
+          tipo_cliente_info: {
+            id: 2,
+            concepto_codigo: 'TIPO_CLIENTE',
+            codigo: 'EMPRESA',
+            nombre: 'Empresa',
+          },
+          nombres: 'María',
+          apellidos: 'Flores',
+          empresa: 'Muebles Flores',
+          activo: true,
+          created_by: 7,
+          updated_by: 7,
+        }),
+      })
+    }
     const url = new URL(route.request().url())
     const pageNumber = Number(url.searchParams.get('page') ?? '1')
     const pageSize = Number(url.searchParams.get('page_size') ?? '20')
@@ -178,6 +216,47 @@ test('FE03 permite al vendedor editar su propio cliente sin exigir capacidad adm
   await page.goto('/clientes/1')
   await expect(page.getByRole('heading', { name: 'Cliente 1 HOMEX' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Editar' })).toBeVisible()
+})
+
+test('AP4 registra una empresa desde móvil y llega a su ficha', async ({ page }) => {
+  await mockBackend(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.route('**/api/v1/clientes/21/', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 21,
+        tipo_cliente: 2,
+        tipo_cliente_info: {
+          id: 2,
+          concepto_codigo: 'TIPO_CLIENTE',
+          codigo: 'EMPRESA',
+          nombre: 'Empresa',
+        },
+        nombres: 'María',
+        apellidos: 'Flores',
+        empresa: 'Muebles Flores',
+        activo: true,
+        created_by: 7,
+        updated_by: 7,
+      }),
+    }),
+  )
+  await page.goto('/clientes/nuevo')
+  await page.getByLabel('Tipo de cliente').selectOption('2')
+  await page.getByLabel('Nombres del contacto').fill('María')
+  await page.getByLabel('Apellidos del contacto').fill('Flores')
+  await page.getByLabel('Razón social o empresa').fill('Muebles Flores')
+  await page.getByRole('button', { name: 'Registrar cliente' }).click()
+  await expect(page).toHaveURL(/\/clientes\/21$/)
+  await expect(page.getByRole('heading', { name: 'Muebles Flores' })).toBeVisible()
+  await expect(page.getByText('María Flores')).toBeVisible()
+  await noOverflow(page)
+  const violations = (await new AxeBuilder({ page }).analyze()).violations.filter(
+    (violation) => violation.impact === 'serious' || violation.impact === 'critical',
+  )
+  expect(violations).toEqual([])
 })
 
 test('FE03 conserva contraste y catálogo en tema oscuro', async ({ page }) => {

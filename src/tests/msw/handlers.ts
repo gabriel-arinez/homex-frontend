@@ -15,6 +15,17 @@ export const vendedor = {
 }
 
 export const handlers = [
+  http.get('http://localhost:8000/api/v1/catalogo/opciones/', ({ request }) => {
+    const concepto = new URL(request.url).searchParams.get('concepto')
+    const options =
+      concepto === 'TIPO_CLIENTE'
+        ? [
+            { id: 1, concepto_codigo: 'TIPO_CLIENTE', codigo: 'PERSONA', nombre: 'Persona' },
+            { id: 2, concepto_codigo: 'TIPO_CLIENTE', codigo: 'EMPRESA', nombre: 'Empresa' },
+          ]
+        : []
+    return HttpResponse.json(options)
+  }),
   http.post('http://localhost:8000/api/v1/auth/token/', async ({ request }) => {
     const body = (await request.json()) as { username?: string; password?: string }
     return body.username === 'vendedor' && body.password === 'correcta'

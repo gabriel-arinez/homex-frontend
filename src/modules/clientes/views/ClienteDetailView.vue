@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { onBeforeRouteLeave, useRoute } from 'vue-router'
 import type { Cliente, PatchedClienteWritable } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { ApiError } from '@/shared/api'
+import ClienteFormFields, { type ClienteFormModel } from '../components/ClienteFormFields.vue'
 import { clientesService, nombreCliente } from '../services/clientesService'
 import Button from '@/shared/ui/Button.vue'
 import ConfirmDialog from '@/shared/ui/ConfirmDialog.vue'
@@ -11,7 +12,7 @@ import Card from '@/shared/ui/Card.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
-import TextField from '@/shared/ui/TextField.vue'
+
 const emit = defineEmits<{ openMenu: [] }>()
 const route = useRoute()
 const session = useSessionStore()
@@ -21,26 +22,72 @@ const error = ref('')
 const editing = ref(false)
 const saving = ref(false)
 const success = ref('')
-const confirmCancel = ref(false)
+const confirmDiscard = ref(false)
+const confirmStatus = ref(false)
 const fields = ref<Record<string, string[]>>({})
-const form = reactive({
+const dirty = ref(false)
+const allowLeave = ref(false)
+let pendingNavigation: ((allow?: boolean) => void) | null = null
+const form = reactive<ClienteFormModel>({
+  tipo_cliente: '',
   nombres: '',
   apellidos: '',
   empresa: '',
   celular: '',
   direccion: '',
   observaciones: '',
-  activo: true,
 })
 const canEdit = computed(() => session.can('comercial.operar'))
+const isCompany = computed(() => client.value?.tipo_cliente_info?.codigo === 'EMPRESA')
+const typeInfo = computed(
+  () =>
+    client.value?.tipo_cliente_info ?? {
+      id: client.value?.tipo_cliente ?? 0,
+      concepto_codigo: 'TIPO_CLIENTE',
+      codigo: client.value?.empresa ? 'EMPRESA' : 'PERSONA',
+      nombre: client.value?.empresa ? 'Empresa' : 'Persona',
+    },
+)
+
 function fill(value: Cliente) {
+  form.tipo_cliente = String(value.tipo_cliente)
   form.nombres = value.nombres ?? ''
   form.apellidos = value.apellidos ?? ''
   form.empresa = value.empresa ?? ''
   form.celular = value.celular ?? ''
   form.direccion = value.direccion ?? ''
   form.observaciones = value.observaciones ?? ''
-  form.activo = value.activo !== false
+  dirty.value = false
+}
+watch(
+  form,
+  () => {
+    if (editing.value) dirty.value = true
+  },
+  { deep: true },
+)
+function beforeUnload(event: BeforeUnloadEvent) {
+  if (editing.value && dirty.value && !allowLeave.value) event.preventDefault()
+}
+onBeforeRouteLeave((_to, _from, next) => {
+  if (!editing.value || !dirty.value || allowLeave.value) return next()
+  confirmDiscard.value = true
+  pendingNavigation = (allow = false) => next(allow ? undefined : false)
+})
+function closeDiscard() {
+  confirmDiscard.value = false
+  pendingNavigation?.(false)
+  pendingNavigation = null
+}
+function discardEdit() {
+  confirmDiscard.value = false
+  editing.value = false
+  if (client.value) fill(client.value)
+  if (pendingNavigation) {
+    allowLeave.value = true
+    pendingNavigation(true)
+    pendingNavigation = null
+  }
 }
 async function load() {
   loading.value = true
@@ -55,15 +102,15 @@ async function load() {
   }
 }
 async function save() {
-  if (!client.value) return
+  if (!client.value || saving.value) return
   saving.value = true
   fields.value = {}
   success.value = ''
+  error.value = ''
   const body: PatchedClienteWritable = {
-    ...form,
     nombres: form.nombres || null,
     apellidos: form.apellidos || null,
-    empresa: form.empresa || null,
+    empresa: isCompany.value ? form.empresa || null : null,
     celular: form.celular || null,
     direccion: form.direccion || null,
     observaciones: form.observaciones || null,
@@ -80,79 +127,92 @@ async function save() {
     saving.value = false
   }
 }
+function updateForm(field: keyof ClienteFormModel, value: string) {
+  form[field] = value
+}
 function cancelEdit() {
-  confirmCancel.value = true
+  if (dirty.value) confirmDiscard.value = true
+  else editing.value = false
 }
-function discardEdit() {
-  confirmCancel.value = false
-  editing.value = false
-  if (client.value) fill(client.value)
+async function changeStatus() {
+  if (!client.value || saving.value) return
+  saving.value = true
+  error.value = ''
+  try {
+    if (client.value.activo === false) {
+      client.value = await clientesService.update(client.value.id, { activo: true })
+    } else {
+      await clientesService.deactivate(client.value.id)
+      client.value = await clientesService.get(client.value.id)
+    }
+    fill(client.value)
+    success.value = client.value.activo === false ? 'Cliente desactivado.' : 'Cliente reactivado.'
+    confirmStatus.value = false
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : 'No se pudo cambiar el estado.'
+  } finally {
+    saving.value = false
+  }
 }
-onMounted(load)
+onMounted(() => {
+  window.addEventListener('beforeunload', beforeUnload)
+  void load()
+})
+onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 </script>
+
 <template>
   <div>
     <PageHeader
       :title="client ? nombreCliente(client) : 'Cliente'"
-      description="Información comercial del cliente."
+      description="Identidad y datos comerciales del cliente."
       show-menu
       @menu="emit('openMenu')"
-      ><template #actions
-        ><Button v-if="client && canEdit && !editing" variant="secondary" @click="editing = true"
+    >
+      <template #actions>
+        <Button v-if="client && canEdit && !editing" variant="secondary" @click="editing = true"
           >Editar</Button
-        ></template
-      ></PageHeader
-    ><LoadingSkeleton v-if="loading" :lines="6" /><ErrorState
-      v-else-if="error && !client"
-      :description="error"
-      ><button type="button" @click="load">Reintentar</button></ErrorState
-    ><Card v-else-if="client"
-      ><p v-if="success" class="success" role="status">{{ success }}</p>
+        >
+        <Button
+          v-if="client && canEdit && !editing"
+          :variant="client.activo === false ? 'primary' : 'danger'"
+          @click="confirmStatus = true"
+          >{{ client.activo === false ? 'Reactivar' : 'Desactivar' }}</Button
+        >
+      </template>
+    </PageHeader>
+    <LoadingSkeleton v-if="loading" :lines="6" />
+    <ErrorState v-else-if="error && !client" :description="error">
+      <button type="button" @click="load">Reintentar</button>
+    </ErrorState>
+    <Card v-else-if="client">
+      <p v-if="success" class="success" role="status">{{ success }}</p>
       <form v-if="editing" @submit.prevent="save">
-        <div class="form-grid">
-          <TextField
-            v-model="form.nombres"
-            name="nombres"
-            label="Nombres"
-            :error="fields.nombres?.[0]"
-          /><TextField
-            v-model="form.apellidos"
-            name="apellidos"
-            label="Apellidos"
-            :error="fields.apellidos?.[0]"
-          /><TextField
-            v-model="form.empresa"
-            name="empresa"
-            label="Empresa"
-            :error="fields.empresa?.[0]"
-          /><TextField
-            v-model="form.celular"
-            name="celular"
-            label="Celular"
-            :error="fields.celular?.[0]"
-          /><TextField
-            v-model="form.direccion"
-            name="direccion"
-            label="Dirección"
-            :error="fields.direccion?.[0]"
-          /><TextField
-            v-model="form.observaciones"
-            name="observaciones"
-            label="Observaciones"
-            :error="fields.observaciones?.[0]"
-          />
-        </div>
-        <label><input v-model="form.activo" type="checkbox" /> Cliente activo</label>
+        <ClienteFormFields
+          :model="form"
+          :tipos="[typeInfo]"
+          :errors="fields"
+          type-readonly
+          @change="updateForm"
+        />
         <p v-if="error" class="form-error" role="alert">{{ error }}</p>
         <div class="actions">
-          <Button type="submit" :processing="saving" processing-label="Guardando…">Guardar</Button
-          ><Button variant="secondary" :disabled="saving" @click="cancelEdit">Cancelar</Button>
+          <Button type="submit" :processing="saving" processing-label="Guardando…">Guardar</Button>
+          <Button variant="secondary" :disabled="saving" @click="cancelEdit">Cancelar</Button>
         </div>
       </form>
       <dl v-else>
         <div>
-          <dt>Tipo registrado</dt>
-          <dd>#{{ client.tipo_cliente }}</dd>
+          <dt>Tipo</dt>
+          <dd>{{ typeInfo.nombre }}</dd>
+        </div>
+        <div v-if="isCompany">
+          <dt>Empresa</dt>
+          <dd>{{ client.empresa }}</dd>
+        </div>
+        <div>
+          <dt>{{ isCompany ? 'Contacto' : 'Nombre completo' }}</dt>
+          <dd>{{ [client.nombres, client.apellidos].filter(Boolean).join(' ') }}</dd>
         </div>
         <div>
           <dt>Celular</dt>
@@ -170,20 +230,33 @@ onMounted(load)
           <dt>Observaciones</dt>
           <dd>{{ client.observaciones || 'Sin observaciones' }}</dd>
         </div>
-      </dl></Card
-    >
+      </dl>
+      <p v-if="error && client && !editing" class="form-error" role="alert">{{ error }}</p>
+    </Card>
     <ConfirmDialog
-      :open="confirmCancel"
+      :open="confirmDiscard"
       title="Descartar cambios"
       description="Los cambios del cliente no se guardarán."
       confirm-label="Descartar"
-      @close="confirmCancel = false"
+      @close="closeDiscard"
       @confirm="discardEdit"
+    />
+    <ConfirmDialog
+      :open="confirmStatus"
+      :title="client?.activo === false ? 'Reactivar cliente' : 'Desactivar cliente'"
+      :description="
+        client?.activo === false
+          ? 'El cliente volverá a estar disponible para nuevas operaciones.'
+          : 'El cliente se conservará en el historial y dejará de estar disponible para nuevas operaciones.'
+      "
+      :confirm-label="client?.activo === false ? 'Reactivar' : 'Desactivar'"
+      @close="confirmStatus = false"
+      @confirm="changeStatus"
     />
   </div>
 </template>
+
 <style scoped>
-.form-grid,
 dl {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -212,7 +285,6 @@ dd {
   color: var(--color-danger);
 }
 @media (max-width: 47.99rem) {
-  .form-grid,
   dl {
     grid-template-columns: 1fr;
   }

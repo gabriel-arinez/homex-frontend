@@ -23,6 +23,7 @@ import PageHeader from '@/shared/ui/PageHeader.vue'
 import Select from '@/shared/ui/Select.vue'
 import TextField from '@/shared/ui/TextField.vue'
 import ClienteSelector from '../components/ClienteSelector.vue'
+import ClienteFormFields from '@/modules/clientes/components/ClienteFormFields.vue'
 import DetalleForm from '../components/DetalleForm.vue'
 import EspecificacionForm from '../components/EspecificacionForm.vue'
 import { proformasService } from '../services/proformasService'
@@ -72,6 +73,9 @@ const nuevoCliente = reactive({
   direccion: '',
   observaciones: '',
 })
+function updateNuevoCliente(field: keyof typeof nuevoCliente, value: string) {
+  nuevoCliente[field] = value
+}
 const lineas = ref<LineaLocal[]>([])
 const existingProductIds = computed(() =>
   lineas.value.flatMap((line) => (line.producto ? [line.producto] : [])),
@@ -402,22 +406,13 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           v-model="header.cliente"
           label="Cliente existente"
         />
-        <Card v-if="clienteMode === 'nuevo'" class="client-grid">
-          <Select
-            v-model="nuevoCliente.tipo_cliente"
-            name="tipo-cliente"
-            label="Tipo de cliente"
-            :options="tiposCliente.map((x) => ({ label: x.nombre, value: String(x.id) }))"
+        <Card v-if="clienteMode === 'nuevo'">
+          <ClienteFormFields
+            :model="nuevoCliente"
+            :tipos="tiposCliente"
+            prefix="proforma-cliente"
+            @change="updateNuevoCliente"
           />
-          <TextField v-model="nuevoCliente.nombres" name="cliente-nombres" label="Nombres" />
-          <TextField v-model="nuevoCliente.apellidos" name="cliente-apellidos" label="Apellidos" />
-          <TextField
-            v-model="nuevoCliente.empresa"
-            name="cliente-empresa"
-            label="Empresa (si corresponde)"
-          />
-          <TextField v-model="nuevoCliente.celular" name="cliente-celular" label="Celular" />
-          <TextField v-model="nuevoCliente.direccion" name="cliente-direccion" label="Dirección" />
         </Card>
         <p v-if="clienteMode === 'pendiente'">
           Puedes guardar el borrador sin cliente. Para emitir deberás definirlo.

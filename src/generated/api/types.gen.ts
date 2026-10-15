@@ -52,6 +52,7 @@ export type CargaImagen = {
 export type Cliente = {
   readonly id: number
   tipo_cliente: number
+  tipo_cliente_info: ValorCatalogoPublico
   nombres?: string | null
   apellidos?: string | null
   empresa?: string | null
@@ -372,6 +373,7 @@ export type PaginatedProformaListadoList = {
 export type PatchedCliente = {
   readonly id?: number
   tipo_cliente?: number
+  tipo_cliente_info?: ValorCatalogoPublico
   nombres?: string | null
   apellidos?: string | null
   empresa?: string | null

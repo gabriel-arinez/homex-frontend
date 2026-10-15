@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import type { Cliente } from '@/generated/api'
+import type { Cliente, ValorCatalogoPublico } from '@/generated/api'
+import { proformasService } from '@/modules/proformas/services/proformasService'
 import { clientesService, nombreCliente } from '../services/clientesService'
 import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
 import DataTable from '@/shared/ui/DataTable.vue'
@@ -23,6 +24,8 @@ const loading = ref(true)
 const error = ref('')
 const search = ref(typeof route.query.q === 'string' ? route.query.q : '')
 const status = ref(typeof route.query.estado === 'string' ? route.query.estado : 'todos')
+const type = ref(typeof route.query.tipo === 'string' ? route.query.tipo : 'todos')
+const types = ref<ValorCatalogoPublico[]>([])
 const page = ref(Math.max(1, Number(route.query.pagina) || 1))
 const pageSize = 10
 let requestId = 0
@@ -33,21 +36,33 @@ const statusLabels: Record<string, string> = {
   inactivos: 'Inactivos',
 }
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
-const hasFilters = computed(() => Boolean(search.value.trim()) || status.value !== 'todos')
+const hasFilters = computed(
+  () => Boolean(search.value.trim()) || status.value !== 'todos' || type.value !== 'todos',
+)
 const activeFilters = computed(() => [
   ...(search.value.trim() ? [{ key: 'search', label: `Búsqueda: ${search.value.trim()}` }] : []),
   ...(status.value !== 'todos'
     ? [{ key: 'status', label: `Estado: ${statusLabels[status.value] ?? status.value}` }]
+    : []),
+  ...(type.value !== 'todos'
+    ? [
+        {
+          key: 'type',
+          label: `Tipo: ${types.value.find((item) => String(item.id) === type.value)?.nombre ?? type.value}`,
+        },
+      ]
     : []),
 ])
 
 function removeFilter(key: string) {
   if (key === 'search') search.value = ''
   if (key === 'status') status.value = 'todos'
+  if (key === 'type') type.value = 'todos'
 }
 function clearFilters() {
   search.value = ''
   status.value = 'todos'
+  type.value = 'todos'
 }
 
 function activeFilter() {
@@ -62,6 +77,7 @@ function syncRoute() {
       q: search.value || undefined,
       estado: status.value === 'todos' ? undefined : status.value,
       pagina: page.value > 1 ? page.value : undefined,
+      tipo: type.value === 'todos' ? undefined : type.value,
     },
   })
 }
@@ -76,6 +92,7 @@ async function load() {
       activo: activeFilter(),
       page: page.value,
       page_size: pageSize,
+      tipo_cliente: type.value === 'todos' ? undefined : Number(type.value),
     })
     if (currentRequest !== requestId) return
     clients.value = response.results
@@ -90,7 +107,7 @@ async function load() {
   }
 }
 
-watch([search, status], () => {
+watch([search, status, type], () => {
   if (page.value !== 1) {
     page.value = 1
     return
@@ -102,10 +119,17 @@ watch(page, () => {
   syncRoute()
   void load()
 })
-onMounted(load)
+onMounted(() => {
+  void load()
+  void proformasService
+    .options('TIPO_CLIENTE')
+    .then((value) => (types.value = value))
+    .catch(() => (types.value = []))
+})
 
 const columns = [
   { key: 'nombre', label: 'Cliente' },
+  { key: 'tipo', label: 'Tipo' },
   { key: 'celular', label: 'Celular' },
   { key: 'estado', label: 'Estado' },
   { key: 'acciones', label: 'Acciones' },
@@ -119,7 +143,10 @@ const columns = [
       description="Consulta y administra los clientes registrados."
       show-menu
       @menu="emit('openMenu')"
-    />
+      ><template #actions
+        ><RouterLink class="primary-link" to="/clientes/nuevo">Nuevo cliente</RouterLink></template
+      ></PageHeader
+    >
     <FilterBar>
       <SearchField v-model="search" label="Buscar por nombre, empresa o celular" />
       <Select
@@ -130,6 +157,15 @@ const columns = [
           { label: 'Todos', value: 'todos' },
           { label: 'Activos', value: 'activos' },
           { label: 'Inactivos', value: 'inactivos' },
+        ]"
+      />
+      <Select
+        v-model="type"
+        name="tipo-cliente"
+        label="Tipo de cliente"
+        :options="[
+          { label: 'Todos', value: 'todos' },
+          ...types.map((item) => ({ label: item.nombre, value: String(item.id) })),
         ]"
       />
     </FilterBar>
@@ -152,12 +188,19 @@ const columns = [
       <DataTable
         caption="Listado de clientes"
         :columns="columns"
-        :rows="clients.map((client) => ({ ...client, nombre: nombreCliente(client) }))"
+        :rows="
+          clients.map((client) => ({
+            ...client,
+            nombre: nombreCliente(client),
+            tipo: client.tipo_cliente_info?.nombre ?? `Tipo #${client.tipo_cliente}`,
+          }))
+        "
       >
         <template #cell-nombre="{ row }"
           ><strong>{{ row.nombre }}</strong></template
         >
         <template #cell-celular="{ row }">{{ row.celular || 'Sin celular' }}</template>
+        <template #cell-tipo="{ row }">{{ row.tipo }}</template>
         <template #cell-estado="{ row }">
           <span :class="row.activo === false ? 'inactive' : 'active'">{{
             row.activo === false ? 'Inactivo' : 'Activo'
@@ -191,5 +234,15 @@ const columns = [
 a {
   color: var(--color-primary-accent);
   font-weight: 600;
+}
+.primary-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0.625rem 1rem;
+  color: white;
+  border-radius: var(--radius-control);
+  background: var(--color-primary);
+  text-decoration: none;
 }
 </style>

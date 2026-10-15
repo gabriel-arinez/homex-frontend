@@ -1,5 +1,6 @@
 import type {
   Cliente,
+  ClienteWritable,
   PaginatedClienteList,
   PatchedClienteWritable,
   V1ClientesListData,
@@ -21,8 +22,11 @@ export const clientesService = {
   list: (query: ClienteListQuery = {}) =>
     apiRequest<PaginatedClienteList>(`/api/v1/clientes/${queryString(query)}`),
   get: (id: number) => apiRequest<Cliente>(`/api/v1/clientes/${id}/`),
+  create: (body: ClienteWritable) =>
+    apiRequest<Cliente>('/api/v1/clientes/', { method: 'POST', body }),
   update: (id: number, body: PatchedClienteWritable) =>
     apiRequest<Cliente>(`/api/v1/clientes/${id}/`, { method: 'PATCH', body }),
+  deactivate: (id: number) => apiRequest<void>(`/api/v1/clientes/${id}/`, { method: 'DELETE' }),
 }
 
 export function nombreCliente(cliente: Cliente) {
