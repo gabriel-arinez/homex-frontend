@@ -262,7 +262,10 @@ describe('AP4 clientes consolidados', () => {
     await router.push('/clientes/41')
     const pinia = createPinia()
     useSessionStore(pinia).capabilities = ['comercial.operar']
-    const wrapper = mount(ClienteDetailView, { global: { plugins: [pinia, router] } })
+    const wrapper = mount(
+      { template: '<RouterView />' },
+      { global: { plugins: [pinia, router] } },
+    )
     await flushPromises()
     const editar = wrapper.findAll('button').find((button) => button.text() === 'Editar')
     await editar!.trigger('click')
