@@ -193,9 +193,7 @@ describe('FE03 clientes y productos', () => {
         HttpResponse.json({ empresa: ['La empresa es obligatoria.'] }, { status: 400 }),
       ),
     )
-    await expect(
-      clientesService.update(3, { empresa: '' }, 'a'.repeat(64)),
-    ).rejects.toMatchObject({
+    await expect(clientesService.update(3, { empresa: '' }, 'a'.repeat(64))).rejects.toMatchObject({
       status: 400,
       fields: { empresa: ['La empresa es obligatoria.'] },
     })
