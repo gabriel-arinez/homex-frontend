@@ -2,7 +2,7 @@ import { createPinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { http, HttpResponse } from 'msw'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import ClienteCreateView from '@/modules/clientes/views/ClienteCreateView.vue'
 import ClienteDetailView from '@/modules/clientes/views/ClienteDetailView.vue'
 import ClientesListView from '@/modules/clientes/views/ClientesListView.vue'
@@ -189,7 +189,7 @@ describe('AP4 clientes consolidados', () => {
     await flushPromises()
     await router.push('/clientes?q=Flores&estado=inactivos&tipo=2&pagina=2')
     await flushPromises()
-    const query = new URL(queries.at(-1) ?? '').searchParams
+    const query = new URL(queries[queries.length - 1] ?? '').searchParams
     expect(Object.fromEntries(query)).toMatchObject({
       search: 'Flores', activo: 'false', tipo_cliente: '2', page: '2',
     })
