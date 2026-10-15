@@ -100,7 +100,7 @@ const canEmit = computed(() => {
   const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
   const esEmpresa = /EMPRESA|JURID/.test(tipo?.codigo ?? '')
   return esEmpresa
-    ? Boolean(nuevoCliente.empresa.trim())
+    ? Boolean(nuevoCliente.empresa.trim() && nuevoCliente.nombres.trim())
     : Boolean(nuevoCliente.nombres.trim() && nuevoCliente.apellidos.trim())
 })
 
