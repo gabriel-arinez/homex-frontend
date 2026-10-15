@@ -182,7 +182,7 @@ describe('FE03 clientes y productos', () => {
         HttpResponse.json({ detail: 'Sin permiso' }, { status: 403 }),
       ),
     )
-    await expect(clientesService.update(3, { celular: '70000000' })).rejects.toMatchObject({
+    await expect(clientesService.update(3, { celular: '70000000' }, 'a'.repeat(64))).rejects.toMatchObject({
       status: 403,
       message: 'Sin permiso',
     })
@@ -191,7 +191,7 @@ describe('FE03 clientes y productos', () => {
         HttpResponse.json({ empresa: ['La empresa es obligatoria.'] }, { status: 400 }),
       ),
     )
-    await expect(clientesService.update(3, { empresa: '' })).rejects.toMatchObject({
+    await expect(clientesService.update(3, { empresa: '' }, 'a'.repeat(64))).rejects.toMatchObject({
       status: 400,
       fields: { empresa: ['La empresa es obligatoria.'] },
     })
