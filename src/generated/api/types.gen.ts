@@ -53,6 +53,7 @@ export type Cliente = {
   readonly id: number
   tipo_cliente: number
   tipo_cliente_info: ValorCatalogoPublico
+  readonly revision: string
   nombres?: string | null
   apellidos?: string | null
   empresa?: string | null
@@ -372,6 +373,7 @@ export type PaginatedProformaListadoList = {
 
 export type PatchedCliente = {
   readonly id?: number
+  readonly revision?: string
   tipo_cliente?: number
   tipo_cliente_info?: ValorCatalogoPublico
   nombres?: string | null
