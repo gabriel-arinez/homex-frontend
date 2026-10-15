@@ -111,4 +111,88 @@ describe('AP4 clientes consolidados', () => {
     await clientesService.update(41, { activo: true }, 'b'.repeat(64))
     expect(methods).toEqual(['DELETE', 'PATCH:{"activo":true}'])
   })
+  it('limpia la razon social oculta al pasar de EMPRESA a PERSONA', async () => {
+    const wrapper = mount(ClienteFormFields, {
+      props: {
+        model: {
+          tipo_cliente: '2',
+          nombres: 'María',
+          apellidos: 'Flores',
+          empresa: 'Razón social anterior',
+          celular: '',
+          direccion: '',
+          observaciones: '',
+        },
+        tipos: [
+          { id: 1, concepto_codigo: 'TIPO_CLIENTE', codigo: 'PERSONA', nombre: 'Persona' },
+          typeInfo,
+        ],
+      },
+    })
+    await wrapper.get('select').setValue('1')
+    expect(wrapper.emitted('change')).toEqual([
+      ['tipo_cliente', '1'],
+      ['empresa', ''],
+    ])
+  })
+
+  it('actualiza la ficha al cambiar de identificador sin mostrar el cliente anterior', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/clientes/:id/', ({ params }) =>
+        HttpResponse.json({
+          id: Number(params.id),
+          tipo_cliente: 1,
+          tipo_cliente_info: {
+            id: 1, concepto_codigo: 'TIPO_CLIENTE', codigo: 'PERSONA', nombre: 'Persona',
+          },
+          nombres: `Nombre ${params.id}`,
+          apellidos: 'HOMEX',
+          empresa: null,
+          revision: 'a'.repeat(64),
+          activo: true,
+        }),
+      ),
+    )
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/clientes/:id', component: ClienteDetailView }],
+    })
+    await router.push('/clientes/1')
+    const wrapper = mount(ClienteDetailView, {
+      global: { plugins: [createPinia(), router] },
+    })
+    await flushPromises()
+    expect(wrapper.text()).toContain('Nombre 1 HOMEX')
+    await router.push('/clientes/2')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Nombre 2 HOMEX')
+    expect(wrapper.text()).not.toContain('Nombre 1 HOMEX')
+  })
+
+  it('restaura los filtros al navegar a otra URL de clientes', async () => {
+    const queries: string[] = []
+    server.use(
+      http.get('http://localhost:8000/api/v1/clientes/', ({ request }) => {
+        queries.push(request.url)
+        return HttpResponse.json({ count: 0, next: null, previous: null, results: [] })
+      }),
+    )
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/clientes', component: ClientesListView }],
+    })
+    await router.push('/clientes')
+    const wrapper = mount(ClientesListView, {
+      global: { plugins: [createPinia(), router] },
+    })
+    await flushPromises()
+    await router.push('/clientes?q=Flores&estado=inactivos&tipo=2&pagina=2')
+    await flushPromises()
+    const query = new URL(queries.at(-1) ?? '').searchParams
+    expect(Object.fromEntries(query)).toMatchObject({
+      search: 'Flores', activo: 'false', tipo_cliente: '2', page: '2',
+    })
+    expect(wrapper.text()).toContain('Flores')
+  })
+
 })
