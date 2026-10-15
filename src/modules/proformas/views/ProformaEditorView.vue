@@ -352,11 +352,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           </div>
           <Button @click="openLine()">Agregar producto</Button>
         </div>
-        <Card
-          v-for="(line, index) in lineas"
-          :key="line.localId"
-          class="line-card"
-        >
+        <Card v-for="(line, index) in lineas" :key="line.localId" class="line-card">
           <div :id="`ap3-linea-${line.localId}`" tabindex="-1">
             <strong>{{ line.nombre }}</strong>
             <p v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
@@ -477,7 +473,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 clienteMode === 'pendiente'
                   ? 'Pendiente'
                   : clienteMode === 'nuevo'
-                    ? (nuevoCliente.empresa || `${nuevoCliente.nombres} ${nuevoCliente.apellidos}`)
+                    ? nuevoCliente.empresa || `${nuevoCliente.nombres} ${nuevoCliente.apellidos}`
                     : `Cliente #${header.cliente}`
               }}
             </p>
@@ -509,7 +505,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         <Button :disabled="!canEmit" :processing="saving" @click="persist(true)"
           >Emitir proforma</Button
         >
-        <Button v-if="persisted" variant="secondary" @click="router.push(`/proformas/${persisted.id}`)">
+        <Button
+          v-if="persisted"
+          variant="secondary"
+          @click="router.push(`/proformas/${persisted.id}`)"
+        >
           Ver detalle, aprobar y gestionar adjuntos
         </Button>
       </footer>
