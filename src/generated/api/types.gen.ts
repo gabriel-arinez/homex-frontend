@@ -132,12 +132,13 @@ export type CrearProforma = {
 
 export type DescuentoProducto = {
   readonly id: number
+  readonly vigente: boolean
   precio_antes: string
   precio_ahora: string
   fecha_inicio?: string | null
   fecha_fin?: string | null
   activo?: boolean
-  producto: number
+  readonly producto: number
 }
 
 export type DetalleIntegral = {
@@ -230,6 +231,12 @@ export type FamiliaProducto = {
   activo?: boolean
 }
 
+export type FamiliaProductoResumen = {
+  readonly id: number
+  readonly codigo: string
+  readonly nombre: string
+}
+
 export type IdentidadActual = {
   readonly id: number
   readonly username: string
@@ -239,8 +246,8 @@ export type IdentidadActual = {
 
 export type ImagenPrincipal = {
   original: string
-  ancho: number
-  alto: number
+  ancho: number | null
+  alto: number | null
   variantes: {
     [key: string]: string
   }
@@ -389,12 +396,13 @@ export type PatchedCliente = {
 
 export type PatchedDescuentoProducto = {
   readonly id?: number
+  readonly vigente?: boolean
   precio_antes?: string
   precio_ahora?: string
   fecha_inicio?: string | null
   fecha_fin?: string | null
   activo?: boolean
-  producto?: number
+  readonly producto?: number
 }
 
 export type PatchedDetalleProforma = {
@@ -439,8 +447,10 @@ export type PatchedFamiliaProducto = {
 export type PatchedProducto = {
   readonly id?: number
   categoria?: number
+  categoria_info?: ValorCatalogoPublico
   familia?: number | null
-  sku?: string | null
+  familia_info?: FamiliaProductoResumen
+  sku?: string
   nombre?: string
   precio_lista?: string
   readonly precio_vigente?: string
@@ -448,15 +458,19 @@ export type PatchedProducto = {
   readonly demanda_pendiente?: string
   readonly disponibilidad_referencial?: string
   unidad_stock?: number
+  unidad_stock_info?: ValorCatalogoPublico
   activo?: boolean
   observaciones?: string | null
   imagen_principal?: ImagenPrincipal | null
+  silla?: ProductoSilla | null
+  piso?: ProductoPiso | null
+  promocion?: DescuentoProducto | null
   readonly created_by?: number | null
   readonly updated_by?: number | null
 }
 
 export type PatchedProductoPiso = {
-  producto?: number
+  readonly producto?: number
   modelo?: string | null
   espesor_mm?: string | null
   largo_mm?: string | null
@@ -470,7 +484,7 @@ export type PatchedProductoPiso = {
 }
 
 export type PatchedProductoSilla = {
-  producto?: number
+  readonly producto?: number
   modelo?: string | null
   especificaciones?: unknown
   marca?: number | null
@@ -523,8 +537,10 @@ export type Pedido = {
 export type Producto = {
   readonly id: number
   categoria: number
+  categoria_info: ValorCatalogoPublico
   familia?: number | null
-  sku?: string | null
+  familia_info: FamiliaProductoResumen
+  sku: string
   nombre: string
   precio_lista?: string
   readonly precio_vigente: string
@@ -532,15 +548,19 @@ export type Producto = {
   readonly demanda_pendiente: string
   readonly disponibilidad_referencial: string
   unidad_stock: number
+  unidad_stock_info: ValorCatalogoPublico
   activo?: boolean
   observaciones?: string | null
   imagen_principal: ImagenPrincipal | null
+  silla?: ProductoSilla | null
+  piso?: ProductoPiso | null
+  promocion?: DescuentoProducto | null
   readonly created_by: number | null
   readonly updated_by: number | null
 }
 
 export type ProductoPiso = {
-  producto: number
+  readonly producto: number
   modelo?: string | null
   espesor_mm?: string | null
   largo_mm?: string | null
@@ -560,7 +580,7 @@ export type ProductoResumenMovimiento = {
 }
 
 export type ProductoSilla = {
-  producto: number
+  readonly producto: number
   modelo?: string | null
   especificaciones?: unknown
   marca?: number | null
@@ -733,7 +753,6 @@ export type DescuentoProductoWritable = {
   fecha_inicio?: string | null
   fecha_fin?: string | null
   activo?: boolean
-  producto: number
 }
 
 export type DetalleIntegralWritable = {
@@ -839,7 +858,6 @@ export type PatchedDescuentoProductoWritable = {
   fecha_inicio?: string | null
   fecha_fin?: string | null
   activo?: boolean
-  producto?: number
 }
 
 export type PatchedDetalleProformaWritable = {
@@ -872,12 +890,36 @@ export type PatchedFamiliaProductoWritable = {
 export type PatchedProductoWritable = {
   categoria?: number
   familia?: number | null
-  sku?: string | null
+  sku?: string
   nombre?: string
   precio_lista?: string
   unidad_stock?: number
   activo?: boolean
   observaciones?: string | null
+  silla?: ProductoSillaWritable | null
+  piso?: ProductoPisoWritable | null
+  promocion?: DescuentoProductoWritable | null
+}
+
+export type PatchedProductoPisoWritable = {
+  modelo?: string | null
+  espesor_mm?: string | null
+  largo_mm?: string | null
+  ancho_mm?: string | null
+  m2_por_caja?: string | null
+  marca?: number | null
+  tipo?: number | null
+  material?: number | null
+  diseno?: number | null
+  acabado?: number | null
+}
+
+export type PatchedProductoSillaWritable = {
+  modelo?: string | null
+  especificaciones?: unknown
+  marca?: number | null
+  color_primario?: number | null
+  color_secundario?: number | null
 }
 
 export type PatchedProformaWritable = {
@@ -897,12 +939,36 @@ export type PatchedProformaWritable = {
 export type ProductoWritable = {
   categoria: number
   familia?: number | null
-  sku?: string | null
+  sku: string
   nombre: string
   precio_lista?: string
   unidad_stock: number
   activo?: boolean
   observaciones?: string | null
+  silla?: ProductoSillaWritable | null
+  piso?: ProductoPisoWritable | null
+  promocion?: DescuentoProductoWritable | null
+}
+
+export type ProductoPisoWritable = {
+  modelo?: string | null
+  espesor_mm?: string | null
+  largo_mm?: string | null
+  ancho_mm?: string | null
+  m2_por_caja?: string | null
+  marca?: number | null
+  tipo?: number | null
+  material?: number | null
+  diseno?: number | null
+  acabado?: number | null
+}
+
+export type ProductoSillaWritable = {
+  modelo?: string | null
+  especificaciones?: unknown
+  marca?: number | null
+  color_primario?: number | null
+  color_secundario?: number | null
 }
 
 export type ProformaWritable = {
@@ -1305,6 +1371,13 @@ export type V1CatalogoOpcionesListData = {
      * * `ESTADO_ORDEN_TRABAJO` - ESTADO_ORDEN_TRABAJO
      * * `TIPO_PAGO` - TIPO_PAGO
      * * `TIPO_MOVIMIENTO` - TIPO_MOVIMIENTO
+     * * `CATEGORIA_PRODUCTO` - CATEGORIA_PRODUCTO
+     * * `MARCA` - MARCA
+     * * `COLOR` - COLOR
+     * * `TIPO_PISO` - TIPO_PISO
+     * * `MATERIAL_PISO` - MATERIAL_PISO
+     * * `DISENO_PISO` - DISENO_PISO
+     * * `ACABADO_PISO` - ACABADO_PISO
      */
     concepto:
       | 'ESTADO_PROFORMA'
@@ -1317,6 +1390,13 @@ export type V1CatalogoOpcionesListData = {
       | 'ESTADO_ORDEN_TRABAJO'
       | 'TIPO_PAGO'
       | 'TIPO_MOVIMIENTO'
+      | 'CATEGORIA_PRODUCTO'
+      | 'MARCA'
+      | 'COLOR'
+      | 'TIPO_PISO'
+      | 'MATERIAL_PISO'
+      | 'DISENO_PISO'
+      | 'ACABADO_PISO'
   }
   url: '/api/v1/catalogo/opciones/'
 }
@@ -1343,7 +1423,7 @@ export type V1CatalogoPisosListResponse =
   V1CatalogoPisosListResponses[keyof V1CatalogoPisosListResponses]
 
 export type V1CatalogoPisosCreateData = {
-  body: ProductoPiso
+  body?: ProductoPisoWritable
   path?: never
   query?: never
   url: '/api/v1/catalogo/pisos/'
@@ -1398,7 +1478,7 @@ export type V1CatalogoPisosRetrieveResponse =
   V1CatalogoPisosRetrieveResponses[keyof V1CatalogoPisosRetrieveResponses]
 
 export type V1CatalogoPisosPartialUpdateData = {
-  body?: PatchedProductoPiso
+  body?: PatchedProductoPisoWritable
   path: {
     /**
      * Un valor único que identifique este producto piso.
@@ -1417,7 +1497,7 @@ export type V1CatalogoPisosPartialUpdateResponse =
   V1CatalogoPisosPartialUpdateResponses[keyof V1CatalogoPisosPartialUpdateResponses]
 
 export type V1CatalogoPisosUpdateData = {
-  body: ProductoPiso
+  body?: ProductoPisoWritable
   path: {
     /**
      * Un valor único que identifique este producto piso.
@@ -1441,6 +1521,7 @@ export type V1CatalogoProductosListData = {
   query?: {
     activo?: boolean
     categoria?: number
+    familia?: number
     /**
      * Un número de página dentro del conjunto de resultados paginado.
      */
@@ -1613,7 +1694,7 @@ export type V1CatalogoSillasListResponse =
   V1CatalogoSillasListResponses[keyof V1CatalogoSillasListResponses]
 
 export type V1CatalogoSillasCreateData = {
-  body: ProductoSilla
+  body?: ProductoSillaWritable
   path?: never
   query?: never
   url: '/api/v1/catalogo/sillas/'
@@ -1668,7 +1749,7 @@ export type V1CatalogoSillasRetrieveResponse =
   V1CatalogoSillasRetrieveResponses[keyof V1CatalogoSillasRetrieveResponses]
 
 export type V1CatalogoSillasPartialUpdateData = {
-  body?: PatchedProductoSilla
+  body?: PatchedProductoSillaWritable
   path: {
     /**
      * Un valor único que identifique este producto silla.
@@ -1687,7 +1768,7 @@ export type V1CatalogoSillasPartialUpdateResponse =
   V1CatalogoSillasPartialUpdateResponses[keyof V1CatalogoSillasPartialUpdateResponses]
 
 export type V1CatalogoSillasUpdateData = {
-  body: ProductoSilla
+  body?: ProductoSillaWritable
   path: {
     /**
      * Un valor único que identifique este producto silla.
@@ -2469,6 +2550,25 @@ export type V1ProformasDocumentoRetrieveResponses = {
 
 export type V1ProformasDocumentoRetrieveResponse =
   V1ProformasDocumentoRetrieveResponses[keyof V1ProformasDocumentoRetrieveResponses]
+
+export type V1ProformasDocumentoPdfRetrieveData = {
+  body?: never
+  path: {
+    /**
+     * Un valor de entero único que identifique este proforma.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/proformas/{id}/documento-pdf/'
+}
+
+export type V1ProformasDocumentoPdfRetrieveResponses = {
+  200: Blob | File
+}
+
+export type V1ProformasDocumentoPdfRetrieveResponse =
+  V1ProformasDocumentoPdfRetrieveResponses[keyof V1ProformasDocumentoPdfRetrieveResponses]
 
 export type V1ProformasEnviarCreateData = {
   body?: never

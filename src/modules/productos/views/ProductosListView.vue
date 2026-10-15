@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import type { Producto } from '@/generated/api'
+import { useSessionStore } from '@/app/stores/useSessionStore'
 import { productosService } from '../services/productosService'
 import ProductImage from '../components/ProductImage.vue'
 import Button from '@/shared/ui/Button.vue'
@@ -19,6 +20,7 @@ import Select from '@/shared/ui/Select.vue'
 const emit = defineEmits<{ openMenu: [] }>()
 const route = useRoute()
 const router = useRouter()
+const session = useSessionStore()
 const products = ref<Producto[]>([])
 const total = ref(0)
 const loading = ref(true)
@@ -116,6 +118,7 @@ const columns = [
   { key: 'stock', label: 'Stock' },
   { key: 'acciones', label: 'Acciones' },
 ]
+const asProduct = (value: unknown) => value as Producto
 const money = (value: string) =>
   new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(Number(value))
 </script>
@@ -129,6 +132,9 @@ const money = (value: string) =>
       @menu="emit('openMenu')"
     >
       <template #actions>
+        <Button v-if="session.can('comercial.administrar')" @click="router.push('/productos/nuevo')"
+          >Nuevo producto</Button
+        >
         <Button
           :variant="view === 'grid' ? 'primary' : 'secondary'"
           :aria-pressed="view === 'grid'"
@@ -176,16 +182,22 @@ const money = (value: string) =>
       <p class="results">{{ total }} producto{{ total === 1 ? '' : 's' }}</p>
       <div v-if="view === 'grid'" class="product-grid">
         <article v-for="product in products" :key="product.id" class="product-card">
-          <span class="category">Categoría #{{ product.categoria }}</span>
+          <span class="category">{{
+            product.categoria_info?.nombre || `Categoría #${product.categoria}`
+          }}</span>
           <ProductImage :image="product.imagen_principal" :alt="product.nombre" />
           <div class="body">
             <small>{{ product.sku || 'Sin SKU' }}</small>
             <h2>
               <RouterLink :to="`/productos/${product.id}`">{{ product.nombre }}</RouterLink>
             </h2>
-            <p>Unidad registrada #{{ product.unidad_stock }}</p>
+            <p>
+              {{ product.unidad_stock_info?.nombre || `Unidad #${product.unidad_stock}`
+              }}<span v-if="product.familia_info"> · {{ product.familia_info.nombre }}</span>
+            </p>
             <div class="commercial">
-              <strong>{{ money(product.precio_vigente) }}</strong>
+              <strong>{{ money(product.precio_vigente) }}</strong
+              ><small v-if="product.promocion?.vigente" class="promotion">Promoción vigente</small>
               <span>Stock: {{ product.stock }}</span>
             </div>
             <small>
@@ -200,7 +212,12 @@ const money = (value: string) =>
           <strong>{{ row.nombre }}</strong
           ><br /><small>{{ row.sku || 'Sin SKU' }}</small>
         </template>
-        <template #cell-categoria="{ row }">#{{ row.categoria }}</template>
+        <template #cell-categoria="{ row }"
+          >{{ asProduct(row).categoria_info?.nombre || `Categoría #${asProduct(row).categoria}`
+          }}<br /><small v-if="asProduct(row).familia_info">{{
+            asProduct(row).familia_info?.nombre
+          }}</small></template
+        >
         <template #cell-precio="{ row }">{{ money(String(row.precio_vigente)) }}</template>
         <template #cell-stock="{ row }">
           {{ row.stock }} <small>(ref. {{ row.disponibilidad_referencial }})</small>

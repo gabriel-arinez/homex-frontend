@@ -125,6 +125,12 @@ const router = createRouter({
           meta: { capability: 'comercial.operar' },
         },
         {
+          path: 'productos/nuevo',
+          name: 'producto-create',
+          component: () => import('@/modules/productos/views/ProductoCreateView.vue'),
+          meta: { capability: 'comercial.administrar' },
+        },
+        {
           path: 'productos/:id',
           name: 'producto-detail',
           component: () => import('@/modules/productos/views/ProductoDetailView.vue'),

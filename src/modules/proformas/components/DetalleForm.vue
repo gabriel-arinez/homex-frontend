@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import type {
   DetalleProforma,
   DetalleProformaWritable,
@@ -12,6 +12,9 @@ import Button from '@/shared/ui/Button.vue'
 import Select from '@/shared/ui/Select.vue'
 import TextField from '@/shared/ui/TextField.vue'
 import { ApiError } from '@/shared/api'
+import { useSessionStore } from '@/app/stores/useSessionStore'
+import { getActivePinia } from 'pinia'
+import { productosService } from '@/modules/productos/services/productosService'
 
 const props = defineProps<{
   tipos: ValorCatalogoPublico[]
@@ -22,15 +25,18 @@ const props = defineProps<{
   processing?: boolean
   externalError?: string
   existingProductIds?: number[]
+  initialProductId?: number | null
 }>()
 const emit = defineEmits<{
   save: [body: DetalleProformaWritable]
   cancel: []
   duplicateProduct: [productId: number]
+  createProduct: []
 }>()
 const saving = ref(false),
   error = ref(''),
   fields = ref<Record<string, string[]>>({})
+const session = getActivePinia() ? useSessionStore() : null
 const form = reactive({
   tipo_item: String(props.detail?.tipo_item ?? props.tipos[0]?.id ?? ''),
   producto: String(props.detail?.producto ?? ''),
@@ -72,6 +78,18 @@ function selectProduct(product: Producto | null) {
     unidadCatalogo.value = null
   }
 }
+onMounted(async () => {
+  if (!props.detail && props.initialProductId) {
+    try {
+      const product = await productosService.get(props.initialProductId)
+      form.producto = String(product.id)
+      selectProduct(product)
+    } catch (cause) {
+      error.value =
+        cause instanceof Error ? cause.message : 'No se pudo seleccionar el producto creado.'
+    }
+  }
+})
 async function submit() {
   if (props.processing) return
   saving.value = true
@@ -113,7 +131,13 @@ async function submit() {
       name="tipo-item"
       label="Tipo de línea"
       :options="tipos.map((x) => ({ label: x.nombre, value: String(x.id) }))"
-    /><ProductoSelector v-if="catalogItem" v-model="form.producto" @select="selectProduct" /><Select
+    /><ProductoSelector v-if="catalogItem" v-model="form.producto" @select="selectProduct" /><Button
+      v-if="catalogItem && session?.can('comercial.administrar')"
+      type="button"
+      variant="secondary"
+      @click="emit('createProduct')"
+      >Crear producto sin perder esta proforma</Button
+    ><Select
       v-if="catalogItem && !form.producto"
       v-model="form.familia_producto"
       name="familia-producto"

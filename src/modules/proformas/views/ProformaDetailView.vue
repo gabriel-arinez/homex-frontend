@@ -228,8 +228,8 @@ async function downloadDocument() {
   downloading.value = true
   error.value = ''
   try {
-    const blob = await proformasService.document(id)
-    downloadBlob(blob, `proforma-${quote.value.numero}.html`)
+    const blob = await proformasService.documentPdf(id)
+    downloadBlob(blob, `proforma-${quote.value.numero}.pdf`)
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'No se pudo descargar la proforma.'
   } finally {
