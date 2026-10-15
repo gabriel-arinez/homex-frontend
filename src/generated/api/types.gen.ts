@@ -1748,6 +1748,12 @@ export type V1ClientesCreateResponse = V1ClientesCreateResponses[keyof V1Cliente
 
 export type V1ClientesDestroyData = {
   body?: never
+  headers: {
+    /**
+     * Revisión del cliente devuelta por GET; evita sobrescrituras obsoletas.
+     */
+    'If-Match': string
+  }
   path: {
     /**
      * Un valor de entero único que identifique este cliente.
@@ -1788,6 +1794,12 @@ export type V1ClientesRetrieveResponse =
 
 export type V1ClientesPartialUpdateData = {
   body?: PatchedClienteWritable
+  headers: {
+    /**
+     * Revisión del cliente devuelta por GET; evita sobrescrituras obsoletas.
+     */
+    'If-Match': string
+  }
   path: {
     /**
      * Un valor de entero único que identifique este cliente.
@@ -1807,6 +1819,12 @@ export type V1ClientesPartialUpdateResponse =
 
 export type V1ClientesUpdateData = {
   body: ClienteWritable
+  headers: {
+    /**
+     * Revisión del cliente devuelta por GET; evita sobrescrituras obsoletas.
+     */
+    'If-Match': string
+  }
   path: {
     /**
      * Un valor de entero único que identifique este cliente.
