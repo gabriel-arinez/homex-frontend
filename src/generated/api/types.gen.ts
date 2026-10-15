@@ -477,6 +477,7 @@ export type PatchedProductoSilla = {
 export type PatchedProforma = {
   readonly id?: number
   readonly numero?: number
+  readonly revision?: string
   cliente?: number | null
   cliente_resumen?: ClienteResumenProforma | null
   readonly vendedor?: number
@@ -566,6 +567,7 @@ export type ProductoSilla = {
 export type Proforma = {
   readonly id: number
   readonly numero: number
+  readonly revision: string
   cliente?: number | null
   cliente_resumen: ClienteResumenProforma | null
   readonly vendedor: number
@@ -597,6 +599,7 @@ export type Proforma = {
 
 export type ProformaIntegral = {
   clave_idempotencia: string
+  revision_esperada?: string
   emitir?: boolean
   cliente?: number | null
   cliente_nuevo?: ClienteNuevoProforma | null
@@ -914,6 +917,7 @@ export type ProformaWritable = {
 
 export type ProformaIntegralWritable = {
   clave_idempotencia: string
+  revision_esperada?: string
   emitir?: boolean
   cliente?: number | null
   cliente_nuevo?: ClienteNuevoProforma | null

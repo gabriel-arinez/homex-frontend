@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import type {
   ClienteNuevoProforma,
@@ -41,6 +41,7 @@ const error = ref('')
 const success = ref('')
 const fields = ref<Record<string, string[]>>({})
 const dirty = ref(false)
+const conflicted = ref(false)
 const persisted = ref<Proforma | null>(null)
 const tipos = ref<ValorCatalogoPublico[]>([])
 const unidades = ref<ValorCatalogoPublico[]>([])
@@ -77,7 +78,10 @@ const existingProductIds = computed(() =>
 )
 const totalPreview = computed(() =>
   lineas.value.reduce((sum, line) => {
-    const bruto = Number(line.cantidad || 0) * Number(line.precio_unitario || 0)
+    const bruto =
+      line.modo_calculo === 'TOTAL_NEGOCIADO'
+        ? Number(line.importe_negociado || 0)
+        : Number(line.cantidad || 0) * Number(line.precio_unitario || 0)
     return sum + Math.max(0, bruto - Number(line.descuento || 0))
   }, 0),
 )
@@ -89,14 +93,15 @@ const editableSpec = computed(() => {
   if (specLine.value === null) return null
   return (lineas.value[specLine.value]?.especificacion ?? null) as EspecificacionMueble | null
 })
-const canEmit = computed(
-  () =>
-    lineas.value.length > 0 &&
-    (clienteMode.value === 'existente'
-      ? Boolean(header.cliente)
-      : clienteMode.value === 'nuevo' &&
-        Boolean(nuevoCliente.tipo_cliente && nuevoCliente.nombres && nuevoCliente.apellidos)),
-)
+const canEmit = computed(() => {
+  if (!lineas.value.length) return false
+  if (clienteMode.value === 'existente') return Boolean(header.cliente)
+  if (clienteMode.value !== 'nuevo' || !nuevoCliente.tipo_cliente) return false
+  const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
+  const esEmpresa = /EMPRESA|JURID/.test(tipo?.codigo ?? '')
+  const contacto = Boolean(nuevoCliente.nombres.trim() && nuevoCliente.apellidos.trim())
+  return esEmpresa ? contacto && Boolean(nuevoCliente.empresa.trim()) : contacto
+})
 
 function markDirty() {
   dirty.value = true
@@ -217,8 +222,23 @@ function removeLine(index: number) {
   markDirty()
 }
 function openLine(index: number | null = null) {
+  if (index !== null && lineas.value[index]?.modo_calculo === 'TOTAL_NEGOCIADO') return
   editingLine.value = index
   lineModal.value = true
+}
+async function focusDuplicateProduct(productId: number) {
+  const index = lineas.value.findIndex((line) => line.producto === productId)
+  if (index < 0) return
+  lineModal.value = false
+  editingLine.value = null
+  success.value = 'Esta variante ya está incluida; puedes editar su línea existente.'
+  await nextTick()
+  document.getElementById(`ap3-linea-${lineas.value[index]?.localId}`)?.focus()
+}
+async function discardAndReload() {
+  conflicted.value = false
+  error.value = ''
+  await load()
 }
 function body(emitir: boolean): ProformaIntegralWritable {
   const detalles = lineas.value.map((line) => {
@@ -228,6 +248,7 @@ function body(emitir: boolean): ProformaIntegralWritable {
   })
   return {
     clave_idempotencia: key.value,
+    ...(proformaId.value && persisted.value ? { revision_esperada: persisted.value.revision } : {}),
     emitir,
     cliente: clienteMode.value === 'existente' && header.cliente ? Number(header.cliente) : null,
     cliente_nuevo:
@@ -250,6 +271,8 @@ async function persist(emitir: boolean) {
   if (saving.value) return
   saving.value = true
   error.value = ''
+  success.value = ''
+  conflicted.value = false
   fields.value = {}
   try {
     const result = proformaId.value
@@ -262,7 +285,10 @@ async function persist(emitir: boolean) {
   } catch (cause) {
     if (cause instanceof ApiError) fields.value = cause.fields
     error.value = cause instanceof Error ? cause.message : 'No se pudo guardar la proforma.'
-    if (cause instanceof ApiError && cause.status === 409 && proformaId.value) await load()
+    if (cause instanceof ApiError && cause.status === 409 && proformaId.value) {
+      conflicted.value = true
+      error.value = `${error.value} Se conservaron tus cambios locales. Puedes copiarlos o descartarlos y recargar.`
+    }
   } finally {
     saving.value = false
   }
@@ -309,6 +335,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         Estado: <strong>{{ persisted.estado_info.nombre }}</strong> · Número {{ persisted.numero }}
       </p>
       <p v-if="error" role="alert" class="error">{{ error }}</p>
+      <div v-if="conflicted" class="conflict-actions">
+        <Button variant="secondary" @click="discardAndReload">
+          Descartar cambios y recargar
+        </Button>
+      </div>
 
       <section v-show="currentStep === 0" aria-labelledby="productos-title">
         <div class="section-title">
@@ -319,21 +350,31 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           <Button @click="openLine()">Agregar producto</Button>
         </div>
         <Card v-for="(line, index) in lineas" :key="line.localId" class="line-card">
-          <div>
+          <div :id="`ap3-linea-${line.localId}`" tabindex="-1">
             <strong>{{ line.nombre }}</strong>
-            <p>{{ line.cantidad }} × {{ money(Number(line.precio_unitario || 0)) }}</p>
+            <p v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
+              Importe histórico negociado: {{ money(Number(line.importe_negociado || 0)) }}
+            </p>
+            <p v-else>{{ line.cantidad }} × {{ money(Number(line.precio_unitario || 0)) }}</p>
           </div>
           <strong>{{
             money(
               Math.max(
                 0,
-                Number(line.cantidad) * Number(line.precio_unitario || 0) -
+                (line.modo_calculo === 'TOTAL_NEGOCIADO'
+                  ? Number(line.importe_negociado || 0)
+                  : Number(line.cantidad) * Number(line.precio_unitario || 0)) -
                   Number(line.descuento || 0),
               ),
             )
           }}</strong>
           <div class="actions">
-            <Button variant="secondary" @click="openLine(index)">Editar</Button>
+            <Button
+              variant="secondary"
+              :disabled="line.modo_calculo === 'TOTAL_NEGOCIADO'"
+              @click="openLine(index)"
+              >Editar</Button
+            >
             <Button
               v-if="tipos.find((x) => x.id === line.tipo_item)?.codigo === 'MUEBLE_MEDIDA'"
               variant="secondary"
@@ -344,6 +385,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           </div>
         </Card>
         <p v-if="!lineas.length" class="empty">Aún no agregaste productos.</p>
+        <p v-if="lineas.some((line) => line.modo_calculo === 'TOTAL_NEGOCIADO')" class="warning">
+          Las líneas de importe histórico negociado se conservan sin conversión automática.
+        </p>
       </section>
 
       <section v-show="currentStep === 1" aria-labelledby="cliente-title">
@@ -426,7 +470,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 clienteMode === 'pendiente'
                   ? 'Pendiente'
                   : clienteMode === 'nuevo'
-                    ? `${nuevoCliente.nombres} ${nuevoCliente.apellidos}`
+                    ? nuevoCliente.empresa || `${nuevoCliente.nombres} ${nuevoCliente.apellidos}`
                     : `Cliente #${header.cliente}`
               }}
             </p>
@@ -458,6 +502,13 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         <Button :disabled="!canEmit" :processing="saving" @click="persist(true)"
           >Emitir proforma</Button
         >
+        <Button
+          v-if="persisted"
+          variant="secondary"
+          @click="router.push(`/proformas/${persisted.id}`)"
+        >
+          Ver detalle, aprobar y gestionar adjuntos
+        </Button>
       </footer>
     </template>
 
@@ -476,6 +527,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         :existing-product-ids="existingProductIds"
         :processing="saving"
         @save="saveLine"
+        @duplicate-product="focusDuplicateProduct"
         @cancel="lineModal = false"
       />
     </Modal>
