@@ -477,7 +477,7 @@ export type PatchedProductoSilla = {
 export type PatchedProforma = {
   readonly id?: number
   readonly numero?: number
-  readonly revision: string
+  readonly revision?: string
   cliente?: number | null
   cliente_resumen?: ClienteResumenProforma | null
   readonly vendedor?: number
