@@ -270,9 +270,12 @@ describe('AP4 clientes consolidados', () => {
     const navigation = router.push('/clientes/42')
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/clientes/41')
-    expect(wrapper.text()).toContain('Descartar cambios')
-    const confirmar = wrapper.findAll('button').find((button) => button.text() === 'Descartar')
-    await confirmar!.trigger('click')
+    expect(document.body.textContent).toContain('Descartar cambios')
+    const confirmar = Array.from(document.querySelectorAll('body button')).find(
+      (button) => button.textContent?.trim() === 'Descartar',
+    )
+    expect(confirmar).toBeDefined()
+    ;(confirmar as HTMLButtonElement).click()
     await navigation
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/clientes/42')
