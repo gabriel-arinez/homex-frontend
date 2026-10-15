@@ -87,6 +87,7 @@ describe('AP3 editor integral', () => {
           {
             id: 9,
             numero: 101,
+            revision: 'a'.repeat(64),
             cliente: null,
             cliente_resumen: null,
             vendedor: 1,
@@ -131,5 +132,20 @@ describe('AP3 editor integral', () => {
     expect(bodies).toHaveLength(1)
     expect(bodies[0]).toMatchObject({ emitir: false, titulo: 'Borrador AP3', detalles: [] })
     expect(router.currentRoute.value.fullPath).toBe('/proformas/9/editar')
+
+    server.use(
+      http.put('http://localhost:8000/api/v1/proformas/9/integral/', () =>
+        HttpResponse.json({ detail: 'Conflicto de revisión.' }, { status: 409 }),
+      ),
+    )
+    await wrapper.get('#titulo').setValue('Cambios locales no enviados')
+    await click(wrapper, 'Guardar borrador')
+    await flushPromises()
+
+    expect((wrapper.get('#titulo').element as HTMLInputElement).value).toBe(
+      'Cambios locales no enviados',
+    )
+    expect(wrapper.text()).toContain('Se conservaron tus cambios locales')
+    expect(wrapper.text()).toContain('Descartar cambios y recargar')
   })
 })
