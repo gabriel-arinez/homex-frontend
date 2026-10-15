@@ -249,9 +249,7 @@ function body(emitir: boolean): ProformaIntegralWritable {
   })
   return {
     clave_idempotencia: key.value,
-    ...(proformaId.value && persisted.value
-      ? { revision_esperada: persisted.value.revision }
-      : {}),
+    ...(proformaId.value && persisted.value ? { revision_esperada: persisted.value.revision } : {}),
     emitir,
     cliente: clienteMode.value === 'existente' && header.cliente ? Number(header.cliente) : null,
     cliente_nuevo:
