@@ -134,7 +134,8 @@ watch(
       estado === status.value &&
       tipo === type.value &&
       pagina === page.value
-    ) return
+    )
+      return
     restoringRoute = true
     search.value = q
     status.value = estado
