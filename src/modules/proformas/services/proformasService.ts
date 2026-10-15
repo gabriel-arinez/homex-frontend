@@ -11,6 +11,7 @@ import type {
   PatchedDetalleProformaWritable,
   PatchedProformaWritable,
   Proforma,
+  ProformaIntegralWritable,
   V1CatalogoOpcionesListData,
   V1ProformasListData,
   ValorCatalogoPublico,
@@ -28,6 +29,10 @@ export const proformasService = {
   get: (id: number) => apiRequest<Proforma>(`/api/v1/proformas/${id}/`),
   create: (body: CrearProformaWritable) =>
     apiRequest<Proforma>('/api/v1/proformas/', { method: 'POST', body }),
+  saveIntegral: (body: ProformaIntegralWritable) =>
+    apiRequest<Proforma>('/api/v1/proformas/integral/', { method: 'POST', body }),
+  updateIntegral: (id: number, body: ProformaIntegralWritable) =>
+    apiRequest<Proforma>(`/api/v1/proformas/${id}/integral/`, { method: 'PUT', body }),
   update: (id: number, body: PatchedProformaWritable) =>
     apiRequest<Proforma>(`/api/v1/proformas/${id}/`, { method: 'PATCH', body }),
   send: (id: number) => apiRequest<Proforma>(`/api/v1/proformas/${id}/enviar/`, { method: 'POST' }),

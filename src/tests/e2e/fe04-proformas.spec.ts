@@ -18,6 +18,9 @@ const options = {
   TIPO_MUEBLE: [
     { id: 30, concepto_codigo: 'TIPO_MUEBLE', codigo: 'ESCRITORIO', nombre: 'Escritorio' },
   ],
+  TIPO_CLIENTE: [
+    { id: 1, concepto_codigo: 'TIPO_CLIENTE', codigo: 'PERSONA', nombre: 'Persona natural' },
+  ],
 }
 const client = {
   id: 1,
@@ -152,6 +155,51 @@ async function mockBackend(page: Page) {
       body: JSON.stringify({ count: 1, next: null, previous: null, results: [quote] }),
     })
   })
+  await page.route('**/api/v1/proformas/integral/', async (r) => {
+    const body = r.request().postDataJSON()
+    const detalles = (body.detalles ?? []).map((line: Record<string, unknown>, index: number) => ({
+      id: Number(line.id ?? index + 10),
+      proforma: 1,
+      ...line,
+      tipo_item_info: options.TIPO_ITEM.find((item) => item.id === line.tipo_item),
+      unidad_info: options.UNIDAD_MEDIDA.find((item) => item.id === line.unidad),
+      precio_antes_snapshot: null,
+      precio_ahora_snapshot: null,
+      total: String(
+        Number(line.cantidad) * Number(line.precio_unitario) - Number(line.descuento ?? 0),
+      ),
+      especificacion: line.especificacion
+        ? {
+            id: 5,
+            proforma_detalle: Number(line.id ?? index + 10),
+            ...line.especificacion,
+            tipo_mueble_info: options.TIPO_MUEBLE[0],
+          }
+        : null,
+    }))
+    quote = {
+      ...quote,
+      ...body,
+      cliente: body.cliente,
+      detalles,
+      estado_info: body.emitir
+        ? { id: 3, codigo: 'EN_REVISION', nombre: 'En revisión' }
+        : quote.estado_info,
+      subtotal: String(
+        detalles.reduce(
+          (sum: number, line: Record<string, unknown>) => sum + Number(line.total),
+          0,
+        ),
+      ),
+      total: String(
+        detalles.reduce(
+          (sum: number, line: Record<string, unknown>) => sum + Number(line.total),
+          0,
+        ),
+      ),
+    }
+    return r.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(quote) })
+  })
   await page.route('**/api/v1/proformas/1/', async (r) => {
     if (r.request().method() === 'PATCH') quote = { ...quote, ...r.request().postDataJSON() }
     return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(quote) })
@@ -263,12 +311,7 @@ test('FE04 crea con unitario y descuento, revisa y aprueba', async ({ page }) =>
   await page.getByRole('button', { name: 'Nueva proforma' }).click()
   await expect(page).toHaveURL(/\/proformas\/nueva$/)
   await expect(page.getByRole('heading', { name: 'Nueva proforma' })).toBeVisible()
-  await expect(page.locator('#cliente-proforma option[value="1"]')).toHaveCount(1)
-  await page.locator('#cliente-proforma').selectOption('1')
-  await page.getByLabel('Título').fill('Oficina nueva')
-  await page.getByRole('button', { name: 'Crear borrador' }).click()
-  await expect(page).toHaveURL(/\/proformas\/1$/)
-  await page.getByRole('button', { name: 'Agregar línea' }).click()
+  await page.getByRole('button', { name: 'Agregar producto' }).click()
   await page.getByLabel('Tipo de línea').selectOption('10')
   await page.getByLabel('Nombre comercial').fill('Tres escritorios')
   await page.getByLabel('Cantidad', { exact: true }).fill('3')
@@ -277,27 +320,30 @@ test('FE04 crea con unitario y descuento, revisa y aprueba', async ({ page }) =>
   await page.getByLabel('Descuento de la línea (BOB)').fill('2.00')
   await page.getByRole('button', { name: 'Guardar línea' }).click()
   await expect(page.getByText(/3 ×/)).toContainText('Bs 34,00')
-  await page.getByRole('button', { name: 'Editar línea' }).click()
+  await page.getByRole('button', { name: 'Editar', exact: true }).click()
   await page.getByLabel('Nombre comercial').fill('Tres escritorios ejecutivos')
   await page.getByRole('button', { name: 'Guardar línea' }).click()
-  await expect(page.getByRole('heading', { name: 'Tres escritorios ejecutivos' })).toBeVisible()
-  await page.getByRole('button', { name: 'Agregar especificación' }).click()
+  await expect(page.getByText('Tres escritorios ejecutivos', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Ficha técnica' }).click()
   await page.locator('#tipo-mueble').selectOption('30')
   await page.locator('#componente-nombre-0').fill('Mesón')
   await page.locator('#componente-material-0').fill('Melamina')
   await page.locator('#componente-espesor-0').fill('25 mm')
   await page.locator('#componente-dimensiones-0').fill('{"ancho":"1.2 m"}')
   await page.getByRole('button', { name: 'Guardar especificación' }).click()
-  await expect(page.getByText('Escritorio', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: 'Editar especificación' }).click()
+  await page.getByRole('button', { name: 'Ficha técnica' }).click()
   await expect(page.locator('#componente-nombre-0')).toHaveValue('Mesón')
   await page.locator('#componente-color-0').fill('Nogal')
   await page.getByRole('button', { name: 'Guardar especificación' }).click()
-  await expect(page.getByRole('button', { name: 'Editar especificación' })).toBeVisible()
-  await page.getByRole('button', { name: 'Enviar' }).click()
-  await page.getByRole('dialog').getByRole('button', { name: 'Enviar' }).click()
+  await page.getByRole('button', { name: /Cliente$/ }).click()
+  await expect(page.locator('#cliente-proforma option[value="1"]')).toHaveCount(1)
+  await page.locator('#cliente-proforma').selectOption('1')
+  await page.getByRole('button', { name: /Condiciones$/ }).click()
+  await page.getByLabel('Título').fill('Oficina nueva')
+  await page.getByRole('button', { name: /Revisar$/ }).click()
+  await page.getByRole('button', { name: 'Emitir proforma' }).click()
   await expect(page.getByText('En revisión', { exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Agregar línea' })).toBeVisible()
+  await page.goto('/proformas/1')
   await page.getByRole('button', { name: 'Aprobar' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Aprobar' }).click()
   await expect(page.getByRole('status')).toContainText('Pedido #55')
@@ -535,6 +581,7 @@ test('FE04 selecciona cliente y producto fuera de la primera página', async ({ 
   })
   await page.goto('/proformas/nueva')
   await expect(page.getByRole('heading', { name: 'Nueva proforma' })).toBeVisible()
+  await page.getByRole('button', { name: /Cliente$/ }).click()
   await page.getByRole('button', { name: 'Cargar más clientes' }).click()
   await expect(page.locator('#cliente-proforma option[value="200"]')).toHaveCount(1)
   await page.locator('#cliente-proforma').selectOption('200')
@@ -558,7 +605,8 @@ test('FE04 selecciona cliente y producto fuera de la primera página', async ({ 
     })
   })
   await page.goto('/proformas/1')
-  await page.getByRole('button', { name: 'Agregar línea' }).click()
+  await page.goto('/proformas/1/editar')
+  await page.getByRole('button', { name: 'Agregar producto' }).click()
   await page.getByLabel('Tipo de línea').selectOption('11')
   await page.getByRole('button', { name: 'Cargar más productos' }).click()
   await expect(page.locator('#producto-linea option[value="200"]')).toHaveCount(1)

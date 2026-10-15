@@ -63,6 +63,16 @@ export type Cliente = {
   readonly updated_by: number | null
 }
 
+export type ClienteNuevoProforma = {
+  tipo_cliente: number
+  nombres?: string | null
+  apellidos?: string | null
+  empresa?: string | null
+  celular?: string | null
+  direccion?: string | null
+  observaciones?: string | null
+}
+
 export type ClienteResumenProforma = {
   id: number
   nombre: string | null
@@ -126,6 +136,28 @@ export type DescuentoProducto = {
   fecha_fin?: string | null
   activo?: boolean
   producto: number
+}
+
+export type DetalleIntegral = {
+  id?: number
+  readonly proforma: number
+  tipo_item: number
+  tipo_item_info: ValorCatalogoResumen
+  producto?: number | null
+  familia_producto?: number | null
+  nombre: string
+  descripcion?: string | null
+  cantidad: string
+  unidad: number
+  unidad_info: ValorCatalogoResumen
+  modo_calculo?: string
+  precio_unitario?: string
+  importe_negociado?: string | null
+  descuento?: string
+  readonly precio_antes_snapshot: string | null
+  readonly precio_ahora_snapshot: string | null
+  readonly total: string
+  especificacion?: EspecificacionMueble | null
 }
 
 export type DetalleOrdenTrabajo = {
@@ -563,6 +595,24 @@ export type Proforma = {
   readonly detalles: Array<DetalleProforma>
 }
 
+export type ProformaIntegral = {
+  clave_idempotencia: string
+  emitir?: boolean
+  cliente?: number | null
+  cliente_nuevo?: ClienteNuevoProforma | null
+  titulo?: string | null
+  plazo_entrega?: string | null
+  validez_oferta?: number | null
+  porcentaje_adelanto?: string | null
+  moneda_codigo: MonedaCodigoEnum
+  observaciones?: string | null
+  prospecto_nombre?: string | null
+  prospecto_empresa?: string | null
+  prospecto_celular?: string | null
+  prospecto_direccion?: string | null
+  detalles?: Array<DetalleIntegral>
+}
+
 export type ProformaListado = {
   readonly id: number
   readonly numero: number
@@ -677,6 +727,22 @@ export type DescuentoProductoWritable = {
   fecha_fin?: string | null
   activo?: boolean
   producto: number
+}
+
+export type DetalleIntegralWritable = {
+  id?: number
+  tipo_item: number
+  producto?: number | null
+  familia_producto?: number | null
+  nombre: string
+  descripcion?: string | null
+  cantidad: string
+  unidad: number
+  modo_calculo?: string
+  precio_unitario?: string
+  importe_negociado?: string | null
+  descuento?: string
+  especificacion?: EspecificacionMuebleWritable | null
 }
 
 export type DetalleOrdenTrabajoWritable = {
@@ -844,6 +910,24 @@ export type ProformaWritable = {
   prospecto_empresa?: string | null
   prospecto_celular?: string | null
   prospecto_direccion?: string | null
+}
+
+export type ProformaIntegralWritable = {
+  clave_idempotencia: string
+  emitir?: boolean
+  cliente?: number | null
+  cliente_nuevo?: ClienteNuevoProforma | null
+  titulo?: string | null
+  plazo_entrega?: string | null
+  validez_oferta?: number | null
+  porcentaje_adelanto?: string | null
+  moneda_codigo: MonedaCodigoEnum
+  observaciones?: string | null
+  prospecto_nombre?: string | null
+  prospecto_empresa?: string | null
+  prospecto_celular?: string | null
+  prospecto_direccion?: string | null
+  detalles?: Array<DetalleIntegralWritable>
 }
 
 export type ProformaListadoWritable = {
@@ -1208,6 +1292,7 @@ export type V1CatalogoOpcionesListData = {
      * * `TIPO_ITEM` - TIPO_ITEM
      * * `UNIDAD_MEDIDA` - UNIDAD_MEDIDA
      * * `TIPO_MUEBLE` - TIPO_MUEBLE
+     * * `TIPO_CLIENTE` - TIPO_CLIENTE
      * * `ESTADO_PEDIDO` - ESTADO_PEDIDO
      * * `ESTADO_ORDEN_TRABAJO` - ESTADO_ORDEN_TRABAJO
      * * `TIPO_PAGO` - TIPO_PAGO
@@ -1219,6 +1304,7 @@ export type V1CatalogoOpcionesListData = {
       | 'TIPO_ITEM'
       | 'UNIDAD_MEDIDA'
       | 'TIPO_MUEBLE'
+      | 'TIPO_CLIENTE'
       | 'ESTADO_PEDIDO'
       | 'ESTADO_ORDEN_TRABAJO'
       | 'TIPO_PAGO'
@@ -2384,6 +2470,32 @@ export type V1ProformasEnviarCreateResponses = {
 export type V1ProformasEnviarCreateResponse =
   V1ProformasEnviarCreateResponses[keyof V1ProformasEnviarCreateResponses]
 
+export type V1ProformasIntegralUpdateData = {
+  body: ProformaIntegralWritable
+  path: {
+    /**
+     * Un valor de entero único que identifique este proforma.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/proformas/{id}/integral/'
+}
+
+export type V1ProformasIntegralUpdateErrors = {
+  /**
+   * Conflicto con el estado actual o con una regla comercial concurrente.
+   */
+  409: unknown
+}
+
+export type V1ProformasIntegralUpdateResponses = {
+  200: Proforma
+}
+
+export type V1ProformasIntegralUpdateResponse =
+  V1ProformasIntegralUpdateResponses[keyof V1ProformasIntegralUpdateResponses]
+
 export type V1ProformasNoConcretarCreateData = {
   body?: never
   path: {
@@ -2435,6 +2547,28 @@ export type V1ProformasReabrirCreateResponses = {
 
 export type V1ProformasReabrirCreateResponse =
   V1ProformasReabrirCreateResponses[keyof V1ProformasReabrirCreateResponses]
+
+export type V1ProformasIntegralCreateData = {
+  body: ProformaIntegralWritable
+  path?: never
+  query?: never
+  url: '/api/v1/proformas/integral/'
+}
+
+export type V1ProformasIntegralCreateErrors = {
+  /**
+   * Conflicto con el estado actual o con una regla comercial concurrente.
+   */
+  409: unknown
+}
+
+export type V1ProformasIntegralCreateResponses = {
+  200: Proforma
+  201: Proforma
+}
+
+export type V1ProformasIntegralCreateResponse =
+  V1ProformasIntegralCreateResponses[keyof V1ProformasIntegralCreateResponses]
 
 export type V1RecibosListData = {
   body?: never

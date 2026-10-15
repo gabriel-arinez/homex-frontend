@@ -48,6 +48,10 @@ const displayRows = computed(() =>
   ])
 const money = (v: string, c: string) =>
   new Intl.NumberFormat('es-BO', { style: 'currency', currency: c }).format(Number(v))
+const editable = (row: unknown) =>
+  ['BORRADOR', 'EN_REVISION'].includes(
+    ((row as ProformaListado).estado_info?.codigo as string | undefined) ?? '',
+  )
 async function load() {
   const currentRequest = ++requestId
   loading.value = true
@@ -135,7 +139,10 @@ const columns = [
           money(String(row.total), String(row.monedaCodigo))
         }}</template
         ><template #cell-acciones="{ row }"
-          ><RouterLink :to="`/proformas/${row.id}`">Ver detalle</RouterLink></template
+          ><RouterLink
+            :to="editable(row) ? `/proformas/${row.id}/editar` : `/proformas/${row.id}`"
+            >{{ editable(row) ? 'Continuar edición' : 'Ver detalle' }}</RouterLink
+          ></template
         ></DataTable
       ><Pagination :page :total-pages="pages" @change="page = $event"
     /></template>
