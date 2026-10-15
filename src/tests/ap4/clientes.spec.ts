@@ -2,8 +2,11 @@ import { createPinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { http, HttpResponse } from 'msw'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import ClienteCreateView from '@/modules/clientes/views/ClienteCreateView.vue'
+import ClienteDetailView from '@/modules/clientes/views/ClienteDetailView.vue'
+import ClientesListView from '@/modules/clientes/views/ClientesListView.vue'
+import ClienteFormFields from '@/modules/clientes/components/ClienteFormFields.vue'
 import { clientesService } from '@/modules/clientes/services/clientesService'
 import { server } from '@/tests/msw/server'
 
@@ -104,8 +107,8 @@ describe('AP4 clientes consolidados', () => {
         })
       }),
     )
-    await clientesService.deactivate(41)
-    await clientesService.update(41, { activo: true })
+    await clientesService.deactivate(41, 'a'.repeat(64))
+    await clientesService.update(41, { activo: true }, 'b'.repeat(64))
     expect(methods).toEqual(['DELETE', 'PATCH:{"activo":true}'])
   })
 })
