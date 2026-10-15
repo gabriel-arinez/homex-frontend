@@ -122,4 +122,43 @@ describe('AP6 correcciones funcionales', () => {
       ],
     })
   })
+  it('preserva propiedades abiertas del objeto raíz y atributos desconocidos de cada componente al editar', async () => {
+    const existente = {
+      id: 73,
+      proforma_detalle: 11,
+      tipo_mueble: null,
+      tipo_mueble_info: null,
+      observaciones: 'Preservar configuración original',
+      datos_tecnicos: {
+        componentes: [
+          {
+            nombre: 'Mesón',
+            material: 'Melamina',
+            tirador_personalizado: 'Negro mate',
+          },
+        ],
+        instrucciones_montaje: 'Fijar a la pared',
+        garantia_acabado: '12 meses',
+        caracteristicas_generales: { color_principal: 'A elección' },
+      },
+    } as unknown as import('@/generated/api').EspecificacionMueble
+
+    const wrapper = mount(EspecificacionForm, {
+      props: { tipos: [], especificacion: existente },
+    })
+    await wrapper.get('#componente-material-0').setValue('MDF')
+    await wrapper.get('form').trigger('submit')
+    const payload = wrapper.emitted('save')?.[0]?.[0] as
+      | { datos_tecnicos?: Record<string, unknown> }
+      | undefined
+    expect(payload?.datos_tecnicos).toMatchObject({
+      instrucciones_montaje: 'Fijar a la pared',
+      garantia_acabado: '12 meses',
+      caracteristicas_generales: { color_principal: 'A elección' },
+      componentes: [
+        { nombre: 'Mesón', material: 'MDF', tirador_personalizado: 'Negro mate' },
+      ],
+    })
+  })
+
 })
