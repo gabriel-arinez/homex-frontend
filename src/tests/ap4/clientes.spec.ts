@@ -275,7 +275,7 @@ describe('AP4 clientes consolidados', () => {
       (button) => button.textContent?.trim() === 'Descartar',
     )
     expect(confirmar).toBeDefined()
-    ;(confirmar as HTMLButtonElement).click()
+    if (confirmar instanceof HTMLButtonElement) confirmar.click()
     await navigation
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/clientes/42')
