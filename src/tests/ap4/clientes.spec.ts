@@ -281,5 +281,4 @@ describe('AP4 clientes consolidados', () => {
     expect(router.currentRoute.value.path).toBe('/clientes/42')
     expect(wrapper.text()).toContain('Nombre 42')
   })
-
 })
