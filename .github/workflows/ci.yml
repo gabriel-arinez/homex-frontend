@@ -46,7 +46,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 24.12.0, cache: npm }
       - run: npm ci
-      - run: npx prettier --write src/modules/proformas/views/ProformaEditorView.vue && git diff -- src/modules/proformas/views/ProformaEditorView.vue && npm run format:check
+      - run: npm run format:check
 
   unit-component:
     runs-on: ubuntu-latest
@@ -123,7 +123,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: gabriel-arinez/homex-backend
-          ref: 269128e8642f322ab80d66430c34d394ba5992ea
+          ref: 9b71b270fd489988e8c09289dd8ef6cd8ebd533d
           path: backend-f10
       - uses: actions/setup-node@v4
         with: { node-version: 24.12.0, cache: npm }
@@ -183,7 +183,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: gabriel-arinez/homex-backend
-          ref: 269128e8642f322ab80d66430c34d394ba5992ea
+          ref: 9b71b270fd489988e8c09289dd8ef6cd8ebd533d
           path: backend
       - uses: actions/setup-node@v4
         with: { node-version: 24.12.0, cache: npm }
