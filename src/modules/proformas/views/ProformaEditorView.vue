@@ -358,7 +358,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           class="line-card"
         >
           <div :id="`ap3-linea-${line.localId}`" tabindex="-1">
-          <div>
             <strong>{{ line.nombre }}</strong>
             <p v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
               Importe histórico negociado: {{ money(Number(line.importe_negociado || 0)) }}
@@ -478,7 +477,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 clienteMode === 'pendiente'
                   ? 'Pendiente'
                   : clienteMode === 'nuevo'
-                    ? `${nuevoCliente.nombres} ${nuevoCliente.apellidos}`
+                    ? (nuevoCliente.empresa || `${nuevoCliente.nombres} ${nuevoCliente.apellidos}`)
                     : `Cliente #${header.cliente}`
               }}
             </p>
