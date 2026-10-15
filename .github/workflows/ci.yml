@@ -46,10 +46,6 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 24.12.0, cache: npm }
       - run: npm ci
-      - name: Diagnostico temporal AP4 - diferencias Prettier
-        run: |
-          npx prettier --write src/modules/clientes/services/clientesService.ts src/modules/clientes/views/ClienteDetailView.vue src/modules/clientes/views/ClientesListView.vue src/tests/ap4/clientes.spec.ts
-          git --no-pager diff -- src/modules/clientes/services/clientesService.ts src/modules/clientes/views/ClienteDetailView.vue src/modules/clientes/views/ClientesListView.vue src/tests/ap4/clientes.spec.ts
       - run: npm run format:check
 
   unit-component:
