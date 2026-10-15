@@ -27,6 +27,13 @@ import ClienteFormFields from '@/modules/clientes/components/ClienteFormFields.v
 import DetalleForm from '../components/DetalleForm.vue'
 import EspecificacionForm from '../components/EspecificacionForm.vue'
 import { proformasService } from '../services/proformasService'
+import {
+  consumeEditorDraft,
+  duplicateLocalLine,
+  removeLocalLine,
+  restoreLocalLine,
+  saveEditorDraft,
+} from '../services/editorLocal'
 
 type LineaLocal = DetalleIntegralWritable & { localId: string }
 const emit = defineEmits<{ openMenu: [] }>()
@@ -53,6 +60,9 @@ const familias = ref<FamiliaProducto[]>([])
 const lineModal = ref(false)
 const editingLine = ref<number | null>(null)
 const specLine = ref<number | null>(null)
+const removedLine = ref<{ line: LineaLocal; index: number } | null>(null)
+const contextualNavigation = ref(false)
+const preferredProductId = ref<number | null>(null)
 const clienteMode = ref<'existente' | 'nuevo' | 'pendiente'>('existente')
 const key = ref(crypto.randomUUID())
 const header = reactive({
@@ -197,6 +207,7 @@ async function loadReferences() {
   }
 }
 function saveLine(body: DetalleProformaWritable) {
+  preferredProductId.value = null
   const line: LineaLocal = { ...body, localId: localId(), especificacion: null }
   if (editingLine.value === null) lineas.value.push(line)
   else {
@@ -222,9 +233,90 @@ function saveSpec(body: EspecificacionMuebleWritable) {
   markDirty()
 }
 function removeLine(index: number) {
-  lineas.value.splice(index, 1)
+  const result = removeLocalLine(lineas.value, index)
+  lineas.value = result.lines
+  removedLine.value = result.removed
   markDirty()
 }
+function undoRemove() {
+  if (!removedLine.value) return
+  lineas.value = restoreLocalLine(lineas.value, removedLine.value)
+  removedLine.value = null
+  markDirty()
+}
+function duplicateFurniture(index: number) {
+  const original = lineas.value[index]
+  if (!original || tipos.value.find((x) => x.id === original.tipo_item)?.codigo !== 'MUEBLE_MEDIDA')
+    return
+  const copy = duplicateLocalLine(original, localId())
+  lineas.value.splice(index + 1, 0, copy)
+  success.value = 'Mueble duplicado con una ficha independiente.'
+  markDirty()
+}
+function editorSnapshot() {
+  return {
+    header: structuredClone(header),
+    nuevoCliente: structuredClone(nuevoCliente),
+    clienteMode: clienteMode.value,
+    lineas: structuredClone(lineas.value),
+    currentStep: currentStep.value,
+    key: key.value,
+  }
+}
+async function createProductContextually() {
+  const token = crypto.randomUUID()
+  saveEditorDraft(token, editorSnapshot())
+  contextualNavigation.value = true
+  lineModal.value = false
+  await router.push({ name: 'producto-create', query: { returnTo: route.path, draft: token } })
+}
+function restoreContextualDraft() {
+  const token = typeof route.query.draft === 'string' ? route.query.draft : ''
+  if (!token) return
+  const snapshot = consumeEditorDraft<ReturnType<typeof editorSnapshot>>(token)
+  if (!snapshot) return
+  Object.assign(header, snapshot.header)
+  Object.assign(nuevoCliente, snapshot.nuevoCliente)
+  clienteMode.value = snapshot.clienteMode
+  lineas.value = snapshot.lineas
+  currentStep.value = snapshot.currentStep
+  key.value = snapshot.key
+  dirty.value = true
+  const created = Number(route.query.productoCreado)
+  if (created) {
+    preferredProductId.value = created
+    editingLine.value = null
+    lineModal.value = true
+    success.value =
+      route.query.mediaError === '1'
+        ? 'Producto creado y seleccionado; la imagen no pudo cargarse. Puedes añadirla desde su ficha.'
+        : 'Producto creado. Completa su cantidad y precio para añadirlo.'
+  }
+}
+async function copyCommercialSummary() {
+  const client =
+    clienteMode.value === 'nuevo'
+      ? nuevoCliente.empresa || `${nuevoCliente.nombres} ${nuevoCliente.apellidos}`.trim()
+      : header.cliente
+        ? `Cliente #${header.cliente}`
+        : 'Cliente pendiente'
+  const lines = lineas.value
+    .map(
+      (line) => `• ${line.nombre}: ${line.cantidad} × ${money(Number(line.precio_unitario || 0))}`,
+    )
+    .join('\n')
+  const conditions = [
+    header.plazo_entrega && `Plazo: ${header.plazo_entrega}`,
+    header.validez_oferta && `Validez: ${header.validez_oferta} días`,
+  ]
+    .filter(Boolean)
+    .join('\n')
+  await navigator.clipboard.writeText(
+    `HOMEX — Cotización\n${client}\n${lines}\nTotal estimado: ${money(totalPreview.value)}${conditions ? `\n${conditions}` : ''}`,
+  )
+  success.value = 'Resumen copiado. Puedes pegarlo manualmente en WhatsApp.'
+}
+
 function openLine(index: number | null = null) {
   if (index !== null && lineas.value[index]?.modo_calculo === 'TOTAL_NEGOCIADO') return
   editingLine.value = index
@@ -283,6 +375,7 @@ async function persist(emitir: boolean) {
       ? await proformasService.updateIntegral(proformaId.value, body(emitir))
       : await proformasService.saveIntegral(body(emitir))
     fill(result)
+    removedLine.value = null
     key.value = crypto.randomUUID()
     success.value = emitir ? 'Proforma emitida para revisión.' : 'Borrador guardado.'
     if (!proformaId.value) await router.replace(`/proformas/${result.id}/editar`)
@@ -301,10 +394,16 @@ function beforeUnload(event: BeforeUnloadEvent) {
   if (!dirty.value) return
   event.preventDefault()
 }
-onBeforeRouteLeave(() => !dirty.value || window.confirm('Hay cambios sin guardar. ¿Deseas salir?'))
-onMounted(() => {
+onBeforeRouteLeave(
+  () =>
+    contextualNavigation.value ||
+    !dirty.value ||
+    window.confirm('Hay cambios sin guardar. ¿Deseas salir?'),
+)
+onMounted(async () => {
   window.addEventListener('beforeunload', beforeUnload)
-  void Promise.all([loadReferences(), load()])
+  await Promise.all([loadReferences(), load()])
+  restoreContextualDraft()
 })
 onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 </script>
@@ -385,9 +484,18 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               @click="specLine = index"
               >Ficha técnica</Button
             >
-            <Button variant="secondary" @click="removeLine(index)">Eliminar</Button>
+            <Button
+              v-if="tipos.find((x) => x.id === line.tipo_item)?.codigo === 'MUEBLE_MEDIDA'"
+              variant="secondary"
+              @click="duplicateFurniture(index)"
+              >Duplicar mueble</Button
+            ><Button variant="secondary" @click="removeLine(index)">Eliminar</Button>
           </div>
         </Card>
+        <p v-if="removedLine" role="status" class="undo">
+          Línea retirada provisionalmente.
+          <button type="button" @click="undoRemove">Deshacer eliminación</button>
+        </p>
         <p v-if="!lineas.length" class="empty">Aún no agregaste productos.</p>
         <p v-if="lineas.some((line) => line.modo_calculo === 'TOTAL_NEGOCIADO')" class="warning">
           Las líneas de importe histórico negociado se conservan sin conversión automática.
@@ -450,7 +558,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         </div>
       </section>
 
-      <section v-show="currentStep === 3" aria-labelledby="revisar-title">
+      <section v-if="currentStep === 3" aria-labelledby="revisar-title">
         <h2 id="revisar-title">Revisar</h2>
         <div class="review-grid">
           <Card
@@ -477,6 +585,22 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <button @click="currentStep = 2">Corregir condiciones</button></Card
           >
         </div>
+        <Card class="commercial-preview"
+          ><p class="brand">HOMEX</p>
+          <h3>{{ header.titulo || 'Cotización comercial' }}</h3>
+          <p v-for="line in lineas" :key="line.localId">
+            <strong>{{ line.nombre }}</strong> — cantidad {{ line.cantidad }}, precio
+            {{ money(Number(line.precio_unitario || 0))
+            }}<span v-if="line.descripcion"><br />{{ line.descripcion }}</span>
+          </p>
+          <p v-if="header.plazo_entrega"><strong>Plazo:</strong> {{ header.plazo_entrega }}</p>
+          <p v-if="header.validez_oferta">
+            <strong>Validez:</strong> {{ header.validez_oferta }} días
+          </p>
+          <Button type="button" variant="secondary" @click="copyCommercialSummary"
+            >Copiar resumen para compartir manualmente</Button
+          ></Card
+        >
         <div class="totals">
           <span>Total estimado</span><strong>{{ money(totalPreview) }}</strong
           ><small>El total definitivo lo calcula y protege PostgreSQL.</small>
@@ -521,8 +645,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         :detail="editableDetail"
         :existing-product-ids="existingProductIds"
         :processing="saving"
+        :initial-product-id="preferredProductId"
         @save="saveLine"
         @duplicate-product="focusDuplicateProduct"
+        @create-product="createProductContextually"
         @cancel="lineModal = false"
       />
     </Modal>
