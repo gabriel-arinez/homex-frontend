@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { onBeforeRouteLeave, useRoute } from 'vue-router'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router'
 import type { Cliente, PatchedClienteWritable } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { ApiError } from '@/shared/api'
@@ -77,6 +77,13 @@ onBeforeRouteLeave((_to, _from, next) => {
   confirmDiscard.value = true
   pendingNavigation = (allow = false) => next(allow ? undefined : false)
 })
+onBeforeRouteUpdate((to, from, next) => {
+  if (to.params.id === from.params.id) return next()
+  if (saving.value) return next(false)
+  if (!editing.value || !dirty.value || allowLeave.value) return next()
+  confirmDiscard.value = true
+  pendingNavigation = (allow = false) => next(allow ? undefined : false)
+})
 function closeDiscard() {
   confirmDiscard.value = false
   pendingNavigation?.(false)
@@ -99,6 +106,9 @@ async function load() {
   error.value = ''
   conflicted.value = false
   success.value = ''
+  confirmStatus.value = false
+  confirmDiscard.value = false
+  pendingNavigation = null
   client.value = null
   editing.value = false
   dirty.value = false
