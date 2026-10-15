@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { onBeforeRouteLeave, useRoute } from 'vue-router'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router'
 import type { Cliente, PatchedClienteWritable } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { ApiError } from '@/shared/api'
@@ -26,6 +26,8 @@ const confirmDiscard = ref(false)
 const confirmStatus = ref(false)
 const fields = ref<Record<string, string[]>>({})
 const dirty = ref(false)
+const conflicted = ref(false)
+let requestId = 0
 const allowLeave = ref(false)
 let pendingNavigation: ((allow?: boolean) => void) | null = null
 const form = reactive<ClienteFormModel>({
@@ -70,6 +72,14 @@ function beforeUnload(event: BeforeUnloadEvent) {
   if (editing.value && dirty.value && !allowLeave.value) event.preventDefault()
 }
 onBeforeRouteLeave((_to, _from, next) => {
+  if (saving.value) return next(false)
+  if (!editing.value || !dirty.value || allowLeave.value) return next()
+  confirmDiscard.value = true
+  pendingNavigation = (allow = false) => next(allow ? undefined : false)
+})
+onBeforeRouteUpdate((to, from, next) => {
+  if (to.params.id === from.params.id) return next()
+  if (saving.value) return next(false)
   if (!editing.value || !dirty.value || allowLeave.value) return next()
   confirmDiscard.value = true
   pendingNavigation = (allow = false) => next(allow ? undefined : false)
@@ -90,15 +100,29 @@ function discardEdit() {
   }
 }
 async function load() {
+  const currentRequest = ++requestId
+  const id = Number(route.params.id)
   loading.value = true
   error.value = ''
+  conflicted.value = false
+  success.value = ''
+  confirmStatus.value = false
+  confirmDiscard.value = false
+  pendingNavigation = null
+  client.value = null
+  editing.value = false
+  dirty.value = false
+  allowLeave.value = false
   try {
-    client.value = await clientesService.get(Number(route.params.id))
-    fill(client.value)
+    const value = await clientesService.get(id)
+    if (currentRequest !== requestId) return
+    client.value = value
+    fill(value)
   } catch (cause) {
+    if (currentRequest !== requestId) return
     error.value = cause instanceof Error ? cause.message : 'No se pudo cargar el cliente.'
   } finally {
-    loading.value = false
+    if (currentRequest === requestId) loading.value = false
   }
 }
 async function save() {
@@ -116,13 +140,17 @@ async function save() {
     observaciones: form.observaciones || null,
   }
   try {
-    client.value = await clientesService.update(client.value.id, body)
+    client.value = await clientesService.update(client.value.id, body, client.value.revision)
     fill(client.value)
     editing.value = false
     success.value = 'Cliente actualizado.'
   } catch (cause) {
-    if (cause instanceof ApiError) fields.value = cause.fields
+    if (cause instanceof ApiError) {
+      fields.value = cause.fields
+      if (cause.status === 409) conflicted.value = true
+    }
     error.value = cause instanceof Error ? cause.message : 'No se pudo guardar.'
+    if (conflicted.value) error.value += ' Tus cambios se conservaron; revisa antes de recargar.'
   } finally {
     saving.value = false
   }
@@ -140,9 +168,13 @@ async function changeStatus() {
   error.value = ''
   try {
     if (client.value.activo === false) {
-      client.value = await clientesService.update(client.value.id, { activo: true })
+      client.value = await clientesService.update(
+        client.value.id,
+        { activo: true },
+        client.value.revision,
+      )
     } else {
-      await clientesService.deactivate(client.value.id)
+      await clientesService.deactivate(client.value.id, client.value.revision)
       client.value = await clientesService.get(client.value.id)
     }
     fill(client.value)
@@ -158,6 +190,10 @@ onMounted(() => {
   window.addEventListener('beforeunload', beforeUnload)
   void load()
 })
+watch(
+  () => route.params.id,
+  () => void load(),
+)
 onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 </script>
 
@@ -196,6 +232,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           @change="updateForm"
         />
         <p v-if="error" class="form-error" role="alert">{{ error }}</p>
+        <Button v-if="conflicted" type="button" variant="secondary" @click="load">
+          Descartar cambios y recargar ficha
+        </Button>
         <div class="actions">
           <Button type="submit" :processing="saving" processing-label="Guardando…">Guardar</Button>
           <Button variant="secondary" :disabled="saving" @click="cancelEdit">Cancelar</Button>

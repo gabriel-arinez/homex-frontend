@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import type { Cliente, ValorCatalogoPublico } from '@/generated/api'
 import { proformasService } from '@/modules/proformas/services/proformasService'
@@ -29,6 +29,7 @@ const types = ref<ValorCatalogoPublico[]>([])
 const page = ref(Math.max(1, Number(route.query.pagina) || 1))
 const pageSize = 10
 let requestId = 0
+let restoringRoute = false
 
 const statusLabels: Record<string, string> = {
   todos: 'Todos',
@@ -108,6 +109,7 @@ async function load() {
 }
 
 watch([search, status, type], () => {
+  if (restoringRoute) return
   if (page.value !== 1) {
     page.value = 1
     return
@@ -116,9 +118,34 @@ watch([search, status, type], () => {
   void load()
 })
 watch(page, () => {
+  if (restoringRoute) return
   syncRoute()
   void load()
 })
+watch(
+  () => route.fullPath,
+  async () => {
+    const q = typeof route.query.q === 'string' ? route.query.q : ''
+    const estado = typeof route.query.estado === 'string' ? route.query.estado : 'todos'
+    const tipo = typeof route.query.tipo === 'string' ? route.query.tipo : 'todos'
+    const pagina = Math.max(1, Number(route.query.pagina) || 1)
+    if (
+      q === search.value &&
+      estado === status.value &&
+      tipo === type.value &&
+      pagina === page.value
+    )
+      return
+    restoringRoute = true
+    search.value = q
+    status.value = estado
+    type.value = tipo
+    page.value = pagina
+    await nextTick()
+    restoringRoute = false
+    void load()
+  },
+)
 onMounted(() => {
   void load()
   void proformasService

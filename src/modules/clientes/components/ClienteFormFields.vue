@@ -30,6 +30,12 @@ const selectedType = computed(() =>
   props.tipos.filter(Boolean).find((type) => String(type.id) === props.model.tipo_cliente),
 )
 const isCompany = computed(() => selectedType.value?.codigo === 'EMPRESA')
+function changeType(value: string) {
+  emit('change', 'tipo_cliente', value)
+  if (props.tipos.find((item) => String(item.id) === value)?.codigo === 'PERSONA') {
+    emit('change', 'empresa', '')
+  }
+}
 </script>
 
 <template>
@@ -45,7 +51,7 @@ const isCompany = computed(() => selectedType.value?.codigo === 'EMPRESA')
       :name="`${prefix}tipo-cliente`"
       label="Tipo de cliente"
       :options="tipos.map((type) => ({ label: type.nombre, value: String(type.id) }))"
-      @update:model-value="emit('change', 'tipo_cliente', $event)"
+      @update:model-value="changeType"
     />
     <TextField
       :model-value="model.nombres"
