@@ -18,10 +18,10 @@ async function login(page: Page) {
 
 async function createDraft(page: Page, title: string) {
   await page.goto('/proformas/nueva')
-  await page.getByRole('button', { name: /2Cliente/ }).click()
+  await page.getByRole('button', { name: /Cliente$/ }).click()
   await expect(page.locator('#cliente-proforma option')).toContainText(['Cliente Integración FE08'])
   await page.locator('#cliente-proforma').selectOption({ label: 'Cliente Integración FE08' })
-  await page.getByRole('button', { name: /3Condiciones/ }).click()
+  await page.getByRole('button', { name: /Condiciones$/ }).click()
   await page.getByLabel('Título').fill(title)
   await page.getByRole('button', { name: 'Guardar borrador' }).click()
   await expect(page).toHaveURL(/\/proformas\/\d+\/editar$/)
@@ -30,7 +30,7 @@ async function createDraft(page: Page, title: string) {
 }
 
 async function addCatalogLine(page: Page) {
-  await page.getByRole('button', { name: /1Productos/ }).click()
+  await page.getByRole('button', { name: /Productos$/ }).click()
   await page.getByRole('button', { name: 'Agregar producto' }).click()
   await page.getByLabel('Tipo de línea').selectOption({ label: 'Otro producto' })
   await expect(page.locator('#producto-linea option')).toContainText(['FE08-SILLA-001'])
