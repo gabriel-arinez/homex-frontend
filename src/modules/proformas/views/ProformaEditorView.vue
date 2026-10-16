@@ -28,6 +28,7 @@ import DetalleForm from '../components/DetalleForm.vue'
 import EspecificacionForm from '../components/EspecificacionForm.vue'
 import { proformasService } from '../services/proformasService'
 import {
+  cloneEditorData,
   consumeEditorDraft,
   duplicateLocalLine,
   removeLocalLine,
@@ -63,6 +64,7 @@ const specLine = ref<number | null>(null)
 const removedLine = ref<{ line: LineaLocal; index: number } | null>(null)
 const contextualNavigation = ref(false)
 const preferredProductId = ref<number | null>(null)
+const pendingLineDraft = ref<Record<string, string> | null>(null)
 const clienteMode = ref<'existente' | 'nuevo' | 'pendiente'>('existente')
 const key = ref(crypto.randomUUID())
 const header = reactive({
@@ -208,6 +210,7 @@ async function loadReferences() {
 }
 function saveLine(body: DetalleProformaWritable) {
   preferredProductId.value = null
+  pendingLineDraft.value = null
   const line: LineaLocal = { ...body, localId: localId(), especificacion: null }
   if (editingLine.value === null) lineas.value.push(line)
   else {
@@ -255,15 +258,18 @@ function duplicateFurniture(index: number) {
 }
 function editorSnapshot() {
   return {
-    header: structuredClone(header),
-    nuevoCliente: structuredClone(nuevoCliente),
+    header: cloneEditorData(header),
+    nuevoCliente: cloneEditorData(nuevoCliente),
     clienteMode: clienteMode.value,
-    lineas: structuredClone(lineas.value),
+    lineas: cloneEditorData(lineas.value),
     currentStep: currentStep.value,
     key: key.value,
+    lineDraft: cloneEditorData(pendingLineDraft.value),
+    editingLine: editingLine.value,
   }
 }
-async function createProductContextually() {
+async function createProductContextually(draft: Record<string, string>) {
+  pendingLineDraft.value = cloneEditorData(draft)
   const token = crypto.randomUUID()
   saveEditorDraft(token, editorSnapshot())
   contextualNavigation.value = true
@@ -281,11 +287,13 @@ function restoreContextualDraft() {
   lineas.value = snapshot.lineas
   currentStep.value = snapshot.currentStep
   key.value = snapshot.key
+  pendingLineDraft.value = snapshot.lineDraft
+  editingLine.value = snapshot.editingLine
   dirty.value = true
+  lineModal.value = Boolean(pendingLineDraft.value)
   const created = Number(route.query.productoCreado)
   if (created) {
     preferredProductId.value = created
-    editingLine.value = null
     lineModal.value = true
     success.value =
       route.query.mediaError === '1'
@@ -301,8 +309,10 @@ async function copyCommercialSummary() {
         ? `Cliente #${header.cliente}`
         : 'Cliente pendiente'
   const lines = lineas.value
-    .map(
-      (line) => `• ${line.nombre}: ${line.cantidad} × ${money(Number(line.precio_unitario || 0))}`,
+    .map((line) =>
+      line.modo_calculo === 'TOTAL_NEGOCIADO'
+        ? `• ${line.nombre}: importe negociado ${money(Number(line.importe_negociado || 0))}`
+        : `• ${line.nombre}: ${line.cantidad} × ${money(Number(line.precio_unitario || 0))}`,
     )
     .join('\n')
   const conditions = [
@@ -319,6 +329,7 @@ async function copyCommercialSummary() {
 
 function openLine(index: number | null = null) {
   if (index !== null && lineas.value[index]?.modo_calculo === 'TOTAL_NEGOCIADO') return
+  pendingLineDraft.value = null
   editingLine.value = index
   lineModal.value = true
 }
@@ -589,9 +600,14 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           ><p class="brand">HOMEX</p>
           <h3>{{ header.titulo || 'Cotización comercial' }}</h3>
           <p v-for="line in lineas" :key="line.localId">
-            <strong>{{ line.nombre }}</strong> — cantidad {{ line.cantidad }}, precio
-            {{ money(Number(line.precio_unitario || 0))
-            }}<span v-if="line.descripcion"><br />{{ line.descripcion }}</span>
+            <strong>{{ line.nombre }}</strong> —
+            <template v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
+              importe negociado {{ money(Number(line.importe_negociado || 0)) }}
+            </template>
+            <template v-else>
+              cantidad {{ line.cantidad }}, precio {{ money(Number(line.precio_unitario || 0)) }}
+            </template>
+            <span v-if="line.descripcion"><br />{{ line.descripcion }}</span>
           </p>
           <p v-if="header.plazo_entrega"><strong>Plazo:</strong> {{ header.plazo_entrega }}</p>
           <p v-if="header.validez_oferta">
@@ -646,10 +662,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         :existing-product-ids="existingProductIds"
         :processing="saving"
         :initial-product-id="preferredProductId"
+        :initial-draft="pendingLineDraft ?? undefined"
         @save="saveLine"
         @duplicate-product="focusDuplicateProduct"
         @create-product="createProductContextually"
-        @cancel="lineModal = false"
+        @cancel="lineModal = false; pendingLineDraft = null"
       />
     </Modal>
     <Modal :open="specLine !== null" title="Ficha técnica" @close="specLine = null">
