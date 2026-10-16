@@ -170,7 +170,11 @@ describe('FE03 clientes y productos', () => {
         })
       }),
     )
-    await productosService.update(4, { nombre: 'Silla B15', precio_lista: '1500.00' }, 'a'.repeat(64))
+    await productosService.update(
+      4,
+      { nombre: 'Silla B15', precio_lista: '1500.00' },
+      'a'.repeat(64),
+    )
     expect(sent).toEqual({ nombre: 'Silla B15', precio_lista: '1500.00' })
     expect(sent).not.toHaveProperty('stock')
     expect(sent).not.toHaveProperty('precio_vigente')
