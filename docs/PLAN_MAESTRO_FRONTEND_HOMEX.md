@@ -2874,3 +2874,10 @@ controles visuales pueden seguir separados por componente, pero `schema_version`
 campos técnicos paralelos no forman parte de la API comercial. La revisión HITL organiza la
 propuesta en el mismo objeto antes de persistirla. Véase
 [AP6_EDITOR_COMERCIAL.md](implementacion/AP6_EDITOR_COMERCIAL.md).
+
+## Actualización AP6.1 — inventario operativo
+
+El historial de movimientos consume unidad, responsable, referencia y pedido relacionado publicados
+por backend. Vue continúa sin calcular stock ni reconstruir reversas. El alcance y las pruebas se
+documentan en [AP6_1_INVENTARIO.md](implementacion/AP6_1_INVENTARIO.md). No se añadió una operación
+de ajuste administrativo sin contrato aprobado y esta actualización no autoriza despliegue productivo.

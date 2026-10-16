@@ -91,6 +91,7 @@ export type {
   Recibo,
   TokenObtainPair,
   TokenRefresh,
+  UsuarioResumenMovimiento,
   V1AuthMeRetrieveData,
   V1AuthMeRetrieveErrors,
   V1AuthMeRetrieveResponse,
