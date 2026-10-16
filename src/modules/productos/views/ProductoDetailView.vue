@@ -56,7 +56,11 @@ async function save(body: ProductoWritable) {
   saving.value = true
   error.value = ''
   try {
-    product.value = await productosService.update(product.value.id, body, product.value.revision)
+    product.value = await productosService.update(
+      product.value.id,
+      body,
+      product.value.revision,
+    )
     conflicted.value = false
     dirty.value = false
     editing.value = false
@@ -64,7 +68,8 @@ async function save(body: ProductoWritable) {
   } catch (cause) {
     if (cause instanceof ApiError && cause.status === 409) conflicted.value = true
     error.value = cause instanceof ApiError ? cause.message : 'No se pudo guardar.'
-    if (conflicted.value) error.value += ' Conservamos los cambios locales; recarga únicamente si deseas descartarlos.'
+    if (conflicted.value)
+      error.value += ' Conservamos los cambios locales; recarga únicamente si deseas descartarlos.'
   } finally {
     saving.value = false
   }
@@ -76,18 +81,22 @@ function discardEdit() {
   error.value = ''
 }
 function confirmNavigation() {
-  return !saving.value && (!editing.value || !dirty.value || window.confirm(
-    'Hay cambios en el producto sin guardar. ¿Deseas descartarlos?',
-  ))
+  return (
+    !saving.value &&
+    (!editing.value ||
+      !dirty.value ||
+      window.confirm('Hay cambios en el producto sin guardar. ¿Deseas descartarlos?'))
+  )
 }
 function beforeUnload(event: BeforeUnloadEvent) {
   if (editing.value && dirty.value) event.preventDefault()
 }
 onBeforeRouteLeave(() => confirmNavigation())
-onBeforeRouteUpdate((to, from) =>
-  to.params.id === from.params.id || confirmNavigation(),
+onBeforeRouteUpdate((to, from) => to.params.id === from.params.id || confirmNavigation())
+watch(
+  () => route.params.id,
+  () => void load(),
 )
-watch(() => route.params.id, () => void load())
 onMounted(() => {
   window.addEventListener('beforeunload', beforeUnload)
   void load()
