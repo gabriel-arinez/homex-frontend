@@ -11,7 +11,11 @@ import Button from '@/shared/ui/Button.vue'
 import Select from '@/shared/ui/Select.vue'
 import TextField from '@/shared/ui/TextField.vue'
 const props = defineProps<{ initial?: Producto; processing?: boolean }>()
-const emit = defineEmits<{ save: [body: ProductoWritable, file: File | null]; cancel: []; change: [] }>()
+const emit = defineEmits<{
+  save: [body: ProductoWritable, file: File | null]
+  cancel: []
+  change: []
+}>()
 const opciones = reactive<Record<string, ValorCatalogoPublico[]>>({})
 const familias = ref<FamiliaProducto[]>([])
 const loading = ref(true)
