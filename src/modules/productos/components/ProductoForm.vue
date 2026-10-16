@@ -11,7 +11,11 @@ import Button from '@/shared/ui/Button.vue'
 import Select from '@/shared/ui/Select.vue'
 import TextField from '@/shared/ui/TextField.vue'
 const props = defineProps<{ initial?: Producto; processing?: boolean }>()
-const emit = defineEmits<{ save: [body: ProductoWritable, file: File | null]; cancel: [] }>()
+const emit = defineEmits<{
+  save: [body: ProductoWritable, file: File | null]
+  cancel: []
+  change: []
+}>()
 const opciones = reactive<Record<string, ValorCatalogoPublico[]>>({})
 const familias = ref<FamiliaProducto[]>([])
 const loading = ref(true)
@@ -43,6 +47,7 @@ const form = reactive({
   ancho_mm: props.initial?.piso?.ancho_mm ?? '',
   m2_por_caja: props.initial?.piso?.m2_por_caja ?? '',
   promo_activa: Boolean(props.initial?.promocion),
+  promo_enabled: props.initial?.promocion?.activo ?? true,
   precio_antes: props.initial?.promocion?.precio_antes ?? '',
   precio_ahora: props.initial?.promocion?.precio_ahora ?? '',
   fecha_inicio: props.initial?.promocion?.fecha_inicio ?? '',
@@ -131,14 +136,20 @@ function submit() {
       precio_ahora: form.precio_ahora,
       fecha_inicio: form.fecha_inicio || null,
       fecha_fin: form.fecha_fin || null,
-      activo: true,
+      activo: form.promo_enabled,
     }
   emit('save', body, image.value)
 }
 onMounted(load)
 </script>
 <template>
-  <form class="product-form" :aria-busy="loading || processing" @submit.prevent="submit">
+  <form
+    class="product-form"
+    :aria-busy="loading || processing"
+    @input="emit('change')"
+    @change="emit('change')"
+    @submit.prevent="submit"
+  >
     <p v-if="error" role="alert">{{ error }}</p>
     <div class="grid">
       <Select
@@ -244,6 +255,7 @@ onMounted(load)
       <legend>Promoción de catálogo</legend>
       <label><input v-model="form.promo_activa" type="checkbox" /> Configurar promoción</label>
       <div v-if="form.promo_activa" class="grid">
+        <label><input v-model="form.promo_enabled" type="checkbox" /> Promoción activa</label>
         <TextField
           v-model="form.precio_antes"
           name="antes"

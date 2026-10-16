@@ -446,6 +446,7 @@ export type PatchedFamiliaProducto = {
 
 export type PatchedProducto = {
   readonly id?: number
+  readonly revision?: string
   categoria?: number
   categoria_info?: ValorCatalogoPublico
   familia?: number | null
@@ -536,6 +537,7 @@ export type Pedido = {
 
 export type Producto = {
   readonly id: number
+  readonly revision: string
   categoria: number
   categoria_info: ValorCatalogoPublico
   familia?: number | null
@@ -1602,6 +1604,12 @@ export type V1CatalogoProductosRetrieveResponse =
 
 export type V1CatalogoProductosPartialUpdateData = {
   body?: PatchedProductoWritable
+  headers: {
+    /**
+     * Revisión del producto devuelta por GET; evita sobrescrituras concurrentes.
+     */
+    'If-Match': string
+  }
   path: {
     /**
      * Un valor de entero único que identifique este producto.
@@ -1621,6 +1629,12 @@ export type V1CatalogoProductosPartialUpdateResponse =
 
 export type V1CatalogoProductosUpdateData = {
   body: ProductoWritable
+  headers: {
+    /**
+     * Revisión del producto devuelta por GET; evita sobrescrituras concurrentes.
+     */
+    'If-Match': string
+  }
   path: {
     /**
      * Un valor de entero único que identifique este producto.

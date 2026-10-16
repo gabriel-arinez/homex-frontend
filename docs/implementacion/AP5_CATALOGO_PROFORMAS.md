@@ -36,4 +36,14 @@ Los totales mostrados antes de guardar se identifican como estimados. PostgreSQL
 - build productivo: correcto;
 - auditoría de dependencias: 0 vulnerabilidades.
 
-Las pruebas usan `VITE_API_BASE_URL=http://localhost:8000`, el mismo contrato explícito de CI. La evidencia remota y el SHA final se registran en el cierre del PR.
+Las pruebas usan `VITE_API_BASE_URL=http://localhost:8000`, el mismo contrato explícito de CI. La evidencia remota y los SHA de merge se verifican en las ejecuciones de CI posteriores al merge.
+
+## Auditoría correctiva AP5
+
+El editor usa copias JSON de los datos comerciales para manejar proxies Vue sin `DataCloneError`. Conserva también la línea aún no guardada al crear un producto contextual (descripción, cantidad, precio y descuento), tanto al crear como al cancelar la creación.
+
+Las líneas `TOTAL_NEGOCIADO` se identifican expresamente en vista previa y texto compartible. El catálogo mantiene el estado real de promociones inactivas; editar los datos del producto no las reactiva.
+
+La ficha comercial de productos escucha cambios de ID y descarta resultados asíncronos obsoletos. Confirma navegación con cambios pendientes y muestra un conflicto 409 sin perder el formulario. Los PATCH envían `If-Match` con la `revision` recibida del backend.
+
+Las pruebas específicas deben incluir componentes montados con datos reactivos y rutas reales, los campos que todavía no forman parte de líneas persistidas y edición de promociones inactivas. La documentación técnica y matriz de H01–H11 se conservan también en el repositorio backend. Esta fase correctiva no despliega producción.

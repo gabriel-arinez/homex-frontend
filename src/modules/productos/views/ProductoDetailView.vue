@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router'
 import type { Producto, ProductoWritable } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { ApiError } from '@/shared/api'
@@ -23,18 +23,32 @@ const editing = ref(false)
 const saving = ref(false)
 const success = ref('')
 const confirmCancel = ref(false)
+const dirty = ref(false)
+const conflicted = ref(false)
+let requestId = 0
 const canEdit = computed(() => session.can('comercial.administrar'))
 const money = (value: string) =>
   new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(Number(value))
 async function load() {
+  const token = ++requestId
+  const id = Number(route.params.id)
   loading.value = true
   error.value = ''
+  success.value = ''
+  conflicted.value = false
+  product.value = null
+  editing.value = false
+  dirty.value = false
+  confirmCancel.value = false
   try {
-    product.value = await productosService.get(Number(route.params.id))
+    const result = await productosService.get(id)
+    if (token !== requestId) return
+    product.value = result
   } catch (cause) {
+    if (token !== requestId) return
     error.value = cause instanceof Error ? cause.message : 'No se pudo cargar el producto.'
   } finally {
-    loading.value = false
+    if (token === requestId) loading.value = false
   }
 }
 async function save(body: ProductoWritable) {
@@ -42,11 +56,15 @@ async function save(body: ProductoWritable) {
   saving.value = true
   error.value = ''
   try {
-    product.value = await productosService.update(product.value.id, body)
+    product.value = await productosService.update(product.value.id, body, product.value.revision)
+    conflicted.value = false
+    dirty.value = false
     editing.value = false
     success.value = 'Producto actualizado.'
   } catch (cause) {
+    if (cause instanceof ApiError && cause.status === 409) conflicted.value = true
     error.value = cause instanceof ApiError ? cause.message : 'No se pudo guardar.'
+    if (conflicted.value) error.value += ' Cambios conservados. Recarga solo para descartarlos.'
   } finally {
     saving.value = false
   }
@@ -54,9 +72,28 @@ async function save(body: ProductoWritable) {
 function discardEdit() {
   confirmCancel.value = false
   editing.value = false
+  dirty.value = false
   error.value = ''
 }
-onMounted(load)
+function confirmNavigation() {
+  if (saving.value) return false
+  if (!editing.value || !dirty.value) return true
+  return window.confirm('Hay cambios sin guardar. ¿Deseas descartarlos?')
+}
+function beforeUnload(event: BeforeUnloadEvent) {
+  if (editing.value && dirty.value) event.preventDefault()
+}
+onBeforeRouteLeave(() => confirmNavigation())
+onBeforeRouteUpdate((to, from) => to.params.id === from.params.id || confirmNavigation())
+watch(
+  () => route.params.id,
+  () => void load(),
+)
+onMounted(() => {
+  window.addEventListener('beforeunload', beforeUnload)
+  void load()
+})
+onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 </script>
 <template>
   <div>
@@ -83,9 +120,13 @@ onMounted(load)
         :initial="product"
         :processing="saving"
         @save="save"
+        @change="dirty = true"
         @cancel="confirmCancel = true"
       />
-      <div v-else class="layout">
+      <div v-if="conflicted" class="conflict-actions">
+        <Button variant="secondary" @click="load">Descartar cambios y recargar producto</Button>
+      </div>
+      <div v-else-if="!editing" class="layout">
         <Card
           ><ProductImage
             :image="product.imagen_principal"

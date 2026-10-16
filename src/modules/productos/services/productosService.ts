@@ -20,8 +20,12 @@ export const productosService = {
   get: (id: number) => apiRequest<Producto>(`/api/v1/catalogo/productos/${id}/`),
   create: (body: ProductoWritable) =>
     apiRequest<Producto>('/api/v1/catalogo/productos/', { method: 'POST', body }),
-  update: (id: number, body: PatchedProductoWritable) =>
-    apiRequest<Producto>(`/api/v1/catalogo/productos/${id}/`, { method: 'PATCH', body }),
+  update: (id: number, body: PatchedProductoWritable, revision: string) =>
+    apiRequest<Producto>(`/api/v1/catalogo/productos/${id}/`, {
+      method: 'PATCH',
+      body,
+      headers: { 'If-Match': revision },
+    }),
   uploadImage: (id: number, file: File) => {
     const body = new FormData()
     body.append('archivo', file)
