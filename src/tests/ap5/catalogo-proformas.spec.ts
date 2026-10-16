@@ -158,9 +158,9 @@ describe('AP5 regresiones de interfaces reactivas y comerciales', () => {
     } as Producto
     const wrapper = mount(ProductoForm, { props: { initial: producto } })
     await flushPromises()
-    const activo = wrapper.findAll('input[type="checkbox"]').find((input) =>
-      input.element.parentElement?.textContent?.includes('Promoción activa'),
-    )
+    const activo = wrapper
+      .findAll('input[type="checkbox"]')
+      .find((input) => input.element.parentElement?.textContent?.includes('Promoción activa'))
     expect((activo!.element as HTMLInputElement).checked).toBe(false)
     await wrapper.get('input[name="nombre"]').setValue('Producto renombrado')
     await wrapper.get('form').trigger('submit')
@@ -219,9 +219,9 @@ describe('AP5 regresiones de interfaces reactivas y comerciales', () => {
     await form.get('input[name="cantidad-linea"]').setValue('7')
     await form.get('input[name="precio-unitario"]').setValue('125.00')
     await form.get('input[name="descuento-linea"]').setValue('12.00')
-    const abrir = form.findAll('button').find((x) =>
-      x.text().includes('Crear producto sin perder esta proforma'),
-    )
+    const abrir = form
+      .findAll('button')
+      .find((x) => x.text().includes('Crear producto sin perder esta proforma'))
     expect(abrir).toBeDefined()
     await abrir!.trigger('click')
     const snapshot = form.emitted('createProduct')?.[0]?.[0] as Record<string, string>
