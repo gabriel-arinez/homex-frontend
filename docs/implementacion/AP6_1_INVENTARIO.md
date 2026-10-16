@@ -44,6 +44,15 @@ Resultados locales antes de publicar la rama:
 - `npm audit --audit-level=high`: **0 vulnerabilidades**;
 - `git diff --check`: limpio.
 
-La evidencia CI remota se añadirá después de publicar el commit.
+Evidencia remota:
+
+- commit funcional: `9fc5935bf4ab3cacafb84aece6667ba148f1114b`;
+- commit coordinado actual: `f36da69dbab479e4c6248cfc1bf9960a241329c0`;
+- backend contractual: `708e872c9fac6f1e947b389c5a6ceaf3de74e90a`;
+- GitHub Actions PR run `38835325142`: **todos los jobs verdes**, incluida la integración real.
+
+Los dos runs anteriores fallaron antes del checkout porque ECR respondió `toomanyrequests` al
+inicializar PostgreSQL. El job quedó estabilizado usando las imágenes oficiales de Docker Hub que ya
+emplea el backend; no cambió código ni comportamiento de HOMEX.
 
 Esta fase no autoriza despliegue productivo ni promoción de D07 RC2.
