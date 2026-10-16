@@ -61,6 +61,7 @@ import ProductoForm from '@/modules/productos/components/ProductoForm.vue'
 import ProductoDetailView from '@/modules/productos/views/ProductoDetailView.vue'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import type { Producto } from '@/generated/api'
+import DetalleForm from '@/modules/proformas/components/DetalleForm.vue'
 
 describe('AP5 contrato unificado de catálogo', () => {
   it('envía producto y ficha en una sola operación sin incluir stock', async () => {
@@ -207,4 +208,84 @@ describe('AP5 regresiones de interfaces reactivas y comerciales', () => {
     expect(wrapper.text()).not.toContain('Producto 10')
     wrapper.unmount()
   })
+  it('conserva cantidad, precio y descuento sin guardar al crear producto contextual', async () => {
+    const pinia = createPinia()
+    useSessionStore(pinia).capabilities = ['comercial.administrar']
+    const props = {
+      tipos: [{ id: 1, codigo: 'PRODUCTO', nombre: 'Producto', concepto_codigo: 'TIPO_ITEM' }],
+      unidades: [{ id: 2, codigo: 'PIEZA', nombre: 'Pieza', concepto_codigo: 'UNIDAD_MEDIDA' }],
+      moneda: 'BOB',
+    }
+    const form = mount(DetalleForm, { props, global: { plugins: [pinia] } })
+    await form.get('input[name="cantidad-linea"]').setValue('7')
+    await form.get('input[name="precio-unitario"]').setValue('125.00')
+    await form.get('input[name="descuento-linea"]').setValue('12.00')
+    const abrir = form.findAll('button').find((x) =>
+      x.text().includes('Crear producto sin perder esta proforma'),
+    )
+    expect(abrir).toBeDefined()
+    await abrir!.trigger('click')
+    const snapshot = form.emitted('createProduct')?.[0]?.[0] as Record<string, string>
+    expect(snapshot).toMatchObject({
+      cantidad: '7',
+      precio_unitario: '125.00',
+      descuento: '12.00',
+    })
+    form.unmount()
+    const restored = mount(DetalleForm, {
+      props: { ...props, initialDraft: cloneEditorData(snapshot) },
+      global: { plugins: [pinia] },
+    })
+    expect((restored.get('input[name="cantidad-linea"]').element as HTMLInputElement).value).toBe('7')
+    expect((restored.get('input[name="precio-unitario"]').element as HTMLInputElement).value).toBe(
+      '125.00',
+    )
+    restored.unmount()
+  })
+
+  it('impide abandonar una ficha con cambios pendientes y respeta el confirmacion', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/catalogo/productos/:id/', ({ params }) =>
+        HttpResponse.json({
+          id: Number(params.id),
+          revision: 'c'.repeat(64),
+          nombre: `Producto ${params.id}`,
+          sku: `SKU-${params.id}`,
+          categoria: 3,
+          unidad_stock: 1,
+          stock: '0.0000',
+          demanda_pendiente: '0',
+          disponibilidad_referencial: '0',
+          precio_vigente: '100.00',
+          precio_lista: '100.00',
+          activo: true,
+          categoria_info: { codigo: 'OTRO', nombre: 'Otros' },
+          unidad_stock_info: { codigo: 'PIEZA', nombre: 'Pieza' },
+        }),
+      ),
+    )
+    const pinia = createPinia()
+    useSessionStore(pinia).capabilities = ['comercial.administrar']
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/productos/:id', component: ProductoDetailView }],
+    })
+    await router.push('/productos/10')
+    const wrapper = mount({ template: '<RouterView />' }, { global: { plugins: [pinia, router] } })
+    await flushPromises()
+    const editar = wrapper.findAll('button').find((x) => x.text().includes('Editar datos comerciales'))
+    expect(editar).toBeDefined()
+    await editar!.trigger('click')
+    await wrapper.get('input[name="nombre"]').setValue('Edición pendiente')
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    await router.push('/productos/11')
+    expect(router.currentRoute.value.path).toBe('/productos/10')
+    confirm.mockReturnValue(true)
+    await router.push('/productos/11')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/productos/11')
+    confirm.mockRestore()
+    wrapper.unmount()
+  })
+
 })
