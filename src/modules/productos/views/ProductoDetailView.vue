@@ -121,7 +121,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         @cancel="confirmCancel = true"
       />
       <div v-if="conflicted" class="conflict-actions">
-        <Button variant="secondary" @click="load">Descartar cambios y recargar producto</Button>
+        <Button variant="secondary" @click="load"
+          >Descartar cambios y recargar producto</Button
+        >
       </div>
       <div v-else-if="!editing" class="layout">
         <Card
