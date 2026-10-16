@@ -95,7 +95,8 @@ onMounted(async () => {
           'precio_unitario',
           'descuento',
         ] as const) {
-          if (props.initialDraft[campo] !== undefined) form[campo] = props.initialDraft[campo]
+          const valor = props.initialDraft[campo]
+          if (valor !== undefined) form[campo] = valor
         }
       }
     } catch (cause) {
