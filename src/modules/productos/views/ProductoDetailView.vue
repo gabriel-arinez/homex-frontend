@@ -85,7 +85,10 @@ function beforeUnload(event: BeforeUnloadEvent) {
 }
 onBeforeRouteLeave(() => confirmNavigation())
 onBeforeRouteUpdate((to, from) => to.params.id === from.params.id || confirmNavigation())
-watch(() => route.params.id, () => void load())
+watch(
+  () => route.params.id,
+  () => void load(),
+)
 onMounted(() => {
   window.addEventListener('beforeunload', beforeUnload)
   void load()
@@ -121,9 +124,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         @cancel="confirmCancel = true"
       />
       <div v-if="conflicted" class="conflict-actions">
-        <Button variant="secondary" @click="load"
-          >Descartar cambios y recargar producto</Button
-        >
+        <Button variant="secondary" @click="load">Descartar cambios y recargar producto</Button>
       </div>
       <div v-else-if="!editing" class="layout">
         <Card
