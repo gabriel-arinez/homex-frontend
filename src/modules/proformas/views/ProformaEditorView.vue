@@ -327,6 +327,10 @@ async function copyCommercialSummary() {
   success.value = 'Resumen copiado. Puedes pegarlo manualmente en WhatsApp.'
 }
 
+function closeLineModal() {
+  lineModal.value = false
+  pendingLineDraft.value = null
+}
 function openLine(index: number | null = null) {
   if (index !== null && lineas.value[index]?.modo_calculo === 'TOTAL_NEGOCIADO') return
   pendingLineDraft.value = null
@@ -650,7 +654,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     <Modal
       :open="lineModal"
       :title="editingLine === null ? 'Agregar producto' : 'Editar producto'"
-      @close="lineModal = false"
+      @close="closeLineModal"
     >
       <DetalleForm
         :key="editableDetail?.id ?? editingLine ?? lineas.length"
@@ -666,7 +670,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         @save="saveLine"
         @duplicate-product="focusDuplicateProduct"
         @create-product="createProductContextually"
-        @cancel="lineModal = false; pendingLineDraft = null"
+        @cancel="closeLineModal"
       />
     </Modal>
     <Modal :open="specLine !== null" title="Ficha técnica" @close="specLine = null">
