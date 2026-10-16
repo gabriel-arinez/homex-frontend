@@ -197,9 +197,10 @@ describe('AP5 regresiones de interfaces reactivas y comerciales', () => {
       routes: [{ path: '/productos/:id', component: ProductoDetailView }],
     })
     await router.push('/productos/10')
-    const wrapper = mount({ template: '<RouterView />' }, {
-      global: { plugins: [createPinia(), router] },
-    })
+    const wrapper = mount(
+      { template: '<RouterView />' },
+      { global: { plugins: [createPinia(), router] } },
+    )
     await flushPromises()
     expect(wrapper.text()).toContain('Producto 10')
     await router.push('/productos/11')
@@ -236,7 +237,9 @@ describe('AP5 regresiones de interfaces reactivas y comerciales', () => {
       props: { ...props, initialDraft: cloneEditorData(snapshot) },
       global: { plugins: [pinia] },
     })
-    expect((restored.get('input[name="cantidad-linea"]').element as HTMLInputElement).value).toBe('7')
+    expect((restored.get('input[name="cantidad-linea"]').element as HTMLInputElement).value).toBe(
+      '7',
+    )
     expect((restored.get('input[name="precio-unitario"]').element as HTMLInputElement).value).toBe(
       '125.00',
     )
@@ -273,7 +276,9 @@ describe('AP5 regresiones de interfaces reactivas y comerciales', () => {
     await router.push('/productos/10')
     const wrapper = mount({ template: '<RouterView />' }, { global: { plugins: [pinia, router] } })
     await flushPromises()
-    const editar = wrapper.findAll('button').find((x) => x.text().includes('Editar datos comerciales'))
+    const editar = wrapper
+      .findAll('button')
+      .find((x) => x.text().includes('Editar datos comerciales'))
     expect(editar).toBeDefined()
     await editar!.trigger('click')
     await wrapper.get('input[name="nombre"]').setValue('Edición pendiente')
@@ -287,5 +292,4 @@ describe('AP5 regresiones de interfaces reactivas y comerciales', () => {
     confirm.mockRestore()
     wrapper.unmount()
   })
-
 })
