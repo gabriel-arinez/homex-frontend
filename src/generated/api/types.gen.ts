@@ -307,9 +307,11 @@ export type MovimientoStock = {
   readonly producto: number
   producto_resumen: ProductoResumenMovimiento
   readonly pedido: number | null
+  readonly pedido_relacionado: number | null
   readonly movimiento_referencia: number | null
   readonly observaciones: string | null
   readonly created_by: number | null
+  responsable: UsuarioResumenMovimiento | null
 }
 
 export type NotaEntrega = {
@@ -579,6 +581,7 @@ export type ProductoResumenMovimiento = {
   readonly id: number
   readonly sku: string | null
   readonly nombre: string
+  unidad_stock_info: ValorCatalogoMovimiento
 }
 
 export type ProductoSilla = {
@@ -692,6 +695,12 @@ export type TokenObtainPair = {
 export type TokenRefresh = {
   readonly access: string
   refresh: string
+}
+
+export type UsuarioResumenMovimiento = {
+  readonly id: number
+  readonly username: string
+  readonly display_name: string
 }
 
 export type ValorCatalogoMovimiento = {

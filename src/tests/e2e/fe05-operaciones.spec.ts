@@ -140,11 +140,18 @@ async function mock(page: Page) {
             tipo_movimiento_info: { id: 12, codigo: 'VENTA', nombre: 'Venta' },
             cantidad: -1,
             producto: 8,
-            producto_resumen: { id: 8, sku: 'SILLA-01', nombre: 'Silla ejecutiva' },
+            producto_resumen: {
+              id: 8,
+              sku: 'SILLA-01',
+              nombre: 'Silla ejecutiva',
+              unidad_stock_info: { id: 1, codigo: 'PIEZA', nombre: 'Pieza' },
+            },
             pedido: 9,
+            pedido_relacionado: 9,
             movimiento_referencia: null,
             observaciones: 'Salida por pedido',
             created_by: 7,
+            responsable: { id: 7, username: 'vendedor', display_name: 'Ana Vendedora' },
           },
         ],
       },
@@ -181,6 +188,9 @@ test('FE05 navegación expone OT, notas, recibos y stock como módulos reales', 
   await expect(page.getByRole('heading', { name: 'Movimientos de stock' })).toBeVisible()
   await expect(page.getByText('Silla ejecutiva')).toBeVisible()
   await expect(page.getByText('-1')).toBeVisible()
+  await expect(page.getByText('Pieza')).toBeVisible()
+  await expect(page.getByText('Ana Vendedora')).toBeVisible()
+  await expect(page.getByText('#9')).toBeVisible()
 })
 
 test('FE05 OT muestra líneas reales y permite descargar su documento', async ({ page }) => {

@@ -39,7 +39,10 @@ const tableRows = computed(() =>
     tipo: item.tipo_movimiento_info.nombre,
     productoNombre: item.producto_resumen.nombre,
     productoSku: item.producto_resumen.sku || `#${item.producto}`,
-    pedidoLabel: item.pedido ? `#${item.pedido}` : 'Sin pedido',
+    unidadNombre: item.producto_resumen.unidad_stock_info.nombre,
+    pedidoLabel: item.pedido_relacionado ? `#${item.pedido_relacionado}` : 'Sin pedido',
+    referenciaLabel: item.movimiento_referencia ? `#${item.movimiento_referencia}` : '—',
+    responsableLabel: item.responsable?.display_name || 'Sistema',
   })),
 )
 const activeFilters = computed(() => [
@@ -131,6 +134,8 @@ const columns = [
   { key: 'producto', label: 'Producto' },
   { key: 'cantidad', label: 'Cantidad' },
   { key: 'pedido', label: 'Pedido' },
+  { key: 'referencia', label: 'Movimiento original' },
+  { key: 'responsable', label: 'Responsable' },
   { key: 'observaciones', label: 'Observaciones' },
 ]
 </script>
@@ -195,8 +200,11 @@ const columns = [
           <strong :class="Number(row.cantidad) < 0 ? 'out' : 'in'">
             {{ Number(row.cantidad) > 0 ? '+' : '' }}{{ row.cantidad }}
           </strong>
+          <small>{{ row.unidadNombre }}</small>
         </template>
         <template #cell-pedido="{ row }">{{ row.pedidoLabel }}</template>
+        <template #cell-referencia="{ row }">{{ row.referenciaLabel }}</template>
+        <template #cell-responsable="{ row }">{{ row.responsableLabel }}</template>
         <template #cell-observaciones="{ row }">{{ row.observaciones || '—' }}</template>
       </DataTable>
       <Pagination :page="page" :total-pages="totalPages" @change="page = $event" />
