@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { reactive } from 'vue'
+import { createPinia } from 'pinia'
+import { flushPromises, mount } from '@vue/test-utils'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import {
+  cloneEditorData,
   consumeEditorDraft,
   duplicateLocalLine,
   removeLocalLine,
@@ -52,6 +57,10 @@ describe('AP5 estado local del editor', () => {
 import { http, HttpResponse } from 'msw'
 import { productosService } from '@/modules/productos/services/productosService'
 import { server } from '@/tests/msw/server'
+import ProductoForm from '@/modules/productos/components/ProductoForm.vue'
+import ProductoDetailView from '@/modules/productos/views/ProductoDetailView.vue'
+import { useSessionStore } from '@/app/stores/useSessionStore'
+import type { Producto } from '@/generated/api'
 
 describe('AP5 contrato unificado de catálogo', () => {
   it('envía producto y ficha en una sola operación sin incluir stock', async () => {
@@ -96,5 +105,106 @@ describe('AP5 contrato unificado de catálogo', () => {
       promocion: { precio_ahora: '110.00' },
     })
     expect(body).not.toHaveProperty('stock')
+  })
+})
+
+describe('AP5 regresiones de interfaces reactivas y comerciales', () => {
+  it('clona proxies Vue profundamente sin DataCloneError en las tres operaciones', () => {
+    const cabecera = reactive({ cliente: '5', observaciones: 'Sin guardar' })
+    const linea = reactive({
+      id: 8,
+      localId: 'original',
+      nombre: 'Mueble',
+      especificacion: { datos_tecnicos: { componentes: [{ material: 'melamina' }] } },
+    })
+    const draft = cloneEditorData({ cabecera, lineas: [linea] })
+    expect(draft.cabecera).toEqual({ cliente: '5', observaciones: 'Sin guardar' })
+    const copy = duplicateLocalLine(linea, 'copy')
+    copy.especificacion.datos_tecnicos.componentes[0]!.material = 'madera'
+    expect(linea.especificacion.datos_tecnicos.componentes[0]!.material).toBe('melamina')
+    const removed = removeLocalLine([linea], 0)
+    expect(restoreLocalLine(removed.lines, removed.removed!)[0]).toEqual(linea)
+  })
+
+  it('no reactiva una promocion inactiva al editar otro campo del producto', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/catalogo/familias/', () =>
+        HttpResponse.json({ count: 0, results: [], next: null, previous: null }),
+      ),
+      http.get('http://localhost:8000/api/v1/catalogo/opciones/', ({ request }) => {
+        const code = new URL(request.url).searchParams.get('concepto')
+        return HttpResponse.json(
+          code === 'CATEGORIA_PRODUCTO'
+            ? [{ id: 3, codigo: 'OTRO', nombre: 'Otro', concepto_codigo: code }]
+            : [{ id: 1, codigo: 'PIEZA', nombre: 'Pieza', concepto_codigo: code }],
+        )
+      }),
+    )
+    const producto = {
+      id: 5,
+      categoria: 3,
+      unidad_stock: 1,
+      nombre: 'Producto existente',
+      sku: 'AP5-TEST',
+      precio_lista: '100.00',
+      activo: true,
+      promocion: {
+        producto: 5,
+        precio_antes: '100.00',
+        precio_ahora: '80.00',
+        activo: false,
+      },
+    } as Producto
+    const wrapper = mount(ProductoForm, { props: { initial: producto } })
+    await flushPromises()
+    const activo = wrapper.findAll('input[type="checkbox"]').find((input) =>
+      input.element.parentElement?.textContent?.includes('Promoción activa'),
+    )
+    expect((activo!.element as HTMLInputElement).checked).toBe(false)
+    await wrapper.get('input[name="nombre"]').setValue('Producto renombrado')
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.emitted('save')?.[0]?.[0]).toMatchObject({
+      nombre: 'Producto renombrado',
+      promocion: { activo: false },
+    })
+    wrapper.unmount()
+  })
+
+  it('recarga la ficha al reutilizar el componente para otro producto', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/catalogo/productos/:id/', ({ params }) =>
+        HttpResponse.json({
+          id: Number(params.id),
+          revision: 'a'.repeat(64),
+          nombre: `Producto ${params.id}`,
+          sku: `SKU-${params.id}`,
+          categoria: 3,
+          unidad_stock: 1,
+          stock: '0.0000',
+          demanda_pendiente: '0',
+          disponibilidad_referencial: '0',
+          precio_vigente: '100.00',
+          precio_lista: '100.00',
+          activo: true,
+          categoria_info: { codigo: 'OTRO', nombre: 'Otros' },
+          unidad_stock_info: { codigo: 'PIEZA', nombre: 'Pieza' },
+        }),
+      ),
+    )
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/productos/:id', component: ProductoDetailView }],
+    })
+    await router.push('/productos/10')
+    const wrapper = mount({ template: '<RouterView />' }, {
+      global: { plugins: [createPinia(), router] },
+    })
+    await flushPromises()
+    expect(wrapper.text()).toContain('Producto 10')
+    await router.push('/productos/11')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Producto 11')
+    expect(wrapper.text()).not.toContain('Producto 10')
+    wrapper.unmount()
   })
 })
