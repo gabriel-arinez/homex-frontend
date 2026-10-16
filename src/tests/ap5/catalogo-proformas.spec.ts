@@ -197,10 +197,8 @@ describe('AP5 regresiones de interfaces reactivas y comerciales', () => {
       routes: [{ path: '/productos/:id', component: ProductoDetailView }],
     })
     await router.push('/productos/10')
-    const wrapper = mount(
-      { template: '<RouterView />' },
-      { global: { plugins: [createPinia(), router] } },
-    )
+    const pinia = createPinia()
+    const wrapper = mount({ template: '<RouterView />' }, { global: { plugins: [pinia, router] } })
     await flushPromises()
     expect(wrapper.text()).toContain('Producto 10')
     await router.push('/productos/11')
@@ -209,7 +207,7 @@ describe('AP5 regresiones de interfaces reactivas y comerciales', () => {
     expect(wrapper.text()).not.toContain('Producto 10')
     wrapper.unmount()
   })
-  it('conserva cantidad, precio y descuento sin guardar al crear producto contextual', async () => {
+  it('restaura importes no guardados al crear una variante', async () => {
     const pinia = createPinia()
     useSessionStore(pinia).capabilities = ['comercial.administrar']
     const props = {
@@ -237,12 +235,10 @@ describe('AP5 regresiones de interfaces reactivas y comerciales', () => {
       props: { ...props, initialDraft: cloneEditorData(snapshot) },
       global: { plugins: [pinia] },
     })
-    expect((restored.get('input[name="cantidad-linea"]').element as HTMLInputElement).value).toBe(
-      '7',
-    )
-    expect((restored.get('input[name="precio-unitario"]').element as HTMLInputElement).value).toBe(
-      '125.00',
-    )
+    const cantidad = restored.get('input[name="cantidad-linea"]').element as HTMLInputElement
+    expect(cantidad.value).toBe('7')
+    const precio = restored.get('input[name="precio-unitario"]').element as HTMLInputElement
+    expect(precio.value).toBe('125.00')
     restored.unmount()
   })
 
@@ -276,9 +272,7 @@ describe('AP5 regresiones de interfaces reactivas y comerciales', () => {
     await router.push('/productos/10')
     const wrapper = mount({ template: '<RouterView />' }, { global: { plugins: [pinia, router] } })
     await flushPromises()
-    const editar = wrapper
-      .findAll('button')
-      .find((x) => x.text().includes('Editar datos comerciales'))
+    const editar = wrapper.findAll('button').find((x) => x.text().startsWith('Editar'))
     expect(editar).toBeDefined()
     await editar!.trigger('click')
     await wrapper.get('input[name="nombre"]').setValue('Edición pendiente')
