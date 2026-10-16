@@ -195,7 +195,7 @@ test('FE05 navegación expone OT, notas, recibos y stock como módulos reales', 
 
 test('AP6.1 conserva reversa M2, CAJA histórica y actor sistema', async ({ page }) => {
   await mock(page)
-  await page.route(/\\/api\\/v1\\/movimientos-stock\\/(?:\\?.*)?$/, (route) =>
+  await page.route(/\/api\/v1\/movimientos-stock\/(?:\?.*)?$/, (route) =>
     route.fulfill({
       json: {
         count: 3,
