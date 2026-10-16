@@ -86,6 +86,18 @@ onMounted(async () => {
       const product = await productosService.get(props.initialProductId)
       form.producto = String(product.id)
       selectProduct(product)
+      // Conservar lo redactado; el producto creado reemplaza solo la variante.
+      if (props.initialDraft) {
+        for (const campo of [
+          'nombre',
+          'descripcion',
+          'cantidad',
+          'precio_unitario',
+          'descuento',
+        ] as const) {
+          if (props.initialDraft[campo] !== undefined) form[campo] = props.initialDraft[campo]
+        }
+      }
     } catch (cause) {
       error.value =
         cause instanceof Error ? cause.message : 'No se pudo seleccionar el producto creado.'
