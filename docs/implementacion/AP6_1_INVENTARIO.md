@@ -18,6 +18,26 @@ La vista `Movimientos de stock` consume el contrato OpenAPI actualizado y muestr
 
 El filtro por pedido se envía al backend; Vue no reconstruye relaciones ni filtra localmente. El servicio sigue siendo de sólo lectura.
 
+## Complemento AP6.1 — cierre de auditoría independiente
+
+Se mantiene la autoridad del backend para asociar pedidos al inventario:
+sólo `REVERSA_VENTA` hereda el pedido de su movimiento original.
+Un `AJUSTE` que utilice la venta como referencia sigue mostrándose
+**sin pedido relacionado**.
+
+La ampliación E2E distingue explícitamente:
+
+- reversa de `M2` con cantidad decimal, pedido original y referencia;
+- movimiento sin responsable, identificado como `Sistema`;
+- ajuste referenciado sin pedido comercial heredado;
+- producto de piso histórico con unidad `CAJA` intacta, sin convertir
+  ni etiquetar la cantidad como `M2`.
+
+La revocación `UPDATE(productos.stock)` y el disparador privilegiado
+se implementan exclusivamente en backend/SQL. El frontend conserva su
+comportamiento de lectura. Estas evidencias se ejecutan en entornos de
+prueba; no autorizan promoción a producción.
+
 ## Preservación
 
 - no se añadió un formulario de ajuste administrativo sin contrato aprobado;

@@ -193,6 +193,102 @@ test('FE05 navegación expone OT, notas, recibos y stock como módulos reales', 
   await expect(page.getByText('#9')).toBeVisible()
 })
 
+test('AP6.1 conserva reversa M2, CAJA histórica y actor sistema', async ({ page }) => {
+  await mock(page)
+  await page.route(/\/api\/v1\/movimientos-stock\/(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      json: {
+        count: 3,
+        next: null,
+        previous: null,
+        results: [
+          {
+            id: 32,
+            fecha: '2026-09-26T12:20:00Z',
+            tipo_movimiento: 13,
+            tipo_movimiento_info: {
+              id: 13,
+              codigo: 'REVERSA_VENTA',
+              nombre: 'Reversa de venta',
+            },
+            cantidad: '2.5000',
+            producto: 80,
+            producto_resumen: {
+              id: 80,
+              sku: 'PISO-M2',
+              nombre: 'Piso decimal',
+              unidad_stock_info: { id: 24, codigo: 'M2', nombre: 'Metro cuadrado' },
+            },
+            pedido: null,
+            pedido_relacionado: 9,
+            movimiento_referencia: 31,
+            observaciones: 'Reversa de venta original',
+            created_by: null,
+            responsable: null,
+          },
+          {
+            id: 33,
+            fecha: '2026-09-26T12:15:00Z',
+            tipo_movimiento: 14,
+            tipo_movimiento_info: { id: 14, codigo: 'AJUSTE', nombre: 'Ajuste' },
+            cantidad: '1.0000',
+            producto: 80,
+            producto_resumen: {
+              id: 80,
+              sku: 'PISO-M2',
+              nombre: 'Ajuste independiente',
+              unidad_stock_info: { id: 24, codigo: 'M2', nombre: 'Metro cuadrado' },
+            },
+            pedido: null,
+            pedido_relacionado: null,
+            movimiento_referencia: 31,
+            observaciones: 'Recuento',
+            created_by: 7,
+            responsable: { id: 7, username: 'vendedor', display_name: 'Vendedor' },
+          },
+          {
+            id: 34,
+            fecha: '2026-09-26T12:10:00Z',
+            tipo_movimiento: 15,
+            tipo_movimiento_info: { id: 15, codigo: 'CARGA_INICIAL', nombre: 'Carga inicial' },
+            cantidad: '3.0000',
+            producto: 81,
+            producto_resumen: {
+              id: 81,
+              sku: 'PISO-HISTORICO',
+              nombre: 'Piso histórico',
+              unidad_stock_info: { id: 25, codigo: 'CAJA', nombre: 'Caja' },
+            },
+            pedido: null,
+            pedido_relacionado: null,
+            movimiento_referencia: null,
+            observaciones: 'Existencias heredadas',
+            created_by: 7,
+            responsable: { id: 7, username: 'vendedor', display_name: 'Vendedor' },
+          },
+        ],
+      },
+    }),
+  )
+  await page.goto('/movimientos-stock')
+  const reversa = page.getByRole('row').filter({ hasText: 'Piso decimal' })
+  await expect(reversa).toContainText('2.5000')
+  await expect(reversa).toContainText('Metro cuadrado')
+  await expect(reversa).toContainText('#9')
+  await expect(reversa).toContainText('#31')
+  await expect(reversa).toContainText('Sistema')
+
+  const ajuste = page.getByRole('row').filter({ hasText: 'Ajuste independiente' })
+  await expect(ajuste).toContainText('Sin pedido')
+  await expect(ajuste).toContainText('#31')
+  await expect(ajuste).not.toContainText('#9')
+
+  const historico = page.getByRole('row').filter({ hasText: 'Piso histórico' })
+  await expect(historico).toContainText('3.0000')
+  await expect(historico).toContainText('Caja')
+  await expect(historico).not.toContainText('Metro cuadrado')
+})
+
 test('FE05 OT muestra líneas reales y permite descargar su documento', async ({ page }) => {
   await mock(page)
   await page.goto('/ordenes-trabajo/3')
