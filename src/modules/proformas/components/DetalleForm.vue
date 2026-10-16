@@ -26,12 +26,13 @@ const props = defineProps<{
   externalError?: string
   existingProductIds?: number[]
   initialProductId?: number | null
+  initialDraft?: Record<string, string>
 }>()
 const emit = defineEmits<{
   save: [body: DetalleProformaWritable]
   cancel: []
   duplicateProduct: [productId: number]
-  createProduct: []
+  createProduct: [draft: Record<string, string>]
 }>()
 const saving = ref(false),
   error = ref(''),
@@ -49,6 +50,7 @@ const form = reactive({
   precio_unitario: props.detail?.precio_unitario ?? '',
   descuento: props.detail?.descuento ?? '0.00',
 })
+if (props.initialDraft) Object.assign(form, props.initialDraft)
 const unidadCatalogo = ref<string | null>(null)
 const catalogItem = computed(
   () => props.tipos.find((x) => String(x.id) === form.tipo_item)?.codigo !== 'MUEBLE_MEDIDA',
@@ -79,7 +81,7 @@ function selectProduct(product: Producto | null) {
   }
 }
 onMounted(async () => {
-  if (!props.detail && props.initialProductId) {
+  if (props.initialProductId) {
     try {
       const product = await productosService.get(props.initialProductId)
       form.producto = String(product.id)
@@ -135,7 +137,7 @@ async function submit() {
       v-if="catalogItem && session?.can('comercial.administrar')"
       type="button"
       variant="secondary"
-      @click="emit('createProduct')"
+      @click="emit('createProduct', { ...form })"
       >Crear producto sin perder esta proforma</Button
     ><Select
       v-if="catalogItem && !form.producto"
