@@ -614,13 +614,20 @@ test('FE04 selecciona cliente y producto fuera de la primera página', async ({ 
     })
   })
   await page.route('**/api/v1/catalogo/productos/200/', (r) =>
-    r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(productPageTwo) }),
+    r.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(productPageTwo),
+    }),
   )
   await page.goto('/proformas/1')
   await page.goto('/proformas/1/editar')
   await page.getByRole('button', { name: 'Añadir ítem' }).click()
   await page.getByRole('button', { name: 'Producto de catálogo' }).click()
-  await page.getByRole('navigation', { name: 'Paginación' }).getByRole('button', { name: 'Siguiente' }).click()
+  await page
+    .getByRole('navigation', { name: 'Paginación' })
+    .getByRole('button', { name: 'Siguiente' })
+    .click()
   await expect(page.getByText('Silla segunda página')).toBeVisible()
   await page.getByRole('button', { name: 'Seleccionar para cotizar' }).click()
   await expect(page.getByLabel('Nombre comercial')).toHaveValue('Silla segunda página')
@@ -780,7 +787,9 @@ test('PRF-01 no pierde edición al detectar variante duplicada', async ({ page }
   await page.getByRole('button', { name: 'Producto de catálogo' }).click()
   await expect(page.getByRole('button', { name: 'Ir a línea' })).toBeVisible()
   await page.getByRole('button', { name: 'Ir a línea' }).click()
-  await expect(page.getByText('Esta variante ya está incluida; puedes editar su línea existente.')).toBeVisible()
+  await expect(
+    page.getByText('Esta variante ya está incluida; puedes editar su línea existente.'),
+  ).toBeVisible()
   await expect(page.getByText('Silla existente', { exact: true })).toBeVisible()
 })
 

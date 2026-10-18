@@ -10,7 +10,11 @@ import { proformasService } from '@/modules/proformas/services/proformasService'
 import Button from '@/shared/ui/Button.vue'
 import Select from '@/shared/ui/Select.vue'
 import TextField from '@/shared/ui/TextField.vue'
-const props = defineProps<{ initial?: Producto; processing?: boolean; preselectCategory?: string }>()
+const props = defineProps<{
+  initial?: Producto
+  processing?: boolean
+  preselectCategory?: string
+}>()
 const emit = defineEmits<{
   save: [body: ProductoWritable, file: File | null]
   cancel: []
@@ -80,7 +84,9 @@ async function load() {
     familias.value = f.results
     keys.forEach((k, i) => (opciones[k] = values[i] as ValorCatalogoPublico[]))
     if (!props.initial && props.preselectCategory) {
-      const categoria = opciones.CATEGORIA_PRODUCTO?.find((item) => item.codigo === props.preselectCategory)
+      const categoria = opciones.CATEGORIA_PRODUCTO?.find(
+        (item) => item.codigo === props.preselectCategory,
+      )
       if (categoria) {
         form.categoria = String(categoria.id)
         const unidadCodigo = categoria.codigo === 'PISO_FLOTANTE' ? 'M2' : 'PIEZA'

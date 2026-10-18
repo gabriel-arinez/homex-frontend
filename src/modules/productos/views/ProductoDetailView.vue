@@ -31,7 +31,8 @@ const canEdit = computed(() => session.can('comercial.administrar'))
 const contextualDestination = computed(() => {
   const path = route.query.returnTo
   const draft = route.query.draft
-  if (typeof path !== 'string' || !/^\/proformas(?:\/|$)/.test(path) || typeof draft !== 'string') return null
+  if (typeof path !== 'string' || !/^\/proformas(?:\/|$)/.test(path) || typeof draft !== 'string')
+    return null
   return { path, query: { draft } }
 })
 function returnToProforma() {
@@ -116,7 +117,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       show-menu
       @menu="emit('openMenu')"
       ><template #actions
-        ><Button v-if="contextualDestination && !editing" variant="secondary" @click="returnToProforma">Volver a proforma</Button
+        ><Button
+          v-if="contextualDestination && !editing"
+          variant="secondary"
+          @click="returnToProforma"
+          >Volver a proforma</Button
         ><Button v-if="product && canEdit && !editing" variant="secondary" @click="editing = true"
           >Editar datos comerciales</Button
         ></template

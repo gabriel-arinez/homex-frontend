@@ -30,7 +30,10 @@ describe('PRF-02 catálogo contextual', () => {
       http.get('http://localhost:8000/api/v1/catalogo/productos/', () => {
         lecturas += 1
         return HttpResponse.json({
-          count: 1, next: null, previous: null, results: [sku],
+          count: 1,
+          next: null,
+          previous: null,
+          results: [sku],
         })
       }),
       http.post('http://localhost:8000/api/v1/proformas/integral/', () => {
@@ -43,8 +46,9 @@ describe('PRF-02 catálogo contextual', () => {
     })
     await flushPromises()
     expect(wrapper.text()).toContain('SILLA-41')
-    const seleccionar = wrapper.findAll('button').find((button) =>
-      button.text().includes('Seleccionar para cotizar'))
+    const seleccionar = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Seleccionar para cotizar'))
     expect(seleccionar).toBeDefined()
     await seleccionar!.trigger('click')
     expect(wrapper.emitted('select')?.[0]?.[0]).toMatchObject({ id: 41 })
@@ -54,14 +58,18 @@ describe('PRF-02 catálogo contextual', () => {
   })
 
   it('redirige el SKU repetido a la línea existente sin incorporarlo otra vez', async () => {
-    server.use(http.get('http://localhost:8000/api/v1/catalogo/productos/', () =>
-      HttpResponse.json({ count: 1, next: null, previous: null, results: [sku] })))
+    server.use(
+      http.get('http://localhost:8000/api/v1/catalogo/productos/', () =>
+        HttpResponse.json({ count: 1, next: null, previous: null, results: [sku] }),
+      ),
+    )
     const wrapper = mount(CatalogoContextual, {
       props: { categorias: [silla], familias: [], existingProductIds: [41] },
     })
     await flushPromises()
-    const seleccionar = wrapper.findAll('button').find((button) =>
-      button.text().includes('Ir a línea'))
+    const seleccionar = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Ir a línea'))
     expect(seleccionar).toBeDefined()
     await seleccionar!.trigger('click')
     expect(wrapper.emitted('duplicate')?.[0]).toEqual([41])

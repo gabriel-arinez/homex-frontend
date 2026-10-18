@@ -67,9 +67,14 @@ function selectProduct(product: Producto | null) {
   if (product) {
     const currentFamily = props.detail?.familia_producto
     const currentType = props.tipos.find((item) => String(item.id) === form.tipo_item)?.codigo
-    if (props.detail && !props.detail.producto && currentFamily &&
-      (product.familia !== currentFamily || product.categoria_info?.codigo !== currentType ||
-        String(product.unidad_stock) !== form.unidad)) {
+    if (
+      props.detail &&
+      !props.detail.producto &&
+      currentFamily &&
+      (product.familia !== currentFamily ||
+        product.categoria_info?.codigo !== currentType ||
+        String(product.unidad_stock) !== form.unidad)
+    ) {
       error.value = 'La variante debe pertenecer a la misma familia, categoría y unidad.'
       form.producto = ''
       return
@@ -222,18 +227,32 @@ async function submit() {
     <p v-if="catalogItem && form.familia_producto && !form.producto" class="hint">
       La variante física deberá elegirse antes de aprobar; esta selección no reserva stock.
     </p>
-    <aside v-if="catalogItem && master" class="master-info" aria-label="Información del producto maestro">
+    <aside
+      v-if="catalogItem && master"
+      class="master-info"
+      aria-label="Información del producto maestro"
+    >
       <ProductImage :image="master.imagen_principal" :alt="master.nombre" />
       <div>
         <strong>{{ master.nombre }} · {{ master.sku }}</strong>
         <p>{{ master.categoria_info?.nombre }} · {{ master.unidad_stock_info?.nombre }}</p>
         <p v-if="master.familia_info">Familia: {{ master.familia_info.nombre }}</p>
         <p>Precio vigente de referencia: {{ master.precio_vigente }} BOB</p>
-        <p v-if="master.promocion?.vigente">Promoción vigente incluida en el precio de referencia.</p>
-        <p>Stock: {{ master.stock }} · Disponible referencial: {{ master.disponibilidad_referencial }}</p>
-        <p v-if="master.silla">Silla: {{ master.silla.modelo }} · {{ master.silla.especificaciones }}</p>
+        <p v-if="master.promocion?.vigente">
+          Promoción vigente incluida en el precio de referencia.
+        </p>
+        <p>
+          Stock: {{ master.stock }} · Disponible referencial:
+          {{ master.disponibilidad_referencial }}
+        </p>
+        <p v-if="master.silla">
+          Silla: {{ master.silla.modelo }} · {{ master.silla.especificaciones }}
+        </p>
         <p v-if="master.piso">Piso: {{ master.piso.modelo }} · {{ master.piso.espesor_mm }} mm</p>
-        <small>Estos datos son de solo lectura. El precio cotizado de la línea se negocia por separado.</small>
+        <small
+          >Estos datos son de solo lectura. El precio cotizado de la línea se negocia por
+          separado.</small
+        >
       </div>
     </aside>
     <TextField
@@ -289,9 +308,20 @@ async function submit() {
   </form>
 </template>
 <style scoped>
- .master-info { display: grid; grid-template-columns: minmax(7rem, 11rem) 1fr; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-card); }
-.master-info p { margin: var(--space-2) 0; }
-.master-info small { color: var(--color-text-secondary); }
+.master-info {
+  display: grid;
+  grid-template-columns: minmax(7rem, 11rem) 1fr;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+.master-info p {
+  margin: var(--space-2) 0;
+}
+.master-info small {
+  color: var(--color-text-secondary);
+}
 .detail-form {
   display: grid;
   gap: var(--space-4);

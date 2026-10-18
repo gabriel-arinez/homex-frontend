@@ -24,7 +24,16 @@ const emit = defineEmits<{
   pending: [familiaId: number, categoriaId: number]
   cancel: []
 }>()
-type Field = 'marca' | 'modelo' | 'color_primario' | 'tipo' | 'material' | 'diseno' | 'acabado' | 'espesor_mm' | 'unidad_stock'
+type Field =
+  | 'marca'
+  | 'modelo'
+  | 'color_primario'
+  | 'tipo'
+  | 'material'
+  | 'diseno'
+  | 'acabado'
+  | 'espesor_mm'
+  | 'unidad_stock'
 const fieldOptions: Record<string, { field: Field; label: string; concepto?: string }[]> = {
   SILLA: [
     { field: 'marca', label: 'Marca', concepto: 'MARCA' },
@@ -45,8 +54,15 @@ const category = ref('')
 const search = ref('')
 const family = ref('')
 const filters = reactive<Record<Field, string>>({
-  marca: '', modelo: '', color_primario: '', tipo: '', material: '',
-  diseno: '', acabado: '', espesor_mm: '', unidad_stock: '',
+  marca: '',
+  modelo: '',
+  color_primario: '',
+  tipo: '',
+  material: '',
+  diseno: '',
+  acabado: '',
+  espesor_mm: '',
+  unidad_stock: '',
 })
 const options = ref<Record<string, ValorCatalogoPublico[]>>({})
 const view = ref<'grid' | 'lista'>('grid')
@@ -90,7 +106,9 @@ async function load() {
   error.value = ''
   try {
     const extra = Object.fromEntries(
-      activeFields.value.filter(({ field }) => filters[field]).map(({ field }) => [field, filters[field]]),
+      activeFields.value
+        .filter(({ field }) => filters[field])
+        .map(({ field }) => [field, filters[field]]),
     )
     const response = await productosService.list({
       activo: true,
@@ -120,11 +138,20 @@ watch(category, () => {
   void loadOptions()
   void load()
 })
-watch(family, () => { page.value = 1; void load() })
-watch(filters, () => { page.value = 1; void load() })
+watch(family, () => {
+  page.value = 1
+  void load()
+})
+watch(filters, () => {
+  page.value = 1
+  void load()
+})
 watch(search, () => {
   if (searchTimer) clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => { page.value = 1; void load() }, 250)
+  searchTimer = setTimeout(() => {
+    page.value = 1
+    void load()
+  }, 250)
 })
 watch(page, () => void load())
 onMounted(() => void load())
@@ -140,46 +167,88 @@ onBeforeUnmount(() => {
     <div class="head">
       <div>
         <h3>Catálogo de productos</h3>
-        <p>Selecciona un SKU real para preparar su línea. Consultar no guarda la proforma ni reserva stock.</p>
+        <p>
+          Selecciona un SKU real para preparar su línea. Consultar no guarda la proforma ni reserva
+          stock.
+        </p>
       </div>
       <Button variant="secondary" @click="emit('cancel')">Volver a la proforma</Button>
     </div>
     <nav class="categorias" aria-label="Categorías de catálogo">
       <button type="button" :aria-pressed="!category" @click="category = ''">Todos</button>
-      <button v-for="item in categorias" :key="item.id" type="button"
-        :aria-pressed="category === String(item.id)" @click="category = String(item.id)">
+      <button
+        v-for="item in categorias"
+        :key="item.id"
+        type="button"
+        :aria-pressed="category === String(item.id)"
+        @click="category = String(item.id)"
+      >
         {{ item.nombre }}
       </button>
     </nav>
     <div class="filtros">
       <SearchField v-model="search" label="Buscar SKU o nombre" />
-      <Select v-model="family" name="familia-catalogo" label="Familia"
-        :options="[{ label: 'Todas las familias', value: '' }, ...familias.filter(x => x.activo).map(x => ({ label: x.nombre, value: String(x.id) }))]" />
+      <Select
+        v-model="family"
+        name="familia-catalogo"
+        label="Familia"
+        :options="[
+          { label: 'Todas las familias', value: '' },
+          ...familias
+            .filter((x) => x.activo)
+            .map((x) => ({ label: x.nombre, value: String(x.id) })),
+        ]"
+      />
       <template v-for="item in activeFields" :key="item.field">
-        <Select v-if="item.concepto" v-model="filters[item.field]" :name="'filtro-' + item.field"
+        <Select
+          v-if="item.concepto"
+          v-model="filters[item.field]"
+          :name="'filtro-' + item.field"
           :label="item.label"
-          :options="[{ label: 'Todos', value: '' }, ...(options[item.concepto] ?? []).map(x => ({ label: x.nombre, value: String(x.id) }))]" />
+          :options="[
+            { label: 'Todos', value: '' },
+            ...(options[item.concepto] ?? []).map((x) => ({
+              label: x.nombre,
+              value: String(x.id),
+            })),
+          ]"
+        />
         <label v-else class="filtro-texto">
           <span>{{ item.label }}</span>
-          <input v-model="filters[item.field]" :type="item.field === 'espesor_mm' ? 'number' : 'text'"
+          <input
+            v-model="filters[item.field]"
+            :type="item.field === 'espesor_mm' ? 'number' : 'text'"
             :min="item.field === 'espesor_mm' ? '0.01' : undefined"
-            :step="item.field === 'espesor_mm' ? '0.01' : undefined" />
+            :step="item.field === 'espesor_mm' ? '0.01' : undefined"
+          />
         </label>
       </template>
     </div>
     <div v-if="canAdmin && category" class="toolbar">
-      <Button variant="secondary" @click="emit('create', categoryCode)">Crear producto maestro en esta categoría</Button>
+      <Button variant="secondary" @click="emit('create', categoryCode)"
+        >Crear producto maestro en esta categoría</Button
+      >
     </div>
     <div class="toolbar">
       <p role="status">{{ total }} SKU encontrados</p>
       <div>
-        <Button :variant="view === 'grid' ? 'primary' : 'secondary'" :aria-pressed="view === 'grid'"
-          @click="view = 'grid'">Cuadrícula</Button>
-        <Button :variant="view === 'lista' ? 'primary' : 'secondary'" :aria-pressed="view === 'lista'"
-          @click="view = 'lista'">Lista</Button>
+        <Button
+          :variant="view === 'grid' ? 'primary' : 'secondary'"
+          :aria-pressed="view === 'grid'"
+          @click="view = 'grid'"
+          >Cuadrícula</Button
+        >
+        <Button
+          :variant="view === 'lista' ? 'primary' : 'secondary'"
+          :aria-pressed="view === 'lista'"
+          @click="view = 'lista'"
+          >Lista</Button
+        >
       </div>
     </div>
-    <p v-if="error" role="alert">{{ error }} <button type="button" @click="load">Reintentar</button></p>
+    <p v-if="error" role="alert">
+      {{ error }} <button type="button" @click="load">Reintentar</button>
+    </p>
     <p v-else-if="loading" role="status">Consultando catálogo…</p>
     <p v-else-if="products.length === 0" role="status">No se encontraron SKU para estos filtros.</p>
     <div v-else :class="view === 'grid' ? 'resultados-grid' : 'resultados-lista'">
@@ -190,31 +259,62 @@ onBeforeUnmount(() => {
           <h4>{{ producto.nombre }}</h4>
           <p v-if="producto.familia_info">{{ producto.familia_info.nombre }}</p>
           <p>{{ producto.unidad_stock_info?.nombre }} · {{ money(producto.precio_vigente) }}</p>
-          <small v-if="producto.promocion?.vigente">Promoción vigente incluida en precio de referencia</small>
+          <small v-if="producto.promocion?.vigente"
+            >Promoción vigente incluida en precio de referencia</small
+          >
           <small>Disponibilidad referencial: {{ producto.disponibilidad_referencial }}</small>
           <div class="card-actions">
             <Button variant="secondary" @click="preview = producto">Ver ficha</Button>
-            <Button v-if="canAdmin" variant="secondary" @click="emit('edit', producto.id)">Editar ficha de catálogo</Button>
+            <Button v-if="canAdmin" variant="secondary" @click="emit('edit', producto.id)"
+              >Editar ficha de catálogo</Button
+            >
           </div>
-          <Button variant="primary"
-            @click="existingProductIds.includes(producto.id) ? emit('duplicate', producto.id) : emit('select', producto)">
-            {{ existingProductIds.includes(producto.id) ? 'Ir a línea' : 'Seleccionar para cotizar' }}
+          <Button
+            variant="primary"
+            @click="
+              existingProductIds.includes(producto.id)
+                ? emit('duplicate', producto.id)
+                : emit('select', producto)
+            "
+          >
+            {{
+              existingProductIds.includes(producto.id) ? 'Ir a línea' : 'Seleccionar para cotizar'
+            }}
           </Button>
         </div>
       </article>
     </div>
-    <Pagination v-if="!error && totalPages > 1" :page="page"
-      :total-pages="totalPages" @change="page = $event" />
-    <Modal :open="Boolean(preview)" :title="preview?.nombre ?? 'Ficha de catálogo'" @close="preview = null">
+    <Pagination
+      v-if="!error && totalPages > 1"
+      :page="page"
+      :total-pages="totalPages"
+      @change="page = $event"
+    />
+    <Modal
+      :open="Boolean(preview)"
+      :title="preview?.nombre ?? 'Ficha de catálogo'"
+      @close="preview = null"
+    >
       <div v-if="preview" class="preview">
         <ProductImage :image="preview.imagen_principal" :alt="preview.nombre" />
         <p>SKU: {{ preview.sku || 'Sin SKU' }} · {{ preview.categoria_info?.nombre }}</p>
         <p>Familia: {{ preview.familia_info?.nombre || 'Sin familia' }}</p>
         <p>Unidad: {{ preview.unidad_stock_info?.nombre }}</p>
-        <p>Precio lista: {{ money(preview.precio_lista ?? '0') }} · Vigente: {{ money(preview.precio_vigente) }}</p>
-        <p>Stock: {{ preview.stock }} · Disponibilidad referencial: {{ preview.disponibilidad_referencial }}</p>
-        <p v-if="preview.silla">Modelo: {{ preview.silla.modelo }} · Especificaciones: {{ preview.silla.especificaciones }}</p>
-        <p v-if="preview.piso">Modelo: {{ preview.piso.modelo }} · Espesor: {{ preview.piso.espesor_mm }} mm</p>
+        <p>
+          Precio lista: {{ money(preview.precio_lista ?? '0') }} · Vigente:
+          {{ money(preview.precio_vigente) }}
+        </p>
+        <p>
+          Stock: {{ preview.stock }} · Disponibilidad referencial:
+          {{ preview.disponibilidad_referencial }}
+        </p>
+        <p v-if="preview.silla">
+          Modelo: {{ preview.silla.modelo }} · Especificaciones:
+          {{ preview.silla.especificaciones }}
+        </p>
+        <p v-if="preview.piso">
+          Modelo: {{ preview.piso.modelo }} · Espesor: {{ preview.piso.espesor_mm }} mm
+        </p>
         <Button variant="secondary" @click="preview = null">Cerrar ficha</Button>
       </div>
     </Modal>
@@ -228,24 +328,113 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.catalogo-contextual { display: grid; gap: var(--space-4); min-width: 0; }
-.head, .toolbar { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
-.head h3, .producto h4 { margin: 0; }
-.head p, .detalle p { margin: 0; color: var(--color-text-secondary); }
-.categorias, .toolbar > div { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.categorias button { border: 1px solid var(--color-border); border-radius: var(--radius-control); padding: var(--space-2) var(--space-3); color: var(--color-text); background: var(--color-surface); cursor: pointer; }
-.categorias button[aria-pressed='true'] { border-color: var(--color-primary); font-weight: 700; }
-.filtros { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: var(--space-3); }
-.filtro-texto { display: grid; gap: var(--space-2); }
-.filtro-texto input { width: 100%; min-width: 0; padding: var(--space-3); color: var(--color-text); border: 1px solid var(--color-border); background: var(--color-surface); border-radius: var(--radius-control); }
-.resultados-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr)); gap: var(--space-3); }
-.resultados-lista { display: grid; gap: var(--space-3); }
-.producto { min-width: 0; overflow: hidden; display: grid; border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface); }
-.resultados-lista .producto { grid-template-columns: minmax(10rem, 15rem) 1fr; }
-.detalle { display: grid; align-content: start; gap: var(--space-2); padding: var(--space-4); }
-.detalle button { justify-self: start; }
-.card-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.preview { display: grid; gap: var(--space-2); }
-.pendiente { padding: var(--space-3); border: 1px dashed var(--color-border); border-radius: var(--radius-card); }
-@media (max-width: 35rem) { .resultados-lista .producto { grid-template-columns: 1fr; } .head { align-items: stretch; } }
+.catalogo-contextual {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.head,
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.head h3,
+.producto h4 {
+  margin: 0;
+}
+.head p,
+.detalle p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+.categorias,
+.toolbar > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.categorias button {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-text);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+.categorias button[aria-pressed='true'] {
+  border-color: var(--color-primary);
+  font-weight: 700;
+}
+.filtros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: var(--space-3);
+}
+.filtro-texto {
+  display: grid;
+  gap: var(--space-2);
+}
+.filtro-texto input {
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-3);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: var(--radius-control);
+}
+.resultados-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+  gap: var(--space-3);
+}
+.resultados-lista {
+  display: grid;
+  gap: var(--space-3);
+}
+.producto {
+  min-width: 0;
+  overflow: hidden;
+  display: grid;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+.resultados-lista .producto {
+  grid-template-columns: minmax(10rem, 15rem) 1fr;
+}
+.detalle {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-4);
+}
+.detalle button {
+  justify-self: start;
+}
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.preview {
+  display: grid;
+  gap: var(--space-2);
+}
+.pendiente {
+  padding: var(--space-3);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-card);
+}
+@media (max-width: 35rem) {
+  .resultados-lista .producto {
+    grid-template-columns: 1fr;
+  }
+  .head {
+    align-items: stretch;
+  }
+}
 </style>

@@ -1548,9 +1548,16 @@ export type V1CatalogoProductosListData = {
   body?: never
   path?: never
   query?: {
+    acabado?: number
     activo?: boolean
     categoria?: number
+    color_primario?: number
+    diseno?: number
+    espesor_mm?: string
     familia?: number
+    marca?: number
+    material?: number
+    modelo?: string
     /**
      * Un número de página dentro del conjunto de resultados paginado.
      */
@@ -1559,10 +1566,9 @@ export type V1CatalogoProductosListData = {
      * Número de resultados a devolver por página.
      */
     page_size?: number
-    /**
-     * Un término de búsqueda.
-     */
     search?: string
+    tipo?: number
+    unidad_stock?: number
   }
   url: '/api/v1/catalogo/productos/'
 }
