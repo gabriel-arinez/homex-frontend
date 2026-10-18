@@ -1,3 +1,4 @@
+# Normalización final de PRF-02 antes de retirar el workflow auxiliar.
 name: PRF02 synchronize and normalize
 
 on:
