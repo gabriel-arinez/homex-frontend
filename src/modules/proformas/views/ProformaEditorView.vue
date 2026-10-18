@@ -110,7 +110,9 @@ function updateNuevoCliente(field: keyof typeof nuevoCliente, value: string) {
 }
 const lineas = ref<LineaLocal[]>([])
 const reviewedCurrency = ref('BOB')
-const priceReviewRequired = computed(() => lineas.value.length > 0 && header.moneda_codigo !== reviewedCurrency.value)
+const priceReviewRequired = computed(
+  () => lineas.value.length > 0 && header.moneda_codigo !== reviewedCurrency.value,
+)
 const existingProductIds = computed(() =>
   lineas.value.flatMap((line) => (line.producto ? [line.producto] : [])),
 )
@@ -118,7 +120,8 @@ const totalPreview = computed(() => totalEstimadoCompleto(lineas.value))
 const emissionPending = computed(() => {
   const pendientes: string[] = []
   if (!lineas.value.length) pendientes.push('agregar al menos una línea')
-  if (priceReviewRequired.value) pendientes.push('revisar explícitamente precios y descuentos tras cambiar de moneda')
+  if (priceReviewRequired.value)
+    pendientes.push('revisar explícitamente precios y descuentos tras cambiar de moneda')
   if (clienteMode.value === 'pendiente') pendientes.push('elegir o registrar un cliente')
   if (clienteMode.value === 'existente' && !header.cliente) pendientes.push('elegir un cliente')
   if (clienteMode.value === 'nuevo') {
@@ -932,9 +935,14 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           <TextField v-model="header.observaciones" name="observaciones" label="Observaciones" />
         </div>
         <div v-if="priceReviewRequired" class="warning" role="status">
-          <p>La moneda cambió. Los precios y descuentos existentes no se convirtieron automáticamente.</p>
+          <p>
+            La moneda cambió. Los precios y descuentos existentes no se convirtieron
+            automáticamente.
+          </p>
           <p>Revisa cada importe en {{ header.moneda_codigo }} antes de continuar.</p>
-          <Button variant="secondary" @click="confirmCurrencyReview">He revisado los precios en esta moneda</Button>
+          <Button variant="secondary" @click="confirmCurrencyReview"
+            >He revisado los precios en esta moneda</Button
+          >
         </div>
       </section>
 
