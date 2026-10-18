@@ -806,6 +806,46 @@ test('PRF-01 separa el total guardado de los cambios locales', async ({ page }) 
   await expect(page.getByText(/Último total guardado:/)).toBeVisible()
 })
 
+test('PRF-02 selecciona catálogo, consulta detalle y deshace sin escribir proforma', async ({
+  page,
+}) => {
+  const state = await mockBackend(page)
+  let writes = 0
+  await page.route('**/api/v1/proformas/integral/', async (route) => {
+    writes += 1
+    await route.fallback()
+  })
+  await page.goto('/proformas/nueva')
+  await page.getByRole('button', { name: 'Añadir ítem' }).click()
+  await page.getByRole('button', { name: 'Producto de catálogo' }).click()
+  await expect(page.getByText('S-01', { exact: false })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Seleccionar para cotizar' }).click()
+  await expect(page.getByLabel('Nombre comercial')).toHaveValue('Silla ejecutiva')
+  await expect(page.getByLabel('Precio unitario (BOB)')).toHaveValue('1200.00')
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancelar' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  expect(writes).toBe(0)
+
+  await page.getByRole('button', { name: 'Seleccionar para cotizar' }).click()
+  await page.getByLabel('Cantidad', { exact: true }).fill('2')
+  await page.getByRole('button', { name: 'Guardar línea' }).click()
+  await expect(page.locator('.line-card').getByText('Silla ejecutiva')).toBeVisible()
+  expect(writes).toBe(0)
+
+  await page.getByRole('button', { name: 'Ver detalle completo de Silla ejecutiva' }).click()
+  await expect(page.getByRole('dialog').getByText('Precio unitario cotizado:', { exact: false })).toBeVisible()
+  await page.getByRole('dialog').getByRole('button', { name: 'Cerrar' }).click()
+  await page.getByRole('button', { name: 'Acciones de Silla ejecutiva' }).click()
+  await page.getByRole('menuitem', { name: 'Eliminar' }).click()
+  await expect(page.locator('.line-card')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Deshacer última eliminación' }).click()
+  await expect(page.locator('.line-card').getByText('Silla ejecutiva')).toBeVisible()
+
+  expect(writes).toBe(0)
+  expect(state.quote().detalles).toHaveLength(0)
+})
+
 for (const width of [360, 390, 768, 1024, 1440])
   test(`@a11y FE04 proforma operable a ${width}px`, async ({ page }) => {
     await mockBackend(page)
