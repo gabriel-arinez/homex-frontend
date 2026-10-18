@@ -70,9 +70,9 @@ describe('PRF-02 ficha maestra de silla', () => {
     mockCatalog()
     const wrapper = mount(ProductoForm, { props: { initial: maestro } })
     await flushPromises()
-    const add = wrapper.findAll('button').find((button) =>
-      button.text().includes('Añadir característica'),
-    )
+    const add = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Añadir característica'))
     expect(add).toBeDefined()
     await add!.trigger('click')
     await wrapper.get('form').trigger('submit')

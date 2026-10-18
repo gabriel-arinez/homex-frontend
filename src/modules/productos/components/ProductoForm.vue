@@ -69,21 +69,20 @@ function camposSimples(value: unknown): CampoSilla[] {
     .map(([clave, dato]) => ({
       clave,
       valor: dato === null ? '' : String(dato),
-      tipo: dato === null
-        ? 'nulo'
-        : typeof dato === 'number'
-          ? 'numero'
-          : typeof dato === 'boolean'
-            ? 'booleano'
-            : 'texto',
+      tipo:
+        dato === null
+          ? 'nulo'
+          : typeof dato === 'number'
+            ? 'numero'
+            : typeof dato === 'boolean'
+              ? 'booleano'
+              : 'texto',
     }))
 }
 const camposSilla = ref<CampoSilla[]>(camposSimples(props.initial?.silla?.especificaciones))
 const modoJson = ref(false)
 function objetoEspecificaciones(): unknown {
-  const datos: unknown = form.especificaciones.trim()
-    ? JSON.parse(form.especificaciones)
-    : {}
+  const datos: unknown = form.especificaciones.trim() ? JSON.parse(form.especificaciones) : {}
   if (!esObjeto(datos)) {
     if (!camposSilla.value.length) return datos
     throw new Error('Para añadir características, utiliza un objeto JSON en la edición avanzada.')
@@ -115,9 +114,7 @@ function editarJsonAvanzado() {
       form.especificaciones = JSON.stringify(objetoEspecificaciones(), null, 2)
       modoJson.value = true
     } else {
-      const datos: unknown = form.especificaciones.trim()
-        ? JSON.parse(form.especificaciones)
-        : {}
+      const datos: unknown = form.especificaciones.trim() ? JSON.parse(form.especificaciones) : {}
       camposSilla.value = camposSimples(datos)
       modoJson.value = false
     }
@@ -186,13 +183,16 @@ function submit() {
   try {
     if (categoria.value === 'SILLA') {
       especificaciones = modoJson.value
-        ? (form.especificaciones.trim() ? JSON.parse(form.especificaciones) : {})
+        ? form.especificaciones.trim()
+          ? JSON.parse(form.especificaciones)
+          : {}
         : objetoEspecificaciones()
     }
   } catch (cause) {
-    error.value = cause instanceof Error
-      ? cause.message
-      : 'Las especificaciones de la silla deben ser JSON válido.'
+    error.value =
+      cause instanceof Error
+        ? cause.message
+        : 'Las especificaciones de la silla deben ser JSON válido.'
     return
   }
   const body: ProductoWritable = {
@@ -296,11 +296,14 @@ onMounted(load)
             v-model="form.color_primario"
             name="color1"
             label="Color primario"
-            :options="opts('COLOR')" /><Select
+            :options="opts('COLOR')"
+          /><Select
             v-model="form.color_secundario"
             name="color2"
             label="Color secundario"
-            :options="opts('COLOR')" /><section class="ficha-silla">
+            :options="opts('COLOR')"
+          />
+          <section class="ficha-silla">
             <h3>Características adicionales de la silla</h3>
             <p class="hint">
               Registra cada característica mediante su nombre y valor. Se conservan también las
@@ -314,8 +317,11 @@ onMounted(load)
                 </label>
                 <label>
                   Valor
-                  <input v-model="campo.valor" :aria-label="'Valor ' + (index + 1)"
-                    :disabled="campo.tipo === 'nulo' || campo.tipo === 'booleano'" />
+                  <input
+                    v-model="campo.valor"
+                    :aria-label="'Valor ' + (index + 1)"
+                    :disabled="campo.tipo === 'nulo' || campo.tipo === 'booleano'"
+                  />
                 </label>
                 <label>
                   Tipo de dato
@@ -343,8 +349,12 @@ onMounted(load)
             </template>
             <label v-else>
               Edición avanzada (JSON)
-              <textarea v-model="form.especificaciones" rows="6"
-                aria-label="Especificaciones avanzadas JSON" placeholder="{}" />
+              <textarea
+                v-model="form.especificaciones"
+                rows="6"
+                aria-label="Especificaciones avanzadas JSON"
+                placeholder="{}"
+              />
             </label>
             <Button type="button" variant="secondary" @click="editarJsonAvanzado">
               {{ modoJson ? 'Volver al formulario guiado' : 'Edición avanzada JSON' }}
@@ -463,11 +473,34 @@ textarea {
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
 }
-.ficha-silla { display: grid; gap: var(--space-3); grid-column: 1 / -1; }
-.ficha-silla h3, .ficha-silla p { margin: 0; }
-.campo-silla { display: flex; gap: var(--space-3); flex-wrap: wrap; align-items: flex-end; }
-.campo-silla label { flex: 1 1 10rem; }
-.campo-silla input, .campo-silla select { width: 100%; min-height: 2.75rem; padding: var(--space-2); border: 1px solid var(--color-border-strong); border-radius: var(--radius-control); background: var(--color-surface); color: var(--color-text); }
+.ficha-silla {
+  display: grid;
+  gap: var(--space-3);
+  grid-column: 1 / -1;
+}
+.ficha-silla h3,
+.ficha-silla p {
+  margin: 0;
+}
+.campo-silla {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.campo-silla label {
+  flex: 1 1 10rem;
+}
+.campo-silla input,
+.campo-silla select {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
 .actions {
   display: flex;
   gap: var(--space-3);
