@@ -47,23 +47,34 @@ const options = computed(() => {
 async function ensureSelected(value = props.modelValue) {
   if (!value) {
     selected.value = null
+    emit('select', null)
     return
   }
-  const existing = clients.value.find((client) => String(client.id) === value)
+  const existing =
+    clients.value.find((client) => String(client.id) === value) ??
+    (String(selected.value?.id) === value ? selected.value : null)
   if (existing) {
     selected.value = existing
+    emit('select', existing)
     return
   }
   try {
-    selected.value = await clientesService.get(Number(value))
+    const cliente = await clientesService.get(Number(value))
+    if (props.modelValue !== value) return
+    selected.value = cliente
+    emit('select', cliente)
   } catch {
+    if (props.modelValue !== value) return
     selected.value = null
+    emit('select', null)
   }
 }
 
 function selectValue(value: string) {
   emit('update:modelValue', value)
-  const cliente = clients.value.find((item) => String(item.id) === value) ?? null
+  const cliente =
+    clients.value.find((item) => String(item.id) === value) ??
+    (String(selected.value?.id) === value ? selected.value : null)
   selected.value = cliente
   emit('select', cliente)
 }

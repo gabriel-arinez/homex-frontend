@@ -63,6 +63,7 @@ const tiposCliente = ref<ValorCatalogoPublico[]>([])
 const familias = ref<FamiliaProducto[]>([])
 const lineModal = ref(false)
 const lineModalDirty = ref(false)
+const specModalDirty = ref(false)
 const editingLine = ref<number | null>(null)
 const specLine = ref<number | null>(null)
 const removedLine = ref<{ line: LineaLocal; index: number } | null>(null)
@@ -117,10 +118,21 @@ const emissionPending = computed(() => {
 const editingStatus = computed(() => {
   if (saving.value) return 'Guardando en HOMEX…'
   if (conflicted.value) return 'Conflicto: cambios locales conservados'
+  if (lineModalDirty.value || specModalDirty.value) return 'Edición pendiente de incorporar'
   if (dirty.value) return 'Cambios locales sin guardar'
-  if (persisted.value) return 'Borrador guardado'
+  if (persisted.value)
+    return persisted.value.estado_info.codigo === 'BORRADOR'
+      ? 'Borrador guardado'
+      : `Proforma ${persisted.value.estado_info.nombre.toLocaleLowerCase('es')}`
   return 'Nueva cotización sin guardar'
 })
+const clientErrors = computed(() =>
+  Object.fromEntries(
+    Object.entries(fields.value)
+      .filter(([campo]) => campo.startsWith('cliente_nuevo.'))
+      .map(([campo, errores]) => [campo.slice('cliente_nuevo.'.length), errores]),
+  ),
+)
 const fieldErrorMessages = computed(() => {
   const labels: Record<string, string> = {
     cliente: 'Cliente',
@@ -130,10 +142,23 @@ const fieldErrorMessages = computed(() => {
     porcentaje_adelanto: 'Adelanto',
     detalles: 'Productos',
     revision_esperada: 'Versión guardada',
+    precio_unitario: 'Precio unitario',
+    'cliente_nuevo.nombres': 'Nombres del cliente',
+    'cliente_nuevo.apellidos': 'Apellidos del cliente',
+    'cliente_nuevo.empresa': 'Razón social',
+    'cliente_nuevo.tipo_cliente': 'Tipo de cliente',
+    'cliente_nuevo.celular': 'Celular del cliente',
+    'cliente_nuevo.direccion': 'Dirección del cliente',
     clave_idempotencia: 'Guardado seguro',
   }
   return Object.entries(fields.value).flatMap(([field, messages]) =>
-    messages.map((message) => `${labels[field] ?? field}: ${message}`),
+    messages.map((message) => {
+      const linea = /^detalles\[(\d+)\]\.(.+)$/.exec(field)
+      const etiqueta = linea
+        ? `Línea ${Number(linea[1]) + 1} · ${labels[linea[2] ?? ''] ?? linea[2]}`
+        : (labels[field] ?? field)
+      return `${etiqueta}: ${message}`
+    }),
   )
 })
 const editableDetail = computed(() => {
@@ -280,7 +305,21 @@ function saveSpec(body: EspecificacionMuebleWritable) {
     if (line) line.especificacion = body
   }
   specLine.value = null
+  specModalDirty.value = false
   markDirty()
+}
+function openSpec(index: number) {
+  specModalDirty.value = false
+  specLine.value = index
+}
+function closeSpec() {
+  if (
+    specModalDirty.value &&
+    !window.confirm('Hay cambios sin guardar en la ficha técnica. ¿Deseas descartarlos?')
+  )
+    return
+  specLine.value = null
+  specModalDirty.value = false
 }
 function removeLine(index: number) {
   const result = removeLocalLine(lineas.value, index)
@@ -308,6 +347,8 @@ function editorSnapshot() {
     header: cloneEditorData(header),
     nuevoCliente: cloneEditorData(nuevoCliente),
     clienteMode: clienteMode.value,
+    clienteSeleccionado: cloneEditorData(clienteSeleccionado.value),
+    lineModalDirty: lineModalDirty.value,
     lineas: cloneEditorData(lineas.value),
     currentStep: currentStep.value,
     key: key.value,
@@ -331,10 +372,13 @@ function restoreContextualDraft() {
   Object.assign(header, snapshot.header)
   Object.assign(nuevoCliente, snapshot.nuevoCliente)
   clienteMode.value = snapshot.clienteMode
+  clienteSeleccionado.value =
+    snapshot.clienteSeleccionado ?? persisted.value?.cliente_resumen ?? null
   lineas.value = snapshot.lineas
   currentStep.value = snapshot.currentStep
   key.value = snapshot.key
   pendingLineDraft.value = snapshot.lineDraft
+  lineModalDirty.value = Boolean(snapshot.lineModalDirty || snapshot.lineDraft)
   editingLine.value = snapshot.editingLine
   dirty.value = true
   lineModal.value = Boolean(pendingLineDraft.value)
@@ -395,7 +439,16 @@ function openLine(index: number | null = null) {
 async function focusDuplicateProduct(productId: number) {
   const index = lineas.value.findIndex((line) => line.producto === productId)
   if (index < 0) return
+  if (
+    lineModalDirty.value &&
+    !window.confirm(
+      'La variante ya está incluida. ¿Deseas descartar esta edición y ver la línea existente?',
+    )
+  )
+    return
   lineModal.value = false
+  lineModalDirty.value = false
+  pendingLineDraft.value = null
   editingLine.value = null
   success.value = 'Esta variante ya está incluida; puedes editar su línea existente.'
   await nextTick()
@@ -461,13 +514,13 @@ async function persist(emitir: boolean) {
   }
 }
 function beforeUnload(event: BeforeUnloadEvent) {
-  if (!dirty.value) return
+  if (!dirty.value && !lineModalDirty.value && !specModalDirty.value) return
   event.preventDefault()
 }
 onBeforeRouteLeave(
   () =>
     contextualNavigation.value ||
-    !dirty.value ||
+    (!dirty.value && !lineModalDirty.value && !specModalDirty.value) ||
     window.confirm('Hay cambios sin guardar. ¿Deseas salir?'),
 )
 onMounted(async () => {
@@ -557,7 +610,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <Button
               v-if="tipos.find((x) => x.id === line.tipo_item)?.codigo === 'MUEBLE_MEDIDA'"
               variant="secondary"
-              @click="specLine = index"
+              @click="openSpec(index)"
               >Ficha técnica</Button
             >
             <Button
@@ -595,6 +648,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           <ClienteFormFields
             :model="nuevoCliente"
             :tipos="tiposCliente"
+            :errors="clientErrors"
             prefix="proforma-cliente"
             @change="updateNuevoCliente"
           />
@@ -685,10 +739,21 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           ></Card
         >
         <div class="totals">
-          <span>Estimación local</span>
-          <strong v-if="totalPreview !== null">{{ money(totalPreview) }}</strong>
-          <strong v-else class="pending-value">Total pendiente</strong>
-          <small>El total confirmado será el que devuelva HOMEX al guardar.</small>
+          <template v-if="persisted && !dirty">
+            <span>Total confirmado por HOMEX</span>
+            <strong>{{ money(Number(persisted.total)) }}</strong>
+            <small>Importe guardado y calculado por el servidor.</small>
+          </template>
+          <template v-else>
+            <span>Estimación local</span>
+            <strong v-if="totalPreview !== null">{{ money(totalPreview) }}</strong>
+            <strong v-else class="pending-value">Total pendiente</strong>
+            <small>El total confirmado será el que devuelva HOMEX al guardar.</small>
+            <small v-if="persisted">
+              Último total guardado: {{ money(Number(persisted.total)) }}. Los cambios actuales aún
+              no se guardaron.
+            </small>
+          </template>
         </div>
         <div v-if="!canEmit" class="warning" role="status">
           <strong>Antes de emitir:</strong>
@@ -742,13 +807,14 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         @cancel="closeLineModal"
       />
     </Modal>
-    <Modal :open="specLine !== null" title="Ficha técnica" @close="specLine = null">
+    <Modal :open="specLine !== null" title="Ficha técnica" @close="closeSpec">
       <EspecificacionForm
         :key="specLine ?? -1"
         :tipos="tiposMueble"
         :especificacion="editableSpec"
         @save="saveSpec"
-        @cancel="specLine = null"
+        @changed="specModalDirty = true"
+        @cancel="closeSpec"
       />
     </Modal>
   </div>

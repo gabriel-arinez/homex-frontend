@@ -24,7 +24,11 @@ const props = defineProps<{
   processing?: boolean
   externalError?: string
 }>()
-const emit = defineEmits<{ save: [body: EspecificacionMuebleWritable]; cancel: [] }>()
+const emit = defineEmits<{
+  save: [body: EspecificacionMuebleWritable]
+  cancel: []
+  changed: []
+}>()
 const saving = ref(false)
 const error = ref('')
 const stringify = (value: unknown) =>
@@ -78,7 +82,12 @@ const form = reactive({
   generales: stringify(datosIniciales.caracteristicas_generales),
   observaciones: props.especificacion?.observaciones ?? '',
 })
+function quitarComponente(indice: number) {
+  componentes.splice(indice, 1)
+  emit('changed')
+}
 function agregarComponente() {
+  emit('changed')
   componentes.push({
     nombre: '',
     material: '',
@@ -162,7 +171,7 @@ function submit() {
 </script>
 
 <template>
-  <form class="spec" @submit.prevent="submit">
+  <form class="spec" @input="emit('changed')" @change="emit('changed')" @submit.prevent="submit">
     <Select
       v-model="form.tipo_mueble"
       name="tipo-mueble"
@@ -183,7 +192,7 @@ function submit() {
           v-if="componentes.length > 1"
           variant="secondary"
           :disabled="processing"
-          @click="componentes.splice(indice, 1)"
+          @click="quitarComponente(indice)"
           >Quitar componente</Button
         >
       </div>
