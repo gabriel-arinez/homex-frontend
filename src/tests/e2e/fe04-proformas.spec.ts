@@ -674,7 +674,9 @@ test('PRF-01 protege cambios pendientes de la ficha técnica', async ({ page }) 
   await expect(page.getByRole('dialog')).toHaveCount(0)
 })
 
-test('PRF-01 restaura cliente y no descarta la línea al volver del producto contextual', async ({ page }) => {
+test('PRF-01 restaura cliente y no descarta la línea al volver del producto contextual', async ({
+  page,
+}) => {
   await mockBackend(page)
   await page.addInitScript(() => {
     sessionStorage.setItem(
