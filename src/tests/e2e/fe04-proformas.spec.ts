@@ -615,6 +615,44 @@ test('FE04 selecciona cliente y producto fuera de la primera página', async ({ 
   await expect(page.getByLabel('Nombre comercial')).toHaveValue('Silla segunda página')
 })
 
+test('PRF-01 previene líneas inválidas y conserva edición al cerrar', async ({ page }) => {
+  await mockBackend(page)
+  await page.goto('/proformas/nueva')
+  await expect(page.getByText('Nueva cotización sin guardar')).toBeVisible()
+  await page.getByRole('button', { name: 'Agregar producto' }).click()
+  await page.getByLabel('Tipo de línea').selectOption('10')
+  await page.getByLabel('Nombre comercial').fill('Escritorio comercial')
+  await page.getByLabel('Cantidad', { exact: true }).fill('1.5')
+  await page.getByLabel('Precio unitario (BOB)').fill('0')
+  await page.getByRole('button', { name: 'Guardar línea' }).click()
+  await expect(page.getByText('Esta unidad requiere una cantidad entera.')).toBeVisible()
+  await expect(page.getByText('El precio unitario debe ser mayor que cero.')).toBeVisible()
+  await expect(page.getByRole('dialog')).toBeVisible()
+
+  page.once('dialog', (dialog) => dialog.dismiss())
+  await page.getByRole('button', { name: 'Cerrar', exact: true }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByLabel('Nombre comercial')).toHaveValue('Escritorio comercial')
+
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('button', { name: 'Cerrar', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+})
+
+test('PRF-01 muestra cliente humano y estimación local sin identificadores internos', async ({
+  page,
+}) => {
+  await mockBackend(page)
+  await page.goto('/proformas/1/editar')
+  await page.getByRole('button', { name: /Cliente$/ }).click()
+  await page.getByLabel('Cliente existente').selectOption('1')
+  await page.getByRole('button', { name: /Revisar$/ }).click()
+  await expect(page.getByRole('region').getByText('Ana Pérez', { exact: true })).toBeVisible()
+  await expect(page.getByText('Cliente #1')).toHaveCount(0)
+  await expect(page.getByText('Estimación local')).toBeVisible()
+  await expect(page.getByText('Total pendiente')).toBeVisible()
+})
+
 for (const width of [360, 390, 768, 1024, 1440])
   test(`@a11y FE04 proforma operable a ${width}px`, async ({ page }) => {
     await mockBackend(page)

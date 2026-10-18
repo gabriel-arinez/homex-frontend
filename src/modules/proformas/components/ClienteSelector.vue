@@ -17,7 +17,10 @@ const props = withDefaults(
     prospectLabel: 'Prospecto',
   },
 )
-const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
+const emit = defineEmits<{
+  'update:modelValue': [value: string]
+  select: [cliente: Cliente | null]
+}>()
 
 const search = ref('')
 const clients = ref<Cliente[]>([])
@@ -56,6 +59,13 @@ async function ensureSelected(value = props.modelValue) {
   } catch {
     selected.value = null
   }
+}
+
+function selectValue(value: string) {
+  emit('update:modelValue', value)
+  const cliente = clients.value.find((item) => String(item.id) === value) ?? null
+  selected.value = cliente
+  emit('select', cliente)
 }
 
 async function load(reset = true) {
@@ -108,7 +118,7 @@ onMounted(() => {
       name="cliente-proforma"
       :label
       :options
-      @update:model-value="emit('update:modelValue', $event)"
+      @update:model-value="selectValue"
     />
     <p v-if="error" role="alert">
       {{ error }}

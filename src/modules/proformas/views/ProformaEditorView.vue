@@ -2,7 +2,9 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import type {
+  Cliente,
   ClienteNuevoProforma,
+  ClienteResumenProforma,
   DetalleIntegralWritable,
   DetalleProforma,
   DetalleProformaWritable,
@@ -35,6 +37,7 @@ import {
   restoreLocalLine,
   saveEditorDraft,
 } from '../services/editorLocal'
+import { totalEstimadoCompleto, totalEstimadoLinea } from '../services/presentacionComercial'
 
 type LineaLocal = DetalleIntegralWritable & { localId: string }
 const emit = defineEmits<{ openMenu: [] }>()
@@ -59,6 +62,7 @@ const tiposMueble = ref<ValorCatalogoPublico[]>([])
 const tiposCliente = ref<ValorCatalogoPublico[]>([])
 const familias = ref<FamiliaProducto[]>([])
 const lineModal = ref(false)
+const lineModalDirty = ref(false)
 const editingLine = ref<number | null>(null)
 const specLine = ref<number | null>(null)
 const removedLine = ref<{ line: LineaLocal; index: number } | null>(null)
@@ -66,6 +70,7 @@ const contextualNavigation = ref(false)
 const preferredProductId = ref<number | null>(null)
 const pendingLineDraft = ref<Record<string, string> | null>(null)
 const clienteMode = ref<'existente' | 'nuevo' | 'pendiente'>('existente')
+const clienteSeleccionado = ref<Cliente | ClienteResumenProforma | null>(null)
 const key = ref(crypto.randomUUID())
 const header = reactive({
   cliente: '',
@@ -92,15 +97,45 @@ const lineas = ref<LineaLocal[]>([])
 const existingProductIds = computed(() =>
   lineas.value.flatMap((line) => (line.producto ? [line.producto] : [])),
 )
-const totalPreview = computed(() =>
-  lineas.value.reduce((sum, line) => {
-    const bruto =
-      line.modo_calculo === 'TOTAL_NEGOCIADO'
-        ? Number(line.importe_negociado || 0)
-        : Number(line.cantidad || 0) * Number(line.precio_unitario || 0)
-    return sum + Math.max(0, bruto - Number(line.descuento || 0))
-  }, 0),
-)
+const totalPreview = computed(() => totalEstimadoCompleto(lineas.value))
+const emissionPending = computed(() => {
+  const pendientes: string[] = []
+  if (!lineas.value.length) pendientes.push('agregar al menos una línea')
+  if (clienteMode.value === 'pendiente') pendientes.push('elegir o registrar un cliente')
+  if (clienteMode.value === 'existente' && !header.cliente) pendientes.push('elegir un cliente')
+  if (clienteMode.value === 'nuevo') {
+    if (!nuevoCliente.tipo_cliente) pendientes.push('indicar el tipo de cliente')
+    const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
+    const contacto = Boolean(nuevoCliente.nombres.trim() && nuevoCliente.apellidos.trim())
+    if (!contacto) pendientes.push('completar nombre y apellidos del contacto')
+    if (/EMPRESA|JURID/.test(tipo?.codigo ?? '') && !nuevoCliente.empresa.trim()) {
+      pendientes.push('completar la razón social')
+    }
+  }
+  return pendientes
+})
+const editingStatus = computed(() => {
+  if (saving.value) return 'Guardando en HOMEX…'
+  if (conflicted.value) return 'Conflicto: cambios locales conservados'
+  if (dirty.value) return 'Cambios locales sin guardar'
+  if (persisted.value) return 'Borrador guardado'
+  return 'Nueva cotización sin guardar'
+})
+const fieldErrorMessages = computed(() => {
+  const labels: Record<string, string> = {
+    cliente: 'Cliente',
+    cliente_nuevo: 'Cliente nuevo',
+    titulo: 'Título',
+    validez_oferta: 'Validez',
+    porcentaje_adelanto: 'Adelanto',
+    detalles: 'Productos',
+    revision_esperada: 'Versión guardada',
+    clave_idempotencia: 'Guardado seguro',
+  }
+  return Object.entries(fields.value).flatMap(([field, messages]) =>
+    messages.map((message) => `${labels[field] ?? field}: ${message}`),
+  )
+})
 const editableDetail = computed(() => {
   if (editingLine.value === null) return undefined
   return lineas.value[editingLine.value] as unknown as DetalleProforma
@@ -121,6 +156,16 @@ const canEmit = computed(() => {
 
 function markDirty() {
   dirty.value = true
+}
+function nombreClienteVisible() {
+  const cliente = clienteSeleccionado.value
+  if (!cliente) return 'Cliente pendiente'
+  if ('nombre' in cliente) return cliente.empresa || cliente.nombre || 'Cliente pendiente'
+  return (
+    cliente.empresa ||
+    `${cliente.nombres ?? ''} ${cliente.apellidos ?? ''}`.trim() ||
+    'Cliente pendiente'
+  )
 }
 function money(value: number) {
   return new Intl.NumberFormat('es-BO', {
@@ -165,6 +210,7 @@ function fill(value: Proforma) {
   header.porcentaje_adelanto = value.porcentaje_adelanto ?? ''
   header.observaciones = value.observaciones ?? ''
   clienteMode.value = value.cliente ? 'existente' : 'pendiente'
+  clienteSeleccionado.value = value.cliente_resumen ?? null
   lineas.value = value.detalles.map(normalizeLine)
   dirty.value = false
 }
@@ -224,6 +270,7 @@ function saveLine(body: DetalleProformaWritable) {
     }
   }
   lineModal.value = false
+  lineModalDirty.value = false
   editingLine.value = null
   markDirty()
 }
@@ -305,14 +352,14 @@ async function copyCommercialSummary() {
   const client =
     clienteMode.value === 'nuevo'
       ? nuevoCliente.empresa || `${nuevoCliente.nombres} ${nuevoCliente.apellidos}`.trim()
-      : header.cliente
-        ? `Cliente #${header.cliente}`
-        : 'Cliente pendiente'
+      : nombreClienteVisible()
   const lines = lineas.value
     .map((line) =>
       line.modo_calculo === 'TOTAL_NEGOCIADO'
         ? `• ${line.nombre}: importe negociado ${money(Number(line.importe_negociado || 0))}`
-        : `• ${line.nombre}: ${line.cantidad} × ${money(Number(line.precio_unitario || 0))}`,
+        : totalEstimadoLinea(line) === null
+          ? `• ${line.nombre}: precio pendiente`
+          : `• ${line.nombre}: ${line.cantidad} × ${money(Number(line.precio_unitario))}`,
     )
     .join('\n')
   const conditions = [
@@ -322,19 +369,27 @@ async function copyCommercialSummary() {
     .filter(Boolean)
     .join('\n')
   await navigator.clipboard.writeText(
-    `HOMEX — Cotización\n${client}\n${lines}\nTotal estimado: ${money(totalPreview.value)}${conditions ? `\n${conditions}` : ''}`,
+    `HOMEX — Cotización\n${client}\n${lines}\n${totalPreview.value === null ? 'Total estimado pendiente' : `Total estimado: ${money(totalPreview.value)}`}${conditions ? `\n${conditions}` : ''}`,
   )
   success.value = 'Resumen copiado. Puedes pegarlo manualmente en WhatsApp.'
 }
 
 function closeLineModal() {
+  if (
+    lineModalDirty.value &&
+    !window.confirm('Hay cambios sin agregar en esta línea. ¿Deseas descartarlos?')
+  )
+    return
   lineModal.value = false
+  lineModalDirty.value = false
   pendingLineDraft.value = null
+  editingLine.value = null
 }
 function openLine(index: number | null = null) {
   if (index !== null && lineas.value[index]?.modo_calculo === 'TOTAL_NEGOCIADO') return
   pendingLineDraft.value = null
   editingLine.value = index
+  lineModalDirty.value = false
   lineModal.value = true
 }
 async function focusDuplicateProduct(productId: number) {
@@ -449,10 +504,19 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         </button>
       </nav>
       <p v-if="success" role="status" class="success">{{ success }}</p>
-      <p v-if="persisted" class="persisted-state">
-        Estado: <strong>{{ persisted.estado_info.nombre }}</strong> · Número {{ persisted.numero }}
-      </p>
-      <p v-if="error" role="alert" class="error">{{ error }}</p>
+      <div class="editor-status" role="status" aria-live="polite">
+        <span>{{ editingStatus }}</span>
+        <span v-if="persisted">
+          Estado comercial: <strong>{{ persisted.estado_info.nombre }}</strong> · Proforma
+          {{ persisted.numero }}
+        </span>
+      </div>
+      <div v-if="error" role="alert" class="error error-summary">
+        <strong>{{ error }}</strong>
+        <ul v-if="fieldErrorMessages.length">
+          <li v-for="message in fieldErrorMessages" :key="message">{{ message }}</li>
+        </ul>
+      </div>
       <div v-if="conflicted" class="conflict-actions">
         <Button variant="secondary" @click="discardAndReload">
           Descartar cambios y recargar
@@ -473,19 +537,16 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <p v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
               Importe histórico negociado: {{ money(Number(line.importe_negociado || 0)) }}
             </p>
-            <p v-else>{{ line.cantidad }} × {{ money(Number(line.precio_unitario || 0)) }}</p>
+            <p v-else-if="totalEstimadoLinea(line) !== null">
+              {{ line.cantidad }} × {{ money(Number(line.precio_unitario)) }}
+              <span v-if="Number(line.descuento) === 0">· Sin descuento</span>
+            </p>
+            <p v-else class="pending-value">Precio pendiente</p>
           </div>
-          <strong>{{
-            money(
-              Math.max(
-                0,
-                (line.modo_calculo === 'TOTAL_NEGOCIADO'
-                  ? Number(line.importe_negociado || 0)
-                  : Number(line.cantidad) * Number(line.precio_unitario || 0)) -
-                  Number(line.descuento || 0),
-              ),
-            )
-          }}</strong>
+          <strong v-if="totalEstimadoLinea(line) !== null">
+            {{ money(totalEstimadoLinea(line)!) }}
+          </strong>
+          <strong v-else class="pending-value">Importe pendiente</strong>
           <div class="actions">
             <Button
               variant="secondary"
@@ -528,6 +589,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           v-if="clienteMode === 'existente'"
           v-model="header.cliente"
           label="Cliente existente"
+          @select="clienteSeleccionado = $event"
         />
         <Card v-if="clienteMode === 'nuevo'">
           <ClienteFormFields
@@ -589,7 +651,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   ? 'Pendiente'
                   : clienteMode === 'nuevo'
                     ? nuevoCliente.empresa || `${nuevoCliente.nombres} ${nuevoCliente.apellidos}`
-                    : `Cliente #${header.cliente}`
+                    : nombreClienteVisible()
               }}
             </p>
             <button @click="currentStep = 1">Corregir cliente</button></Card
@@ -608,9 +670,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <template v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
               importe negociado {{ money(Number(line.importe_negociado || 0)) }}
             </template>
-            <template v-else>
-              cantidad {{ line.cantidad }}, precio {{ money(Number(line.precio_unitario || 0)) }}
+            <template v-else-if="totalEstimadoLinea(line) !== null">
+              cantidad {{ line.cantidad }}, precio {{ money(Number(line.precio_unitario)) }}
             </template>
+            <template v-else>precio pendiente</template>
             <span v-if="line.descripcion"><br />{{ line.descripcion }}</span>
           </p>
           <p v-if="header.plazo_entrega"><strong>Plazo:</strong> {{ header.plazo_entrega }}</p>
@@ -622,12 +685,17 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           ></Card
         >
         <div class="totals">
-          <span>Total estimado</span><strong>{{ money(totalPreview) }}</strong
-          ><small>El total definitivo lo calcula y protege PostgreSQL.</small>
+          <span>Estimación local</span>
+          <strong v-if="totalPreview !== null">{{ money(totalPreview) }}</strong>
+          <strong v-else class="pending-value">Total pendiente</strong>
+          <small>El total confirmado será el que devuelva HOMEX al guardar.</small>
         </div>
-        <p v-if="!canEmit" class="warning">
-          Para emitir necesitas un cliente válido y al menos una línea.
-        </p>
+        <div v-if="!canEmit" class="warning" role="status">
+          <strong>Antes de emitir:</strong>
+          <ul>
+            <li v-for="pending in emissionPending" :key="pending">{{ pending }}.</li>
+          </ul>
+        </div>
       </section>
 
       <footer class="editor-actions">
@@ -670,6 +738,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         @save="saveLine"
         @duplicate-product="focusDuplicateProduct"
         @create-product="createProductContextually"
+        @changed="lineModalDirty = true"
         @cancel="closeLineModal"
       />
     </Modal>
@@ -772,8 +841,24 @@ section {
 .success {
   color: var(--color-success);
 }
-.persisted-state {
+.editor-status {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-5);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
   color: var(--color-text-secondary);
+}
+.pending-value {
+  color: var(--color-warning-text, var(--color-text-secondary));
+}
+.error-summary ul,
+.warning ul {
+  margin-bottom: 0;
 }
 .empty {
   padding: var(--space-6);
