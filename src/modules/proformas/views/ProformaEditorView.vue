@@ -126,6 +126,13 @@ const editingStatus = computed(() => {
       : `Proforma ${persisted.value.estado_info.nombre.toLocaleLowerCase('es')}`
   return 'Nueva cotización sin guardar'
 })
+const clientErrors = computed(() =>
+  Object.fromEntries(
+    Object.entries(fields.value)
+      .filter(([campo]) => campo.startsWith('cliente_nuevo.'))
+      .map(([campo, errores]) => [campo.slice('cliente_nuevo.'.length), errores]),
+  ),
+)
 const fieldErrorMessages = computed(() => {
   const labels: Record<string, string> = {
     cliente: 'Cliente',
@@ -136,6 +143,12 @@ const fieldErrorMessages = computed(() => {
     detalles: 'Productos',
     revision_esperada: 'Versión guardada',
     precio_unitario: 'Precio unitario',
+    'cliente_nuevo.nombres': 'Nombres del cliente',
+    'cliente_nuevo.apellidos': 'Apellidos del cliente',
+    'cliente_nuevo.empresa': 'Razón social',
+    'cliente_nuevo.tipo_cliente': 'Tipo de cliente',
+    'cliente_nuevo.celular': 'Celular del cliente',
+    'cliente_nuevo.direccion': 'Dirección del cliente',
     clave_idempotencia: 'Guardado seguro',
   }
   return Object.entries(fields.value).flatMap(([field, messages]) =>
@@ -635,6 +648,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           <ClienteFormFields
             :model="nuevoCliente"
             :tipos="tiposCliente"
+            :errors="clientErrors"
             prefix="proforma-cliente"
             @change="updateNuevoCliente"
           />
