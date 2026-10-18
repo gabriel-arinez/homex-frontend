@@ -6,7 +6,17 @@ import type {
   V1CatalogoProductosListData,
 } from '@/generated/api'
 import { apiRequest } from '@/shared/api'
-type ProductoListQuery = NonNullable<V1CatalogoProductosListData['query']>
+type ProductoListQuery = NonNullable<V1CatalogoProductosListData['query']> & {
+  marca?: string | number
+  modelo?: string
+  color_primario?: string | number
+  tipo?: string | number
+  material?: string | number
+  diseno?: string | number
+  acabado?: string | number
+  espesor_mm?: string
+  unidad_stock?: string | number
+}
 function queryString(query: ProductoListQuery) {
   const params = new URLSearchParams()
   for (const [key, value] of Object.entries(query))
