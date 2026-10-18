@@ -39,7 +39,7 @@ async function addCatalogLine(page: Page) {
   await expect(page.locator('#unidad-linea')).toBeDisabled()
   await expect(page.locator('#unidad-linea option:checked')).toHaveText('Pieza')
   await page.getByRole('button', { name: 'Guardar línea' }).click()
-  await expect(page.getByText('Silla integración FE08', { exact: true })).toBeVisible()
+  await expect(page.getByText('Silla integración FE08', { exact: true }).first()).toBeVisible()
 }
 
 async function approveCurrentQuote(page: Page) {

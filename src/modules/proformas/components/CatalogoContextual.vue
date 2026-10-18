@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import Modal from '@/shared/ui/Modal.vue'
 import type { FamiliaProducto, Producto, ValorCatalogoPublico } from '@/generated/api'
 import { productosService } from '@/modules/productos/services/productosService'
 import { proformasService } from '../services/proformasService'
@@ -13,10 +14,13 @@ const props = defineProps<{
   categorias: ValorCatalogoPublico[]
   familias: FamiliaProducto[]
   existingProductIds: number[]
+  canAdmin?: boolean
 }>()
 const emit = defineEmits<{
   select: [producto: Producto]
   duplicate: [productoId: number]
+  create: [categoryCode: string]
+  edit: [productId: number]
   pending: [familiaId: number, categoriaId: number]
   cancel: []
 }>()
@@ -48,6 +52,7 @@ const options = ref<Record<string, ValorCatalogoPublico[]>>({})
 const view = ref<'grid' | 'lista'>('grid')
 const page = ref(1)
 const products = ref<Producto[]>([])
+const preview = ref<Producto | null>(null)
 const total = ref(0)
 const loading = ref(false)
 const error = ref('')
@@ -162,6 +167,9 @@ onBeforeUnmount(() => {
         </label>
       </template>
     </div>
+    <div v-if="canAdmin && category" class="toolbar">
+      <Button variant="secondary" @click="emit('create', categoryCode)">Crear producto maestro en esta categoría</Button>
+    </div>
     <div class="toolbar">
       <p role="status">{{ total }} SKU encontrados</p>
       <div>
@@ -184,6 +192,10 @@ onBeforeUnmount(() => {
           <p>{{ producto.unidad_stock_info?.nombre }} · {{ money(producto.precio_vigente) }}</p>
           <small v-if="producto.promocion?.vigente">Promoción vigente incluida en precio de referencia</small>
           <small>Disponibilidad referencial: {{ producto.disponibilidad_referencial }}</small>
+          <div class="card-actions">
+            <Button variant="secondary" @click="preview = producto">Ver ficha</Button>
+            <Button v-if="canAdmin" variant="secondary" @click="emit('edit', producto.id)">Editar ficha de catálogo</Button>
+          </div>
           <Button variant="primary"
             @click="existingProductIds.includes(producto.id) ? emit('duplicate', producto.id) : emit('select', producto)">
             {{ existingProductIds.includes(producto.id) ? 'Ir a línea' : 'Seleccionar para cotizar' }}
@@ -193,6 +205,19 @@ onBeforeUnmount(() => {
     </div>
     <Pagination v-if="!error && totalPages > 1" :page="page"
       :total-pages="totalPages" @change="page = $event" />
+    <Modal :open="Boolean(preview)" :title="preview?.nombre ?? 'Ficha de catálogo'" @close="preview = null">
+      <div v-if="preview" class="preview">
+        <ProductImage :image="preview.imagen_principal" :alt="preview.nombre" />
+        <p>SKU: {{ preview.sku || 'Sin SKU' }} · {{ preview.categoria_info?.nombre }}</p>
+        <p>Familia: {{ preview.familia_info?.nombre || 'Sin familia' }}</p>
+        <p>Unidad: {{ preview.unidad_stock_info?.nombre }}</p>
+        <p>Precio lista: {{ money(preview.precio_lista) }} · Vigente: {{ money(preview.precio_vigente) }}</p>
+        <p>Stock: {{ preview.stock }} · Disponibilidad referencial: {{ preview.disponibilidad_referencial }}</p>
+        <p v-if="preview.silla">Modelo: {{ preview.silla.modelo }} · Especificaciones: {{ preview.silla.especificaciones }}</p>
+        <p v-if="preview.piso">Modelo: {{ preview.piso.modelo }} · Espesor: {{ preview.piso.espesor_mm }} mm</p>
+        <Button variant="secondary" @click="preview = null">Cerrar ficha</Button>
+      </div>
+    </Modal>
     <div v-if="category && family" class="pendiente">
       <p>¿Aún no está definida la variante de esta familia?</p>
       <Button variant="secondary" @click="emit('pending', Number(family), Number(category))">
@@ -219,6 +244,8 @@ onBeforeUnmount(() => {
 .resultados-lista .producto { grid-template-columns: minmax(10rem, 15rem) 1fr; }
 .detalle { display: grid; align-content: start; gap: var(--space-2); padding: var(--space-4); }
 .detalle button { justify-self: start; }
+.card-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.preview { display: grid; gap: var(--space-2); }
 .pendiente { padding: var(--space-3); border: 1px dashed var(--color-border); border-radius: var(--radius-card); }
 @media (max-width: 35rem) { .resultados-lista .producto { grid-template-columns: 1fr; } .head { align-items: stretch; } }
 </style>

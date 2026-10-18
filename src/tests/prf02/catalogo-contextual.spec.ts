@@ -53,7 +53,7 @@ describe('PRF-02 catálogo contextual', () => {
     wrapper.unmount()
   })
 
-  it('bloquea visualmente agregar el mismo SKU dos veces', async () => {
+  it('redirige el SKU repetido a la línea existente sin incorporarlo otra vez', async () => {
     server.use(http.get('http://localhost:8000/api/v1/catalogo/productos/', () =>
       HttpResponse.json({ count: 1, next: null, previous: null, results: [sku] })))
     const wrapper = mount(CatalogoContextual, {
@@ -61,8 +61,11 @@ describe('PRF-02 catálogo contextual', () => {
     })
     await flushPromises()
     const seleccionar = wrapper.findAll('button').find((button) =>
-      button.text().includes('SKU ya agregado'))
-    expect(seleccionar?.attributes('disabled')).toBeDefined()
+      button.text().includes('Ir a línea'))
+    expect(seleccionar).toBeDefined()
+    await seleccionar!.trigger('click')
+    expect(wrapper.emitted('duplicate')?.[0]).toEqual([41])
+    expect(wrapper.emitted('select')).toBeUndefined()
     wrapper.unmount()
   })
 })

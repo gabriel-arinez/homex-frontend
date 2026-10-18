@@ -31,6 +31,7 @@ import DetalleForm from '../components/DetalleForm.vue'
 import CatalogoContextual from '../components/CatalogoContextual.vue'
 import EspecificacionForm from '../components/EspecificacionForm.vue'
 import { proformasService } from '../services/proformasService'
+import { useSessionStore } from '@/app/stores/useSessionStore'
 import { productosService } from '@/modules/productos/services/productosService'
 import {
   cloneEditorData,
@@ -45,6 +46,7 @@ type LineaLocal = DetalleIntegralWritable & { localId: string }
 const emit = defineEmits<{ openMenu: [] }>()
 const route = useRoute()
 const router = useRouter()
+const session = useSessionStore()
 const proformaId = computed(() => (route.params.id ? Number(route.params.id) : null))
 const steps = ['Productos', 'Cliente', 'Condiciones', 'Revisar'] as const
 const currentStep = ref(0)
@@ -423,6 +425,8 @@ function editorSnapshot() {
     lineModalDirty: lineModalDirty.value,
     lineas: cloneEditorData(lineas.value),
     removedLines: cloneEditorData(removedLines.value),
+    additionMode: additionMode.value,
+    catalogInitialized: catalogInitialized.value,
     currentStep: currentStep.value,
     key: key.value,
     lineDraft: cloneEditorData(pendingLineDraft.value),
@@ -443,6 +447,22 @@ async function createProductContextually(draft: Record<string, string>) {
     query: { returnTo: route.path, draft: token, categoria },
   })
 }
+function createProductFromCategory(categoryCode: string) {
+  const tipo = tipos.value.find((value) => value.codigo === categoryCode)
+  if (!tipo) return
+  void createProductContextually({ tipo_item: String(tipo.id) })
+}
+async function editProductContextually(productId: number) {
+  if (!session.can('comercial.administrar')) return
+  const token = crypto.randomUUID()
+  saveEditorDraft(token, editorSnapshot())
+  contextualNavigation.value = true
+  await router.push({
+    name: 'producto-detail',
+    params: { id: productId },
+    query: { returnTo: route.path, draft: token, editar: '1' },
+  })
+}
 function restoreContextualDraft() {
   const token = typeof route.query.draft === 'string' ? route.query.draft : ''
   if (!token) return
@@ -455,6 +475,8 @@ function restoreContextualDraft() {
     snapshot.clienteSeleccionado ?? persisted.value?.cliente_resumen ?? null
   lineas.value = snapshot.lineas
   removedLines.value = snapshot.removedLines ?? []
+  additionMode.value = snapshot.additionMode ?? 'none'
+  catalogInitialized.value = snapshot.catalogInitialized ?? false
   currentStep.value = snapshot.currentStep
   key.value = snapshot.key
   pendingLineDraft.value = snapshot.lineDraft
@@ -720,6 +742,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             :categorias="catalogCategories"
             :familias="familias"
             :existing-product-ids="existingProductIds"
+            :can-admin="session.can('comercial.administrar')"
+            @create="createProductFromCategory"
+            @edit="editProductContextually"
             @select="selectCatalogProduct"
             @duplicate="focusDuplicateProduct"
             @pending="quotePendingFamily"
