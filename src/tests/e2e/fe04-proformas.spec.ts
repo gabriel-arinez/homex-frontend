@@ -649,8 +649,42 @@ test('PRF-01 muestra cliente humano y estimación local sin identificadores inte
   await page.getByRole('button', { name: /Revisar$/ }).click()
   await expect(page.getByRole('region').getByText('Ana Pérez', { exact: true })).toBeVisible()
   await expect(page.getByText('Cliente #1')).toHaveCount(0)
+  await expect(page.getByText('Total confirmado por HOMEX')).toBeVisible()
+  await expect(page.getByText('Importe guardado y calculado por el servidor.')).toBeVisible()
+})
+
+test('PRF-01 protege cambios pendientes de la ficha técnica', async ({ page }) => {
+  await mockBackend(page)
+  await page.goto('/proformas/nueva')
+  await page.getByRole('button', { name: 'Agregar producto' }).click()
+  await page.getByLabel('Tipo de línea').selectOption('10')
+  await page.getByLabel('Nombre comercial').fill('Mueble con ficha')
+  await page.getByLabel('Precio unitario (BOB)').fill('150')
+  await page.getByRole('button', { name: 'Guardar línea' }).click()
+  await page.getByRole('button', { name: 'Ficha técnica' }).click()
+  await page.locator('#componente-nombre-0').fill('Mesón')
+
+  page.once('dialog', (dialog) => dialog.dismiss())
+  await page.getByRole('button', { name: 'Cerrar', exact: true }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.locator('#componente-nombre-0')).toHaveValue('Mesón')
+
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('button', { name: 'Cancelar', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+})
+
+test('PRF-01 separa el total guardado de los cambios locales', async ({ page }) => {
+  const state = await mockBackend(page)
+  state.quote().total = '250.00'
+  await page.goto('/proformas/1/editar')
+  await page.getByRole('button', { name: /Revisar$/ }).click()
+  await expect(page.getByText('Total confirmado por HOMEX')).toBeVisible()
+  await page.getByRole('button', { name: /Condiciones$/ }).click()
+  await page.getByLabel('Título').fill('Cotización modificada')
+  await page.getByRole('button', { name: /Revisar$/ }).click()
   await expect(page.getByText('Estimación local')).toBeVisible()
-  await expect(page.getByText('Total pendiente')).toBeVisible()
+  await expect(page.getByText(/Último total guardado:/)).toBeVisible()
 })
 
 for (const width of [360, 390, 768, 1024, 1440])
