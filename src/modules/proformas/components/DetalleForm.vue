@@ -33,6 +33,7 @@ const emit = defineEmits<{
   cancel: []
   duplicateProduct: [productId: number]
   createProduct: [draft: Record<string, string>]
+  changed: []
 }>()
 const saving = ref(false),
   error = ref(''),
@@ -114,6 +115,31 @@ async function submit() {
     if (catalogItem.value && form.producto && unidadCatalogo.value) {
       form.unidad = unidadCatalogo.value
     }
+    const cantidad = Number(form.cantidad)
+    const precio = Number(form.precio_unitario)
+    const descuento = form.descuento === '' ? 0 : Number(form.descuento)
+    if (!form.nombre.trim()) fields.value.nombre = ['Escribe un nombre comercial.']
+    if (!form.cantidad || !Number.isFinite(cantidad) || cantidad <= 0) {
+      fields.value.cantidad = ['La cantidad debe ser mayor que cero.']
+    } else if (selectedUnit.value !== 'M2' && !Number.isInteger(cantidad)) {
+      fields.value.cantidad = ['Esta unidad requiere una cantidad entera.']
+    }
+    if (!form.precio_unitario || !Number.isFinite(precio) || precio <= 0) {
+      fields.value.precio_unitario = ['El precio unitario debe ser mayor que cero.']
+    }
+    if (!Number.isFinite(descuento) || descuento < 0) {
+      fields.value.descuento = ['El descuento no puede ser negativo.']
+    } else if (
+      Number.isFinite(cantidad) &&
+      Number.isFinite(precio) &&
+      descuento > cantidad * precio
+    ) {
+      fields.value.descuento = ['El descuento no puede superar el importe de la línea.']
+    }
+    if (Object.keys(fields.value).length) {
+      error.value = 'Revisa los campos indicados antes de agregar la línea.'
+      return
+    }
     const body: DetalleProformaWritable = {
       tipo_item: Number(form.tipo_item),
       producto: catalogItem.value && form.producto ? Number(form.producto) : null,
@@ -140,7 +166,14 @@ async function submit() {
 }
 </script>
 <template>
-  <form class="detail-form" :aria-busy="saving" @submit.prevent="submit">
+  <form
+    class="detail-form"
+    :aria-busy="saving"
+    novalidate
+    @input="emit('changed')"
+    @change="emit('changed')"
+    @submit.prevent="submit"
+  >
     <Select
       v-model="form.tipo_item"
       name="tipo-item"
@@ -179,6 +212,7 @@ async function submit() {
         type="number"
         :min="quantityMin"
         :step="quantityStep"
+        :error="fields.cantidad?.[0]"
       /><Select
         v-model="form.unidad"
         name="unidad-linea"
@@ -190,11 +224,12 @@ async function submit() {
     <TextField
       v-model="form.precio_unitario"
       name="precio-unitario"
-      min="0"
+      min="0.01"
       step="0.01"
       :label="`Precio unitario (${moneda})`"
       type="number"
-      hint="El backend calcula cantidad × precio unitario."
+      hint="Debe ser mayor que cero. El servidor calcula el importe definitivo."
+      :error="fields.precio_unitario?.[0]"
     /><TextField
       v-model="form.descuento"
       name="descuento-linea"
@@ -202,7 +237,8 @@ async function submit() {
       step="0.01"
       :label="`Descuento de la línea (${moneda})`"
       type="number"
-      hint="Opcional. El backend calcula y protege el subtotal y el total."
+      hint="Opcional; cero es válido. El servidor protege el total."
+      :error="fields.descuento?.[0]"
     />
     <p v-if="error || externalError" role="alert">{{ error || externalError }}</p>
     <div class="actions">

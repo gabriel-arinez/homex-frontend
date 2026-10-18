@@ -18,6 +18,7 @@ Prioridades ordenadas: (1) reglas comerciales y datos, (2) velocidad de respuest
 El frontend utiliza Vue 3 + TypeScript, Vite, Vue Router, Pinia, componentes internos y estilos con variables CSS. Los componentes y rutas existentes se reutilizan; no migrar a Tailwind, otro framework ni un nuevo kit gráfico sólo para PRF-01.
 
 Puntos de entrada y zonas sensibles:
+
 - `src/modules/proformas/views/ProformaEditorView.vue`: editor integral de cuatro apartados (Productos, Cliente, Condiciones, Revisar), guardado local, borrador y emisión; acciones de líneas y vista previa.
 - `src/modules/proformas/views/ProformasListView.vue` y `ProformaDetailView.vue`: catálogo de proformas, acceso a editor, estados y acciones posteriores; conservar funcionalidades.
 - `src/modules/proformas/components/DetalleForm.vue`, `ProductoSelector.vue`, `EspecificacionForm.vue`, `ClienteSelector.vue`, `AdjuntosDetalle.vue`.
@@ -79,17 +80,17 @@ Puntos de entrada y zonas sensibles:
 
 Aplicar prevención en el punto de entrada y nuevamente antes de un guardado/emisión cuando corresponda, **sin reclamar autoridad del backend**.
 
-| Dato/acción | Comportamiento UX esperado |
-| --- | --- |
+| Dato/acción           | Comportamiento UX esperado                                                                                                                             |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Nueva línea comercial | No incorporar una línea nueva al borrador local con cantidad inválida o sin precio unitario numérico **mayor que cero**; explicar el campo específico. |
-| Descuento | Cero es válido. Rechazar negativos, formatos inválidos o cifras fuera de la regla vigente, sin aplicar un descuento automáticamente. |
-| Cantidad y unidad | Respetar unidad vinculada a variante de stock; M2 fraccional según contrato, otras unidades enteras según regla actual. Sin conversiones imaginadas. |
-| Borrador | Permitir dejar pendientes cliente o condiciones que no son obligatorios en ese estado, sin confundirlo con una línea nueva inválida. |
-| Emisión | Exigir cliente válido, líneas y campos de emisión que el contrato requiera; mostrar los pendientes, no sólo desactivar el botón sin explicación. |
-| Cliente nuevo | Respetar identidad de personas y, en personas jurídicas, razón social y contacto según validación vigente. |
-| Catálogo | No introducir variante duplicada en la misma proforma; guiar hacia la línea existente. Familia pendiente ≠ variante que reserva stock. |
-| Histórico | Proteger `TOTAL_NEGOCIADO` y valores heredados sin reconversión; mostrar lectura y restricciones pertinentes. |
-| Guardado | Validaciones locales no habilitan saltar errores 400/409, permisos o cálculos del servidor. |
+| Descuento             | Cero es válido. Rechazar negativos, formatos inválidos o cifras fuera de la regla vigente, sin aplicar un descuento automáticamente.                   |
+| Cantidad y unidad     | Respetar unidad vinculada a variante de stock; M2 fraccional según contrato, otras unidades enteras según regla actual. Sin conversiones imaginadas.   |
+| Borrador              | Permitir dejar pendientes cliente o condiciones que no son obligatorios en ese estado, sin confundirlo con una línea nueva inválida.                   |
+| Emisión               | Exigir cliente válido, líneas y campos de emisión que el contrato requiera; mostrar los pendientes, no sólo desactivar el botón sin explicación.       |
+| Cliente nuevo         | Respetar identidad de personas y, en personas jurídicas, razón social y contacto según validación vigente.                                             |
+| Catálogo              | No introducir variante duplicada en la misma proforma; guiar hacia la línea existente. Familia pendiente ≠ variante que reserva stock.                 |
+| Histórico             | Proteger `TOTAL_NEGOCIADO` y valores heredados sin reconversión; mostrar lectura y restricciones pertinentes.                                          |
+| Guardado              | Validaciones locales no habilitan saltar errores 400/409, permisos o cálculos del servidor.                                                            |
 
 No forzar la creación anticipada de una proforma al abrir el formulario ni la selección inmediata de un cliente; no inventar precio si falta, ni presentar 0 como precio provisional por defecto.
 
@@ -109,20 +110,20 @@ No forzar la creación anticipada de una proforma al abrir el formulario ni la s
 
 **Regla principal:** representar el valor real y su procedencia. No confundir ausencia, invalidez, cero, estado provisional y persistencia confirmada.
 
-| Caso | Representación requerida |
-| --- | --- |
-| Precio unitario no informado | «Precio pendiente»/campo requerido en vez de Bs 0,00; no sumar una línea indefinida como si fuera válida. |
-| Precio unitario 0 para nueva línea | Valor inválido con explicación; nunca aceptar como precio de venta correcto. |
-| Descuento explícito 0 | Dato válido, no es «pendiente». |
-| Cliente no elegido | «Cliente pendiente»; no mostrar `Cliente #id` como denominación cuando hay nombre disponible. |
-| Cliente en creación local | Identificar que no fue registrado todavía; no sugerir cliente persistido. |
-| «A elección» | Opción comercial indicada expresamente; diferente de «No especificado»/campo vacío. |
-| Familia pendiente | Mostrar como pendiente de concretar, sin afirmar existencia de stock reservado. |
-| Línea histórica `TOTAL_NEGOCIADO` | Mostrar el importe pactado sin dividirlo, reconstruir precio ni convertir el modo. |
-| Previsualización | Señalar inequívocamente «estimación local» cuando corresponda; no presentarla como total confirmado. |
-| Resultado guardado | Mostrar la cifra que devuelve el backend/PostgreSQL y la moneda real, no inferir a partir de JavaScript. |
-| Errores/red/409 | Conservar y diferenciar cambios locales vs versión guardada; nunca fusionar silenciosamente. |
-| Datos técnicos | Conservar información conocida y claves adicionales, incluso si no se editan desde el formulario actual. |
+| Caso                               | Representación requerida                                                                                  |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Precio unitario no informado       | «Precio pendiente»/campo requerido en vez de Bs 0,00; no sumar una línea indefinida como si fuera válida. |
+| Precio unitario 0 para nueva línea | Valor inválido con explicación; nunca aceptar como precio de venta correcto.                              |
+| Descuento explícito 0              | Dato válido, no es «pendiente».                                                                           |
+| Cliente no elegido                 | «Cliente pendiente»; no mostrar `Cliente #id` como denominación cuando hay nombre disponible.             |
+| Cliente en creación local          | Identificar que no fue registrado todavía; no sugerir cliente persistido.                                 |
+| «A elección»                       | Opción comercial indicada expresamente; diferente de «No especificado»/campo vacío.                       |
+| Familia pendiente                  | Mostrar como pendiente de concretar, sin afirmar existencia de stock reservado.                           |
+| Línea histórica `TOTAL_NEGOCIADO`  | Mostrar el importe pactado sin dividirlo, reconstruir precio ni convertir el modo.                        |
+| Previsualización                   | Señalar inequívocamente «estimación local» cuando corresponda; no presentarla como total confirmado.      |
+| Resultado guardado                 | Mostrar la cifra que devuelve el backend/PostgreSQL y la moneda real, no inferir a partir de JavaScript.  |
+| Errores/red/409                    | Conservar y diferenciar cambios locales vs versión guardada; nunca fusionar silenciosamente.              |
+| Datos técnicos                     | Conservar información conocida y claves adicionales, incluso si no se editan desde el formulario actual.  |
 
 Revisar especialmente el cálculo local en `ProformaEditorView.vue` que usa `Number(... || 0)` y `Math.max`: la UI debe distinguir líneas pendientes y resultados estimativos de cifras guardadas. No implementar una segunda autoridad de cálculo; si el total no es confiable o está incompleto, declararlo en vez de inventar uno.
 
@@ -149,17 +150,17 @@ Los datos estructurados se muestran con lenguaje humano y sin pérdida de inform
 
 La siguiente es una **ruta de investigación y adaptación**, no una orden de modificar todos los archivos:
 
-| Ubicación | Revisión/intervención permitida |
-| --- | --- |
-| `src/modules/proformas/views/ProformaEditorView.vue` | Layout responsive, mensajes, visualización estado/provisional, bloqueo preventivo y claridad de acciones conservando flujo y persistencia. |
-| `src/modules/proformas/views/ProformasListView.vue` | Consistencia de filtros, estados, columna de cliente y acciones; preservar paginación y búsqueda. |
-| `src/modules/proformas/views/ProformaDetailView.vue` | Coherencia de etiquetas/estados y acceso a acciones; no cambiar reglas comerciales. |
-| `src/modules/proformas/components/DetalleForm.vue` | Validaciones de precio/cantidad/descuento y ayudas; respetar productos, unidades y modo histórico. |
-| `src/modules/proformas/components/EspecificacionForm.vue` | Claridad visual y representación de campos, con preservación exacta del JSON abierto. Reorganización profunda de muebles corresponde a PRF-03. |
-| `src/modules/proformas/components/ClienteSelector.vue`, `ProductoSelector.vue` | UX de selección, búsqueda, duplicados y vacíos sin alterar consulta/paginación. Rediseño integral del catálogo corresponde a PRF-02. |
-| `src/modules/clientes/components/ClienteFormFields.vue` | Etiquetas, ayuda y errores requeridos para la creación contextual. |
-| `src/shared/ui/` y estilos globales | Sólo mejoras coherentes, accesibles y sin regresión en otros módulos. |
-| `src/tests/` | Ampliar pruebas de componentes, UX, casos límite, accesibilidad y E2E focales. |
+| Ubicación                                                                      | Revisión/intervención permitida                                                                                                                |
+| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/modules/proformas/views/ProformaEditorView.vue`                           | Layout responsive, mensajes, visualización estado/provisional, bloqueo preventivo y claridad de acciones conservando flujo y persistencia.     |
+| `src/modules/proformas/views/ProformasListView.vue`                            | Consistencia de filtros, estados, columna de cliente y acciones; preservar paginación y búsqueda.                                              |
+| `src/modules/proformas/views/ProformaDetailView.vue`                           | Coherencia de etiquetas/estados y acceso a acciones; no cambiar reglas comerciales.                                                            |
+| `src/modules/proformas/components/DetalleForm.vue`                             | Validaciones de precio/cantidad/descuento y ayudas; respetar productos, unidades y modo histórico.                                             |
+| `src/modules/proformas/components/EspecificacionForm.vue`                      | Claridad visual y representación de campos, con preservación exacta del JSON abierto. Reorganización profunda de muebles corresponde a PRF-03. |
+| `src/modules/proformas/components/ClienteSelector.vue`, `ProductoSelector.vue` | UX de selección, búsqueda, duplicados y vacíos sin alterar consulta/paginación. Rediseño integral del catálogo corresponde a PRF-02.           |
+| `src/modules/clientes/components/ClienteFormFields.vue`                        | Etiquetas, ayuda y errores requeridos para la creación contextual.                                                                             |
+| `src/shared/ui/` y estilos globales                                            | Sólo mejoras coherentes, accesibles y sin regresión en otros módulos.                                                                          |
+| `src/tests/`                                                                   | Ampliar pruebas de componentes, UX, casos límite, accesibilidad y E2E focales.                                                                 |
 
 Se debe preservar Vue, TypeScript, Router, Pinia, cliente generado y variables CSS existentes. No incorporar Tailwind, UI kits ni dependencias de producción salvo necesidad demostrada con medición y justificación aprobada. Priorizar cambios simples con menor carga del bundle y menor número de requests.
 
@@ -179,28 +180,28 @@ Se debe preservar Vue, TypeScript, Router, Pinia, cliente generado y variables C
 
 ## 13. Matriz de verificación frontend obligatoria
 
-| ID | Caso que hay que probar |
-| --- | --- |
-| F-01 | Móvil 360/390, tableta 768 y escritorio 1024/1440: sin scroll horizontal ni botones tapados. |
+| ID   | Caso que hay que probar                                                                                              |
+| ---- | -------------------------------------------------------------------------------------------------------------------- |
+| F-01 | Móvil 360/390, tableta 768 y escritorio 1024/1440: sin scroll horizontal ni botones tapados.                         |
 | F-02 | Formulario navegable por teclado, foco visible, campos accesibles, errores y ayudas asociados; temas claros/oscuros. |
-| F-03 | Abrir editor y pasar por las cuatro etapas: ningún POST/PUT automático, contenido local conservado. |
-| F-04 | Crear línea con precio ausente/0/negativo/formato no válido: mensaje junto a campo, sin incorporación inválida. |
-| F-05 | Nueva línea positiva válida con descuento cero; cantidad M2 fraccional y otras unidades enteras según reglas. |
-| F-06 | Duplicar variante de catálogo: no crea segunda línea, enfoca la existente. |
-| F-07 | Agregar/editar/eliminar línea y `Deshacer` antes de guardar; duplicar mueble con ficha independiente. |
-| F-08 | Ficha técnica con claves raíz y atributos por componente extra: edición no elimina datos ajenos. |
-| F-09 | Borrador sin cliente y luego emisión: primero permitido, segundo bloqueado hasta completar requisitos. |
-| F-10 | Empresa y persona natural: validaciones visibles y alineadas con backend. |
-| F-11 | Guardar/emisión exitosa: estado persistido, numeral, navegación y acciones de detalle/adjuntos correctas. |
-| F-12 | Errores 400/403/404/409, timeout o desconexión: información local intacta, sin éxito aparente. |
-| F-13 | Doble clic y reintento: bloqueo UI e idempotencia, sin duplicación. |
-| F-14 | Precio pendiente no aparece como Bs 0,00; descuento cero sí aparece válido; total local marcado estimado. |
-| F-15 | Histórico `TOTAL_NEGOCIADO` sin conversión ni recalcular; moneda y cantidades fieles. |
-| F-16 | Familia pendiente y «A elección» diferenciadas de variante/stock y «No especificado». |
-| F-17 | Cierre de modal y vuelta a la página: foco y controles operables; salidas con cambios sucios protegidas. |
-| F-18 | Crear producto desde el editor y regresar: no perder datos del borrador ni crear una proforma involuntaria. |
-| F-19 | Listado/detalle: filtros, búsqueda, paginación, acciones por estado y permisos sin regresión. |
-| F-20 | Confirmación HITL, acceso a documentos, pedido, inventario y adjuntos: regresión de navegación/contrato. |
+| F-03 | Abrir editor y pasar por las cuatro etapas: ningún POST/PUT automático, contenido local conservado.                  |
+| F-04 | Crear línea con precio ausente/0/negativo/formato no válido: mensaje junto a campo, sin incorporación inválida.      |
+| F-05 | Nueva línea positiva válida con descuento cero; cantidad M2 fraccional y otras unidades enteras según reglas.        |
+| F-06 | Duplicar variante de catálogo: no crea segunda línea, enfoca la existente.                                           |
+| F-07 | Agregar/editar/eliminar línea y `Deshacer` antes de guardar; duplicar mueble con ficha independiente.                |
+| F-08 | Ficha técnica con claves raíz y atributos por componente extra: edición no elimina datos ajenos.                     |
+| F-09 | Borrador sin cliente y luego emisión: primero permitido, segundo bloqueado hasta completar requisitos.               |
+| F-10 | Empresa y persona natural: validaciones visibles y alineadas con backend.                                            |
+| F-11 | Guardar/emisión exitosa: estado persistido, numeral, navegación y acciones de detalle/adjuntos correctas.            |
+| F-12 | Errores 400/403/404/409, timeout o desconexión: información local intacta, sin éxito aparente.                       |
+| F-13 | Doble clic y reintento: bloqueo UI e idempotencia, sin duplicación.                                                  |
+| F-14 | Precio pendiente no aparece como Bs 0,00; descuento cero sí aparece válido; total local marcado estimado.            |
+| F-15 | Histórico `TOTAL_NEGOCIADO` sin conversión ni recalcular; moneda y cantidades fieles.                                |
+| F-16 | Familia pendiente y «A elección» diferenciadas de variante/stock y «No especificado».                                |
+| F-17 | Cierre de modal y vuelta a la página: foco y controles operables; salidas con cambios sucios protegidas.             |
+| F-18 | Crear producto desde el editor y regresar: no perder datos del borrador ni crear una proforma involuntaria.          |
+| F-19 | Listado/detalle: filtros, búsqueda, paginación, acciones por estado y permisos sin regresión.                        |
+| F-20 | Confirmación HITL, acceso a documentos, pedido, inventario y adjuntos: regresión de navegación/contrato.             |
 
 ## 14. Gates y evidencia (usar scripts existentes)
 
@@ -234,3 +235,45 @@ Antes de afirmar resultados de Playwright, instalar el navegador y preparar serv
 ### Regla final de aceptación
 
 Un PRF-01 exitoso no es solamente más bonito: el vendedor debe identificar, capturar, revisar y guardar más fácilmente la información, sin demora perceptible adicional, sin representar valores falsos y **sin perder ninguna propiedad de negocio ya implementada**. La ampliación de catálogo, el rediseño de muebles a medida, la integración profunda del micrófono/NLP y la formalización integral quedan para las fases siguientes.
+
+## 16. Cierre de implementación
+
+### Trazabilidad PRF-01.1–PRF-01.8
+
+| Punto    | Implementación                                                                                                                                                  | Verificación                                              |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| PRF-01.1 | El editor prioriza contexto, estado de edición, contenido comercial y acciones; el total provisional se identifica como estimación local.                       | Playwright del flujo y capturas 390/1440.                 |
+| PRF-01.2 | La composición existente se conserva sin dependencias ni requests adicionales y responde en móvil, tableta y escritorio.                                        | Viewports 360, 390, 768, 1024 y 1440; temas claro/oscuro. |
+| PRF-01.3 | Los campos de línea reutilizan `TextField`, ayudas y errores asociados mediante `aria-invalid`/`aria-describedby`.                                              | Vitest de formulario y suite a11y Playwright.             |
+| PRF-01.4 | La revisión muestra el nombre comercial del cliente y evita identificadores internos; los mensajes distinguen edición, guardado y conflicto.                    | E2E PRF-01 y regresiones FE04.                            |
+| PRF-01.5 | Se impiden precio ausente, cero, negativo o inválido; M2 admite decimal, las demás unidades exigen entero y descuento cero sigue válido.                        | Vitest parametrizado y E2E de prevención.                 |
+| PRF-01.6 | El modal protege cambios sucios, conserva valores si se cancela el descarte y expone pendientes de emisión y errores por campo.                                 | E2E de cierre, errores y recuperación 409.                |
+| PRF-01.7 | Precio pendiente no se presenta como cero; descuento cero se declara válido; `TOTAL_NEGOCIADO` conserva el importe exacto; un total incompleto queda pendiente. | Pruebas puras de presentación comercial y E2E.            |
+| PRF-01.8 | Se preservan guardado explícito, idempotencia, `revision_esperada`, datos técnicos abiertos, históricos y autoridad PostgreSQL.                                 | Suite completa frontend y regresión PostgreSQL backend.   |
+
+### Evidencia visual
+
+La evidencia es generada por Playwright sobre el build productivo:
+
+- `docs/implementacion/evidencias/prf01/proforma-mobile-light.png`: 390 px, tema claro.
+- `docs/implementacion/evidencias/prf01/proforma-desktop-dark.png`: 1440 px, tema oscuro.
+
+La referencia anterior se conserva en `docs/implementacion/evidencias/fe04/`. No se introdujeron bibliotecas visuales, dependencias de producción ni solicitudes de red adicionales.
+
+### Autoridad backend coordinada
+
+La auditoría reprodujo que una línea nueva `PRECIO_UNITARIO` podía llegar con precio ausente o cero. El backend valida ahora el mismo requisito tanto en serializer como en servicio; PostgreSQL continúa calculando importes y los históricos `TOTAL_NEGOCIADO` permanecen legibles sin conversión. El contrato OpenAPI estructural no cambió.
+
+### Resultado de gates
+
+Línea base frontend: `6b3bd7d316bc374e41a13670985a4ecef4dd84c7`. Backend coordinado: `2d63ac00baf55d4b5d9eafc4347c471bc2eaadf3`. Resultados locales:
+
+- unitarias/componentes/integración MSW: **104 passed**;
+- Playwright funcional, responsive, visual y a11y: **73 passed**;
+- type-check, Oxlint, ESLint, Prettier, contrato y build: correctos;
+- `npm audit --audit-level=high`: **0 vulnerabilidades**;
+- OpenAPI y TypeScript generado: sin drift.
+
+La porción diferida del editor pasó de 18 469 a 20 910 bytes sin comprimir y de 6 645 a 7 349 bytes con gzip (**+704 bytes gzip**). No cambió el chunk inicial, no hay dependencias nuevas y la implementación no añade solicitudes de red.
+
+Los commits y ejecuciones remotas se registran al finalizar los PR. La aceptación de esta implementación continúa sujeta a auditoría independiente y visto bueno del usuario, según la regla de esta especificación.
