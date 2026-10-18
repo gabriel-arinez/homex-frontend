@@ -10,7 +10,11 @@ import { proformasService } from '@/modules/proformas/services/proformasService'
 import Button from '@/shared/ui/Button.vue'
 import Select from '@/shared/ui/Select.vue'
 import TextField from '@/shared/ui/TextField.vue'
-const props = defineProps<{ initial?: Producto; processing?: boolean }>()
+const props = defineProps<{
+  initial?: Producto
+  processing?: boolean
+  preselectCategory?: string
+}>()
 const emit = defineEmits<{
   save: [body: ProductoWritable, file: File | null]
   cancel: []
@@ -53,6 +57,79 @@ const form = reactive({
   fecha_inicio: props.initial?.promocion?.fecha_inicio ?? '',
   fecha_fin: props.initial?.promocion?.fecha_fin ?? '',
 })
+type TipoCampo = 'texto' | 'numero' | 'booleano' | 'nulo'
+type CampoSilla = { clave: string; valor: string; tipo: TipoCampo }
+function esObjeto(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+function camposSimples(value: unknown): CampoSilla[] {
+  if (!esObjeto(value)) return []
+  return Object.entries(value)
+    .filter(([, dato]) => dato === null || typeof dato !== 'object')
+    .map(([clave, dato]) => ({
+      clave,
+      valor: dato === null ? '' : String(dato),
+      tipo:
+        dato === null
+          ? 'nulo'
+          : typeof dato === 'number'
+            ? 'numero'
+            : typeof dato === 'boolean'
+              ? 'booleano'
+              : 'texto',
+    }))
+}
+const camposSilla = ref<CampoSilla[]>(camposSimples(props.initial?.silla?.especificaciones))
+const modoJson = ref(false)
+function objetoEspecificaciones(): unknown {
+  const datos: unknown = form.especificaciones.trim() ? JSON.parse(form.especificaciones) : {}
+  if (!esObjeto(datos)) {
+    if (!camposSilla.value.length) return datos
+    throw new Error('Para añadir características, utiliza un objeto JSON en la edición avanzada.')
+  }
+  const combinado: Record<string, unknown> = { ...datos }
+  for (const campo of camposSimples(datos)) delete combinado[campo.clave]
+  const claves = new Set<string>()
+  for (const campo of camposSilla.value) {
+    const clave = campo.clave.trim()
+    if (!clave) throw new Error('Cada característica debe tener un nombre.')
+    if (claves.has(clave)) throw new Error('No se puede repetir una característica de la silla.')
+    if (clave in combinado) throw new Error('Ya existe una característica avanzada con ese nombre.')
+    claves.add(clave)
+    if (campo.tipo === 'numero') {
+      if (!campo.valor.trim() || !Number.isFinite(Number(campo.valor))) {
+        throw new Error('Las características numéricas requieren un número válido.')
+      }
+      combinado[clave] = Number(campo.valor)
+    } else if (campo.tipo === 'booleano') combinado[clave] = campo.valor === 'true'
+    else if (campo.tipo === 'nulo') combinado[clave] = null
+    else combinado[clave] = campo.valor
+  }
+  return combinado
+}
+function editarJsonAvanzado() {
+  error.value = ''
+  try {
+    if (!modoJson.value) {
+      form.especificaciones = JSON.stringify(objetoEspecificaciones(), null, 2)
+      modoJson.value = true
+    } else {
+      const datos: unknown = form.especificaciones.trim() ? JSON.parse(form.especificaciones) : {}
+      camposSilla.value = camposSimples(datos)
+      modoJson.value = false
+    }
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : 'La ficha contiene JSON inválido.'
+  }
+}
+function agregarCampoSilla() {
+  camposSilla.value.push({ clave: '', valor: '', tipo: 'texto' })
+  emit('change')
+}
+function quitarCampoSilla(index: number) {
+  camposSilla.value.splice(index, 1)
+  emit('change')
+}
 const categoria = computed(
   () => opciones.CATEGORIA_PRODUCTO?.find((x) => String(x.id) === form.categoria)?.codigo,
 )
@@ -79,6 +156,17 @@ async function load() {
     ])
     familias.value = f.results
     keys.forEach((k, i) => (opciones[k] = values[i] as ValorCatalogoPublico[]))
+    if (!props.initial && props.preselectCategory) {
+      const categoria = opciones.CATEGORIA_PRODUCTO?.find(
+        (item) => item.codigo === props.preselectCategory,
+      )
+      if (categoria) {
+        form.categoria = String(categoria.id)
+        const unidadCodigo = categoria.codigo === 'PISO_FLOTANTE' ? 'M2' : 'PIEZA'
+        const unidad = opciones.UNIDAD_MEDIDA?.find((item) => item.codigo === unidadCodigo)
+        if (unidad) form.unidad_stock = String(unidad.id)
+      }
+    }
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : 'No se cargaron los catálogos.'
   } finally {
@@ -93,9 +181,18 @@ function submit() {
   fields.value = {}
   let especificaciones: unknown = null
   try {
-    if (form.especificaciones) especificaciones = JSON.parse(form.especificaciones)
-  } catch {
-    error.value = 'Las especificaciones de la silla deben ser JSON válido.'
+    if (categoria.value === 'SILLA') {
+      especificaciones = modoJson.value
+        ? form.especificaciones.trim()
+          ? JSON.parse(form.especificaciones)
+          : {}
+        : objetoEspecificaciones()
+    }
+  } catch (cause) {
+    error.value =
+      cause instanceof Error
+        ? cause.message
+        : 'Las especificaciones de la silla deben ser JSON válido.'
     return
   }
   const body: ProductoWritable = {
@@ -199,16 +296,70 @@ onMounted(load)
             v-model="form.color_primario"
             name="color1"
             label="Color primario"
-            :options="opts('COLOR')" /><Select
+            :options="opts('COLOR')"
+          /><Select
             v-model="form.color_secundario"
             name="color2"
             label="Color secundario"
-            :options="opts('COLOR')" /><label
-            >Especificaciones JSON<textarea
-              v-model="form.especificaciones"
-              rows="4"
-              placeholder="{}"
-            /></label></template
+            :options="opts('COLOR')"
+          />
+          <section class="ficha-silla">
+            <h3>Características adicionales de la silla</h3>
+            <p class="hint">
+              Registra cada característica mediante su nombre y valor. Se conservan también las
+              propiedades avanzadas que ya tenga el producto.
+            </p>
+            <template v-if="!modoJson">
+              <div v-for="(campo, index) in camposSilla" :key="index" class="campo-silla">
+                <label>
+                  Característica
+                  <input v-model="campo.clave" :aria-label="'Característica ' + (index + 1)" />
+                </label>
+                <label>
+                  Valor
+                  <input
+                    v-model="campo.valor"
+                    :aria-label="'Valor ' + (index + 1)"
+                    :disabled="campo.tipo === 'nulo' || campo.tipo === 'booleano'"
+                  />
+                </label>
+                <label>
+                  Tipo de dato
+                  <select v-model="campo.tipo" :aria-label="'Tipo de dato ' + (index + 1)">
+                    <option value="texto">Texto</option>
+                    <option value="numero">Número</option>
+                    <option value="booleano">Sí / No</option>
+                    <option value="nulo">Sin valor</option>
+                  </select>
+                </label>
+                <label v-if="campo.tipo === 'booleano'">
+                  Valor lógico
+                  <select v-model="campo.valor" :aria-label="'Valor lógico ' + (index + 1)">
+                    <option value="true">Sí</option>
+                    <option value="false">No</option>
+                  </select>
+                </label>
+                <Button type="button" variant="secondary" @click="quitarCampoSilla(index)">
+                  Quitar
+                </Button>
+              </div>
+              <Button type="button" variant="secondary" @click="agregarCampoSilla">
+                Añadir característica
+              </Button>
+            </template>
+            <label v-else>
+              Edición avanzada (JSON)
+              <textarea
+                v-model="form.especificaciones"
+                rows="6"
+                aria-label="Especificaciones avanzadas JSON"
+                placeholder="{}"
+              />
+            </label>
+            <Button type="button" variant="secondary" @click="editarJsonAvanzado">
+              {{ modoJson ? 'Volver al formulario guiado' : 'Edición avanzada JSON' }}
+            </Button>
+          </section></template
         ><template v-else
           ><Select
             v-model="form.tipo"
@@ -321,6 +472,34 @@ textarea {
   background: var(--color-surface);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
+}
+.ficha-silla {
+  display: grid;
+  gap: var(--space-3);
+  grid-column: 1 / -1;
+}
+.ficha-silla h3,
+.ficha-silla p {
+  margin: 0;
+}
+.campo-silla {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.campo-silla label {
+  flex: 1 1 10rem;
+}
+.campo-silla input,
+.campo-silla select {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 .actions {
   display: flex;

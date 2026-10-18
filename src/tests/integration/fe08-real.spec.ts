@@ -31,15 +31,18 @@ async function createDraft(page: Page, title: string) {
 
 async function addCatalogLine(page: Page) {
   await page.getByRole('button', { name: /Productos$/ }).click()
-  await page.getByRole('button', { name: 'Agregar producto' }).click()
-  await page.getByLabel('Tipo de línea').selectOption({ label: 'Otro producto' })
-  await expect(page.locator('#producto-linea option')).toContainText(['FE08-SILLA-001'])
-  await page.locator('#producto-linea').selectOption({ index: 1 })
+  await page.getByRole('button', { name: 'Añadir ítem' }).click()
+  await page.getByRole('button', { name: 'Producto de catálogo' }).click()
+  await expect(page.getByText('FE08-SILLA-001')).toBeVisible()
+  await page.getByRole('button', { name: 'Seleccionar para cotizar' }).click()
   await page.getByLabel('Cantidad', { exact: true }).fill('1')
   await expect(page.locator('#unidad-linea')).toBeDisabled()
   await expect(page.locator('#unidad-linea option:checked')).toHaveText('Pieza')
   await page.getByRole('button', { name: 'Guardar línea' }).click()
-  await expect(page.getByText('Silla integración FE08', { exact: true })).toBeVisible()
+  // Verificar la línea incorporada, no la tarjeta del catálogo oculto con v-show.
+  await expect(
+    page.locator('.line-card').getByText('Silla integración FE08', { exact: true }),
+  ).toBeVisible()
 }
 
 async function approveCurrentQuote(page: Page) {

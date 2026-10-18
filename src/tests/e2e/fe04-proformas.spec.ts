@@ -43,6 +43,10 @@ const product = {
   demanda_pendiente: 3,
   disponibilidad_referencial: 5,
   unidad_stock: 20,
+  categoria_info: { id: 1, codigo: 'SILLA', nombre: 'Silla' },
+  unidad_stock_info: { id: 20, codigo: 'PIEZA', nombre: 'Pieza' },
+  familia: null,
+  familia_info: null,
   activo: true,
   observaciones: null,
   imagen_principal: null,
@@ -311,8 +315,9 @@ test('FE04 crea con unitario y descuento, revisa y aprueba', async ({ page }) =>
   await page.getByRole('button', { name: 'Nueva proforma' }).click()
   await expect(page).toHaveURL(/\/proformas\/nueva$/)
   await expect(page.getByRole('heading', { name: 'Nueva proforma' })).toBeVisible()
-  await page.getByRole('button', { name: 'Agregar producto' }).click()
-  await page.getByLabel('Tipo de línea').selectOption('10')
+  await page.getByRole('button', { name: 'Añadir ítem' }).click()
+  await page.getByRole('button', { name: 'Mueble a pedido' }).click()
+  await expect(page.getByLabel('Tipo de línea')).toHaveValue('10')
   await page.getByLabel('Nombre comercial').fill('Tres escritorios')
   await page.getByLabel('Cantidad', { exact: true }).fill('3')
   await page.locator('#unidad-linea').selectOption('20')
@@ -320,18 +325,21 @@ test('FE04 crea con unitario y descuento, revisa y aprueba', async ({ page }) =>
   await page.getByLabel('Descuento de la línea (BOB)').fill('2.00')
   await page.getByRole('button', { name: 'Guardar línea' }).click()
   await expect(page.getByText(/3 ×/)).toContainText('Bs 34,00')
-  await page.getByRole('button', { name: 'Editar', exact: true }).click()
+  await page.getByRole('button', { name: 'Acciones de Tres escritorios' }).click()
+  await page.getByRole('menuitem', { name: 'Editar' }).click()
   await page.getByLabel('Nombre comercial').fill('Tres escritorios ejecutivos')
   await page.getByRole('button', { name: 'Guardar línea' }).click()
   await expect(page.getByText('Tres escritorios ejecutivos', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: 'Ficha técnica' }).click()
+  await page.getByRole('button', { name: 'Acciones de Tres escritorios ejecutivos' }).click()
+  await page.getByRole('menuitem', { name: 'Ficha técnica' }).click()
   await page.locator('#tipo-mueble').selectOption('30')
   await page.locator('#componente-nombre-0').fill('Mesón')
   await page.locator('#componente-material-0').fill('Melamina')
   await page.locator('#componente-espesor-0').fill('25 mm')
   await page.locator('#componente-dimensiones-0').fill('{"ancho":"1.2 m"}')
   await page.getByRole('button', { name: 'Guardar especificación' }).click()
-  await page.getByRole('button', { name: 'Ficha técnica' }).click()
+  await page.getByRole('button', { name: 'Acciones de Tres escritorios ejecutivos' }).click()
+  await page.getByRole('menuitem', { name: 'Ficha técnica' }).click()
   await expect(page.locator('#componente-nombre-0')).toHaveValue('Mesón')
   await page.locator('#componente-color-0').fill('Nogal')
   await page.getByRole('button', { name: 'Guardar especificación' }).click()
@@ -605,13 +613,23 @@ test('FE04 selecciona cliente y producto fuera de la primera página', async ({ 
       ),
     })
   })
+  await page.route('**/api/v1/catalogo/productos/200/', (r) =>
+    r.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(productPageTwo),
+    }),
+  )
   await page.goto('/proformas/1')
   await page.goto('/proformas/1/editar')
-  await page.getByRole('button', { name: 'Agregar producto' }).click()
-  await page.getByLabel('Tipo de línea').selectOption('11')
-  await page.getByRole('button', { name: 'Cargar más productos' }).click()
-  await expect(page.locator('#producto-linea option[value="200"]')).toHaveCount(1)
-  await page.locator('#producto-linea').selectOption('200')
+  await page.getByRole('button', { name: 'Añadir ítem' }).click()
+  await page.getByRole('button', { name: 'Producto de catálogo' }).click()
+  await page
+    .getByRole('navigation', { name: 'Paginación' })
+    .getByRole('button', { name: 'Siguiente' })
+    .click()
+  await expect(page.getByText('Silla segunda página')).toBeVisible()
+  await page.getByRole('button', { name: 'Seleccionar para cotizar' }).click()
   await expect(page.getByLabel('Nombre comercial')).toHaveValue('Silla segunda página')
 })
 
@@ -619,8 +637,9 @@ test('PRF-01 previene líneas inválidas y conserva edición al cerrar', async (
   await mockBackend(page)
   await page.goto('/proformas/nueva')
   await expect(page.getByText('Nueva cotización sin guardar')).toBeVisible()
-  await page.getByRole('button', { name: 'Agregar producto' }).click()
-  await page.getByLabel('Tipo de línea').selectOption('10')
+  await page.getByRole('button', { name: 'Añadir ítem' }).click()
+  await page.getByRole('button', { name: 'Mueble a pedido' }).click()
+  await expect(page.getByLabel('Tipo de línea')).toHaveValue('10')
   await page.getByLabel('Nombre comercial').fill('Escritorio comercial')
   await page.getByLabel('Cantidad', { exact: true }).fill('1.5')
   await page.getByLabel('Precio unitario (BOB)').fill('0')
@@ -656,12 +675,14 @@ test('PRF-01 muestra cliente humano y estimación local sin identificadores inte
 test('PRF-01 protege cambios pendientes de la ficha técnica', async ({ page }) => {
   await mockBackend(page)
   await page.goto('/proformas/nueva')
-  await page.getByRole('button', { name: 'Agregar producto' }).click()
-  await page.getByLabel('Tipo de línea').selectOption('10')
+  await page.getByRole('button', { name: 'Añadir ítem' }).click()
+  await page.getByRole('button', { name: 'Mueble a pedido' }).click()
+  await expect(page.getByLabel('Tipo de línea')).toHaveValue('10')
   await page.getByLabel('Nombre comercial').fill('Mueble con ficha')
   await page.getByLabel('Precio unitario (BOB)').fill('150')
   await page.getByRole('button', { name: 'Guardar línea' }).click()
-  await page.getByRole('button', { name: 'Ficha técnica' }).click()
+  await page.getByRole('button', { name: 'Acciones de Mueble con ficha' }).click()
+  await page.getByRole('menuitem', { name: 'Ficha técnica' }).click()
   await page.locator('#componente-nombre-0').fill('Mesón')
 
   page.once('dialog', (dialog) => dialog.dismiss())
@@ -762,14 +783,14 @@ test('PRF-01 no pierde edición al detectar variante duplicada', async ({ page }
     },
   ]
   await page.goto('/proformas/1/editar')
-  await page.getByRole('button', { name: 'Agregar producto' }).click()
-  await page.getByLabel('Tipo de línea').selectOption('11')
-  await page.getByLabel('Nombre comercial').fill('Edición aún pendiente')
-
-  page.once('dialog', (dialog) => dialog.dismiss())
-  await page.locator('#producto-linea').selectOption('4')
-  await expect(page.getByRole('dialog')).toBeVisible()
-  await expect(page.getByLabel('Nombre comercial')).toHaveValue('Edición aún pendiente')
+  await page.getByRole('button', { name: 'Añadir ítem' }).click()
+  await page.getByRole('button', { name: 'Producto de catálogo' }).click()
+  await expect(page.getByRole('button', { name: 'Ir a línea' })).toBeVisible()
+  await page.getByRole('button', { name: 'Ir a línea' }).click()
+  await expect(
+    page.getByText('Esta variante ya está incluida; puedes editar su línea existente.'),
+  ).toBeVisible()
+  await expect(page.getByText('Silla existente', { exact: true })).toBeVisible()
 })
 
 test('PRF-01 separa el total guardado de los cambios locales', async ({ page }) => {
@@ -783,6 +804,48 @@ test('PRF-01 separa el total guardado de los cambios locales', async ({ page }) 
   await page.getByRole('button', { name: /Revisar$/ }).click()
   await expect(page.getByText('Estimación local')).toBeVisible()
   await expect(page.getByText(/Último total guardado:/)).toBeVisible()
+})
+
+test('PRF-02 selecciona catálogo, consulta detalle y deshace sin escribir proforma', async ({
+  page,
+}) => {
+  const state = await mockBackend(page)
+  let writes = 0
+  await page.route('**/api/v1/proformas/integral/', async (route) => {
+    writes += 1
+    await route.fallback()
+  })
+  await page.goto('/proformas/nueva')
+  await page.getByRole('button', { name: 'Añadir ítem' }).click()
+  await page.getByRole('button', { name: 'Producto de catálogo' }).click()
+  await expect(page.getByText('S-01', { exact: false })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Seleccionar para cotizar' }).click()
+  await expect(page.getByLabel('Nombre comercial')).toHaveValue('Silla ejecutiva')
+  await expect(page.getByLabel('Precio unitario (BOB)')).toHaveValue('1200.00')
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancelar' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  expect(writes).toBe(0)
+
+  await page.getByRole('button', { name: 'Seleccionar para cotizar' }).click()
+  await page.getByLabel('Cantidad', { exact: true }).fill('2')
+  await page.getByRole('button', { name: 'Guardar línea' }).click()
+  await expect(page.locator('.line-card').getByText('Silla ejecutiva')).toBeVisible()
+  expect(writes).toBe(0)
+
+  await page.getByRole('button', { name: 'Ver detalle completo de Silla ejecutiva' }).click()
+  await expect(
+    page.getByRole('dialog').getByText('Precio unitario cotizado:', { exact: false }),
+  ).toBeVisible()
+  await page.getByRole('dialog').getByRole('button', { name: 'Cerrar' }).last().click()
+  await page.getByRole('button', { name: 'Acciones de Silla ejecutiva' }).click()
+  await page.getByRole('menuitem', { name: 'Eliminar' }).click()
+  await expect(page.locator('.line-card')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Deshacer última eliminación' }).click()
+  await expect(page.locator('.line-card').getByText('Silla ejecutiva')).toBeVisible()
+
+  expect(writes).toBe(0)
+  expect(state.quote().detalles).toHaveLength(0)
 })
 
 for (const width of [360, 390, 768, 1024, 1440])

@@ -6,7 +6,7 @@ import Button from '@/shared/ui/Button.vue'
 import SearchField from '@/shared/ui/SearchField.vue'
 import Select from '@/shared/ui/Select.vue'
 
-const props = defineProps<{ modelValue?: string }>()
+const props = defineProps<{ modelValue?: string; categoria?: number; familia?: number }>()
 const emit = defineEmits<{
   'update:modelValue': [value: string]
   select: [value: Producto | null]
@@ -59,6 +59,8 @@ async function load(reset = true) {
   try {
     const response = await productosService.list({
       activo: true,
+      categoria: props.categoria,
+      familia: props.familia,
       search: search.value.trim() || undefined,
       page: targetPage,
       page_size: 20,
@@ -89,6 +91,7 @@ watch(
   },
 )
 
+watch([() => props.categoria, () => props.familia], () => void load(true))
 onMounted(() => {
   void load()
 })

@@ -13,6 +13,7 @@ import type {
   FamiliaProducto,
   Proforma,
   ProformaIntegralWritable,
+  Producto,
   ValorCatalogoPublico,
 } from '@/generated/api'
 import { ApiError } from '@/shared/api'
@@ -27,12 +28,15 @@ import TextField from '@/shared/ui/TextField.vue'
 import ClienteSelector from '../components/ClienteSelector.vue'
 import ClienteFormFields from '@/modules/clientes/components/ClienteFormFields.vue'
 import DetalleForm from '../components/DetalleForm.vue'
+import CatalogoContextual from '../components/CatalogoContextual.vue'
+import type { CatalogoContextState } from '../services/catalogoContext'
 import EspecificacionForm from '../components/EspecificacionForm.vue'
 import { proformasService } from '../services/proformasService'
+import { useSessionStore } from '@/app/stores/useSessionStore'
+import { productosService } from '@/modules/productos/services/productosService'
 import {
   cloneEditorData,
   consumeEditorDraft,
-  duplicateLocalLine,
   removeLocalLine,
   restoreLocalLine,
   saveEditorDraft,
@@ -43,6 +47,7 @@ type LineaLocal = DetalleIntegralWritable & { localId: string }
 const emit = defineEmits<{ openMenu: [] }>()
 const route = useRoute()
 const router = useRouter()
+const session = useSessionStore()
 const proformaId = computed(() => (route.params.id ? Number(route.params.id) : null))
 const steps = ['Productos', 'Cliente', 'Condiciones', 'Revisar'] as const
 const currentStep = ref(0)
@@ -61,15 +66,26 @@ const monedas = ref<ValorCatalogoPublico[]>([])
 const tiposMueble = ref<ValorCatalogoPublico[]>([])
 const tiposCliente = ref<ValorCatalogoPublico[]>([])
 const familias = ref<FamiliaProducto[]>([])
+const catalogCategories = ref<ValorCatalogoPublico[]>([])
 const lineModal = ref(false)
+const additionMode = ref<'none' | 'choose' | 'catalog'>('none')
+const catalogInitialized = ref(false)
+const catalogState = ref<CatalogoContextState | null>(null)
+const lineFormVersion = ref(0)
 const lineModalDirty = ref(false)
 const specModalDirty = ref(false)
 const editingLine = ref<number | null>(null)
+const menuLineId = ref<string | null>(null)
+const readingLineId = ref<string | null>(null)
+const readMaster = ref<Producto | null>(null)
+let readRequestId = 0
 const specLine = ref<number | null>(null)
-const removedLine = ref<{ line: LineaLocal; index: number } | null>(null)
+const removedLines = ref<{ line: LineaLocal; index: number }[]>([])
 const contextualNavigation = ref(false)
 const preferredProductId = ref<number | null>(null)
 const pendingLineDraft = ref<Record<string, string> | null>(null)
+const duplicateOrigin = ref<string | null>(null)
+const duplicateSpec = ref<EspecificacionMuebleWritable | null>(null)
 const clienteMode = ref<'existente' | 'nuevo' | 'pendiente'>('existente')
 const clienteSeleccionado = ref<Cliente | ClienteResumenProforma | null>(null)
 const key = ref(crypto.randomUUID())
@@ -95,6 +111,10 @@ function updateNuevoCliente(field: keyof typeof nuevoCliente, value: string) {
   nuevoCliente[field] = value
 }
 const lineas = ref<LineaLocal[]>([])
+const reviewedCurrency = ref('BOB')
+const priceReviewRequired = computed(
+  () => lineas.value.length > 0 && header.moneda_codigo !== reviewedCurrency.value,
+)
 const existingProductIds = computed(() =>
   lineas.value.flatMap((line) => (line.producto ? [line.producto] : [])),
 )
@@ -102,6 +122,8 @@ const totalPreview = computed(() => totalEstimadoCompleto(lineas.value))
 const emissionPending = computed(() => {
   const pendientes: string[] = []
   if (!lineas.value.length) pendientes.push('agregar al menos una línea')
+  if (priceReviewRequired.value)
+    pendientes.push('revisar explícitamente precios y descuentos tras cambiar de moneda')
   if (clienteMode.value === 'pendiente') pendientes.push('elegir o registrar un cliente')
   if (clienteMode.value === 'existente' && !header.cliente) pendientes.push('elegir un cliente')
   if (clienteMode.value === 'nuevo') {
@@ -161,6 +183,33 @@ const fieldErrorMessages = computed(() => {
     }),
   )
 })
+const readingLine = computed(
+  () => lineas.value.find((line) => line.localId === readingLineId.value) ?? null,
+)
+async function openLineRead(id: string) {
+  readingLineId.value = id
+  menuLineId.value = null
+  readMaster.value = null
+  const token = ++readRequestId
+  const productId = readingLine.value?.producto
+  if (!productId) return
+  try {
+    const product = await productosService.get(productId)
+    if (token === readRequestId) readMaster.value = product
+  } catch {
+    // La línea negociada debe poder consultarse aunque el maestro no esté disponible.
+  }
+}
+function closeLineRead() {
+  readRequestId++
+  readingLineId.value = null
+  readMaster.value = null
+}
+function editReadLine() {
+  const index = lineas.value.findIndex((line) => line.localId === readingLineId.value)
+  closeLineRead()
+  if (index >= 0) openLine(index)
+}
 const editableDetail = computed(() => {
   if (editingLine.value === null) return undefined
   return lineas.value[editingLine.value] as unknown as DetalleProforma
@@ -170,7 +219,7 @@ const editableSpec = computed(() => {
   return (lineas.value[specLine.value]?.especificacion ?? null) as EspecificacionMueble | null
 })
 const canEmit = computed(() => {
-  if (!lineas.value.length) return false
+  if (!lineas.value.length || priceReviewRequired.value) return false
   if (clienteMode.value === 'existente') return Boolean(header.cliente)
   if (clienteMode.value !== 'nuevo' || !nuevoCliente.tipo_cliente) return false
   const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
@@ -181,6 +230,10 @@ const canEmit = computed(() => {
 
 function markDirty() {
   dirty.value = true
+}
+function confirmCurrencyReview() {
+  reviewedCurrency.value = header.moneda_codigo
+  markDirty()
 }
 function nombreClienteVisible() {
   const cliente = clienteSeleccionado.value
@@ -230,6 +283,7 @@ function fill(value: Proforma) {
   header.cliente = value.cliente ? String(value.cliente) : ''
   header.titulo = value.titulo ?? ''
   header.moneda_codigo = value.moneda_info.codigo
+  reviewedCurrency.value = value.moneda_info.codigo
   header.plazo_entrega = value.plazo_entrega ?? ''
   header.validez_oferta = value.validez_oferta ? String(value.validez_oferta) : ''
   header.porcentaje_adelanto = value.porcentaje_adelanto ?? ''
@@ -237,6 +291,7 @@ function fill(value: Proforma) {
   clienteMode.value = value.cliente ? 'existente' : 'pendiente'
   clienteSeleccionado.value = value.cliente_resumen ?? null
   lineas.value = value.detalles.map(normalizeLine)
+  removedLines.value = []
   dirty.value = false
 }
 async function load() {
@@ -258,13 +313,14 @@ async function load() {
 async function loadReferences() {
   referenceLoading.value = true
   try {
-    const [a, b, c, d, e, f] = await Promise.all([
+    const [a, b, c, d, e, f, g] = await Promise.all([
       proformasService.options('TIPO_ITEM'),
       proformasService.options('UNIDAD_MEDIDA'),
       proformasService.options('MONEDA'),
       proformasService.options('TIPO_MUEBLE'),
       proformasService.options('TIPO_CLIENTE'),
       proformasService.families(),
+      proformasService.options('CATEGORIA_PRODUCTO'),
     ])
     tipos.value = a
     unidades.value = b
@@ -272,6 +328,7 @@ async function loadReferences() {
     tiposMueble.value = d
     tiposCliente.value = e
     familias.value = f.results
+    catalogCategories.value = g
     if (!nuevoCliente.tipo_cliente && e[0]) nuevoCliente.tipo_cliente = String(e[0].id)
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : 'No se cargaron los datos auxiliares.'
@@ -280,9 +337,48 @@ async function loadReferences() {
   }
 }
 function saveLine(body: DetalleProformaWritable) {
+  if (duplicateOrigin.value) {
+    const original = lineas.value.find((item) => item.localId === duplicateOrigin.value)
+    if (original) {
+      const fields: (keyof DetalleProformaWritable)[] = [
+        'tipo_item',
+        'producto',
+        'familia_producto',
+        'nombre',
+        'descripcion',
+        'cantidad',
+        'unidad',
+        'precio_unitario',
+        'descuento',
+      ]
+      const identical = fields.every(
+        (field) => String(original[field] ?? '') === String(body[field] ?? ''),
+      )
+      if (identical) {
+        if (
+          !window.confirm(
+            'La copia es idéntica. ¿Sumar su cantidad a la línea original en lugar de duplicarla?',
+          )
+        )
+          return
+        original.cantidad = String(Number(original.cantidad) + Number(body.cantidad))
+        duplicateOrigin.value = null
+        duplicateSpec.value = null
+        closeLineModal()
+        markDirty()
+        return
+      }
+    }
+  }
   preferredProductId.value = null
   pendingLineDraft.value = null
-  const line: LineaLocal = { ...body, localId: localId(), especificacion: null }
+  const line: LineaLocal = {
+    ...body,
+    localId: localId(),
+    especificacion: duplicateOrigin.value ? cloneEditorData(duplicateSpec.value) : null,
+  }
+  duplicateOrigin.value = null
+  duplicateSpec.value = null
   if (editingLine.value === null) lineas.value.push(line)
   else {
     const previous = lineas.value[editingLine.value]
@@ -297,6 +393,7 @@ function saveLine(body: DetalleProformaWritable) {
   lineModal.value = false
   lineModalDirty.value = false
   editingLine.value = null
+  additionMode.value = 'none'
   markDirty()
 }
 function saveSpec(body: EspecificacionMuebleWritable) {
@@ -307,6 +404,13 @@ function saveSpec(body: EspecificacionMuebleWritable) {
   specLine.value = null
   specModalDirty.value = false
   markDirty()
+}
+function selectMenuAction(action: 'edit' | 'spec' | 'duplicate' | 'remove', index: number) {
+  menuLineId.value = null
+  if (action === 'edit') openLine(index)
+  else if (action === 'spec') openSpec(index)
+  else if (action === 'duplicate') duplicateFurniture(index)
+  else removeLine(index)
 }
 function openSpec(index: number) {
   specModalDirty.value = false
@@ -324,32 +428,51 @@ function closeSpec() {
 function removeLine(index: number) {
   const result = removeLocalLine(lineas.value, index)
   lineas.value = result.lines
-  removedLine.value = result.removed
+  if (result.removed) removedLines.value.push(result.removed)
   markDirty()
 }
 function undoRemove() {
-  if (!removedLine.value) return
-  lineas.value = restoreLocalLine(lineas.value, removedLine.value)
-  removedLine.value = null
+  const removed = removedLines.value.pop()
+  if (!removed) return
+  lineas.value = restoreLocalLine(lineas.value, removed)
   markDirty()
 }
 function duplicateFurniture(index: number) {
   const original = lineas.value[index]
   if (!original || tipos.value.find((x) => x.id === original.tipo_item)?.codigo !== 'MUEBLE_MEDIDA')
     return
-  const copy = duplicateLocalLine(original, localId())
-  lineas.value.splice(index + 1, 0, copy)
-  success.value = 'Mueble duplicado con una ficha independiente.'
-  markDirty()
+  preferredProductId.value = null
+  openLine()
+  duplicateOrigin.value = original.localId
+  duplicateSpec.value = cloneEditorData(original.especificacion ?? null)
+  pendingLineDraft.value = {
+    tipo_item: String(original.tipo_item),
+    producto: '',
+    familia_producto: '',
+    nombre: original.nombre,
+    descripcion: original.descripcion ?? '',
+    cantidad: String(original.cantidad),
+    unidad: String(original.unidad),
+    precio_unitario: String(original.precio_unitario),
+    descuento: String(original.descuento),
+  }
+  success.value = 'Revisa la copia del mueble y confirma sus datos antes de incorporarla.'
 }
 function editorSnapshot() {
   return {
+    userId: session.identity?.id ?? null,
+    expiresAt: Date.now() + 60 * 60 * 1000,
     header: cloneEditorData(header),
+    reviewedCurrency: reviewedCurrency.value,
     nuevoCliente: cloneEditorData(nuevoCliente),
     clienteMode: clienteMode.value,
     clienteSeleccionado: cloneEditorData(clienteSeleccionado.value),
     lineModalDirty: lineModalDirty.value,
     lineas: cloneEditorData(lineas.value),
+    removedLines: cloneEditorData(removedLines.value),
+    additionMode: additionMode.value,
+    catalogInitialized: catalogInitialized.value,
+    catalogState: cloneEditorData(catalogState.value),
     currentStep: currentStep.value,
     key: key.value,
     lineDraft: cloneEditorData(pendingLineDraft.value),
@@ -362,19 +485,55 @@ async function createProductContextually(draft: Record<string, string>) {
   saveEditorDraft(token, editorSnapshot())
   contextualNavigation.value = true
   lineModal.value = false
-  await router.push({ name: 'producto-create', query: { returnTo: route.path, draft: token } })
+  const tipo = tipos.value.find((item) => String(item.id) === draft.tipo_item)
+  const categoria = ['SILLA', 'PISO_FLOTANTE', 'OTRO'].includes(tipo?.codigo ?? '')
+    ? tipo?.codigo
+    : undefined
+  await router.push({
+    name: 'producto-create',
+    query: { returnTo: route.path, draft: token, categoria },
+  })
+}
+function createProductFromCategory(categoryCode: string) {
+  const tipo = tipos.value.find((value) => value.codigo === categoryCode)
+  if (!tipo) return
+  void createProductContextually({ tipo_item: String(tipo.id) })
+}
+async function editProductContextually(productId: number) {
+  if (!session.can('comercial.administrar')) return
+  const token = crypto.randomUUID()
+  saveEditorDraft(token, editorSnapshot())
+  contextualNavigation.value = true
+  await router.push({
+    name: 'producto-detail',
+    params: { id: productId },
+    query: { returnTo: route.path, draft: token, editar: '1' },
+  })
 }
 function restoreContextualDraft() {
   const token = typeof route.query.draft === 'string' ? route.query.draft : ''
   if (!token) return
   const snapshot = consumeEditorDraft<ReturnType<typeof editorSnapshot>>(token)
   if (!snapshot) return
+  if (snapshot.expiresAt && Date.now() > snapshot.expiresAt) {
+    error.value = 'El borrador temporal caducó. Recupera la última proforma guardada.'
+    return
+  }
+  if (snapshot.userId != null && snapshot.userId !== session.identity?.id) {
+    error.value = 'Este borrador temporal corresponde a otra sesión y no será restaurado.'
+    return
+  }
   Object.assign(header, snapshot.header)
+  reviewedCurrency.value = snapshot.reviewedCurrency ?? header.moneda_codigo
   Object.assign(nuevoCliente, snapshot.nuevoCliente)
   clienteMode.value = snapshot.clienteMode
   clienteSeleccionado.value =
     snapshot.clienteSeleccionado ?? persisted.value?.cliente_resumen ?? null
   lineas.value = snapshot.lineas
+  removedLines.value = snapshot.removedLines ?? []
+  additionMode.value = snapshot.additionMode ?? 'none'
+  catalogInitialized.value = snapshot.catalogInitialized ?? false
+  catalogState.value = snapshot.catalogState ?? null
   currentStep.value = snapshot.currentStep
   key.value = snapshot.key
   pendingLineDraft.value = snapshot.lineDraft
@@ -428,13 +587,58 @@ function closeLineModal() {
   lineModalDirty.value = false
   pendingLineDraft.value = null
   editingLine.value = null
+  duplicateOrigin.value = null
+  duplicateSpec.value = null
 }
 function openLine(index: number | null = null) {
   if (index !== null && lineas.value[index]?.modo_calculo === 'TOTAL_NEGOCIADO') return
+  lineFormVersion.value++
   pendingLineDraft.value = null
   editingLine.value = index
   lineModalDirty.value = false
   lineModal.value = true
+}
+function chooseCatalog() {
+  catalogInitialized.value = true
+  additionMode.value = 'catalog'
+}
+function selectCatalogProduct(product: Producto) {
+  if (existingProductIds.value.includes(product.id)) {
+    void focusDuplicateProduct(product.id)
+    return
+  }
+  preferredProductId.value = product.id
+  openLine()
+}
+function chooseManualFurniture() {
+  preferredProductId.value = null
+  openLine()
+  const tipo = tipos.value.find((x) => x.codigo === 'MUEBLE_MEDIDA')
+  const unidad = unidades.value.find((x) => x.codigo === 'PIEZA')
+  pendingLineDraft.value = {
+    tipo_item: String(tipo?.id ?? ''),
+    unidad: String(unidad?.id ?? ''),
+  }
+}
+function quotePendingFamily(familyId: number, categoryId: number) {
+  const categoria = tipos.value.find(
+    (x) =>
+      x.codigo === (catalogCategories.value.find((item) => item.id === categoryId)?.codigo ?? ''),
+  )
+  if (!categoria) return
+  const codigo = categoria.codigo
+  const unidadCodigo = codigo === 'PISO_FLOTANTE' ? 'M2' : 'PIEZA'
+  const unidad = unidades.value.find((x) => x.codigo === unidadCodigo)
+  const familia = familias.value.find((x) => x.id === familyId)
+  preferredProductId.value = null
+  openLine()
+  pendingLineDraft.value = {
+    tipo_item: String(categoria.id),
+    unidad: String(unidad?.id ?? ''),
+    familia_producto: String(familyId),
+    nombre: familia?.nombre ?? '',
+    precio_unitario: '',
+  }
 }
 async function focusDuplicateProduct(productId: number) {
   const index = lineas.value.findIndex((line) => line.producto === productId)
@@ -488,6 +692,11 @@ function body(emitir: boolean): ProformaIntegralWritable {
 }
 async function persist(emitir: boolean) {
   if (saving.value) return
+  if (priceReviewRequired.value) {
+    currentStep.value = 2
+    error.value = 'Antes de guardar, revisa los precios negociados y confirma la nueva moneda.'
+    return
+  }
   saving.value = true
   error.value = ''
   success.value = ''
@@ -498,7 +707,7 @@ async function persist(emitir: boolean) {
       ? await proformasService.updateIntegral(proformaId.value, body(emitir))
       : await proformasService.saveIntegral(body(emitir))
     fill(result)
-    removedLine.value = null
+    removedLines.value = []
     key.value = crypto.randomUUID()
     success.value = emitir ? 'Proforma emitida para revisión.' : 'Borrador guardado.'
     if (!proformaId.value) await router.replace(`/proformas/${result.id}/editar`)
@@ -582,10 +791,43 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <h2 id="productos-title">Productos</h2>
             <p>Agrega productos antes o después de elegir cliente.</p>
           </div>
-          <Button @click="openLine()">Agregar producto</Button>
+          <Button @click="additionMode = 'choose'">Añadir ítem</Button>
+        </div>
+        <div v-if="additionMode === 'choose'" class="choice-panel">
+          <h3>¿Qué deseas incorporar a la cotización?</h3>
+          <div class="actions">
+            <Button @click="chooseCatalog">Producto de catálogo</Button>
+            <Button variant="secondary" @click="chooseManualFurniture">Mueble a pedido</Button>
+            <Button variant="secondary" @click="additionMode = 'none'">Cancelar</Button>
+          </div>
+        </div>
+        <div v-if="catalogInitialized" v-show="additionMode === 'catalog'">
+          <CatalogoContextual
+            :categorias="catalogCategories"
+            :familias="familias"
+            :existing-product-ids="existingProductIds"
+            :can-admin="session.can('comercial.administrar')"
+            :initial-state="catalogState ?? undefined"
+            @state-change="catalogState = $event"
+            @create="createProductFromCategory"
+            @edit="editProductContextually"
+            @select="selectCatalogProduct"
+            @duplicate="focusDuplicateProduct"
+            @pending="quotePendingFamily"
+            @cancel="additionMode = 'none'"
+          />
         </div>
         <Card v-for="(line, index) in lineas" :key="line.localId" class="line-card">
-          <div :id="`ap3-linea-${line.localId}`" tabindex="-1">
+          <div
+            :id="`ap3-linea-${line.localId}`"
+            class="line-summary"
+            tabindex="0"
+            role="button"
+            :aria-label="'Ver detalle completo de ' + line.nombre"
+            @click="openLineRead(line.localId)"
+            @keydown.enter.prevent="openLineRead(line.localId)"
+            @keydown.space.prevent="openLineRead(line.localId)"
+          >
             <strong>{{ line.nombre }}</strong>
             <p v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
               Importe histórico negociado: {{ money(Number(line.importe_negociado || 0)) }}
@@ -600,30 +842,51 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             {{ money(totalEstimadoLinea(line)!) }}
           </strong>
           <strong v-else class="pending-value">Importe pendiente</strong>
-          <div class="actions">
-            <Button
-              variant="secondary"
-              :disabled="line.modo_calculo === 'TOTAL_NEGOCIADO'"
-              @click="openLine(index)"
-              >Editar</Button
+          <div class="line-menu" @keydown.esc="menuLineId = null">
+            <button
+              type="button"
+              class="menu-trigger"
+              :aria-expanded="menuLineId === line.localId"
+              :aria-label="'Acciones de ' + line.nombre"
+              aria-haspopup="menu"
+              @click.stop="menuLineId = menuLineId === line.localId ? null : line.localId"
             >
-            <Button
-              v-if="tipos.find((x) => x.id === line.tipo_item)?.codigo === 'MUEBLE_MEDIDA'"
-              variant="secondary"
-              @click="openSpec(index)"
-              >Ficha técnica</Button
-            >
-            <Button
-              v-if="tipos.find((x) => x.id === line.tipo_item)?.codigo === 'MUEBLE_MEDIDA'"
-              variant="secondary"
-              @click="duplicateFurniture(index)"
-              >Duplicar mueble</Button
-            ><Button variant="secondary" @click="removeLine(index)">Eliminar</Button>
+              ⋮
+            </button>
+            <div v-if="menuLineId === line.localId" class="menu-panel" role="menu">
+              <button
+                type="button"
+                role="menuitem"
+                :disabled="line.modo_calculo === 'TOTAL_NEGOCIADO'"
+                @click="selectMenuAction('edit', index)"
+              >
+                Editar
+              </button>
+              <button
+                v-if="tipos.find((x) => x.id === line.tipo_item)?.codigo === 'MUEBLE_MEDIDA'"
+                type="button"
+                role="menuitem"
+                @click="selectMenuAction('spec', index)"
+              >
+                Ficha técnica
+              </button>
+              <button
+                v-if="tipos.find((x) => x.id === line.tipo_item)?.codigo === 'MUEBLE_MEDIDA'"
+                type="button"
+                role="menuitem"
+                @click="selectMenuAction('duplicate', index)"
+              >
+                Duplicar mueble
+              </button>
+              <button type="button" role="menuitem" @click="selectMenuAction('remove', index)">
+                Eliminar
+              </button>
+            </div>
           </div>
         </Card>
-        <p v-if="removedLine" role="status" class="undo">
-          Línea retirada provisionalmente.
-          <button type="button" @click="undoRemove">Deshacer eliminación</button>
+        <p v-if="removedLines.length" role="status" class="undo">
+          {{ removedLines.length }} eliminación(es) provisional(es) pendiente(s) de guardar.
+          <button type="button" @click="undoRemove">Deshacer última eliminación</button>
         </p>
         <p v-if="!lineas.length" class="empty">Aún no agregaste productos.</p>
         <p v-if="lineas.some((line) => line.modo_calculo === 'TOTAL_NEGOCIADO')" class="warning">
@@ -686,6 +949,16 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             step="0.01"
           />
           <TextField v-model="header.observaciones" name="observaciones" label="Observaciones" />
+        </div>
+        <div v-if="priceReviewRequired" class="warning" role="status">
+          <p>
+            La moneda cambió. Los precios y descuentos existentes no se convirtieron
+            automáticamente.
+          </p>
+          <p>Revisa cada importe en {{ header.moneda_codigo }} antes de continuar.</p>
+          <Button variant="secondary" @click="confirmCurrencyReview"
+            >He revisado los precios en esta moneda</Button
+          >
         </div>
       </section>
 
@@ -785,13 +1058,85 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     </template>
 
     <Modal
+      :open="Boolean(readingLine)"
+      :title="readingLine?.nombre ?? 'Detalle de línea'"
+      @close="closeLineRead"
+    >
+      <div v-if="readingLine" class="read-line">
+        <p>
+          <strong>Tipo:</strong> {{ tipos.find((x) => x.id === readingLine?.tipo_item)?.nombre }}
+        </p>
+        <p>
+          <strong>SKU:</strong>
+          {{
+            readMaster?.sku ||
+            (readingLine.producto
+              ? 'Producto #' + readingLine.producto
+              : 'Variante pendiente / mueble a pedido')
+          }}
+        </p>
+        <p>
+          <strong>Descripción:</strong> {{ readingLine.descripcion || 'Sin descripción adicional' }}
+        </p>
+        <p>
+          <strong>Cantidad:</strong> {{ readingLine.cantidad }}
+          {{ unidades.find((x) => x.id === readingLine?.unidad)?.nombre }}
+        </p>
+        <p v-if="readingLine.familia_producto && !readingLine.producto" role="status">
+          Variante pendiente; no se reserva stock.
+        </p>
+        <p v-if="readingLine.modo_calculo === 'TOTAL_NEGOCIADO'">
+          <strong>Importe negociado histórico:</strong> {{ readingLine.importe_negociado }}
+        </p>
+        <p v-else>
+          <strong>Precio unitario cotizado:</strong>
+          {{ money(Number(readingLine.precio_unitario)) }}
+        </p>
+        <p><strong>Descuento:</strong> {{ money(Number(readingLine.descuento)) }}</p>
+        <p>
+          <strong>Importe estimado:</strong>
+          {{
+            totalEstimadoLinea(readingLine) === null
+              ? 'Pendiente'
+              : money(totalEstimadoLinea(readingLine)!)
+          }}
+        </p>
+        <template v-if="readMaster">
+          <h3>Datos actuales del catálogo · solo lectura</h3>
+          <p>{{ readMaster.nombre }} · {{ readMaster.categoria_info?.nombre }}</p>
+          <p>Precio vigente de referencia BOB: {{ readMaster.precio_vigente }}</p>
+          <p>Disponibilidad referencial: {{ readMaster.disponibilidad_referencial }}</p>
+          <p v-if="readMaster.silla">Silla: {{ readMaster.silla.modelo }}</p>
+          <p v-if="readMaster.piso">
+            Piso: {{ readMaster.piso.modelo }} · {{ readMaster.piso.espesor_mm }} mm
+          </p>
+        </template>
+        <template v-if="readingLine.especificacion">
+          <h3>Ficha técnica</h3>
+          <p>{{ readingLine.especificacion.observaciones }}</p>
+          <pre>{{ JSON.stringify(readingLine.especificacion.datos_tecnicos, null, 2) }}</pre>
+        </template>
+        <div class="actions">
+          <Button
+            v-if="readingLine.modo_calculo !== 'TOTAL_NEGOCIADO'"
+            variant="secondary"
+            @click="editReadLine"
+            >Editar</Button
+          >
+          <Button variant="secondary" @click="closeLineRead">Cerrar</Button>
+        </div>
+      </div>
+    </Modal>
+    <Modal
+      wide
       :open="lineModal"
       :title="editingLine === null ? 'Agregar producto' : 'Editar producto'"
       @close="closeLineModal"
     >
       <DetalleForm
-        :key="editableDetail?.id ?? editingLine ?? lineas.length"
+        :key="lineFormVersion"
         :tipos
+        :categorias="catalogCategories"
         :unidades
         :familias
         :moneda="header.moneda_codigo"
@@ -862,6 +1207,74 @@ section {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+}
+.choice-panel {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+.choice-panel h3 {
+  margin-top: 0;
+}
+.line-summary {
+  cursor: pointer;
+  min-width: 0;
+  flex: 1;
+}
+.line-summary:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.line-menu {
+  position: relative;
+  flex-shrink: 0;
+}
+.menu-trigger {
+  padding: var(--space-2);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+.menu-panel {
+  position: absolute;
+  z-index: 10;
+  top: 100%;
+  right: 0;
+  min-width: 10rem;
+  display: grid;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-raised);
+  box-shadow: 0 4px 16px #0002;
+}
+.menu-panel button {
+  text-align: left;
+  padding: var(--space-2);
+  background: transparent;
+  color: var(--color-text);
+  border: 0;
+  cursor: pointer;
+}
+.menu-panel button:focus-visible {
+  outline: 2px solid var(--color-primary);
+}
+.read-line {
+  display: grid;
+  gap: var(--space-2);
+}
+.read-line p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.read-line pre {
+  max-width: 100%;
+  overflow: auto;
+  white-space: pre-wrap;
 }
 .line-card {
   margin-bottom: var(--space-3);

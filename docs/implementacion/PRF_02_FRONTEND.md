@@ -12,7 +12,7 @@
 ## 0. Principios innegociables
 
 1. La proforma es **un único borrador comercial**, con líneas de silla, piso, otros y muebles a pedido en una lista común; cambiar de categoría no crea otra proforma.
-2. **Dos caminos de incorporación:** «Producto de catálogo» y «Mueble a pedido». El de catálogo muestra Sillas, Pisos y Otros, búsqueda directa por SKU/nombre y filtros por categoría. Mueble a pedido va al formulario manual completo, *no* al maestro `Producto` ni a un catálogo de muebles inventado. Detalle de ese formulario: PRF-03. Voz/NLP: PRF-04, opcional y siempre revisable.
+2. **Dos caminos de incorporación:** «Producto de catálogo» y «Mueble a pedido». El de catálogo muestra Sillas, Pisos y Otros, búsqueda directa por SKU/nombre y filtros por categoría. Mueble a pedido va al formulario manual completo, _no_ al maestro `Producto` ni a un catálogo de muebles inventado. Detalle de ese formulario: PRF-03. Voz/NLP: PRF-04, opcional y siempre revisable.
 3. Los productos maestros se consultan y seleccionan, **nunca se editan accidentalmente al negociar**. Solo `comercial.administrar` crea/modifica maestros. La línea comercial y el maestro tienen persistencia y permisos diferentes.
 4. Seleccionar un producto abre el **formulario comercial completo**; jamás insertar automáticamente cantidad 1/precio catálogo ni ejecutar POST/PUT de proforma. La incorporación solo actualiza el borrador local hasta «Guardar borrador»/«Emitir».
 5. Cada SKU es variante real con precio, unidad y stock propios; una familia agrupa y habilita «Variante pendiente», pero no es SKU, no reserva stock ni autoriza aprobar. No inventar variantes ni mostrar una familia como si tuviera precio/stock individual.
@@ -26,21 +26,21 @@
 
 ## 1. Baseline y brechas concretas constatadas
 
-| Área/código actual | Estado real (baseline) | Trabajo PRF-02 |
-|---|---|---|
-| `src/modules/proformas/views/ProformaEditorView.vue` | Editor cuatro pasos Productos/Cliente/Condiciones/Revisar; guarda integral; tarjetas con botones; solo última eliminación reversible | Orquestar dos caminos, catálogo contextual, lista compacta, detalle lectura, menú, stack undo, ida/vuelta estable |
-| `src/modules/proformas/components/DetalleForm.vue` | Formulario genérico con selección textual, productos/familias y precio vigente | Formulario comercial de SKU/familia predefinidos, read-only maestro, evitar sobrescritura negociada |
-| `src/modules/proformas/components/ProductoSelector.vue` | Select paginado/búsqueda activos, no catálogo visual | Reutilizar consulta en nueva vista contextual, sin romper consumidores legados |
-| `src/modules/productos/views/ProductosListView.vue` | Catálogo administrativo grid/list y SearchField, filtros activos y paginación | Reutilizar primitivas visuales; no redirigir al vendedor a la lista administrativa para seleccionar |
-| `src/modules/productos/components/ProductoForm.vue` | Maestro de categorías, silla/piso y JSON visible para silla | Preselección contextual; controles comerciales legibles para especificaciones JSON manteniendo datos desconocidos |
-| `src/modules/productos/views/ProductoCreateView.vue` | `returnTo/draft/productoCreado` y upload posterior a alta | Pasar categoría; retorno fiable y explícito en el contexto comercial |
-| `src/modules/productos/views/ProductoDetailView.vue` | Edición protegida por `If-Match`, sin retorno contextual equivalente | Editar maestro desde cotización y regresar conservando estado |
-| `src/modules/proformas/services/editorLocal.ts` | Clonación JSON, una eliminación por vez, token `sessionStorage` para retorno puntual | Stack undo, contexto completo, identidad/expiración, recuperación temporal segura |
-| `src/modules/proformas/services/presentacionComercial.ts` | Total estimado con validación de datos | Mantener previsualización fiel y separada de total servidor; precisión/invalidación según contrato |
-| `src/modules/proformas/views/ProformaDetailView.vue` | Advierte familia pendiente en detalle persistido | Consistencia visual y acceso a resolver variante desde editor, sin abrir escritura por estados |
-| `apps/catalogo/api/views.py` + `ProductoFiltrosListadoSerializer` | Solo activo/categoría/familia, `search` en SKU/nombre | Coordinar nuevos filtros backend *antes* de usar como reales |
-| `apps/catalogo/api/serializers.py` | SKU, datos de silla/piso, familia, precio, promoción, unidad, disponibilidad | Usar datos existentes sin inventar atributos o números |
-| `apps/proformas/services.py`/triggers | Familia pendiente válida y bloqueo en aprobación, unicidad SKU, precios/históricos | Conservar contrato; corregir únicamente brechas probadas |
+| Área/código actual                                                | Estado real (baseline)                                                                                                               | Trabajo PRF-02                                                                                                    |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `src/modules/proformas/views/ProformaEditorView.vue`              | Editor cuatro pasos Productos/Cliente/Condiciones/Revisar; guarda integral; tarjetas con botones; solo última eliminación reversible | Orquestar dos caminos, catálogo contextual, lista compacta, detalle lectura, menú, stack undo, ida/vuelta estable |
+| `src/modules/proformas/components/DetalleForm.vue`                | Formulario genérico con selección textual, productos/familias y precio vigente                                                       | Formulario comercial de SKU/familia predefinidos, read-only maestro, evitar sobrescritura negociada               |
+| `src/modules/proformas/components/ProductoSelector.vue`           | Select paginado/búsqueda activos, no catálogo visual                                                                                 | Reutilizar consulta en nueva vista contextual, sin romper consumidores legados                                    |
+| `src/modules/productos/views/ProductosListView.vue`               | Catálogo administrativo grid/list y SearchField, filtros activos y paginación                                                        | Reutilizar primitivas visuales; no redirigir al vendedor a la lista administrativa para seleccionar               |
+| `src/modules/productos/components/ProductoForm.vue`               | Maestro de categorías, silla/piso y JSON visible para silla                                                                          | Preselección contextual; controles comerciales legibles para especificaciones JSON manteniendo datos desconocidos |
+| `src/modules/productos/views/ProductoCreateView.vue`              | `returnTo/draft/productoCreado` y upload posterior a alta                                                                            | Pasar categoría; retorno fiable y explícito en el contexto comercial                                              |
+| `src/modules/productos/views/ProductoDetailView.vue`              | Edición protegida por `If-Match`, sin retorno contextual equivalente                                                                 | Editar maestro desde cotización y regresar conservando estado                                                     |
+| `src/modules/proformas/services/editorLocal.ts`                   | Clonación JSON, una eliminación por vez, token `sessionStorage` para retorno puntual                                                 | Stack undo, contexto completo, identidad/expiración, recuperación temporal segura                                 |
+| `src/modules/proformas/services/presentacionComercial.ts`         | Total estimado con validación de datos                                                                                               | Mantener previsualización fiel y separada de total servidor; precisión/invalidación según contrato                |
+| `src/modules/proformas/views/ProformaDetailView.vue`              | Advierte familia pendiente en detalle persistido                                                                                     | Consistencia visual y acceso a resolver variante desde editor, sin abrir escritura por estados                    |
+| `apps/catalogo/api/views.py` + `ProductoFiltrosListadoSerializer` | Solo activo/categoría/familia, `search` en SKU/nombre                                                                                | Coordinar nuevos filtros backend _antes_ de usar como reales                                                      |
+| `apps/catalogo/api/serializers.py`                                | SKU, datos de silla/piso, familia, precio, promoción, unidad, disponibilidad                                                         | Usar datos existentes sin inventar atributos o números                                                            |
+| `apps/proformas/services.py`/triggers                             | Familia pendiente válida y bloqueo en aprobación, unicidad SKU, precios/históricos                                                   | Conservar contrato; corregir únicamente brechas probadas                                                          |
 
 No confundir la presencia de tests de AP5/PRF-01 con prueba de PRF-02. Las rutas y pantallas nuevas no se implementaron en este baseline.
 
@@ -55,6 +55,7 @@ No confundir la presencia de tests de AP5/PRF-01 con prueba de PRF-02. Las rutas
 ## 3. PRF-02.2 — Catálogo visual contextual y filtros
 
 ### 3.1 Interfaz
+
 - Navegación contextual «Proforma › Añadir producto › Categoría». Selector de categoría, búsqueda SKU/nombre global, resultado contado, alternancia cuadrícula/lista, filtros visibles, chips activos y vaciado, carga/error/resultado vacío. Vista responsive: lateral desktop, panel plegable móvil, sin desbordes.
 - Tarjeta por **SKU real**, con fotografía o fallback, nombre, SKU, familia opcional, 2–3 atributos pertinentes, unidad de stock, precio de referencia BOB, promoción vigente cuando aplique y disponibilidad **referencial**, sin afirmar «reservado». Primaria «Seleccionar para cotizar», secundaria «Ver ficha»; crear/editar maestro solo como acciones secundarias autorizadas.
 - Familia organiza/filtra sin ocultar SKU ni fusionar variantes con stock/precio distintos. Si no hay familia, el SKU sigue siendo seleccionable. Cero stock no bloquea preparar proforma, pero informa adecuadamente. Cero de lista **no** se adopta como venta válida.
@@ -63,13 +64,13 @@ No confundir la presencia de tests de AP5/PRF-01 con prueba de PRF-02. Las rutas
 
 ### 3.2 Matriz de filtros requerida
 
-| Contexto | Filtros |
-|---|---|
-| Global | SKU/nombre, categoría, familia |
-| SILLA | Familia, marca, modelo, color primario |
-| PISO_FLOTANTE | Familia, marca, tipo, material, diseño, acabado, espesor (mm) |
-| OTRO | Familia, SKU/nombre, unidad |
-| Selección de variante pendiente | Familia y categoría actual, solo variantes compatibles |
+| Contexto                        | Filtros                                                       |
+| ------------------------------- | ------------------------------------------------------------- |
+| Global                          | SKU/nombre, categoría, familia                                |
+| SILLA                           | Familia, marca, modelo, color primario                        |
+| PISO_FLOTANTE                   | Familia, marca, tipo, material, diseño, acabado, espesor (mm) |
+| OTRO                            | Familia, SKU/nombre, unidad                                   |
+| Selección de variante pendiente | Familia y categoría actual, solo variantes compatibles        |
 
 Backend añade filtros mediante API pública, parámetros documentados y tipos OpenAPI. Solo ofrecer opciones fundamentadas en valores reales; no inventar filtro «color de piso» (el modelo no lo tiene). Modelo puede usar texto validado, espesor decimal; respetar exactitud/semántica de los campos según backend. Ningún filtro local reemplaza filtrado servidor.
 
@@ -119,6 +120,7 @@ Backend añade filtros mediante API pública, parámetros documentados y tipos O
 ## 8. PRF-02.7 — Integración, calidad y límites
 
 ### 8.1 Rutas completas obligatorias
+
 1. Cotización nueva → Catálogo → Sillas → SKU → formulario → lista, sin POST de proforma.
 2. Lo mismo para Pisos (M2 decimal) y Otros (PIEZA/JUEGO/BARRA).
 3. Búsqueda SKU directa, filtros específicos **backend**, chips/paginación/vistas grid-list, loading/error/empty, cambio rápido sin respuestas obsoletas.
@@ -133,12 +135,14 @@ Backend añade filtros mediante API pública, parámetros documentados y tipos O
 12. No regresiones en clientes, documentos, adjuntos, pedidos, movimientos ni integración de captura existente.
 
 ### 8.2 Superficies a intervenir (orientativas, no listas cerradas)
+
 - `src/modules/proformas/views/ProformaEditorView.vue`, `ProformaDetailView.vue`, `components/DetalleForm.vue`, `ProductoSelector.vue`, `services/editorLocal.ts`, `presentacionComercial.ts`, `proformasService.ts`.
 - `src/modules/productos/views/ProductosListView.vue`, `ProductoCreateView.vue`, `ProductoDetailView.vue`, `components/ProductoForm.vue`, `ProductImage.vue`, `services/productosService.ts`.
-- Componentes nuevos *acotados* para catálogo contextual, tarjeta SKU, filtros, detalle lectura y menú `⋮`. Reutilizar UI compartida donde tenga sentido y no romper consumidor anterior.
+- Componentes nuevos _acotados_ para catálogo contextual, tarjeta SKU, filtros, detalle lectura y menú `⋮`. Reutilizar UI compartida donde tenga sentido y no romper consumidor anterior.
 - `contracts/backend-openapi.yaml`, `src/generated/api/` solo vía procedimiento generado/sincronizado con backend cuando contrato cambie.
 
 ### 8.3 Pruebas y gates
+
 - Vitest unit/component para: filtro, estado, precio/moneda/promos, qty M2 vs PIEZA/JUEGO/BARRA, familias, SKU duplicate, conservación de IDs, snapshots, varias eliminaciones/undo, editor multi-tab, draft recovery, race conditions, modal/menú y distinción maestro/línea.
 - Playwright E2E para escenarios 8.1 con mocks controlados **y pruebas de integración reales** contra versión compatible backend/PostgreSQL. Asegurar que integración PRF-02 ejecute el par **real de commits nuevos**; los jobs con SHA histórico fijado no bastan para demostrar compatibilidad de PRF-02.
 - A11y teclado/semántica/foco/restauración/Escape, overlay sin bloqueo residual; responsive 360,390,768,1024,1440; claro/oscuro; capturas y trazas de errores.
@@ -164,14 +168,14 @@ Backend añade filtros mediante API pública, parámetros documentados y tipos O
 
 ## 11. Matriz resumida de trazabilidad
 
-| PRF | Entrega | Evidencia mínima |
-|---|---|---|
-| 02.1 | Dos caminos y navegación contextual | E2E de entrada/cancelación/retorno |
-| 02.2 | Catálogo SKU visual, filtros servidor y responsive | API test filtros, E2E catálogo/filtros/paginación, capturas |
-| 02.3 | Formulario comercial SKU y precio/moneda/unidad/promos | Unit + E2E precios, descuentos y cero stock |
-| 02.4 | Familia pendiente y resolución sobre misma línea | PostgreSQL + E2E pendiente/emisión/bloqueo/compatibilidad |
-| 02.5 | Lista/lectura/menú/editar/duplicar/undo múltiple | Component+E2E identidad y accesibilidad |
-| 02.6 | Crear/editar maestros contextual con recuperación | E2E permisos, cancelación, retorno, 409 y sesiones |
-| 02.7 | Compatibilidad, seguridad, rendimiento y no regresión | Tests integrados, contratos, CI, capturas, auditoría |
+| PRF  | Entrega                                                | Evidencia mínima                                            |
+| ---- | ------------------------------------------------------ | ----------------------------------------------------------- |
+| 02.1 | Dos caminos y navegación contextual                    | E2E de entrada/cancelación/retorno                          |
+| 02.2 | Catálogo SKU visual, filtros servidor y responsive     | API test filtros, E2E catálogo/filtros/paginación, capturas |
+| 02.3 | Formulario comercial SKU y precio/moneda/unidad/promos | Unit + E2E precios, descuentos y cero stock                 |
+| 02.4 | Familia pendiente y resolución sobre misma línea       | PostgreSQL + E2E pendiente/emisión/bloqueo/compatibilidad   |
+| 02.5 | Lista/lectura/menú/editar/duplicar/undo múltiple       | Component+E2E identidad y accesibilidad                     |
+| 02.6 | Crear/editar maestros contextual con recuperación      | E2E permisos, cancelación, retorno, 409 y sesiones          |
+| 02.7 | Compatibilidad, seguridad, rendimiento y no regresión  | Tests integrados, contratos, CI, capturas, auditoría        |
 
 **Resultado exigido:** el vendedor puede preparar una única cotización de catálogo con variantes concretas o pendientes, administrar líneas y regresar de mantenimiento maestro **sin pérdida de trabajo, sin duplicaciones y sin operaciones de proforma implícitas**. La autoridad comercial y transaccional sigue en backend/PostgreSQL.

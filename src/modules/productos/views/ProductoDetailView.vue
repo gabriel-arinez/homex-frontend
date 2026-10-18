@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import type { Producto, ProductoWritable } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { ApiError } from '@/shared/api'
@@ -15,6 +15,7 @@ import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
 const emit = defineEmits<{ openMenu: [] }>()
 const route = useRoute()
+const router = useRouter()
 const session = useSessionStore()
 const product = ref<Producto | null>(null)
 const loading = ref(true)
@@ -27,6 +28,17 @@ const dirty = ref(false)
 const conflicted = ref(false)
 let requestId = 0
 const canEdit = computed(() => session.can('comercial.administrar'))
+const contextualDestination = computed(() => {
+  const path = route.query.returnTo
+  const draft = route.query.draft
+  if (typeof path !== 'string' || !/^\/proformas(?:\/|$)/.test(path) || typeof draft !== 'string')
+    return null
+  return { path, query: { draft } }
+})
+function returnToProforma() {
+  if (!contextualDestination.value) return
+  void router.push(contextualDestination.value)
+}
 const money = (value: string) =>
   new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(Number(value))
 async function load() {
@@ -44,6 +56,7 @@ async function load() {
     const result = await productosService.get(id)
     if (token !== requestId) return
     product.value = result
+    if (route.query.editar === '1' && canEdit.value) editing.value = true
   } catch (cause) {
     if (token !== requestId) return
     error.value = cause instanceof Error ? cause.message : 'No se pudo cargar el producto.'
@@ -61,6 +74,7 @@ async function save(body: ProductoWritable) {
     dirty.value = false
     editing.value = false
     success.value = 'Producto actualizado.'
+    if (contextualDestination.value) await router.push(contextualDestination.value)
   } catch (cause) {
     if (cause instanceof ApiError && cause.status === 409) conflicted.value = true
     error.value = cause instanceof ApiError ? cause.message : 'No se pudo guardar.'
@@ -103,6 +117,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       show-menu
       @menu="emit('openMenu')"
       ><template #actions
+        ><Button
+          v-if="contextualDestination && !editing"
+          variant="secondary"
+          @click="returnToProforma"
+          >Volver a proforma</Button
         ><Button v-if="product && canEdit && !editing" variant="secondary" @click="editing = true"
           >Editar datos comerciales</Button
         ></template
