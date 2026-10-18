@@ -33,6 +33,23 @@ describe('AP5 estado local del editor', () => {
     expect(consumeEditorDraft('token')).toEqual(draft)
     expect(consumeEditorDraft('token')).toBeNull()
   })
+  it('deshace múltiples eliminaciones en orden LIFO sin perder identidad ni posición', () => {
+    const original = [
+      { id: 11, localId: 'a', nombre: 'Silla', precio_unitario: '87.50' },
+      { id: 12, localId: 'b', nombre: 'Piso', precio_unitario: '120.00' },
+      { id: 13, localId: 'c', nombre: 'Mueble', especificacion: { datos_tecnicos: { alto: 90 } } },
+    ]
+    const primero = removeLocalLine(original, 0)
+    const segundo = removeLocalLine(primero.lines, 1)
+    const pila = [primero.removed!, segundo.removed!]
+    let actual = segundo.lines
+    actual = restoreLocalLine(actual, pila.pop()!)
+    actual = restoreLocalLine(actual, pila.pop()!)
+    expect(actual).toEqual(original)
+    expect(actual[0]).not.toBe(original[0])
+    expect(actual[2]).not.toBe(original[2])
+  })
+
   it('duplica profundamente un mueble y conserva recuperación íntegra', () => {
     const original = {
       id: 9,
