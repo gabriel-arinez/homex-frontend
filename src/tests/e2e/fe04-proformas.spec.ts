@@ -649,8 +649,8 @@ test('PRF-01 muestra cliente humano y estimación local sin identificadores inte
   await page.getByRole('button', { name: /Revisar$/ }).click()
   await expect(page.getByRole('region').getByText('Ana Pérez', { exact: true })).toBeVisible()
   await expect(page.getByText('Cliente #1')).toHaveCount(0)
-  await expect(page.getByText('Total confirmado por HOMEX')).toBeVisible()
-  await expect(page.getByText('Importe guardado y calculado por el servidor.')).toBeVisible()
+  await expect(page.getByText('Estimación local')).toBeVisible()
+  await expect(page.getByText('Total pendiente')).toBeVisible()
 })
 
 test('PRF-01 protege cambios pendientes de la ficha técnica', async ({ page }) => {
