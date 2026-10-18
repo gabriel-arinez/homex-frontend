@@ -72,11 +72,14 @@ function selectProduct(product: Producto | null) {
       emit('duplicateProduct', product.id)
       return
     }
-    form.familia_producto = ''
+    // Al resolver una familia pendiente, no sustituir importes ya negociados.
+    form.familia_producto = product.familia ? String(product.familia) : ''
     unidadCatalogo.value = String(product.unidad_stock)
     form.unidad = String(product.unidad_stock)
-    form.nombre = product.nombre
-    if (props.moneda === 'BOB') form.precio_unitario = product.precio_vigente
+    if (!props.detail) {
+      form.nombre = product.nombre
+      if (props.moneda === 'BOB') form.precio_unitario = product.precio_vigente
+    }
   } else {
     unidadCatalogo.value = null
   }
