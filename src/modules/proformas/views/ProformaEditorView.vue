@@ -66,7 +66,7 @@ const lineModalDirty = ref(false)
 const specModalDirty = ref(false)
 const editingLine = ref<number | null>(null)
 const specLine = ref<number | null>(null)
-const removedLine = ref<{ line: LineaLocal; index: number } | null>(null)
+const removedLines = ref<{ line: LineaLocal; index: number }[]>([])
 const contextualNavigation = ref(false)
 const preferredProductId = ref<number | null>(null)
 const pendingLineDraft = ref<Record<string, string> | null>(null)
@@ -237,6 +237,7 @@ function fill(value: Proforma) {
   clienteMode.value = value.cliente ? 'existente' : 'pendiente'
   clienteSeleccionado.value = value.cliente_resumen ?? null
   lineas.value = value.detalles.map(normalizeLine)
+  removedLines.value = []
   dirty.value = false
 }
 async function load() {
@@ -324,13 +325,13 @@ function closeSpec() {
 function removeLine(index: number) {
   const result = removeLocalLine(lineas.value, index)
   lineas.value = result.lines
-  removedLine.value = result.removed
+  if (result.removed) removedLines.value.push(result.removed)
   markDirty()
 }
 function undoRemove() {
-  if (!removedLine.value) return
-  lineas.value = restoreLocalLine(lineas.value, removedLine.value)
-  removedLine.value = null
+  const removed = removedLines.value.pop()
+  if (!removed) return
+  lineas.value = restoreLocalLine(lineas.value, removed)
   markDirty()
 }
 function duplicateFurniture(index: number) {
@@ -350,6 +351,7 @@ function editorSnapshot() {
     clienteSeleccionado: cloneEditorData(clienteSeleccionado.value),
     lineModalDirty: lineModalDirty.value,
     lineas: cloneEditorData(lineas.value),
+    removedLines: cloneEditorData(removedLines.value),
     currentStep: currentStep.value,
     key: key.value,
     lineDraft: cloneEditorData(pendingLineDraft.value),
@@ -375,6 +377,7 @@ function restoreContextualDraft() {
   clienteSeleccionado.value =
     snapshot.clienteSeleccionado ?? persisted.value?.cliente_resumen ?? null
   lineas.value = snapshot.lineas
+  removedLines.value = snapshot.removedLines ?? []
   currentStep.value = snapshot.currentStep
   key.value = snapshot.key
   pendingLineDraft.value = snapshot.lineDraft
@@ -498,7 +501,7 @@ async function persist(emitir: boolean) {
       ? await proformasService.updateIntegral(proformaId.value, body(emitir))
       : await proformasService.saveIntegral(body(emitir))
     fill(result)
-    removedLine.value = null
+    removedLines.value = []
     key.value = crypto.randomUUID()
     success.value = emitir ? 'Proforma emitida para revisión.' : 'Borrador guardado.'
     if (!proformaId.value) await router.replace(`/proformas/${result.id}/editar`)
@@ -621,9 +624,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             ><Button variant="secondary" @click="removeLine(index)">Eliminar</Button>
           </div>
         </Card>
-        <p v-if="removedLine" role="status" class="undo">
-          Línea retirada provisionalmente.
-          <button type="button" @click="undoRemove">Deshacer eliminación</button>
+        <p v-if="removedLines.length" role="status" class="undo">
+          {{ removedLines.length }} eliminación(es) provisional(es) pendiente(s) de guardar.
+          <button type="button" @click="undoRemove">Deshacer última eliminación</button>
         </p>
         <p v-if="!lineas.length" class="empty">Aún no agregaste productos.</p>
         <p v-if="lineas.some((line) => line.modo_calculo === 'TOTAL_NEGOCIADO')" class="warning">
