@@ -653,6 +653,138 @@ test('PRF-01 muestra cliente humano y estimación local sin identificadores inte
   await expect(page.getByText('Total pendiente')).toBeVisible()
 })
 
+test('PRF-01 protege cambios pendientes de la ficha técnica', async ({ page }) => {
+  await mockBackend(page)
+  await page.goto('/proformas/nueva')
+  await page.getByRole('button', { name: 'Agregar producto' }).click()
+  await page.getByLabel('Tipo de línea').selectOption('10')
+  await page.getByLabel('Nombre comercial').fill('Mueble con ficha')
+  await page.getByLabel('Precio unitario (BOB)').fill('150')
+  await page.getByRole('button', { name: 'Guardar línea' }).click()
+  await page.getByRole('button', { name: 'Ficha técnica' }).click()
+  await page.locator('#componente-nombre-0').fill('Mesón')
+
+  page.once('dialog', (dialog) => dialog.dismiss())
+  await page.getByRole('button', { name: 'Cerrar', exact: true }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.locator('#componente-nombre-0')).toHaveValue('Mesón')
+
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('button', { name: 'Cancelar', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+})
+
+test('PRF-01 restaura cliente y no descarta la línea al volver del producto contextual', async ({
+  page,
+}) => {
+  await mockBackend(page)
+  await page.addInitScript(() => {
+    sessionStorage.setItem(
+      'homex:ap5:draft:prf01-retorno',
+      JSON.stringify({
+        header: {
+          cliente: '1',
+          titulo: 'Cotización recuperada',
+          moneda_codigo: 'BOB',
+          plazo_entrega: '',
+          validez_oferta: '',
+          porcentaje_adelanto: '',
+          observaciones: '',
+        },
+        nuevoCliente: {
+          tipo_cliente: '1',
+          nombres: '',
+          apellidos: '',
+          empresa: '',
+          celular: '',
+          direccion: '',
+          observaciones: '',
+        },
+        clienteMode: 'existente',
+        clienteSeleccionado: {
+          id: 1,
+          nombre: 'Ana Pérez',
+          empresa: null,
+          celular: '70000000',
+        },
+        lineModalDirty: true,
+        lineas: [],
+        currentStep: 3,
+        key: crypto.randomUUID(),
+        lineDraft: {
+          tipo_item: '10',
+          nombre: 'Mesa pendiente',
+          cantidad: '1',
+          unidad: '20',
+          precio_unitario: '100',
+          descuento: '0',
+        },
+        editingLine: null,
+      }),
+    )
+  })
+  await page.goto('/proformas/1/editar?draft=prf01-retorno')
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByLabel('Nombre comercial')).toHaveValue('Mesa pendiente')
+
+  page.once('dialog', (dialog) => dialog.dismiss())
+  await page.getByRole('button', { name: 'Cerrar', exact: true }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByLabel('Nombre comercial')).toHaveValue('Mesa pendiente')
+
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('button', { name: 'Cerrar', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.getByRole('region').getByText('Ana Pérez', { exact: true })).toBeVisible()
+})
+
+test('PRF-01 no pierde edición al detectar variante duplicada', async ({ page }) => {
+  const state = await mockBackend(page)
+  state.quote().detalles = [
+    {
+      id: 10,
+      proforma: 1,
+      tipo_item: 11,
+      tipo_item_info: options.TIPO_ITEM[1],
+      producto: 4,
+      familia_producto: null,
+      nombre: 'Silla existente',
+      descripcion: null,
+      cantidad: '1.0000',
+      unidad: 20,
+      unidad_info: options.UNIDAD_MEDIDA[0],
+      modo_calculo: 'PRECIO_UNITARIO',
+      precio_unitario: '1200.00',
+      importe_negociado: null,
+      descuento: '0.00',
+      total: '1200.00',
+      especificacion: null,
+    },
+  ]
+  await page.goto('/proformas/1/editar')
+  await page.getByRole('button', { name: 'Agregar producto' }).click()
+  await page.getByLabel('Tipo de línea').selectOption('11')
+  await page.getByLabel('Nombre comercial').fill('Edición aún pendiente')
+
+  page.once('dialog', (dialog) => dialog.dismiss())
+  await page.locator('#producto-linea').selectOption('4')
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByLabel('Nombre comercial')).toHaveValue('Edición aún pendiente')
+})
+
+test('PRF-01 separa el total guardado de los cambios locales', async ({ page }) => {
+  const state = await mockBackend(page)
+  state.quote().total = '250.00'
+  await page.goto('/proformas/1/editar')
+  await page.getByRole('button', { name: /Revisar$/ }).click()
+  await expect(page.getByText('Total confirmado por HOMEX')).toBeVisible()
+  await page.getByRole('button', { name: /Condiciones$/ }).click()
+  await page.getByLabel('Título').fill('Cotización modificada')
+  await page.getByRole('button', { name: /Revisar$/ }).click()
+  await expect(page.getByText('Estimación local')).toBeVisible()
+  await expect(page.getByText(/Último total guardado:/)).toBeVisible()
+})
+
 for (const width of [360, 390, 768, 1024, 1440])
   test(`@a11y FE04 proforma operable a ${width}px`, async ({ page }) => {
     await mockBackend(page)

@@ -16,11 +16,23 @@ export function normalizeApiError(status: number, body: unknown): ApiError {
   const data = body as Record<string, unknown>
   const detail = typeof data.detail === 'string' ? data.detail : undefined
   const fields: FieldErrors = {}
+  function registrar(ruta: string, valor: unknown) {
+    if (typeof valor === 'string') {
+      fields[ruta] = [...(fields[ruta] ?? []), valor]
+    } else if (Array.isArray(valor)) {
+      if (valor.every((item) => typeof item === 'string')) {
+        fields[ruta] = [...(fields[ruta] ?? []), ...valor]
+      } else {
+        valor.forEach((item, index) => registrar(`${ruta}[${index}]`, item))
+      }
+    } else if (valor !== null && typeof valor === 'object') {
+      for (const [clave, contenido] of Object.entries(valor)) {
+        registrar(ruta ? `${ruta}.${clave}` : clave, contenido)
+      }
+    }
+  }
   for (const [field, value] of Object.entries(data)) {
-    if (field === 'detail') continue
-    if (typeof value === 'string') fields[field] = [value]
-    else if (Array.isArray(value) && value.every((item) => typeof item === 'string'))
-      fields[field] = value
+    if (field !== 'detail') registrar(field, value)
   }
   return new ApiError(
     detail ?? Object.values(fields)[0]?.[0] ?? 'Revisa los datos enviados.',
