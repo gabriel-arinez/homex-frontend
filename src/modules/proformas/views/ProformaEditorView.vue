@@ -402,7 +402,13 @@ async function createProductContextually(draft: Record<string, string>) {
   saveEditorDraft(token, editorSnapshot())
   contextualNavigation.value = true
   lineModal.value = false
-  await router.push({ name: 'producto-create', query: { returnTo: route.path, draft: token } })
+  const tipo = tipos.value.find((item) => String(item.id) === draft.tipo_item)
+  const categoria = ['SILLA', 'PISO_FLOTANTE', 'OTRO'].includes(tipo?.codigo ?? '')
+    ? tipo?.codigo : undefined
+  await router.push({
+    name: 'producto-create',
+    query: { returnTo: route.path, draft: token, categoria },
+  })
 }
 function restoreContextualDraft() {
   const token = typeof route.query.draft === 'string' ? route.query.draft : ''
