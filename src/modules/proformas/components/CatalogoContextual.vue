@@ -16,6 +16,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   select: [producto: Producto]
+  duplicate: [productoId: number]
   pending: [familiaId: number, categoriaId: number]
   cancel: []
 }>()
@@ -183,9 +184,9 @@ onBeforeUnmount(() => {
           <p>{{ producto.unidad_stock_info?.nombre }} · {{ money(producto.precio_vigente) }}</p>
           <small v-if="producto.promocion?.vigente">Promoción vigente incluida en precio de referencia</small>
           <small>Disponibilidad referencial: {{ producto.disponibilidad_referencial }}</small>
-          <Button variant="primary" :disabled="existingProductIds.includes(producto.id)"
-            @click="emit('select', producto)">
-            {{ existingProductIds.includes(producto.id) ? 'SKU ya agregado' : 'Seleccionar para cotizar' }}
+          <Button variant="primary"
+            @click="existingProductIds.includes(producto.id) ? emit('duplicate', producto.id) : emit('select', producto)">
+            {{ existingProductIds.includes(producto.id) ? 'Ir a línea' : 'Seleccionar para cotizar' }}
           </Button>
         </div>
       </article>

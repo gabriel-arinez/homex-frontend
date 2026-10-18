@@ -63,6 +63,7 @@ const monedas = ref<ValorCatalogoPublico[]>([])
 const tiposMueble = ref<ValorCatalogoPublico[]>([])
 const tiposCliente = ref<ValorCatalogoPublico[]>([])
 const familias = ref<FamiliaProducto[]>([])
+const catalogCategories = ref<ValorCatalogoPublico[]>([])
 const lineModal = ref(false)
 const additionMode = ref<'none' | 'choose' | 'catalog'>('none')
 const catalogInitialized = ref(false)
@@ -295,13 +296,14 @@ async function load() {
 async function loadReferences() {
   referenceLoading.value = true
   try {
-    const [a, b, c, d, e, f] = await Promise.all([
+    const [a, b, c, d, e, f, g] = await Promise.all([
       proformasService.options('TIPO_ITEM'),
       proformasService.options('UNIDAD_MEDIDA'),
       proformasService.options('MONEDA'),
       proformasService.options('TIPO_MUEBLE'),
       proformasService.options('TIPO_CLIENTE'),
       proformasService.families(),
+      proformasService.options('CATEGORIA_PRODUCTO'),
     ])
     tipos.value = a
     unidades.value = b
@@ -309,6 +311,7 @@ async function loadReferences() {
     tiposMueble.value = d
     tiposCliente.value = e
     familias.value = f.results
+    catalogCategories.value = g
     if (!nuevoCliente.tipo_cliente && e[0]) nuevoCliente.tipo_cliente = String(e[0].id)
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : 'No se cargaron los datos auxiliares.'
@@ -556,8 +559,6 @@ function quotePendingFamily(familyId: number, categoryId: number) {
     precio_unitario: '',
   }
 }
-const catalogCategories = computed(() => tipos.value.filter((x) =>
-  ['SILLA', 'PISO_FLOTANTE', 'OTRO'].includes(x.codigo)))
 async function focusDuplicateProduct(productId: number) {
   const index = lineas.value.findIndex((line) => line.producto === productId)
   if (index < 0) return
@@ -720,6 +721,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             :familias="familias"
             :existing-product-ids="existingProductIds"
             @select="selectCatalogProduct"
+            @duplicate="focusDuplicateProduct"
             @pending="quotePendingFamily"
             @cancel="additionMode = 'none'"
           />
@@ -954,6 +956,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       </div>
     </Modal>
     <Modal
+      wide
       :open="lineModal"
       :title="editingLine === null ? 'Agregar producto' : 'Editar producto'"
       @close="closeLineModal"
