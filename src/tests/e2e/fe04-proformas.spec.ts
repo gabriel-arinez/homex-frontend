@@ -736,6 +736,40 @@ test('PRF-01 restaura cliente y no descarta la línea al volver del producto con
   await expect(page.getByRole('region').getByText('Ana Pérez', { exact: true })).toBeVisible()
 })
 
+test('PRF-01 no pierde edición al detectar variante duplicada', async ({ page }) => {
+  const state = await mockBackend(page)
+  state.quote().detalles = [
+    {
+      id: 10,
+      proforma: 1,
+      tipo_item: 11,
+      tipo_item_info: options.TIPO_ITEM[1],
+      producto: 4,
+      familia_producto: null,
+      nombre: 'Silla existente',
+      descripcion: null,
+      cantidad: '1.0000',
+      unidad: 20,
+      unidad_info: options.UNIDAD_MEDIDA[0],
+      modo_calculo: 'PRECIO_UNITARIO',
+      precio_unitario: '1200.00',
+      importe_negociado: null,
+      descuento: '0.00',
+      total: '1200.00',
+      especificacion: null,
+    },
+  ]
+  await page.goto('/proformas/1/editar')
+  await page.getByRole('button', { name: 'Agregar producto' }).click()
+  await page.getByLabel('Tipo de línea').selectOption('11')
+  await page.getByLabel('Nombre comercial').fill('Edición aún pendiente')
+
+  page.once('dialog', (dialog) => dialog.dismiss())
+  await page.locator('#producto-linea').selectOption('4')
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByLabel('Nombre comercial')).toHaveValue('Edición aún pendiente')
+})
+
 test('PRF-01 separa el total guardado de los cambios locales', async ({ page }) => {
   const state = await mockBackend(page)
   state.quote().total = '250.00'
