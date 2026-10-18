@@ -39,7 +39,10 @@ async function addCatalogLine(page: Page) {
   await expect(page.locator('#unidad-linea')).toBeDisabled()
   await expect(page.locator('#unidad-linea option:checked')).toHaveText('Pieza')
   await page.getByRole('button', { name: 'Guardar línea' }).click()
-  await expect(page.getByText('Silla integración FE08', { exact: true }).first()).toBeVisible()
+  // Verificar la línea incorporada, no la tarjeta del catálogo oculto con v-show.
+  await expect(
+    page.locator('.line-card').getByText('Silla integración FE08', { exact: true }),
+  ).toBeVisible()
 }
 
 async function approveCurrentQuote(page: Page) {
