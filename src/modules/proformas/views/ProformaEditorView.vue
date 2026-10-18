@@ -109,6 +109,8 @@ function updateNuevoCliente(field: keyof typeof nuevoCliente, value: string) {
   nuevoCliente[field] = value
 }
 const lineas = ref<LineaLocal[]>([])
+const reviewedCurrency = ref('BOB')
+const priceReviewRequired = computed(() => lineas.value.length > 0 && header.moneda_codigo !== reviewedCurrency.value)
 const existingProductIds = computed(() =>
   lineas.value.flatMap((line) => (line.producto ? [line.producto] : [])),
 )
@@ -116,6 +118,7 @@ const totalPreview = computed(() => totalEstimadoCompleto(lineas.value))
 const emissionPending = computed(() => {
   const pendientes: string[] = []
   if (!lineas.value.length) pendientes.push('agregar al menos una línea')
+  if (priceReviewRequired.value) pendientes.push('revisar explícitamente precios y descuentos tras cambiar de moneda')
   if (clienteMode.value === 'pendiente') pendientes.push('elegir o registrar un cliente')
   if (clienteMode.value === 'existente' && !header.cliente) pendientes.push('elegir un cliente')
   if (clienteMode.value === 'nuevo') {
@@ -211,7 +214,7 @@ const editableSpec = computed(() => {
   return (lineas.value[specLine.value]?.especificacion ?? null) as EspecificacionMueble | null
 })
 const canEmit = computed(() => {
-  if (!lineas.value.length) return false
+  if (!lineas.value.length || priceReviewRequired.value) return false
   if (clienteMode.value === 'existente') return Boolean(header.cliente)
   if (clienteMode.value !== 'nuevo' || !nuevoCliente.tipo_cliente) return false
   const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
@@ -222,6 +225,10 @@ const canEmit = computed(() => {
 
 function markDirty() {
   dirty.value = true
+}
+function confirmCurrencyReview() {
+  reviewedCurrency.value = header.moneda_codigo
+  markDirty()
 }
 function nombreClienteVisible() {
   const cliente = clienteSeleccionado.value
@@ -271,6 +278,7 @@ function fill(value: Proforma) {
   header.cliente = value.cliente ? String(value.cliente) : ''
   header.titulo = value.titulo ?? ''
   header.moneda_codigo = value.moneda_info.codigo
+  reviewedCurrency.value = value.moneda_info.codigo
   header.plazo_entrega = value.plazo_entrega ?? ''
   header.validez_oferta = value.validez_oferta ? String(value.validez_oferta) : ''
   header.porcentaje_adelanto = value.porcentaje_adelanto ?? ''
@@ -448,6 +456,7 @@ function duplicateFurniture(index: number) {
 function editorSnapshot() {
   return {
     header: cloneEditorData(header),
+    reviewedCurrency: reviewedCurrency.value,
     nuevoCliente: cloneEditorData(nuevoCliente),
     clienteMode: clienteMode.value,
     clienteSeleccionado: cloneEditorData(clienteSeleccionado.value),
@@ -499,6 +508,7 @@ function restoreContextualDraft() {
   const snapshot = consumeEditorDraft<ReturnType<typeof editorSnapshot>>(token)
   if (!snapshot) return
   Object.assign(header, snapshot.header)
+  reviewedCurrency.value = snapshot.reviewedCurrency ?? header.moneda_codigo
   Object.assign(nuevoCliente, snapshot.nuevoCliente)
   clienteMode.value = snapshot.clienteMode
   clienteSeleccionado.value =
@@ -665,6 +675,11 @@ function body(emitir: boolean): ProformaIntegralWritable {
 }
 async function persist(emitir: boolean) {
   if (saving.value) return
+  if (priceReviewRequired.value) {
+    currentStep.value = 2
+    error.value = 'Antes de guardar, revisa los precios negociados y confirma la nueva moneda.'
+    return
+  }
   saving.value = true
   error.value = ''
   success.value = ''
@@ -916,6 +931,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           />
           <TextField v-model="header.observaciones" name="observaciones" label="Observaciones" />
         </div>
+        <div v-if="priceReviewRequired" class="warning" role="status">
+          <p>La moneda cambió. Los precios y descuentos existentes no se convirtieron automáticamente.</p>
+          <p>Revisa cada importe en {{ header.moneda_codigo }} antes de continuar.</p>
+          <Button variant="secondary" @click="confirmCurrencyReview">He revisado los precios en esta moneda</Button>
+        </div>
       </section>
 
       <section v-if="currentStep === 3" aria-labelledby="revisar-title">
@@ -1092,6 +1112,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       <DetalleForm
         :key="lineFormVersion"
         :tipos
+        :categorias="catalogCategories"
         :unidades
         :familias
         :moneda="header.moneda_codigo"

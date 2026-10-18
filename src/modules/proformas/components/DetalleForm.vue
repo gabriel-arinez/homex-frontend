@@ -19,6 +19,7 @@ import { productosService } from '@/modules/productos/services/productosService'
 
 const props = defineProps<{
   tipos: ValorCatalogoPublico[]
+  categorias?: ValorCatalogoPublico[]
   unidades: ValorCatalogoPublico[]
   familias?: FamiliaProducto[]
   moneda: string
@@ -55,6 +56,10 @@ const form = reactive({
 if (props.initialDraft) Object.assign(form, props.initialDraft)
 const unidadCatalogo = ref<string | null>(null)
 const master = ref<Producto | null>(null)
+const categoriaId = computed(() => {
+  const tipo = props.tipos.find((item) => String(item.id) === form.tipo_item)?.codigo
+  return props.categorias?.find((item) => item.codigo === tipo)?.id
+})
 const catalogItem = computed(
   () => props.tipos.find((x) => String(x.id) === form.tipo_item)?.codigo !== 'MUEBLE_MEDIDA',
 )
@@ -208,7 +213,13 @@ async function submit() {
       label="Tipo de línea"
       :disabled="Boolean(form.producto)"
       :options="tipos.map((x) => ({ label: x.nombre, value: String(x.id) }))"
-    /><ProductoSelector v-if="catalogItem" v-model="form.producto" @select="selectProduct" /><Button
+    /><ProductoSelector
+      v-if="catalogItem && !initialProductId && !detail?.producto"
+      v-model="form.producto"
+      :categoria="categoriaId"
+      :familia="form.familia_producto ? Number(form.familia_producto) : undefined"
+      @select="selectProduct"
+    /><Button
       v-if="catalogItem && session?.can('comercial.administrar')"
       type="button"
       variant="secondary"
