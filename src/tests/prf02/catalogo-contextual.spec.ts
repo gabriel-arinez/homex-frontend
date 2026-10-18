@@ -101,9 +101,7 @@ describe('PRF-02 catálogo contextual', () => {
           results: [sku],
         })
       }),
-      http.get('http://localhost:8000/api/v1/catalogo/opciones/', () =>
-        HttpResponse.json([]),
-      ),
+      http.get('http://localhost:8000/api/v1/catalogo/opciones/', () => HttpResponse.json([])),
     )
     const wrapper = mount(CatalogoContextual, {
       props: { categorias: [silla], familias: [], existingProductIds: [] },
@@ -114,9 +112,9 @@ describe('PRF-02 catálogo contextual', () => {
     await categoria!.trigger('click')
     await flushPromises()
     expect(consultas.some((url) => url.searchParams.get('categoria') === '1')).toBe(true)
-    const filtro = wrapper.findAll('button').find((button) =>
-      button.attributes('aria-label')?.includes('Quitar Categoría: Sillas'),
-    )
+    const filtro = wrapper
+      .findAll('button')
+      .find((button) => button.attributes('aria-label')?.includes('Quitar Categoría: Sillas'))
     expect(filtro).toBeDefined()
     await filtro!.trigger('click')
     await flushPromises()

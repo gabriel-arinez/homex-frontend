@@ -101,7 +101,7 @@ const activeChips = computed(() => {
     const raw = filters[item.field]
     if (!raw) continue
     const nombre = item.concepto
-      ? options.value[item.concepto]?.find((option) => String(option.id) === raw)?.nombre ?? raw
+      ? (options.value[item.concepto]?.find((option) => String(option.id) === raw)?.nombre ?? raw)
       : raw
     chips.push({ key: item.field, label: `${item.label}: ${nombre}` })
   }
@@ -247,48 +247,53 @@ onBeforeUnmount(() => {
     <details class="filtros-panel" :open="filtersExpanded" @toggle="setFiltersOpen">
       <summary>Filtros del catálogo</summary>
       <div class="filtros">
-      <SearchField v-model="search" label="Buscar SKU o nombre" />
-      <Select
-        v-model="family"
-        name="familia-catalogo"
-        label="Familia"
-        :options="[
-          { label: 'Todas las familias', value: '' },
-          ...familias
-            .filter((x) => x.activo)
-            .map((x) => ({ label: x.nombre, value: String(x.id) })),
-        ]"
-      />
-      <template v-for="item in activeFields" :key="item.field">
+        <SearchField v-model="search" label="Buscar SKU o nombre" />
         <Select
-          v-if="item.concepto"
-          v-model="filters[item.field]"
-          :name="'filtro-' + item.field"
-          :label="item.label"
+          v-model="family"
+          name="familia-catalogo"
+          label="Familia"
           :options="[
-            { label: 'Todos', value: '' },
-            ...(options[item.concepto] ?? []).map((x) => ({
-              label: x.nombre,
-              value: String(x.id),
-            })),
+            { label: 'Todas las familias', value: '' },
+            ...familias
+              .filter((x) => x.activo)
+              .map((x) => ({ label: x.nombre, value: String(x.id) })),
           ]"
         />
-        <label v-else class="filtro-texto">
-          <span>{{ item.label }}</span>
-          <input
+        <template v-for="item in activeFields" :key="item.field">
+          <Select
+            v-if="item.concepto"
             v-model="filters[item.field]"
-            :type="item.field === 'espesor_mm' ? 'number' : 'text'"
-            :min="item.field === 'espesor_mm' ? '0.01' : undefined"
-            :step="item.field === 'espesor_mm' ? '0.01' : undefined"
+            :name="'filtro-' + item.field"
+            :label="item.label"
+            :options="[
+              { label: 'Todos', value: '' },
+              ...(options[item.concepto] ?? []).map((x) => ({
+                label: x.nombre,
+                value: String(x.id),
+              })),
+            ]"
           />
-        </label>
-      </template>
+          <label v-else class="filtro-texto">
+            <span>{{ item.label }}</span>
+            <input
+              v-model="filters[item.field]"
+              :type="item.field === 'espesor_mm' ? 'number' : 'text'"
+              :min="item.field === 'espesor_mm' ? '0.01' : undefined"
+              :step="item.field === 'espesor_mm' ? '0.01' : undefined"
+            />
+          </label>
+        </template>
       </div>
     </details>
     <div v-if="activeChips.length" class="chips-filtros" aria-label="Filtros activos">
       <span>Filtros activos:</span>
-      <button v-for="chip in activeChips" :key="chip.key" type="button"
-        :aria-label="'Quitar ' + chip.label" @click="clearFilter(chip.key)">
+      <button
+        v-for="chip in activeChips"
+        :key="chip.key"
+        type="button"
+        :aria-label="'Quitar ' + chip.label"
+        @click="clearFilter(chip.key)"
+      >
         {{ chip.label }} <span aria-hidden="true">×</span>
       </button>
       <Button variant="secondary" @click="clearAllFilters">Limpiar filtros</Button>
@@ -437,10 +442,26 @@ onBeforeUnmount(() => {
   border-color: var(--color-primary);
   font-weight: 700;
 }
- .filtros-panel { min-width: 0; }
-.filtros-panel > summary { display: none; }
-.chips-filtros { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-.chips-filtros button:not(.button) { border: 1px solid var(--color-border); border-radius: var(--radius-control); padding: var(--space-2); background: var(--color-surface); color: var(--color-text); cursor: pointer; }
+.filtros-panel {
+  min-width: 0;
+}
+.filtros-panel > summary {
+  display: none;
+}
+.chips-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.chips-filtros button:not(.button) {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: var(--space-2);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
 .filtros {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
@@ -503,8 +524,16 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-card);
 }
 @media (max-width: 40rem) {
-  .filtros-panel > summary { display: list-item; cursor: pointer; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-control); }
-  .filtros-panel .filtros { margin-top: var(--space-3); }
+  .filtros-panel > summary {
+    display: list-item;
+    cursor: pointer;
+    padding: var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-control);
+  }
+  .filtros-panel .filtros {
+    margin-top: var(--space-3);
+  }
 }
 @media (max-width: 35rem) {
   .resultados-lista .producto {
