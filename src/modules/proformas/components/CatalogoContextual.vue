@@ -160,14 +160,15 @@ watch(search, () => {
 watch(page, () => void load())
 watch(
   [category, search, family, filters, view, page],
-  () => emit('stateChange', {
-    category: category.value,
-    search: search.value,
-    family: family.value,
-    filters: { ...filters },
-    view: view.value,
-    page: page.value,
-  }),
+  () =>
+    emit('stateChange', {
+      category: category.value,
+      search: search.value,
+      family: family.value,
+      filters: { ...filters },
+      view: view.value,
+      page: page.value,
+    }),
   { deep: true },
 )
 onMounted(() => {
