@@ -8,6 +8,7 @@ import type {
   ValorCatalogoPublico,
 } from '@/generated/api'
 import ProductoSelector from './ProductoSelector.vue'
+import ProductImage from '@/modules/productos/components/ProductImage.vue'
 import Button from '@/shared/ui/Button.vue'
 import Select from '@/shared/ui/Select.vue'
 import TextField from '@/shared/ui/TextField.vue'
@@ -53,6 +54,7 @@ const form = reactive({
 })
 if (props.initialDraft) Object.assign(form, props.initialDraft)
 const unidadCatalogo = ref<string | null>(null)
+const master = ref<Producto | null>(null)
 const catalogItem = computed(
   () => props.tipos.find((x) => String(x.id) === form.tipo_item)?.codigo !== 'MUEBLE_MEDIDA',
 )
@@ -63,6 +65,15 @@ const quantityStep = computed(() => (selectedUnit.value === 'M2' ? '0.0001' : '1
 const quantityMin = computed(() => (selectedUnit.value === 'M2' ? '0.0001' : '1'))
 function selectProduct(product: Producto | null) {
   if (product) {
+    const currentFamily = props.detail?.familia_producto
+    const currentType = props.tipos.find((item) => String(item.id) === form.tipo_item)?.codigo
+    if (props.detail && !props.detail.producto && currentFamily &&
+      (product.familia !== currentFamily || product.categoria_info?.codigo !== currentType ||
+        String(product.unidad_stock) !== form.unidad)) {
+      error.value = 'La variante debe pertenecer a la misma familia, categoría y unidad.'
+      form.producto = ''
+      return
+    }
     if (
       product.id !== props.detail?.producto &&
       (props.existingProductIds ?? []).includes(product.id)
@@ -72,24 +83,33 @@ function selectProduct(product: Producto | null) {
       emit('duplicateProduct', product.id)
       return
     }
+    master.value = product
     // Al resolver una familia pendiente, no sustituir importes ya negociados.
     form.familia_producto = product.familia ? String(product.familia) : ''
     unidadCatalogo.value = String(product.unidad_stock)
     form.unidad = String(product.unidad_stock)
     if (!props.detail) {
+      const tipo = props.tipos.find((item) => item.codigo === product.categoria_info?.codigo)
+      if (tipo) form.tipo_item = String(tipo.id)
       form.nombre = product.nombre
       if (props.moneda === 'BOB') form.precio_unitario = product.precio_vigente
     }
   } else {
+    master.value = null
     unidadCatalogo.value = null
   }
 }
 onMounted(async () => {
-  if (props.initialProductId) {
+  const initialId = props.initialProductId ?? props.detail?.producto
+  if (initialId) {
     try {
-      const product = await productosService.get(props.initialProductId)
-      form.producto = String(product.id)
-      selectProduct(product)
+      const product = await productosService.get(initialId)
+      if (props.initialProductId) form.producto = String(product.id)
+      if (props.initialProductId) selectProduct(product)
+      else {
+        master.value = product
+        unidadCatalogo.value = String(product.unidad_stock)
+      }
       // Conservar lo redactado; el producto creado reemplaza solo la variante.
       if (props.initialDraft) {
         for (const campo of [
@@ -181,6 +201,7 @@ async function submit() {
       v-model="form.tipo_item"
       name="tipo-item"
       label="Tipo de línea"
+      :disabled="Boolean(form.producto)"
       :options="tipos.map((x) => ({ label: x.nombre, value: String(x.id) }))"
     /><ProductoSelector v-if="catalogItem" v-model="form.producto" @select="selectProduct" /><Button
       v-if="catalogItem && session?.can('comercial.administrar')"
@@ -201,6 +222,20 @@ async function submit() {
     <p v-if="catalogItem && form.familia_producto && !form.producto" class="hint">
       La variante física deberá elegirse antes de aprobar; esta selección no reserva stock.
     </p>
+    <aside v-if="catalogItem && master" class="master-info" aria-label="Información del producto maestro">
+      <ProductImage :image="master.imagen_principal" :alt="master.nombre" />
+      <div>
+        <strong>{{ master.nombre }} · {{ master.sku }}</strong>
+        <p>{{ master.categoria_info?.nombre }} · {{ master.unidad_stock_info?.nombre }}</p>
+        <p v-if="master.familia_info">Familia: {{ master.familia_info.nombre }}</p>
+        <p>Precio vigente de referencia: {{ master.precio_vigente }} BOB</p>
+        <p v-if="master.promocion?.vigente">Promoción vigente incluida en el precio de referencia.</p>
+        <p>Stock: {{ master.stock }} · Disponible referencial: {{ master.disponibilidad_referencial }}</p>
+        <p v-if="master.silla">Silla: {{ master.silla.modelo }} · {{ master.silla.especificaciones }}</p>
+        <p v-if="master.piso">Piso: {{ master.piso.modelo }} · {{ master.piso.espesor_mm }} mm</p>
+        <small>Estos datos son de solo lectura. El precio cotizado de la línea se negocia por separado.</small>
+      </div>
+    </aside>
     <TextField
       v-model="form.nombre"
       name="nombre-linea"
@@ -254,6 +289,9 @@ async function submit() {
   </form>
 </template>
 <style scoped>
+ .master-info { display: grid; grid-template-columns: minmax(7rem, 11rem) 1fr; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-card); }
+.master-info p { margin: var(--space-2) 0; }
+.master-info small { color: var(--color-text-secondary); }
 .detail-form {
   display: grid;
   gap: var(--space-4);
