@@ -20,7 +20,7 @@ const sku = {
   stock: '5.0000',
   disponibilidad_referencial: '5.0000',
   imagen_principal: null,
-} as Producto
+} as unknown as Producto
 
 describe('PRF-02 catálogo contextual', () => {
   it('consulta productos reales mediante API y no guarda proformas al seleccionar SKU', async () => {
