@@ -171,12 +171,7 @@ function submit() {
 </script>
 
 <template>
-  <form
-    class="spec"
-    @input="emit('changed')"
-    @change="emit('changed')"
-    @submit.prevent="submit"
-  >
+  <form class="spec" @input="emit('changed')" @change="emit('changed')" @submit.prevent="submit">
     <Select
       v-model="form.tipo_mueble"
       name="tipo-mueble"
