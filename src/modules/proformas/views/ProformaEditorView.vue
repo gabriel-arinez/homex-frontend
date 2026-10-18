@@ -471,8 +471,8 @@ function chooseManualFurniture() {
 function quotePendingFamily(familyId: number, categoryId: number) {
   const categoria = tipos.value.find((x) => x.codigo ===
     (catalogCategories.value.find((item) => item.id === categoryId)?.codigo ?? ''))
-  const codigo = categoria?.codigo
-  if (!codigo) return
+  if (!categoria) return
+  const codigo = categoria.codigo
   const unidadCodigo = codigo === 'PISO_FLOTANTE' ? 'M2' : 'PIEZA'
   const unidad = unidades.value.find((x) => x.codigo === unidadCodigo)
   const familia = familias.value.find((x) => x.id === familyId)
