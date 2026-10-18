@@ -359,7 +359,8 @@ function restoreContextualDraft() {
   Object.assign(header, snapshot.header)
   Object.assign(nuevoCliente, snapshot.nuevoCliente)
   clienteMode.value = snapshot.clienteMode
-  clienteSeleccionado.value = snapshot.clienteSeleccionado ?? persisted.value?.cliente_resumen ?? null
+  clienteSeleccionado.value =
+    snapshot.clienteSeleccionado ?? persisted.value?.cliente_resumen ?? null
   lineas.value = snapshot.lineas
   currentStep.value = snapshot.currentStep
   key.value = snapshot.key
@@ -427,7 +428,9 @@ async function focusDuplicateProduct(productId: number) {
   if (index < 0) return
   if (
     lineModalDirty.value &&
-    !window.confirm('La variante ya está incluida. ¿Deseas descartar esta edición y ver la línea existente?')
+    !window.confirm(
+      'La variante ya está incluida. ¿Deseas descartar esta edición y ver la línea existente?',
+    )
   )
     return
   lineModal.value = false
@@ -733,8 +736,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <strong v-else class="pending-value">Total pendiente</strong>
             <small>El total confirmado será el que devuelva HOMEX al guardar.</small>
             <small v-if="persisted">
-              Último total guardado: {{ money(Number(persisted.total)) }}.
-              Los cambios actuales aún no se guardaron.
+              Último total guardado: {{ money(Number(persisted.total)) }}. Los cambios actuales aún
+              no se guardaron.
             </small>
           </template>
         </div>
