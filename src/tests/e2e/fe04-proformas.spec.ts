@@ -674,6 +674,68 @@ test('PRF-01 protege cambios pendientes de la ficha técnica', async ({ page }) 
   await expect(page.getByRole('dialog')).toHaveCount(0)
 })
 
+test('PRF-01 restaura cliente y no descarta la línea al volver del producto contextual', async ({ page }) => {
+  await mockBackend(page)
+  await page.addInitScript(() => {
+    sessionStorage.setItem(
+      'homex:ap5:draft:prf01-retorno',
+      JSON.stringify({
+        header: {
+          cliente: '1',
+          titulo: 'Cotización recuperada',
+          moneda_codigo: 'BOB',
+          plazo_entrega: '',
+          validez_oferta: '',
+          porcentaje_adelanto: '',
+          observaciones: '',
+        },
+        nuevoCliente: {
+          tipo_cliente: '1',
+          nombres: '',
+          apellidos: '',
+          empresa: '',
+          celular: '',
+          direccion: '',
+          observaciones: '',
+        },
+        clienteMode: 'existente',
+        clienteSeleccionado: {
+          id: 1,
+          nombre: 'Ana Pérez',
+          empresa: null,
+          celular: '70000000',
+        },
+        lineModalDirty: true,
+        lineas: [],
+        currentStep: 3,
+        key: '847c4be0-9988-46d0-b338-b45970672918',
+        lineDraft: {
+          tipo_item: '10',
+          nombre: 'Mesa pendiente',
+          cantidad: '1',
+          unidad: '20',
+          precio_unitario: '100',
+          descuento: '0',
+        },
+        editingLine: null,
+      }),
+    )
+  })
+  await page.goto('/proformas/1/editar?draft=prf01-retorno')
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByLabel('Nombre comercial')).toHaveValue('Mesa pendiente')
+
+  page.once('dialog', (dialog) => dialog.dismiss())
+  await page.getByRole('button', { name: 'Cerrar', exact: true }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByLabel('Nombre comercial')).toHaveValue('Mesa pendiente')
+
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('button', { name: 'Cerrar', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.getByRole('region').getByText('Ana Pérez', { exact: true })).toBeVisible()
+})
+
 test('PRF-01 separa el total guardado de los cambios locales', async ({ page }) => {
   const state = await mockBackend(page)
   state.quote().total = '250.00'
