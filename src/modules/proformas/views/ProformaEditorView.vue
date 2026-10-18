@@ -192,6 +192,11 @@ function closeLineRead() {
   readingLineId.value = null
   readMaster.value = null
 }
+function editReadLine() {
+  const index = lineas.value.findIndex((line) => line.localId === readingLineId.value)
+  closeLineRead()
+  if (index >= 0) openLine(index)
+}
 const editableDetail = computed(() => {
   if (editingLine.value === null) return undefined
   return lineas.value[editingLine.value] as unknown as DetalleProforma
@@ -943,7 +948,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         </template>
         <div class="actions">
           <Button v-if="readingLine.modo_calculo !== 'TOTAL_NEGOCIADO'" variant="secondary"
-            @click="const index = lineas.findIndex(x => x.localId === readingLineId); closeLineRead(); openLine(index)">Editar</Button>
+            @click="editReadLine">Editar</Button>
           <Button variant="secondary" @click="closeLineRead">Cerrar</Button>
         </div>
       </div>
