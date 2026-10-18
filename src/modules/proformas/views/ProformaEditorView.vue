@@ -375,6 +375,13 @@ function saveSpec(body: EspecificacionMuebleWritable) {
   specModalDirty.value = false
   markDirty()
 }
+function selectMenuAction(action: 'edit' | 'spec' | 'duplicate' | 'remove', index: number) {
+  menuLineId.value = null
+  if (action === 'edit') openLine(index)
+  else if (action === 'spec') openSpec(index)
+  else if (action === 'duplicate') duplicateFurniture(index)
+  else removeLine(index)
+}
 function openSpec(index: number) {
   specModalDirty.value = false
   specLine.value = index
@@ -777,12 +784,12 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <div v-if="menuLineId === line.localId" class="menu-panel" role="menu">
               <button type="button" role="menuitem"
                 :disabled="line.modo_calculo === 'TOTAL_NEGOCIADO'"
-                @click="menuLineId = null; openLine(index)">Editar</button>
+                @click="selectMenuAction('edit', index)">Editar</button>
               <button v-if="tipos.find((x) => x.id === line.tipo_item)?.codigo === 'MUEBLE_MEDIDA'"
-                type="button" role="menuitem" @click="menuLineId = null; openSpec(index)">Ficha técnica</button>
+                type="button" role="menuitem" @click="selectMenuAction('spec', index)">Ficha técnica</button>
               <button v-if="tipos.find((x) => x.id === line.tipo_item)?.codigo === 'MUEBLE_MEDIDA'"
-                type="button" role="menuitem" @click="menuLineId = null; duplicateFurniture(index)">Duplicar mueble</button>
-              <button type="button" role="menuitem" @click="menuLineId = null; removeLine(index)">Eliminar</button>
+                type="button" role="menuitem" @click="selectMenuAction('duplicate', index)">Duplicar mueble</button>
+              <button type="button" role="menuitem" @click="selectMenuAction('remove', index)">Eliminar</button>
             </div>
           </div>
         </Card>
