@@ -120,7 +120,7 @@ describe('PRF-02 catálogo contextual', () => {
     expect(filtro).toBeDefined()
     await filtro!.trigger('click')
     await flushPromises()
-    expect(consultas.at(-1)?.searchParams.has('categoria')).toBe(false)
+    expect(consultas[consultas.length - 1]?.searchParams.has('categoria')).toBe(false)
     wrapper.unmount()
   })
 
