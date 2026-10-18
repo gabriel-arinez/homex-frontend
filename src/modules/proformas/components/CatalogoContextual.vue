@@ -211,7 +211,7 @@ onBeforeUnmount(() => {
         <p>SKU: {{ preview.sku || 'Sin SKU' }} · {{ preview.categoria_info?.nombre }}</p>
         <p>Familia: {{ preview.familia_info?.nombre || 'Sin familia' }}</p>
         <p>Unidad: {{ preview.unidad_stock_info?.nombre }}</p>
-        <p>Precio lista: {{ money(preview.precio_lista) }} · Vigente: {{ money(preview.precio_vigente) }}</p>
+        <p>Precio lista: {{ money(preview.precio_lista ?? '0') }} · Vigente: {{ money(preview.precio_vigente) }}</p>
         <p>Stock: {{ preview.stock }} · Disponibilidad referencial: {{ preview.disponibilidad_referencial }}</p>
         <p v-if="preview.silla">Modelo: {{ preview.silla.modelo }} · Especificaciones: {{ preview.silla.especificaciones }}</p>
         <p v-if="preview.piso">Modelo: {{ preview.piso.modelo }} · Espesor: {{ preview.piso.espesor_mm }} mm</p>
