@@ -29,11 +29,13 @@ jobs:
       - name: Synchronize backend schema and generated TypeScript
         run: |
           cp backend-prf02/docs/openapi.yaml contracts/backend-openapi.yaml
+          mv backend-prf02 "$RUNNER_TEMP/prf02-backend-checked-out"
           printf '%s\n' a9abb92f642bd4f0d75fcb901b506aacf65487bb > contracts/backend-ref.txt
           npm run api:generate
       - name: Format approved documentation and changed code
         run: |
           npx prettier --write docs/implementacion/PRF_02_FRONTEND.md \
+            contracts/backend-openapi.yaml \
             src/modules/proformas/components/CatalogoContextual.vue \
             src/modules/proformas/components/DetalleForm.vue \
             src/modules/proformas/views/ProformaEditorView.vue \
