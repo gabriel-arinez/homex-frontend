@@ -13,6 +13,7 @@ import type {
   FamiliaProducto,
   Proforma,
   ProformaIntegralWritable,
+  Producto,
   ValorCatalogoPublico,
 } from '@/generated/api'
 import { ApiError } from '@/shared/api'
@@ -27,6 +28,7 @@ import TextField from '@/shared/ui/TextField.vue'
 import ClienteSelector from '../components/ClienteSelector.vue'
 import ClienteFormFields from '@/modules/clientes/components/ClienteFormFields.vue'
 import DetalleForm from '../components/DetalleForm.vue'
+import CatalogoContextual from '../components/CatalogoContextual.vue'
 import EspecificacionForm from '../components/EspecificacionForm.vue'
 import { proformasService } from '../services/proformasService'
 import {
@@ -62,6 +64,9 @@ const tiposMueble = ref<ValorCatalogoPublico[]>([])
 const tiposCliente = ref<ValorCatalogoPublico[]>([])
 const familias = ref<FamiliaProducto[]>([])
 const lineModal = ref(false)
+const additionMode = ref<'none' | 'choose' | 'catalog'>('none')
+const catalogInitialized = ref(false)
+const lineFormVersion = ref(0)
 const lineModalDirty = ref(false)
 const specModalDirty = ref(false)
 const editingLine = ref<number | null>(null)
@@ -298,6 +303,7 @@ function saveLine(body: DetalleProformaWritable) {
   lineModal.value = false
   lineModalDirty.value = false
   editingLine.value = null
+  additionMode.value = 'none'
   markDirty()
 }
 function saveSpec(body: EspecificacionMuebleWritable) {
@@ -434,11 +440,54 @@ function closeLineModal() {
 }
 function openLine(index: number | null = null) {
   if (index !== null && lineas.value[index]?.modo_calculo === 'TOTAL_NEGOCIADO') return
+  lineFormVersion.value++
   pendingLineDraft.value = null
   editingLine.value = index
   lineModalDirty.value = false
   lineModal.value = true
 }
+function chooseCatalog() {
+  catalogInitialized.value = true
+  additionMode.value = 'catalog'
+}
+function selectCatalogProduct(product: Producto) {
+  if (existingProductIds.value.includes(product.id)) {
+    void focusDuplicateProduct(product.id)
+    return
+  }
+  preferredProductId.value = product.id
+  openLine()
+}
+function chooseManualFurniture() {
+  preferredProductId.value = null
+  openLine()
+  const tipo = tipos.value.find((x) => x.codigo === 'MUEBLE_MEDIDA')
+  const unidad = unidades.value.find((x) => x.codigo === 'PIEZA')
+  pendingLineDraft.value = {
+    tipo_item: String(tipo?.id ?? ''),
+    unidad: String(unidad?.id ?? ''),
+  }
+}
+function quotePendingFamily(familyId: number, categoryId: number) {
+  const categoria = tipos.value.find((x) => x.codigo ===
+    (catalogCategories.value.find((item) => item.id === categoryId)?.codigo ?? ''))
+  const codigo = categoria?.codigo
+  if (!codigo) return
+  const unidadCodigo = codigo === 'PISO_FLOTANTE' ? 'M2' : 'PIEZA'
+  const unidad = unidades.value.find((x) => x.codigo === unidadCodigo)
+  const familia = familias.value.find((x) => x.id === familyId)
+  preferredProductId.value = null
+  openLine()
+  pendingLineDraft.value = {
+    tipo_item: String(categoria.id),
+    unidad: String(unidad?.id ?? ''),
+    familia_producto: String(familyId),
+    nombre: familia?.nombre ?? '',
+    precio_unitario: '',
+  }
+}
+const catalogCategories = computed(() => tipos.value.filter((x) =>
+  ['SILLA', 'PISO_FLOTANTE', 'OTRO'].includes(x.codigo)))
 async function focusDuplicateProduct(productId: number) {
   const index = lineas.value.findIndex((line) => line.producto === productId)
   if (index < 0) return
@@ -585,7 +634,25 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <h2 id="productos-title">Productos</h2>
             <p>Agrega productos antes o después de elegir cliente.</p>
           </div>
-          <Button @click="openLine()">Agregar producto</Button>
+          <Button @click="additionMode = 'choose'">Añadir ítem</Button>
+        </div>
+        <div v-if="additionMode === 'choose'" class="choice-panel">
+          <h3>¿Qué deseas incorporar a la cotización?</h3>
+          <div class="actions">
+            <Button @click="chooseCatalog">Producto de catálogo</Button>
+            <Button variant="secondary" @click="chooseManualFurniture">Mueble a pedido</Button>
+            <Button variant="secondary" @click="additionMode = 'none'">Cancelar</Button>
+          </div>
+        </div>
+        <div v-if="catalogInitialized" v-show="additionMode === 'catalog'">
+          <CatalogoContextual
+            :categorias="catalogCategories"
+            :familias="familias"
+            :existing-product-ids="existingProductIds"
+            @select="selectCatalogProduct"
+            @pending="quotePendingFamily"
+            @cancel="additionMode = 'none'"
+          />
         </div>
         <Card v-for="(line, index) in lineas" :key="line.localId" class="line-card">
           <div :id="`ap3-linea-${line.localId}`" tabindex="-1">
@@ -793,7 +860,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       @close="closeLineModal"
     >
       <DetalleForm
-        :key="editableDetail?.id ?? editingLine ?? lineas.length"
+        :key="lineFormVersion"
         :tipos
         :unidades
         :familias
@@ -866,6 +933,8 @@ section {
   justify-content: space-between;
   gap: var(--space-3);
 }
+.choice-panel { padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface); }
+.choice-panel h3 { margin-top: 0; }
 .line-card {
   margin-bottom: var(--space-3);
 }
