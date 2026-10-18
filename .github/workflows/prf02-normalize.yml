@@ -48,6 +48,7 @@ jobs:
             src/modules/productos/services/productosService.ts \
             src/shared/ui/Modal.vue \
             src/tests/prf02/catalogo-contextual.spec.ts \
+            src/tests/prf02/ficha-silla.spec.ts \
             src/tests/e2e/fe04-proformas.spec.ts \
             src/tests/integration/fe08-real.spec.ts \
             src/tests/ap5/catalogo-proformas.spec.ts \
