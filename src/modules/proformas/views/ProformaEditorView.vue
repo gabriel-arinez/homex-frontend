@@ -29,6 +29,7 @@ import ClienteSelector from '../components/ClienteSelector.vue'
 import ClienteFormFields from '@/modules/clientes/components/ClienteFormFields.vue'
 import DetalleForm from '../components/DetalleForm.vue'
 import CatalogoContextual from '../components/CatalogoContextual.vue'
+import type { CatalogoContextState } from '../services/catalogoContext'
 import EspecificacionForm from '../components/EspecificacionForm.vue'
 import { proformasService } from '../services/proformasService'
 import { useSessionStore } from '@/app/stores/useSessionStore'
@@ -69,6 +70,7 @@ const catalogCategories = ref<ValorCatalogoPublico[]>([])
 const lineModal = ref(false)
 const additionMode = ref<'none' | 'choose' | 'catalog'>('none')
 const catalogInitialized = ref(false)
+const catalogState = ref<CatalogoContextState | null>(null)
 const lineFormVersion = ref(0)
 const lineModalDirty = ref(false)
 const specModalDirty = ref(false)
@@ -458,6 +460,8 @@ function duplicateFurniture(index: number) {
 }
 function editorSnapshot() {
   return {
+    userId: session.identity?.id ?? null,
+    expiresAt: Date.now() + 60 * 60 * 1000,
     header: cloneEditorData(header),
     reviewedCurrency: reviewedCurrency.value,
     nuevoCliente: cloneEditorData(nuevoCliente),
@@ -468,6 +472,7 @@ function editorSnapshot() {
     removedLines: cloneEditorData(removedLines.value),
     additionMode: additionMode.value,
     catalogInitialized: catalogInitialized.value,
+    catalogState: cloneEditorData(catalogState.value),
     currentStep: currentStep.value,
     key: key.value,
     lineDraft: cloneEditorData(pendingLineDraft.value),
@@ -510,6 +515,14 @@ function restoreContextualDraft() {
   if (!token) return
   const snapshot = consumeEditorDraft<ReturnType<typeof editorSnapshot>>(token)
   if (!snapshot) return
+  if (snapshot.expiresAt && Date.now() > snapshot.expiresAt) {
+    error.value = 'El borrador temporal caducó. Recupera la última proforma guardada.'
+    return
+  }
+  if (snapshot.userId != null && snapshot.userId !== session.identity?.id) {
+    error.value = 'Este borrador temporal corresponde a otra sesión y no será restaurado.'
+    return
+  }
   Object.assign(header, snapshot.header)
   reviewedCurrency.value = snapshot.reviewedCurrency ?? header.moneda_codigo
   Object.assign(nuevoCliente, snapshot.nuevoCliente)
@@ -520,6 +533,7 @@ function restoreContextualDraft() {
   removedLines.value = snapshot.removedLines ?? []
   additionMode.value = snapshot.additionMode ?? 'none'
   catalogInitialized.value = snapshot.catalogInitialized ?? false
+  catalogState.value = snapshot.catalogState ?? null
   currentStep.value = snapshot.currentStep
   key.value = snapshot.key
   pendingLineDraft.value = snapshot.lineDraft
@@ -793,6 +807,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             :familias="familias"
             :existing-product-ids="existingProductIds"
             :can-admin="session.can('comercial.administrar')"
+            :initial-state="catalogState ?? undefined"
+            @state-change="catalogState = $event"
             @create="createProductFromCategory"
             @edit="editProductContextually"
             @select="selectCatalogProduct"

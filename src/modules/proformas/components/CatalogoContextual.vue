@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import Modal from '@/shared/ui/Modal.vue'
+import type { CatalogoContextState } from '../services/catalogoContext'
 import type { FamiliaProducto, Producto, ValorCatalogoPublico } from '@/generated/api'
 import { productosService } from '@/modules/productos/services/productosService'
 import { proformasService } from '../services/proformasService'
@@ -15,12 +16,14 @@ const props = defineProps<{
   familias: FamiliaProducto[]
   existingProductIds: number[]
   canAdmin?: boolean
+  initialState?: CatalogoContextState
 }>()
 const emit = defineEmits<{
   select: [producto: Producto]
   duplicate: [productoId: number]
   create: [categoryCode: string]
   edit: [productId: number]
+  stateChange: [state: CatalogoContextState]
   pending: [familiaId: number, categoriaId: number]
   cancel: []
 }>()
@@ -50,9 +53,9 @@ const fieldOptions: Record<string, { field: Field; label: string; concepto?: str
   ],
   OTRO: [{ field: 'unidad_stock', label: 'Unidad', concepto: 'UNIDAD_MEDIDA' }],
 }
-const category = ref('')
-const search = ref('')
-const family = ref('')
+const category = ref(props.initialState?.category ?? '')
+const search = ref(props.initialState?.search ?? '')
+const family = ref(props.initialState?.family ?? '')
 const filters = reactive<Record<Field, string>>({
   marca: '',
   modelo: '',
@@ -63,10 +66,11 @@ const filters = reactive<Record<Field, string>>({
   acabado: '',
   espesor_mm: '',
   unidad_stock: '',
+  ...props.initialState?.filters,
 })
 const options = ref<Record<string, ValorCatalogoPublico[]>>({})
-const view = ref<'grid' | 'lista'>('grid')
-const page = ref(1)
+const view = ref<'grid' | 'lista'>(props.initialState?.view ?? 'grid')
+const page = ref(props.initialState?.page ?? 1)
 const products = ref<Producto[]>([])
 const preview = ref<Producto | null>(null)
 const total = ref(0)
@@ -154,7 +158,22 @@ watch(search, () => {
   }, 250)
 })
 watch(page, () => void load())
-onMounted(() => void load())
+watch(
+  [category, search, family, filters, view, page],
+  () => emit('stateChange', {
+    category: category.value,
+    search: search.value,
+    family: family.value,
+    filters: { ...filters },
+    view: view.value,
+    page: page.value,
+  }),
+  { deep: true },
+)
+onMounted(() => {
+  if (category.value) void loadOptions()
+  void load()
+})
 onBeforeUnmount(() => {
   requestId++
   optionsId++
