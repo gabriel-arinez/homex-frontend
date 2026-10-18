@@ -89,6 +89,41 @@ describe('PRF-02 catálogo contextual', () => {
     wrapper.unmount()
   })
 
+  it('filtra en servidor por categoría y permite quitar el filtro activo', async () => {
+    const consultas: URL[] = []
+    server.use(
+      http.get('http://localhost:8000/api/v1/catalogo/productos/', ({ request }) => {
+        consultas.push(new URL(request.url))
+        return HttpResponse.json({
+          count: 1,
+          next: null,
+          previous: null,
+          results: [sku],
+        })
+      }),
+      http.get('http://localhost:8000/api/v1/catalogo/opciones/', () =>
+        HttpResponse.json([]),
+      ),
+    )
+    const wrapper = mount(CatalogoContextual, {
+      props: { categorias: [silla], familias: [], existingProductIds: [] },
+    })
+    await flushPromises()
+    const categoria = wrapper.findAll('button').find((button) => button.text() === 'Sillas')
+    expect(categoria).toBeDefined()
+    await categoria!.trigger('click')
+    await flushPromises()
+    expect(consultas.some((url) => url.searchParams.get('categoria') === '1')).toBe(true)
+    const filtro = wrapper.findAll('button').find((button) =>
+      button.attributes('aria-label')?.includes('Quitar Categoría: Sillas'),
+    )
+    expect(filtro).toBeDefined()
+    await filtro!.trigger('click')
+    await flushPromises()
+    expect(consultas.at(-1)?.searchParams.has('categoria')).toBe(false)
+    wrapper.unmount()
+  })
+
   it('consulta productos reales mediante API y no guarda proformas al seleccionar SKU', async () => {
     let lecturas = 0
     let escrituras = 0
