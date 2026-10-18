@@ -1,0 +1,73 @@
+name: PRF02 synchronize and normalize
+
+on:
+  push:
+    branches: [feat/prf02-frontend-editor]
+    paths: [.github/workflows/prf02-normalize.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  normalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/prf02-frontend-editor
+          fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          repository: gabriel-arinez/homex-backend
+          ref: a9abb92f642bd4f0d75fcb901b506aacf65487bb
+          path: backend-prf02
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.15.0
+          cache: npm
+      - run: npm ci
+      - name: Synchronize backend schema and generated TypeScript
+        run: |
+          cp backend-prf02/docs/openapi.yaml contracts/backend-openapi.yaml
+          printf '%s\n' a9abb92f642bd4f0d75fcb901b506aacf65487bb > contracts/backend-ref.txt
+          npm run api:generate
+      - name: Format approved documentation and changed code
+        run: |
+          npx prettier --write docs/implementacion/PRF_02_FRONTEND.md \
+            src/modules/proformas/components/CatalogoContextual.vue \
+            src/modules/proformas/components/DetalleForm.vue \
+            src/modules/proformas/views/ProformaEditorView.vue \
+            src/modules/productos/components/ProductoForm.vue \
+            src/modules/productos/views/ProductoCreateView.vue \
+            src/modules/productos/views/ProductoDetailView.vue \
+            src/modules/productos/services/productosService.ts \
+            src/shared/ui/Modal.vue \
+            src/tests/prf02/catalogo-contextual.spec.ts \
+            src/tests/e2e/fe04-proformas.spec.ts \
+            src/tests/integration/fe08-real.spec.ts \
+            src/tests/ap5/catalogo-proformas.spec.ts \
+            'src/generated/api/**/*.ts'
+      - name: Validate generated contract, types, lint, format, unit and build
+        run: |
+          npm run type-check
+          npm run lint:check
+          npm run format:check
+          npm run contract:check
+          npm run test:unit -- --run
+          npm run build
+      - name: Commit generated artifacts only after checks pass
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- contracts/backend-openapi.yaml contracts/backend-ref.txt src/generated/api \
+            docs/implementacion/PRF_02_FRONTEND.md \
+            src/modules/proformas/components src/modules/proformas/views \
+            src/modules/productos/components src/modules/productos/views \
+            src/modules/productos/services/productosService.ts \
+            src/shared/ui/Modal.vue src/tests/prf02 src/tests/e2e/fe04-proformas.spec.ts \
+            src/tests/integration/fe08-real.spec.ts src/tests/ap5/catalogo-proformas.spec.ts
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(prf02): sincronizar OpenAPI, tipos y formato"
+            git push origin HEAD:feat/prf02-frontend-editor
+          fi
