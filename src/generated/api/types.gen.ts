@@ -154,6 +154,9 @@ export type DetalleIntegral = {
   unidad: number
   unidad_info: ValorCatalogoResumen
   modo_calculo?: string
+  /**
+   * Para líneas nuevas PRECIO_UNITARIO, el precio es obligatorio y mayor que cero. En una edición puede omitirse para conservar el valor persistido. Las líneas históricas TOTAL_NEGOCIADO preservan su importe y no están sujetas a esa validación.
+   */
   precio_unitario?: string
   importe_negociado?: string | null
   descuento?: string
@@ -188,6 +191,9 @@ export type DetalleProforma = {
   unidad: number
   unidad_info: ValorCatalogoResumen
   modo_calculo?: string
+  /**
+   * Para líneas nuevas PRECIO_UNITARIO, el precio es obligatorio y mayor que cero. En una edición puede omitirse para conservar el valor persistido. Las líneas históricas TOTAL_NEGOCIADO preservan su importe y no están sujetas a esa validación.
+   */
   precio_unitario?: string
   importe_negociado?: string | null
   descuento?: string
@@ -420,6 +426,9 @@ export type PatchedDetalleProforma = {
   unidad?: number
   unidad_info?: ValorCatalogoResumen
   modo_calculo?: string
+  /**
+   * Para líneas nuevas PRECIO_UNITARIO, el precio es obligatorio y mayor que cero. En una edición puede omitirse para conservar el valor persistido. Las líneas históricas TOTAL_NEGOCIADO preservan su importe y no están sujetas a esa validación.
+   */
   precio_unitario?: string
   importe_negociado?: string | null
   descuento?: string
@@ -776,6 +785,9 @@ export type DetalleIntegralWritable = {
   cantidad: string
   unidad: number
   modo_calculo?: string
+  /**
+   * Para líneas nuevas PRECIO_UNITARIO, el precio es obligatorio y mayor que cero. En una edición puede omitirse para conservar el valor persistido. Las líneas históricas TOTAL_NEGOCIADO preservan su importe y no están sujetas a esa validación.
+   */
   precio_unitario?: string
   importe_negociado?: string | null
   descuento?: string
@@ -795,6 +807,9 @@ export type DetalleProformaWritable = {
   cantidad: string
   unidad: number
   modo_calculo?: string
+  /**
+   * Para líneas nuevas PRECIO_UNITARIO, el precio es obligatorio y mayor que cero. En una edición puede omitirse para conservar el valor persistido. Las líneas históricas TOTAL_NEGOCIADO preservan su importe y no están sujetas a esa validación.
+   */
   precio_unitario?: string
   importe_negociado?: string | null
   descuento?: string
@@ -880,6 +895,9 @@ export type PatchedDetalleProformaWritable = {
   cantidad?: string
   unidad?: number
   modo_calculo?: string
+  /**
+   * Para líneas nuevas PRECIO_UNITARIO, el precio es obligatorio y mayor que cero. En una edición puede omitirse para conservar el valor persistido. Las líneas históricas TOTAL_NEGOCIADO preservan su importe y no están sujetas a esa validación.
+   */
   precio_unitario?: string
   importe_negociado?: string | null
   descuento?: string
