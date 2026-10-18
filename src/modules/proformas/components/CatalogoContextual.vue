@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import type { FamiliaProducto, Producto, ValorCatalogoPublico } from '@/generated/api'
 import { productosService } from '@/modules/productos/services/productosService'
 import { proformasService } from '../services/proformasService'
@@ -68,7 +68,9 @@ async function loadOptions() {
   const token = ++optionsId
   const codes = [...new Set(activeFields.value.map((item) => item.concepto).filter(Boolean))]
   const result = await Promise.allSettled(
-    codes.map((code) => proformasService.options(code!)),
+    codes.map((code) =>
+      proformasService.options(code as Parameters<typeof proformasService.options>[0]),
+    ),
   )
   if (token !== optionsId) return
   for (let index = 0; index < codes.length; index++) {
@@ -120,7 +122,6 @@ watch(search, () => {
 })
 watch(page, () => void load())
 onMounted(() => void load())
-import { onBeforeUnmount } from 'vue'
 onBeforeUnmount(() => {
   requestId++
   optionsId++
