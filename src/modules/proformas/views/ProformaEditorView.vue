@@ -31,6 +31,7 @@ import DetalleForm from '../components/DetalleForm.vue'
 import CatalogoContextual from '../components/CatalogoContextual.vue'
 import EspecificacionForm from '../components/EspecificacionForm.vue'
 import { proformasService } from '../services/proformasService'
+import { productosService } from '@/modules/productos/services/productosService'
 import {
   cloneEditorData,
   consumeEditorDraft,
@@ -69,6 +70,10 @@ const lineFormVersion = ref(0)
 const lineModalDirty = ref(false)
 const specModalDirty = ref(false)
 const editingLine = ref<number | null>(null)
+const menuLineId = ref<string | null>(null)
+const readingLineId = ref<string | null>(null)
+const readMaster = ref<Producto | null>(null)
+let readRequestId = 0
 const specLine = ref<number | null>(null)
 const removedLines = ref<{ line: LineaLocal; index: number }[]>([])
 const contextualNavigation = ref(false)
@@ -167,6 +172,26 @@ const fieldErrorMessages = computed(() => {
     }),
   )
 })
+const readingLine = computed(() => lineas.value.find((line) => line.localId === readingLineId.value) ?? null)
+async function openLineRead(id: string) {
+  readingLineId.value = id
+  menuLineId.value = null
+  readMaster.value = null
+  const token = ++readRequestId
+  const productId = readingLine.value?.producto
+  if (!productId) return
+  try {
+    const product = await productosService.get(productId)
+    if (token === readRequestId) readMaster.value = product
+  } catch {
+    // La línea negociada debe poder consultarse aunque el maestro no esté disponible.
+  }
+}
+function closeLineRead() {
+  readRequestId++
+  readingLineId.value = null
+  readMaster.value = null
+}
 const editableDetail = computed(() => {
   if (editingLine.value === null) return undefined
   return lineas.value[editingLine.value] as unknown as DetalleProforma
@@ -695,7 +720,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           />
         </div>
         <Card v-for="(line, index) in lineas" :key="line.localId" class="line-card">
-          <div :id="`ap3-linea-${line.localId}`" tabindex="-1">
+          <div :id="`ap3-linea-${line.localId}`" class="line-summary" tabindex="0"
+            role="button" :aria-label="'Ver detalle completo de ' + line.nombre"
+            @click="openLineRead(line.localId)" @keydown.enter.prevent="openLineRead(line.localId)"
+            @keydown.space.prevent="openLineRead(line.localId)">
             <strong>{{ line.nombre }}</strong>
             <p v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
               Importe histórico negociado: {{ money(Number(line.importe_negociado || 0)) }}
@@ -710,25 +738,20 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             {{ money(totalEstimadoLinea(line)!) }}
           </strong>
           <strong v-else class="pending-value">Importe pendiente</strong>
-          <div class="actions">
-            <Button
-              variant="secondary"
-              :disabled="line.modo_calculo === 'TOTAL_NEGOCIADO'"
-              @click="openLine(index)"
-              >Editar</Button
-            >
-            <Button
-              v-if="tipos.find((x) => x.id === line.tipo_item)?.codigo === 'MUEBLE_MEDIDA'"
-              variant="secondary"
-              @click="openSpec(index)"
-              >Ficha técnica</Button
-            >
-            <Button
-              v-if="tipos.find((x) => x.id === line.tipo_item)?.codigo === 'MUEBLE_MEDIDA'"
-              variant="secondary"
-              @click="duplicateFurniture(index)"
-              >Duplicar mueble</Button
-            ><Button variant="secondary" @click="removeLine(index)">Eliminar</Button>
+          <div class="line-menu" @keydown.esc="menuLineId = null">
+            <button type="button" class="menu-trigger" :aria-expanded="menuLineId === line.localId"
+              :aria-label="'Acciones de ' + line.nombre" aria-haspopup="menu"
+              @click.stop="menuLineId = menuLineId === line.localId ? null : line.localId">⋮</button>
+            <div v-if="menuLineId === line.localId" class="menu-panel" role="menu">
+              <button type="button" role="menuitem"
+                :disabled="line.modo_calculo === 'TOTAL_NEGOCIADO'"
+                @click="menuLineId = null; openLine(index)">Editar</button>
+              <button v-if="tipos.find((x) => x.id === line.tipo_item)?.codigo === 'MUEBLE_MEDIDA'"
+                type="button" role="menuitem" @click="menuLineId = null; openSpec(index)">Ficha técnica</button>
+              <button v-if="tipos.find((x) => x.id === line.tipo_item)?.codigo === 'MUEBLE_MEDIDA'"
+                type="button" role="menuitem" @click="menuLineId = null; duplicateFurniture(index)">Duplicar mueble</button>
+              <button type="button" role="menuitem" @click="menuLineId = null; removeLine(index)">Eliminar</button>
+            </div>
           </div>
         </Card>
         <p v-if="removedLines.length" role="status" class="undo">
@@ -894,6 +917,37 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       </footer>
     </template>
 
+    <Modal :open="Boolean(readingLine)" :title="readingLine?.nombre ?? 'Detalle de línea'" @close="closeLineRead">
+      <div v-if="readingLine" class="read-line">
+        <p><strong>Tipo:</strong> {{ tipos.find(x => x.id === readingLine?.tipo_item)?.nombre }}</p>
+        <p><strong>SKU:</strong> {{ readMaster?.sku || (readingLine.producto ? 'Producto #' + readingLine.producto : 'Variante pendiente / mueble a pedido') }}</p>
+        <p><strong>Descripción:</strong> {{ readingLine.descripcion || 'Sin descripción adicional' }}</p>
+        <p><strong>Cantidad:</strong> {{ readingLine.cantidad }} {{ unidades.find(x => x.id === readingLine?.unidad)?.nombre }}</p>
+        <p v-if="readingLine.familia_producto && !readingLine.producto" role="status">Variante pendiente; no se reserva stock.</p>
+        <p v-if="readingLine.modo_calculo === 'TOTAL_NEGOCIADO'"><strong>Importe negociado histórico:</strong> {{ readingLine.importe_negociado }}</p>
+        <p v-else><strong>Precio unitario cotizado:</strong> {{ money(Number(readingLine.precio_unitario)) }}</p>
+        <p><strong>Descuento:</strong> {{ money(Number(readingLine.descuento)) }}</p>
+        <p><strong>Importe estimado:</strong> {{ totalEstimadoLinea(readingLine) === null ? 'Pendiente' : money(totalEstimadoLinea(readingLine)!) }}</p>
+        <template v-if="readMaster">
+          <h3>Datos actuales del catálogo · solo lectura</h3>
+          <p>{{ readMaster.nombre }} · {{ readMaster.categoria_info?.nombre }}</p>
+          <p>Precio vigente de referencia BOB: {{ readMaster.precio_vigente }}</p>
+          <p>Disponibilidad referencial: {{ readMaster.disponibilidad_referencial }}</p>
+          <p v-if="readMaster.silla">Silla: {{ readMaster.silla.modelo }}</p>
+          <p v-if="readMaster.piso">Piso: {{ readMaster.piso.modelo }} · {{ readMaster.piso.espesor_mm }} mm</p>
+        </template>
+        <template v-if="readingLine.especificacion">
+          <h3>Ficha técnica</h3>
+          <p>{{ readingLine.especificacion.observaciones }}</p>
+          <pre>{{ JSON.stringify(readingLine.especificacion.datos_tecnicos, null, 2) }}</pre>
+        </template>
+        <div class="actions">
+          <Button v-if="readingLine.modo_calculo !== 'TOTAL_NEGOCIADO'" variant="secondary"
+            @click="const index = lineas.findIndex(x => x.localId === readingLineId); closeLineRead(); openLine(index)">Editar</Button>
+          <Button variant="secondary" @click="closeLineRead">Cerrar</Button>
+        </div>
+      </div>
+    </Modal>
     <Modal
       :open="lineModal"
       :title="editingLine === null ? 'Agregar producto' : 'Editar producto'"
@@ -975,6 +1029,16 @@ section {
 }
 .choice-panel { padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface); }
 .choice-panel h3 { margin-top: 0; }
+.line-summary { cursor: pointer; min-width: 0; flex: 1; }
+.line-summary:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.line-menu { position: relative; flex-shrink: 0; }
+.menu-trigger { padding: var(--space-2); border-radius: var(--radius-control); border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); font-size: 1.25rem; cursor: pointer; }
+.menu-panel { position: absolute; z-index: 10; top: 100%; right: 0; min-width: 10rem; display: grid; padding: var(--space-2); border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-surface-raised); box-shadow: 0 4px 16px #0002; }
+.menu-panel button { text-align: left; padding: var(--space-2); background: transparent; color: var(--color-text); border: 0; cursor: pointer; }
+.menu-panel button:focus-visible { outline: 2px solid var(--color-primary); }
+.read-line { display: grid; gap: var(--space-2); }
+.read-line p { margin: 0; overflow-wrap: anywhere; }
+.read-line pre { max-width: 100%; overflow: auto; white-space: pre-wrap; }
 .line-card {
   margin-bottom: var(--space-3);
 }
