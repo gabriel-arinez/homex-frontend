@@ -708,7 +708,7 @@ test('PRF-01 restaura cliente y no descarta la línea al volver del producto con
         lineModalDirty: true,
         lineas: [],
         currentStep: 3,
-        key: '847c4be0-9988-46d0-b338-b45970672918',
+        key: crypto.randomUUID(),
         lineDraft: {
           tipo_item: '10',
           nombre: 'Mesa pendiente',
