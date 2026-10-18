@@ -84,7 +84,10 @@ function objetoEspecificaciones(): unknown {
   const datos: unknown = form.especificaciones.trim()
     ? JSON.parse(form.especificaciones)
     : {}
-  if (!esObjeto(datos)) throw new Error('Las especificaciones guiadas necesitan un objeto JSON.')
+  if (!esObjeto(datos)) {
+    if (!camposSilla.value.length) return datos
+    throw new Error('Para añadir características, utiliza un objeto JSON en la edición avanzada.')
+  }
   const combinado: Record<string, unknown> = { ...datos }
   for (const campo of camposSimples(datos)) delete combinado[campo.clave]
   const claves = new Set<string>()
