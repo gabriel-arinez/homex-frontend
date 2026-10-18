@@ -70,6 +70,7 @@ const filters = reactive<Record<Field, string>>({
 })
 const options = ref<Record<string, ValorCatalogoPublico[]>>({})
 const view = ref<'grid' | 'lista'>(props.initialState?.view ?? 'grid')
+const filtersExpanded = ref(true)
 const page = ref(props.initialState?.page ?? 1)
 const products = ref<Producto[]>([])
 const preview = ref<Producto | null>(null)
@@ -85,6 +86,42 @@ const categoryCode = computed(
 )
 const activeFields = computed(() => fieldOptions[categoryCode.value] ?? [])
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
+const activeChips = computed(() => {
+  const chips: { key: string; label: string }[] = []
+  if (search.value.trim()) chips.push({ key: 'search', label: `Búsqueda: ${search.value.trim()}` })
+  if (category.value) {
+    const nombre = props.categorias.find((item) => String(item.id) === category.value)?.nombre
+    chips.push({ key: 'category', label: `Categoría: ${nombre ?? category.value}` })
+  }
+  if (family.value) {
+    const nombre = props.familias.find((item) => String(item.id) === family.value)?.nombre
+    chips.push({ key: 'family', label: `Familia: ${nombre ?? family.value}` })
+  }
+  for (const item of activeFields.value) {
+    const raw = filters[item.field]
+    if (!raw) continue
+    const nombre = item.concepto
+      ? options.value[item.concepto]?.find((option) => String(option.id) === raw)?.nombre ?? raw
+      : raw
+    chips.push({ key: item.field, label: `${item.label}: ${nombre}` })
+  }
+  return chips
+})
+function clearFilter(key: string) {
+  if (key === 'search') search.value = ''
+  else if (key === 'category') category.value = ''
+  else if (key === 'family') family.value = ''
+  else if (key in filters) filters[key as Field] = ''
+}
+function clearAllFilters() {
+  search.value = ''
+  category.value = ''
+  family.value = ''
+  resetSpecificFilters()
+}
+function setFiltersOpen(event: Event) {
+  filtersExpanded.value = (event.currentTarget as HTMLDetailsElement).open
+}
 const money = (value: string) =>
   new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(Number(value))
 function resetSpecificFilters() {
@@ -172,6 +209,7 @@ watch(
   { deep: true },
 )
 onMounted(() => {
+  filtersExpanded.value = window.innerWidth >= 640
   if (category.value) void loadOptions()
   void load()
 })
@@ -206,7 +244,9 @@ onBeforeUnmount(() => {
         {{ item.nombre }}
       </button>
     </nav>
-    <div class="filtros">
+    <details class="filtros-panel" :open="filtersExpanded" @toggle="setFiltersOpen">
+      <summary>Filtros del catálogo</summary>
+      <div class="filtros">
       <SearchField v-model="search" label="Buscar SKU o nombre" />
       <Select
         v-model="family"
@@ -243,6 +283,15 @@ onBeforeUnmount(() => {
           />
         </label>
       </template>
+      </div>
+    </details>
+    <div v-if="activeChips.length" class="chips-filtros" aria-label="Filtros activos">
+      <span>Filtros activos:</span>
+      <button v-for="chip in activeChips" :key="chip.key" type="button"
+        :aria-label="'Quitar ' + chip.label" @click="clearFilter(chip.key)">
+        {{ chip.label }} <span aria-hidden="true">×</span>
+      </button>
+      <Button variant="secondary" @click="clearAllFilters">Limpiar filtros</Button>
     </div>
     <div v-if="canAdmin && category" class="toolbar">
       <Button variant="secondary" @click="emit('create', categoryCode)"
@@ -388,6 +437,10 @@ onBeforeUnmount(() => {
   border-color: var(--color-primary);
   font-weight: 700;
 }
+ .filtros-panel { min-width: 0; }
+.filtros-panel > summary { display: none; }
+.chips-filtros { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.chips-filtros button:not(.button) { border: 1px solid var(--color-border); border-radius: var(--radius-control); padding: var(--space-2); background: var(--color-surface); color: var(--color-text); cursor: pointer; }
 .filtros {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
@@ -448,6 +501,10 @@ onBeforeUnmount(() => {
   padding: var(--space-3);
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-card);
+}
+@media (max-width: 40rem) {
+  .filtros-panel > summary { display: list-item; cursor: pointer; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-control); }
+  .filtros-panel .filtros { margin-top: var(--space-3); }
 }
 @media (max-width: 35rem) {
   .resultados-lista .producto {
