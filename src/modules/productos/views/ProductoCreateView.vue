@@ -12,7 +12,9 @@ const router = useRouter()
 const saving = ref(false)
 const error = ref('')
 function destination(producto?: number, mediaError = false) {
-  const target = typeof route.query.returnTo === 'string' ? route.query.returnTo : '/productos'
+  const requested = route.query.returnTo
+  const target = typeof requested === 'string' && /^\/proformas(?:\/|$)/.test(requested)
+    ? requested : '/productos'
   return producto
     ? {
         path: target,
@@ -55,6 +57,11 @@ async function save(body: ProductoWritable, file: File | null) {
       @menu="emit('openMenu')"
     />
     <p v-if="error" role="alert">{{ error }}</p>
-    <ProductoForm :processing="saving" @save="save" @cancel="router.push(destination())" />
+    <ProductoForm
+      :processing="saving"
+      :preselect-category="typeof route.query.categoria === 'string' ? route.query.categoria : undefined"
+      @save="save"
+      @cancel="router.push(destination())"
+    />
   </div>
 </template>
