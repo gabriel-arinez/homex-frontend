@@ -34,7 +34,6 @@ import { proformasService } from '../services/proformasService'
 import {
   cloneEditorData,
   consumeEditorDraft,
-  duplicateLocalLine,
   removeLocalLine,
   restoreLocalLine,
   saveEditorDraft,
@@ -75,6 +74,8 @@ const removedLines = ref<{ line: LineaLocal; index: number }[]>([])
 const contextualNavigation = ref(false)
 const preferredProductId = ref<number | null>(null)
 const pendingLineDraft = ref<Record<string, string> | null>(null)
+const duplicateOrigin = ref<string | null>(null)
+const duplicateSpec = ref<EspecificacionMuebleWritable | null>(null)
 const clienteMode = ref<'existente' | 'nuevo' | 'pendiente'>('existente')
 const clienteSeleccionado = ref<Cliente | ClienteResumenProforma | null>(null)
 const key = ref(crypto.randomUUID())
@@ -286,9 +287,33 @@ async function loadReferences() {
   }
 }
 function saveLine(body: DetalleProformaWritable) {
+  if (duplicateOrigin.value) {
+    const original = lineas.value.find((item) => item.localId === duplicateOrigin.value)
+    if (original) {
+      const fields: (keyof DetalleProformaWritable)[] = [
+        'tipo_item', 'producto', 'familia_producto', 'nombre', 'descripcion', 'cantidad',
+        'unidad', 'precio_unitario', 'descuento',
+      ]
+      const identical = fields.every((field) => String(original[field] ?? '') === String(body[field] ?? ''))
+      if (identical) {
+        if (!window.confirm('La copia es idéntica. ¿Sumar su cantidad a la línea original en lugar de duplicarla?')) return
+        original.cantidad = String(Number(original.cantidad) + Number(body.cantidad))
+        duplicateOrigin.value = null
+        duplicateSpec.value = null
+        closeLineModal()
+        markDirty()
+        return
+      }
+    }
+  }
   preferredProductId.value = null
   pendingLineDraft.value = null
-  const line: LineaLocal = { ...body, localId: localId(), especificacion: null }
+  const line: LineaLocal = {
+    ...body, localId: localId(),
+    especificacion: duplicateOrigin.value ? cloneEditorData(duplicateSpec.value) : null,
+  }
+  duplicateOrigin.value = null
+  duplicateSpec.value = null
   if (editingLine.value === null) lineas.value.push(line)
   else {
     const previous = lineas.value[editingLine.value]
@@ -342,12 +367,19 @@ function undoRemove() {
 }
 function duplicateFurniture(index: number) {
   const original = lineas.value[index]
-  if (!original || tipos.value.find((x) => x.id === original.tipo_item)?.codigo !== 'MUEBLE_MEDIDA')
-    return
-  const copy = duplicateLocalLine(original, localId())
-  lineas.value.splice(index + 1, 0, copy)
-  success.value = 'Mueble duplicado con una ficha independiente.'
-  markDirty()
+  if (!original || tipos.value.find((x) => x.id === original.tipo_item)?.codigo !== 'MUEBLE_MEDIDA') return
+  preferredProductId.value = null
+  openLine()
+  duplicateOrigin.value = original.localId
+  duplicateSpec.value = cloneEditorData(original.especificacion ?? null)
+  pendingLineDraft.value = {
+    tipo_item: String(original.tipo_item),
+    producto: '', familia_producto: '',
+    nombre: original.nombre, descripcion: original.descripcion ?? '',
+    cantidad: String(original.cantidad), unidad: String(original.unidad),
+    precio_unitario: String(original.precio_unitario), descuento: String(original.descuento),
+  }
+  success.value = 'Revisa la copia del mueble y confirma sus datos antes de incorporarla.'
 }
 function editorSnapshot() {
   return {
@@ -437,6 +469,8 @@ function closeLineModal() {
   lineModalDirty.value = false
   pendingLineDraft.value = null
   editingLine.value = null
+  duplicateOrigin.value = null
+  duplicateSpec.value = null
 }
 function openLine(index: number | null = null) {
   if (index !== null && lineas.value[index]?.modo_calculo === 'TOTAL_NEGOCIADO') return
