@@ -835,7 +835,7 @@ test('PRF-02 selecciona catálogo, consulta detalle y deshace sin escribir profo
 
   await page.getByRole('button', { name: 'Ver detalle completo de Silla ejecutiva' }).click()
   await expect(page.getByRole('dialog').getByText('Precio unitario cotizado:', { exact: false })).toBeVisible()
-  await page.getByRole('dialog').getByRole('button', { name: 'Cerrar' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Cerrar' }).last().click()
   await page.getByRole('button', { name: 'Acciones de Silla ejecutiva' }).click()
   await page.getByRole('menuitem', { name: 'Eliminar' }).click()
   await expect(page.locator('.line-card')).toHaveCount(0)
