@@ -377,8 +377,51 @@ function saveLine(body: DetalleProformaWritable) {
     specModalDirty.value = false
   } else duplicateOrigin.value = null
 }
-function saveSpec(body: EspecificacionMuebleWritable) {
+function saveSpec(
+  body: EspecificacionMuebleWritable,
+  comercial: {
+    nombre: string
+    descripcion: string
+    cantidad: string
+    unidad: number
+    precio_unitario: string
+    descuento: string
+  },
+) {
+  if (draftingFurniture.value) {
+    const candidate: LineaLocal = {
+      ...draftingFurniture.value,
+      ...comercial,
+      especificacion: body,
+    }
+    const original = duplicateOrigin.value
+      ? lineas.value.find((line) => line.localId === duplicateOrigin.value) : null
+    if (original) {
+      const commercialKeys = ['nombre', 'descripcion', 'cantidad', 'unidad', 'precio_unitario', 'descuento'] as const
+      const sameCommercial = commercialKeys.every(
+        (key) => String(original[key] ?? '') === String(candidate[key] ?? ''),
+      )
+      const sameSpec = JSON.stringify(original.especificacion ?? null) === JSON.stringify(body)
+      if (sameCommercial && sameSpec) {
+        if (!window.confirm('La copia es idéntica. ¿Aumentar la cantidad de la línea original?'))
+          return
+        original.cantidad = String(Number(original.cantidad) + Number(candidate.cantidad))
+      } else lineas.value.push(candidate)
+    } else lineas.value.push(candidate)
+    draftingFurniture.value = null
+    duplicateOrigin.value = null
+    duplicateSpec.value = null
+    specLine.value = null
+    specModalDirty.value = false
+    additionMode.value = 'none'
+    markDirty()
+    return
+  }
   if (specLine.value === null) return
+  const existingLine = lineas.value[specLine.value]
+  if (!existingLine) return
+  Object.assign(existingLine, comercial)
+
   const index = specLine.value
   const line = lineas.value[index]
   if (!line) return
