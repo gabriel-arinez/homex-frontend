@@ -45,6 +45,12 @@ Mantener cabecera compacta que indique nombre provisional, acción (nuevo/editar
 - Selector no despliega de inicio el universo de opciones. Muestra sugerencias pertinentes y resultado filtrado bajo demanda. Evitar duplicar el mismo atributo dentro de la misma tarjeta; permitir mismo tipo de atributo en otras partes del mueble.
 - Si no existe campo, admitir **atributo personalizado local** nombre+valor, sin crear definición global automáticamente. No depender de JSON textual. No solicitar privilegios de catálogo general.
 
+### Contrato obligatorio de catálogo PRF-03
+
+El servicio tipado consume **GET /api/v1/catalogo/atributos-mueble/** con respuesta `{limites: {max_conjuntos: number, max_componentes: number}, atributos: [{id, codigo, nombre, grupo, tipo_entrada, ambitos, sinonimos}]}`; puede enviar `search` sin cambiar el formato. La creación usa **POST /api/v1/catalogo/tipos-mueble/** exclusivamente con `{nombre: string}`, espera 201 `{id, codigo, nombre}` o 409 `{codigo: "tipo_duplicado", existente: {id, codigo, nombre}}`. No enviar `concepto`, `codigo`, `activo` ni permisos configurables en esa petición. Los tipos existentes siguen consultándose por GET /api/v1/catalogo/opciones/?concepto=TIPO_MUEBLE.
+
+Usar exclusivamente los nombres y formas de respuesta publicados por el backend y el cliente OpenAPI regenerado; no implementar rutas alternativas ni adivinar nombres en runtime. Los atributos seleccionados persisten con código, nombre snapshot y valor; el formulario de fichas históricas puede mostrar atributos desconocidos/inactivos sin sobrescribirlos. Si GET falla, informar indisponibilidad de sugerencias, mantener el borrador y permitir captura manual de atributos personalizados.
+
 ## 3. PRF-03.3 — Componentes y conjuntos
 
 ### Componentes sin conjuntos
