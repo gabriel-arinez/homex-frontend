@@ -29,7 +29,7 @@ const props = defineProps<{
   moneda?: 'BOB' | 'USD'
   detalle?: {
     tipo_item?: number
-    descripcion?: string
+    descripcion?: string | null
     nombre?: string
     cantidad?: string | number
     unidad?: string | number
