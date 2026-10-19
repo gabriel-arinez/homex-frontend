@@ -80,6 +80,7 @@ const readingLineId = ref<string | null>(null)
 const readMaster = ref<Producto | null>(null)
 let readRequestId = 0
 const specLine = ref<number | null>(null)
+const draftingFurniture = ref<LineaLocal | null>(null)
 const removedLines = ref<{ line: LineaLocal; index: number }[]>([])
 const contextualNavigation = ref(false)
 const preferredProductId = ref<number | null>(null)
