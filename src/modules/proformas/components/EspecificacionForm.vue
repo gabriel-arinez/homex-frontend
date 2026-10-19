@@ -395,7 +395,7 @@ function submit() {
     generalesActuales.dimensiones = dim
   if (Object.hasOwn(generales, 'atributos') || atributosGenerales.length)
     generalesActuales.atributos = atributosGenerales
-  const cambios: Record<string, unknown> = {}
+  const cambios: Parameters<typeof fusionarDatosTecnicos>[1] = {}
   if (Object.hasOwn(base, 'caracteristicas_generales') || Object.keys(generalesActuales).length)
     cambios.caracteristicas_generales = generalesActuales
   if (Object.hasOwn(base, 'conjuntos') || conjuntos.length) cambios.conjuntos = conjuntos
