@@ -1,5 +1,5 @@
 name: PRF03 format
-# Final normalization after PRF03 interface and E2E changes
+# Normalization after corpus and multiple-undo regression fixes
 
 on:
   push:
