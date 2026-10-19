@@ -473,6 +473,8 @@ function closeSpec() {
   )
     return
   specLine.value = null
+  draftingFurniture.value = null
+  duplicateOrigin.value = null
   specModalDirty.value = false
 }
 function removeLine(index: number) {
@@ -656,6 +658,11 @@ function closeLineModal() {
 }
 function openLine(index: number | null = null) {
   if (index !== null && lineas.value[index]?.modo_calculo === 'TOTAL_NEGOCIADO') return
+  if (index !== null &&
+    tipos.value.find((x) => x.id === lineas.value[index]?.tipo_item)?.codigo === 'MUEBLE_MEDIDA') {
+    openSpec(index)
+    return
+  }
   lineFormVersion.value++
   pendingLineDraft.value = null
   editingLine.value = index
@@ -676,13 +683,8 @@ function selectCatalogProduct(product: Producto) {
 }
 function chooseManualFurniture() {
   preferredProductId.value = null
-  openLine()
-  const tipo = tipos.value.find((x) => x.codigo === 'MUEBLE_MEDIDA')
-  const unidad = unidades.value.find((x) => x.codigo === 'PIEZA')
-  pendingLineDraft.value = {
-    tipo_item: String(tipo?.id ?? ''),
-    unidad: String(unidad?.id ?? ''),
-  }
+  duplicateOrigin.value = null
+  openFurnitureDraft()
 }
 function quotePendingFamily(familyId: number, categoryId: number) {
   const categoria = tipos.value.find(
