@@ -4657,8 +4657,8 @@ components:
         existente:
           $ref: '#/components/schemas/TipoMuebleRespuesta'
       required:
-      - codigo
-      - existente
+        - codigo
+        - existente
     TipoMuebleCrear:
       type: object
       properties:
