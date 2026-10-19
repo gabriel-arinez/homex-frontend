@@ -487,6 +487,33 @@ function undoRemove() {
   lineas.value = restoreLocalLine(lineas.value, removed)
   markDirty()
 }
+function openFurnitureDraft(source?: LineaLocal) {
+  const tipo = tipos.value.find((item) => item.codigo === 'MUEBLE_MEDIDA')
+  const unidad = unidades.value.find((item) => item.codigo === 'PIEZA')
+  if (!tipo || !unidad) {
+    error.value = 'Faltan referencias comerciales necesarias para configurar el mueble.'
+    return
+  }
+  draftingFurniture.value = {
+    ...(source ? cloneEditorData(source) : {}),
+    localId: localId(),
+    tipo_item: tipo.id,
+    producto: null,
+    familia_producto: null,
+    nombre: source?.nombre ?? '',
+    descripcion: source?.descripcion ?? '',
+    cantidad: source?.cantidad ?? '1',
+    unidad: source?.unidad ?? unidad.id,
+    modo_calculo: 'PRECIO_UNITARIO',
+    precio_unitario: source?.precio_unitario ?? '',
+    descuento: source?.descuento ?? '0.00',
+    especificacion: cloneEditorData(source?.especificacion ?? null),
+  } as LineaLocal
+  delete draftingFurniture.value.id
+  specLine.value = null
+  lineModal.value = false
+  specModalDirty.value = false
+}
 function duplicateFurniture(index: number) {
   const original = lineas.value[index]
   if (!original || tipos.value.find((x) => x.id === original.tipo_item)?.codigo !== 'MUEBLE_MEDIDA')
