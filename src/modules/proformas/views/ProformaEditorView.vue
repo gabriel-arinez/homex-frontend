@@ -535,6 +535,7 @@ function editorSnapshot() {
     clienteSeleccionado: cloneEditorData(clienteSeleccionado.value),
     lineModalDirty: lineModalDirty.value,
     lineas: cloneEditorData(lineas.value),
+    draftingFurniture: cloneEditorData(draftingFurniture.value),
     removedLines: cloneEditorData(removedLines.value),
     additionMode: additionMode.value,
     catalogInitialized: catalogInitialized.value,
@@ -596,6 +597,7 @@ function restoreContextualDraft() {
   clienteSeleccionado.value =
     snapshot.clienteSeleccionado ?? persisted.value?.cliente_resumen ?? null
   lineas.value = snapshot.lineas
+  draftingFurniture.value = snapshot.draftingFurniture ?? null
   removedLines.value = snapshot.removedLines ?? []
   additionMode.value = snapshot.additionMode ?? 'none'
   catalogInitialized.value = snapshot.catalogInitialized ?? false
@@ -1219,7 +1221,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       />
     </Modal>
     <Modal
-      :open="specLine !== null"
+       :open="specLine !== null || draftingFurniture !== null"
       title="Configurador integral de mueble a pedido"
       fullscreen
       @close="closeSpec"
@@ -1229,6 +1231,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         :tipos="tiposMueble"
         :especificacion="editableSpec"
         :detalle="editableSpecDetail"
+        :unidades="unidades"
+        :moneda="header.moneda_codigo as 'BOB' | 'USD'"
         @save="saveSpec"
         @changed="specModalDirty = true"
         @cancel="closeSpec"
