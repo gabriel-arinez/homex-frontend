@@ -49,14 +49,31 @@ describe('AP6 correcciones funcionales', () => {
 
   it('registra datos técnicos únicos por componente sin mezclar atributos', async () => {
     const wrapper = mount(EspecificacionForm, {
-      props: { tipos: [opcion(5, 'ESCRITORIO', 'Escritorio')] },
+      props: {
+        tipos: [opcion(5, 'ESCRITORIO', 'Escritorio')],
+        unidades: [opcion(10, 'PIEZA', 'Pieza')],
+        detalle: {
+          nombre: 'Escritorio',
+          cantidad: '1',
+          unidad: 10,
+          precio_unitario: '125',
+          descuento: '0',
+        },
+      },
     })
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text() === 'Agregar componente')!
+      .trigger('click')
     await wrapper.get('#componente-nombre-0').setValue('Mesón')
     await wrapper.get('#componente-material-0').setValue('Melamina')
     await wrapper.get('#componente-espesor-0').setValue('25 mm')
     await wrapper.get('#componente-color-0').setValue('Nogal')
-    await wrapper.get('#texto-original').setValue('Escritorio con cajonera a elección')
-    await wrapper.get('#accesorios').setValue('Pasacables incorporado')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Añadir accesorio')!
+      .trigger('click')
+    await wrapper.get('#accesorio-0').setValue('Pasacables incorporado')
     await wrapper
       .findAll('button')
       .find((button) => button.text() === 'Agregar componente')!
@@ -64,11 +81,10 @@ describe('AP6 correcciones funcionales', () => {
     await wrapper.get('#componente-nombre-1').setValue('Estructura')
     await wrapper.get('#componente-espesor-1').setValue('18 mm')
     await wrapper.get('#componente-color-1').setValue('Blanco')
-    await wrapper.get('#componente-adicionales-1').setValue('{"cantidad_interna":2}')
+    await wrapper.get('input[name="componente-1-cantidad"]').setValue('2')
     await wrapper.get('form').trigger('submit')
     expect(wrapper.emitted('save')?.[0]?.[0]).toMatchObject({
       datos_tecnicos: {
-        descripcion_original: 'Escritorio con cajonera a elección',
         accesorios: ['Pasacables incorporado'],
         componentes: [
           { nombre: 'Mesón', material: 'Melamina', espesor: '25 mm', color: 'Nogal' },
@@ -83,6 +99,14 @@ describe('AP6 correcciones funcionales', () => {
     const wrapper = mount(EspecificacionForm, {
       props: {
         tipos: [opcion(5, 'ESCRITORIO', 'Escritorio')],
+        unidades: [opcion(10, 'PIEZA', 'Pieza')],
+        detalle: {
+          nombre: 'Escritorio',
+          cantidad: '1',
+          unidad: 10,
+          precio_unitario: '125',
+          descuento: '0',
+        },
         especificacion: {
           id: 91,
           tipo_mueble: 5,

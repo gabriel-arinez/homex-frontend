@@ -2,7 +2,13 @@
 import { computed, ref } from 'vue'
 import { X } from '@lucide/vue'
 import { useFocusTrap } from '@/shared/composables/useFocusTrap'
-const props = defineProps<{ open: boolean; title: string; description?: string; wide?: boolean }>()
+const props = defineProps<{
+  open: boolean
+  title: string
+  description?: string
+  wide?: boolean
+  fullscreen?: boolean
+}>()
 const emit = defineEmits<{ close: [] }>()
 const panel = ref<HTMLElement | null>(null)
 useFocusTrap(
@@ -16,7 +22,7 @@ useFocusTrap(
       <section
         ref="panel"
         class="modal"
-        :class="{ 'modal--wide': wide }"
+        :class="{ 'modal--wide': wide, 'modal--fullscreen': fullscreen }"
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
@@ -54,6 +60,10 @@ useFocusTrap(
 }
 .modal--wide {
   width: min(62rem, 100%);
+}
+.modal--fullscreen {
+  width: min(90rem, 100%);
+  height: calc(100dvh - 2rem);
 }
 .modal header,
 .modal footer {

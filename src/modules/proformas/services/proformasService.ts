@@ -1,5 +1,6 @@
 import type {
   AprobarProformaRespuesta,
+  CatalogoAtributosMueble,
   ArchivoAdjunto,
   CrearProformaWritable,
   DetalleProforma,
@@ -14,6 +15,8 @@ import type {
   ProformaIntegralWritable,
   V1CatalogoOpcionesListData,
   V1ProformasListData,
+  TipoMuebleCrear,
+  TipoMuebleRespuesta,
   ValorCatalogoPublico,
 } from '@/generated/api'
 import { apiRequest } from '@/shared/api'
@@ -60,6 +63,10 @@ export const proformasService = {
     }),
   options: (concepto: Concepto) =>
     apiRequest<ValorCatalogoPublico[]>(`/api/v1/catalogo/opciones/${qs({ concepto })}`),
+  furnitureAttributes: (search = '') =>
+    apiRequest<CatalogoAtributosMueble>(`/api/v1/catalogo/atributos-mueble/${qs({ search })}`),
+  createFurnitureType: (body: TipoMuebleCrear) =>
+    apiRequest<TipoMuebleRespuesta>('/api/v1/catalogo/tipos-mueble/', { method: 'POST', body }),
   families: () =>
     apiRequest<PaginatedFamiliaProductoList>('/api/v1/catalogo/familias/?page_size=100'),
   attachments: (p: number, d: number) =>

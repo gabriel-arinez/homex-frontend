@@ -17,6 +17,16 @@ export type ArchivoAdjunto = {
   readonly url: string
 }
 
+export type AtributoMueble = {
+  id: number
+  codigo: string
+  nombre: string
+  grupo: string
+  tipo_entrada: string
+  ambitos?: unknown
+  sinonimos?: unknown
+}
+
 export type CambiarEstadoPedido = {
   estado_codigo: EstadoCodigoEnum
 }
@@ -47,6 +57,11 @@ export type CargaArchivoImagen = {
 
 export type CargaImagen = {
   archivo: string
+}
+
+export type CatalogoAtributosMueble = {
+  limites: LimitesConfigurador
+  atributos: Array<AtributoMueble>
 }
 
 export type Cliente = {
@@ -281,6 +296,11 @@ export type ItemIa = {
   readonly cantidad: number | null
   readonly precio_total: string | null
   readonly observaciones: string | null
+}
+
+export type LimitesConfigurador = {
+  max_conjuntos: number
+  max_componentes: number
 }
 
 export type LineaComercialHitl = {
@@ -692,6 +712,21 @@ export type Recibo = {
   readonly tipo_pago: number
   readonly created_by: number | null
   readonly updated_by: number | null
+}
+
+export type TipoMuebleConflicto = {
+  codigo: string
+  existente: TipoMuebleRespuesta
+}
+
+export type TipoMuebleCrear = {
+  nombre: string
+}
+
+export type TipoMuebleRespuesta = {
+  id: number
+  codigo: string
+  nombre: string
 }
 
 export type TokenObtainPair = {
@@ -1161,6 +1196,22 @@ export type V1CapturasConfirmarCreateResponses = {
 
 export type V1CapturasConfirmarCreateResponse =
   V1CapturasConfirmarCreateResponses[keyof V1CapturasConfirmarCreateResponses]
+
+export type V1CatalogoAtributosMuebleListData = {
+  body?: never
+  path?: never
+  query?: {
+    search?: string
+  }
+  url: '/api/v1/catalogo/atributos-mueble/'
+}
+
+export type V1CatalogoAtributosMuebleListResponses = {
+  200: CatalogoAtributosMueble
+}
+
+export type V1CatalogoAtributosMuebleListResponse =
+  V1CatalogoAtributosMuebleListResponses[keyof V1CatalogoAtributosMuebleListResponses]
 
 export type V1CatalogoDescuentosListData = {
   body?: never
@@ -1832,6 +1883,27 @@ export type V1CatalogoSillasUpdateResponses = {
 
 export type V1CatalogoSillasUpdateResponse =
   V1CatalogoSillasUpdateResponses[keyof V1CatalogoSillasUpdateResponses]
+
+export type V1CatalogoTiposMuebleCreateData = {
+  body: TipoMuebleCrear
+  path?: never
+  query?: never
+  url: '/api/v1/catalogo/tipos-mueble/'
+}
+
+export type V1CatalogoTiposMuebleCreateErrors = {
+  409: TipoMuebleConflicto
+}
+
+export type V1CatalogoTiposMuebleCreateError =
+  V1CatalogoTiposMuebleCreateErrors[keyof V1CatalogoTiposMuebleCreateErrors]
+
+export type V1CatalogoTiposMuebleCreateResponses = {
+  201: TipoMuebleRespuesta
+}
+
+export type V1CatalogoTiposMuebleCreateResponse =
+  V1CatalogoTiposMuebleCreateResponses[keyof V1CatalogoTiposMuebleCreateResponses]
 
 export type V1ClientesListData = {
   body?: never

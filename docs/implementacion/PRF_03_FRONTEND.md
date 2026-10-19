@@ -188,3 +188,16 @@ Ejecutar Vitest/unit/component para composables y adaptadores; E2E Playwright/Cy
 7. Ejecutar suites, E2E cinco casos, accesibilidad/responsive, checks de contrato y CI con backend real. Corregir defectos antes de solicitar aceptación; entregar diff, commits, PRs y comandos exactos de verificación.
 
 **Resultado exigido:** cualquier vendedor autorizado configura y cotiza muebles reales manualmente, sin JSON visible, sin datos inferidos, con un único detalle+ficha y sin pérdida de contexto ni regresiones de PRF-02. La aprobación funcional de PRF-03 NO equivale a aceptación de su implementación.
+
+## 11. Evidencia de implementación (19-10-2026)
+
+**Estado:** candidato implementado en `feat/prf03-configurador-frontend`; pendiente de auditoría técnica independiente y de integración del PR.
+
+- El editor incorpora un configurador visual de pantalla completa con cabecera contextual y navegación por identificación, dimensiones, conjuntos/componentes, accesorios y revisión. No expone JSON al vendedor.
+- El adaptador técnico tipado clona y fusiona la ficha preservando claves desconocidas, UID y evidencia histórica. Los límites 10/40 provienen del contrato backend y se validan también antes de incorporar la ficha local.
+- El diccionario dinámico admite búsqueda normalizada por nombre/sinónimo, atributos globales o contextuales por componente y atributos personalizados locales. Un fallo del catálogo conserva el borrador. La creación restringida de tipo preserva el formulario y selecciona la coincidencia devuelta en 409.
+- Componentes y conjuntos permiten altas acotadas, duplicación profunda, reordenamiento, movimiento y eliminación explícita. Accesorios impiden más de una fila vacía. La revisión presenta datos técnicos/comerciales legibles y aclara que no existe escritura remota hasta guardar/emitir la proforma.
+- La duplicación compara la representación comercial y técnica después de revisar la copia; una ficha idéntica requiere confirmación para sumar cantidad y una diferencia técnica conserva una línea independiente.
+- OpenAPI y tipos TypeScript fueron regenerados desde el contrato backend PRF-03.
+
+Evidencia local: Vitest `116 passed`; Playwright `78 passed`; type-check, lint, format, build y contract drift verdes; `npm audit` reportó 0 vulnerabilidades. Estos resultados no sustituyen la auditoría independiente exigida para aceptar PRF-03.

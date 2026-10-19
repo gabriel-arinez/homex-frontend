@@ -31,6 +31,7 @@ import DetalleForm from '../components/DetalleForm.vue'
 import CatalogoContextual from '../components/CatalogoContextual.vue'
 import type { CatalogoContextState } from '../services/catalogoContext'
 import EspecificacionForm from '../components/EspecificacionForm.vue'
+import { leerDatosTecnicos, tecnicaIgual } from '../services/muebleTecnico'
 import { proformasService } from '../services/proformasService'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { productosService } from '@/modules/productos/services/productosService'
@@ -80,6 +81,7 @@ const readingLineId = ref<string | null>(null)
 const readMaster = ref<Producto | null>(null)
 let readRequestId = 0
 const specLine = ref<number | null>(null)
+const draftingFurniture = ref<LineaLocal | null>(null)
 const removedLines = ref<{ line: LineaLocal; index: number }[]>([])
 const contextualNavigation = ref(false)
 const preferredProductId = ref<number | null>(null)
@@ -186,6 +188,18 @@ const fieldErrorMessages = computed(() => {
 const readingLine = computed(
   () => lineas.value.find((line) => line.localId === readingLineId.value) ?? null,
 )
+const readingTechnical = computed(() =>
+  leerDatosTecnicos(readingLine.value?.especificacion?.datos_tecnicos),
+)
+function readableTechnical(value: unknown): string {
+  if (value === null || value === undefined) return 'No especificado'
+  if (Array.isArray(value)) return value.map(readableTechnical).join(', ')
+  if (typeof value === 'object')
+    return Object.entries(value as Record<string, unknown>)
+      .map(([key, v]) => `${key.replace(/_/g, ' ')}: ${readableTechnical(v)}`)
+      .join(' · ')
+  return String(value)
+}
 async function openLineRead(id: string) {
   readingLineId.value = id
   menuLineId.value = null
@@ -214,7 +228,14 @@ const editableDetail = computed(() => {
   if (editingLine.value === null) return undefined
   return lineas.value[editingLine.value] as unknown as DetalleProforma
 })
+const editableSpecDetail = computed(
+  () =>
+    draftingFurniture.value ??
+    (specLine.value === null ? null : (lineas.value[specLine.value] ?? null)),
+)
 const editableSpec = computed(() => {
+  if (draftingFurniture.value)
+    return draftingFurniture.value.especificacion as EspecificacionMueble | null
   if (specLine.value === null) return null
   return (lineas.value[specLine.value]?.especificacion ?? null) as EspecificacionMueble | null
 })
@@ -337,39 +358,6 @@ async function loadReferences() {
   }
 }
 function saveLine(body: DetalleProformaWritable) {
-  if (duplicateOrigin.value) {
-    const original = lineas.value.find((item) => item.localId === duplicateOrigin.value)
-    if (original) {
-      const fields: (keyof DetalleProformaWritable)[] = [
-        'tipo_item',
-        'producto',
-        'familia_producto',
-        'nombre',
-        'descripcion',
-        'cantidad',
-        'unidad',
-        'precio_unitario',
-        'descuento',
-      ]
-      const identical = fields.every(
-        (field) => String(original[field] ?? '') === String(body[field] ?? ''),
-      )
-      if (identical) {
-        if (
-          !window.confirm(
-            'La copia es idéntica. ¿Sumar su cantidad a la línea original en lugar de duplicarla?',
-          )
-        )
-          return
-        original.cantidad = String(Number(original.cantidad) + Number(body.cantidad))
-        duplicateOrigin.value = null
-        duplicateSpec.value = null
-        closeLineModal()
-        markDirty()
-        return
-      }
-    }
-  }
   preferredProductId.value = null
   pendingLineDraft.value = null
   const line: LineaLocal = {
@@ -377,13 +365,15 @@ function saveLine(body: DetalleProformaWritable) {
     localId: localId(),
     especificacion: duplicateOrigin.value ? cloneEditorData(duplicateSpec.value) : null,
   }
-  duplicateOrigin.value = null
+  const duplicateSource = duplicateOrigin.value
   duplicateSpec.value = null
-  if (editingLine.value === null) lineas.value.push(line)
+  const editingIndex = editingLine.value
+  const wasNew = editingIndex === null
+  if (wasNew) lineas.value.push(line)
   else {
-    const previous = lineas.value[editingLine.value]
+    const previous = lineas.value[editingIndex!]
     if (!previous) return
-    lineas.value[editingLine.value] = {
+    lineas.value[editingIndex!] = {
       ...line,
       id: previous.id,
       localId: previous.localId,
@@ -395,12 +385,106 @@ function saveLine(body: DetalleProformaWritable) {
   editingLine.value = null
   additionMode.value = 'none'
   markDirty()
+  const isFurniture =
+    tipos.value.find((x) => x.id === Number(body.tipo_item))?.codigo === 'MUEBLE_MEDIDA'
+  if (wasNew && isFurniture && duplicateSource) {
+    duplicateOrigin.value = duplicateSource
+    specLine.value = lineas.value.length - 1
+    specModalDirty.value = false
+  } else duplicateOrigin.value = null
 }
-function saveSpec(body: EspecificacionMuebleWritable) {
-  if (specLine.value !== null) {
-    const line = lineas.value[specLine.value]
-    if (line) line.especificacion = body
+function registrarTipoMueble(tipo: ValorCatalogoPublico) {
+  if (tiposMueble.value.some((item) => item.id === tipo.id)) return
+  tiposMueble.value = [...tiposMueble.value, tipo].sort((a, b) =>
+    a.nombre.localeCompare(b.nombre, 'es'),
+  )
+}
+function saveSpec(
+  body: EspecificacionMuebleWritable,
+  comercial: {
+    nombre: string
+    descripcion: string
+    cantidad: string
+    unidad: number
+    precio_unitario: string
+    descuento: string
+  },
+) {
+  if (draftingFurniture.value) {
+    const candidate: LineaLocal = {
+      ...draftingFurniture.value,
+      ...comercial,
+      especificacion: body,
+    }
+    const original = duplicateOrigin.value
+      ? lineas.value.find((line) => line.localId === duplicateOrigin.value)
+      : null
+    if (original) {
+      const commercialKeys = [
+        'nombre',
+        'descripcion',
+        'cantidad',
+        'unidad',
+        'precio_unitario',
+        'descuento',
+      ] as const
+      const sameCommercial = commercialKeys.every(
+        (key) => String(original[key] ?? '') === String(candidate[key] ?? ''),
+      )
+      const existingSpec = original.especificacion
+      const sameSpec =
+        (existingSpec?.tipo_mueble ?? null) === (body.tipo_mueble ?? null) &&
+        (existingSpec?.observaciones ?? null) === (body.observaciones ?? null) &&
+        tecnicaIgual(existingSpec?.datos_tecnicos ?? {}, body.datos_tecnicos ?? {})
+      if (sameCommercial && sameSpec) {
+        if (!window.confirm('La copia es idéntica. ¿Aumentar la cantidad de la línea original?'))
+          return
+        original.cantidad = String(Number(original.cantidad) + Number(candidate.cantidad))
+      } else lineas.value.push(candidate)
+    } else lineas.value.push(candidate)
+    draftingFurniture.value = null
+    duplicateOrigin.value = null
+    duplicateSpec.value = null
+    specLine.value = null
+    specModalDirty.value = false
+    additionMode.value = 'none'
+    markDirty()
+    return
   }
+  if (specLine.value === null) return
+  const existingLine = lineas.value[specLine.value]
+  if (!existingLine) return
+  Object.assign(existingLine, comercial)
+
+  const index = specLine.value
+  const line = lineas.value[index]
+  if (!line) return
+  line.especificacion = body
+  if (duplicateOrigin.value) {
+    const original = lineas.value.find((item) => item.localId === duplicateOrigin.value)
+    const commercialKeys: (keyof DetalleProformaWritable)[] = [
+      'tipo_item',
+      'producto',
+      'familia_producto',
+      'nombre',
+      'descripcion',
+      'cantidad',
+      'unidad',
+      'precio_unitario',
+      'descuento',
+    ]
+    const identical =
+      original &&
+      commercialKeys.every((key) => String(original[key] ?? '') === String(line[key] ?? '')) &&
+      tecnicaIgual(original.especificacion ?? null, body)
+    if (identical) {
+      if (!window.confirm('La copia completa es idéntica. ¿Sumar su cantidad a la línea original?'))
+        return
+      original.cantidad = String(Number(original.cantidad) + Number(line.cantidad))
+      lineas.value.splice(index, 1)
+    }
+  }
+  duplicateOrigin.value = null
   specLine.value = null
   specModalDirty.value = false
   markDirty()
@@ -423,6 +507,8 @@ function closeSpec() {
   )
     return
   specLine.value = null
+  draftingFurniture.value = null
+  duplicateOrigin.value = null
   specModalDirty.value = false
 }
 function removeLine(index: number) {
@@ -437,26 +523,41 @@ function undoRemove() {
   lineas.value = restoreLocalLine(lineas.value, removed)
   markDirty()
 }
+function openFurnitureDraft(source?: LineaLocal) {
+  const tipo = tipos.value.find((item) => item.codigo === 'MUEBLE_MEDIDA')
+  const unidad = unidades.value.find((item) => item.codigo === 'PIEZA')
+  if (!tipo || !unidad) {
+    error.value = 'Faltan referencias comerciales necesarias para configurar el mueble.'
+    return
+  }
+  draftingFurniture.value = {
+    ...(source ? cloneEditorData(source) : {}),
+    localId: localId(),
+    tipo_item: tipo.id,
+    producto: null,
+    familia_producto: null,
+    nombre: source?.nombre ?? '',
+    descripcion: source?.descripcion ?? '',
+    cantidad: source?.cantidad ?? '1',
+    unidad: source?.unidad ?? unidad.id,
+    modo_calculo: 'PRECIO_UNITARIO',
+    precio_unitario: source?.precio_unitario ?? '',
+    descuento: source?.descuento ?? '0.00',
+    especificacion: cloneEditorData(source?.especificacion ?? null),
+  } as LineaLocal
+  delete draftingFurniture.value.id
+  markDirty()
+  specLine.value = null
+  lineModal.value = false
+  specModalDirty.value = false
+}
 function duplicateFurniture(index: number) {
   const original = lineas.value[index]
   if (!original || tipos.value.find((x) => x.id === original.tipo_item)?.codigo !== 'MUEBLE_MEDIDA')
     return
-  preferredProductId.value = null
-  openLine()
   duplicateOrigin.value = original.localId
-  duplicateSpec.value = cloneEditorData(original.especificacion ?? null)
-  pendingLineDraft.value = {
-    tipo_item: String(original.tipo_item),
-    producto: '',
-    familia_producto: '',
-    nombre: original.nombre,
-    descripcion: original.descripcion ?? '',
-    cantidad: String(original.cantidad),
-    unidad: String(original.unidad),
-    precio_unitario: String(original.precio_unitario),
-    descuento: String(original.descuento),
-  }
-  success.value = 'Revisa la copia del mueble y confirma sus datos antes de incorporarla.'
+  openFurnitureDraft(original)
+  success.value = 'Revisa la copia y su ficha técnica antes de incorporarla.'
 }
 function editorSnapshot() {
   return {
@@ -469,6 +570,7 @@ function editorSnapshot() {
     clienteSeleccionado: cloneEditorData(clienteSeleccionado.value),
     lineModalDirty: lineModalDirty.value,
     lineas: cloneEditorData(lineas.value),
+    draftingFurniture: cloneEditorData(draftingFurniture.value),
     removedLines: cloneEditorData(removedLines.value),
     additionMode: additionMode.value,
     catalogInitialized: catalogInitialized.value,
@@ -530,6 +632,7 @@ function restoreContextualDraft() {
   clienteSeleccionado.value =
     snapshot.clienteSeleccionado ?? persisted.value?.cliente_resumen ?? null
   lineas.value = snapshot.lineas
+  draftingFurniture.value = snapshot.draftingFurniture ?? null
   removedLines.value = snapshot.removedLines ?? []
   additionMode.value = snapshot.additionMode ?? 'none'
   catalogInitialized.value = snapshot.catalogInitialized ?? false
@@ -592,6 +695,13 @@ function closeLineModal() {
 }
 function openLine(index: number | null = null) {
   if (index !== null && lineas.value[index]?.modo_calculo === 'TOTAL_NEGOCIADO') return
+  if (
+    index !== null &&
+    tipos.value.find((x) => x.id === lineas.value[index]?.tipo_item)?.codigo === 'MUEBLE_MEDIDA'
+  ) {
+    openSpec(index)
+    return
+  }
   lineFormVersion.value++
   pendingLineDraft.value = null
   editingLine.value = index
@@ -612,13 +722,8 @@ function selectCatalogProduct(product: Producto) {
 }
 function chooseManualFurniture() {
   preferredProductId.value = null
-  openLine()
-  const tipo = tipos.value.find((x) => x.codigo === 'MUEBLE_MEDIDA')
-  const unidad = unidades.value.find((x) => x.codigo === 'PIEZA')
-  pendingLineDraft.value = {
-    tipo_item: String(tipo?.id ?? ''),
-    unidad: String(unidad?.id ?? ''),
-  }
+  duplicateOrigin.value = null
+  openFurnitureDraft()
 }
 function quotePendingFamily(familyId: number, categoryId: number) {
   const categoria = tipos.value.find(
@@ -1112,9 +1217,48 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           </p>
         </template>
         <template v-if="readingLine.especificacion">
-          <h3>Ficha técnica</h3>
-          <p>{{ readingLine.especificacion.observaciones }}</p>
-          <pre>{{ JSON.stringify(readingLine.especificacion.datos_tecnicos, null, 2) }}</pre>
+          <h3>Ficha técnica · solo lectura</h3>
+          <p v-if="readingLine.especificacion.tipo_mueble">
+            Tipo de mueble:
+            {{
+              tiposMueble.find((t) => t.id === readingLine?.especificacion?.tipo_mueble)?.nombre ??
+              'Histórico'
+            }}
+          </p>
+          <p v-if="readingLine.especificacion.observaciones">
+            Observaciones: {{ readingLine.especificacion.observaciones }}
+          </p>
+          <h4>Características y dimensiones</h4>
+          <p>{{ readableTechnical(readingTechnical.caracteristicas_generales) }}</p>
+          <h4>Conjuntos</h4>
+          <ul>
+            <li v-for="g in readingTechnical.conjuntos ?? []" :key="g.uid">{{ g.nombre }}</li>
+          </ul>
+          <h4>Componentes</h4>
+          <ul>
+            <li v-for="(c, i) in readingTechnical.componentes ?? []" :key="c.uid ?? i">
+              <strong>{{ c.nombre }}</strong>
+              <span v-if="c.cantidad_interna"> · {{ c.cantidad_interna }} por mueble</span>
+              <span v-if="c.material"> · {{ c.material }}</span>
+              <span v-if="c.espesor"> · {{ c.espesor }}</span>
+              <span v-if="c.color"> · {{ c.color }}</span>
+              <span v-if="c.dimensiones"> · {{ readableTechnical(c.dimensiones) }}</span>
+              <span v-for="a in c.atributos ?? []" :key="a.codigo || a.nombre">
+                · {{ a.nombre }}: {{ a.valor }} {{ a.unidad ?? '' }}
+              </span>
+            </li>
+          </ul>
+          <h4>Accesorios</h4>
+          <ul>
+            <li v-for="(a, i) in readingTechnical.accesorios ?? []" :key="i">{{ a }}</li>
+          </ul>
+          <h4 v-if="readingTechnical.advertencias?.length">Información pendiente histórica</h4>
+          <ul>
+            <li v-for="(a, i) in readingTechnical.advertencias ?? []" :key="i">{{ a }}</li>
+          </ul>
+          <p v-if="readingTechnical.descripcion_original">
+            Descripción original: {{ readingTechnical.descripcion_original }}
+          </p>
         </template>
         <div class="actions">
           <Button
@@ -1152,12 +1296,21 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         @cancel="closeLineModal"
       />
     </Modal>
-    <Modal :open="specLine !== null" title="Ficha técnica" @close="closeSpec">
+    <Modal
+      :open="specLine !== null || draftingFurniture !== null"
+      title="Configurador integral de mueble a pedido"
+      fullscreen
+      @close="closeSpec"
+    >
       <EspecificacionForm
         :key="specLine ?? -1"
         :tipos="tiposMueble"
         :especificacion="editableSpec"
+        :detalle="editableSpecDetail"
+        :unidades="unidades"
+        :moneda="header.moneda_codigo === 'USD' ? 'USD' : 'BOB'"
         @save="saveSpec"
+        @type-created="registrarTipoMueble"
         @changed="specModalDirty = true"
         @cancel="closeSpec"
       />

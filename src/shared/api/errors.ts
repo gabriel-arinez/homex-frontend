@@ -19,6 +19,8 @@ export function normalizeApiError(status: number, body: unknown): ApiError {
   function registrar(ruta: string, valor: unknown) {
     if (typeof valor === 'string') {
       fields[ruta] = [...(fields[ruta] ?? []), valor]
+    } else if (typeof valor === 'number' && Number.isFinite(valor)) {
+      fields[ruta] = [...(fields[ruta] ?? []), String(valor)]
     } else if (Array.isArray(valor)) {
       if (valor.every((item) => typeof item === 'string')) {
         fields[ruta] = [...(fields[ruta] ?? []), ...valor]
