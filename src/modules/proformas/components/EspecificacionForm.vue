@@ -396,8 +396,7 @@ function submit() {
   // Solo admitir ese exceso si las colecciones permanecen idénticas.
   const limitesCompatibles = {
     max_conjuntos:
-      conjuntos.length > limites.max_conjuntos &&
-      tecnicaIgual(conjuntos, base.conjuntos ?? [])
+      conjuntos.length > limites.max_conjuntos && tecnicaIgual(conjuntos, base.conjuntos ?? [])
         ? conjuntos.length
         : limites.max_conjuntos,
     max_componentes:
