@@ -306,7 +306,10 @@ function setCantidadInterna(componente: ComponenteTecnico, event: Event) {
 function removeComponente(index: number) {
   const item = componentes[index]
   if (!item) return
-  componentesRetirados.value.push({ item: JSON.parse(JSON.stringify(item)) as ComponenteTecnico, index })
+  componentesRetirados.value.push({
+    item: JSON.parse(JSON.stringify(item)) as ComponenteTecnico,
+    index,
+  })
   componentes.splice(index, 1)
   changed()
 }
@@ -414,11 +417,17 @@ function submit() {
   if (Object.prototype.hasOwnProperty.call(generales, 'atributos') || atributosGenerales.length)
     generalesActuales.atributos = atributosGenerales
   const cambios: Parameters<typeof fusionarDatosTecnicos>[1] = {}
-  if (Object.prototype.hasOwnProperty.call(base, 'caracteristicas_generales') || Object.keys(generalesActuales).length)
+  if (
+    Object.prototype.hasOwnProperty.call(base, 'caracteristicas_generales') ||
+    Object.keys(generalesActuales).length
+  )
     cambios.caracteristicas_generales = generalesActuales
-  if (Object.prototype.hasOwnProperty.call(base, 'conjuntos') || conjuntos.length) cambios.conjuntos = conjuntos
-  if (Object.prototype.hasOwnProperty.call(base, 'componentes') || componentes.length) cambios.componentes = componentes
-  if (Object.prototype.hasOwnProperty.call(base, 'accesorios') || accesorios.length) cambios.accesorios = accesorios
+  if (Object.prototype.hasOwnProperty.call(base, 'conjuntos') || conjuntos.length)
+    cambios.conjuntos = conjuntos
+  if (Object.prototype.hasOwnProperty.call(base, 'componentes') || componentes.length)
+    cambios.componentes = componentes
+  if (Object.prototype.hasOwnProperty.call(base, 'accesorios') || accesorios.length)
+    cambios.accesorios = accesorios
   const datos = fusionarDatosTecnicos(base, cambios)
   // Un histórico anterior a PRF-03 puede exceder 10/40.
   // Solo admitir ese exceso si las colecciones permanecen idénticas.
@@ -445,8 +454,7 @@ function submit() {
     )
       errores.push(`El atributo ${atributo.nombre} debe tener un número entero válido.`)
     if (atributo.tipo_entrada === 'numero_unidad') {
-      if (!atributo.unidad?.trim())
-        errores.push(`Indica la unidad de ${atributo.nombre}.`)
+      if (!atributo.unidad?.trim()) errores.push(`Indica la unidad de ${atributo.nombre}.`)
       if (!atributo.valor.trim() || !Number.isFinite(Number(atributo.valor)))
         errores.push(`El atributo ${atributo.nombre} requiere un número válido.`)
     }
@@ -647,14 +655,22 @@ onMounted(loadCatalog)
             >Añadir componente</Button
           ><Button variant="secondary" @click="removeConjunto(gi)">Quitar conjunto</Button>
         </div>
-        <div v-if="conjuntoPorEliminar === g.uid" class="conjunto-destino" role="group"
-          :aria-label="'Reasignación del conjunto ' + g.nombre">
+        <div
+          v-if="conjuntoPorEliminar === g.uid"
+          class="conjunto-destino"
+          role="group"
+          :aria-label="'Reasignación del conjunto ' + g.nombre"
+        >
           <p>Elige a dónde mover sus componentes. Ninguna pieza se eliminará.</p>
-          <label>Destino de componentes
+          <label
+            >Destino de componentes
             <select v-model="destinoDelConjunto" aria-label="Destino de componentes">
               <option value="">Sin conjunto</option>
-              <option v-for="otro in conjuntos.filter((c) => c.uid !== g.uid)"
-                :key="otro.uid" :value="otro.uid">
+              <option
+                v-for="otro in conjuntos.filter((c) => c.uid !== g.uid)"
+                :key="otro.uid"
+                :value="otro.uid"
+              >
                 {{ otro.nombre }}
               </option>
             </select>
@@ -754,10 +770,10 @@ onMounted(loadCatalog)
             <input v-model="a.valor" :name="`atributo-${i}-${ai}`" type="number" step="1" />
           </label>
           <label v-else-if="a.tipo_entrada === 'numero_unidad'">
-          {{ a.nombre }}
-          <input v-model="a.valor" :name="`atributo-${i}-${ai}`" type="number" step="any" />
-        </label>
-        <TextField v-else v-model="a.valor" :name="`atributo-${i}-${ai}`" :label="a.nombre" />
+            {{ a.nombre }}
+            <input v-model="a.valor" :name="`atributo-${i}-${ai}`" type="number" step="any" />
+          </label>
+          <TextField v-else v-model="a.valor" :name="`atributo-${i}-${ai}`" :label="a.nombre" />
           <label v-if="a.tipo_entrada === 'numero_unidad'"
             >Unidad de {{ a.nombre }}
             <select v-model="a.unidad">

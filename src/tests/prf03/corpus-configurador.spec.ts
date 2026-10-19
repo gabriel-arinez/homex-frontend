@@ -174,12 +174,23 @@ describe('PRF-03 corpus representativo conservado por el configurador visual', (
     const wrapper = mount(EspecificacionForm, {
       props: {
         ...opciones,
-        detalle: { nombre: 'Sillón', cantidad: '1', unidad: 20, precio_unitario: '300', descuento: '0' },
+        detalle: {
+          nombre: 'Sillón',
+          cantidad: '1',
+          unidad: 20,
+          precio_unitario: '300',
+          descuento: '0',
+        },
         especificacion: {
           tipo_mueble: 5,
           datos_tecnicos: {
-            conjuntos: [{ uid: 'g1', nombre: 'Principal' }, { uid: 'g2', nombre: 'Alternativo' }],
-            componentes: [{ uid: 'pieza', conjunto_uid: 'g1', nombre: 'Asiento', cantidad_interna: 1 }],
+            conjuntos: [
+              { uid: 'g1', nombre: 'Principal' },
+              { uid: 'g2', nombre: 'Alternativo' },
+            ],
+            componentes: [
+              { uid: 'pieza', conjunto_uid: 'g1', nombre: 'Asiento', cantidad_interna: 1 },
+            ],
           },
         } as EspecificacionMueble,
       },
@@ -189,16 +200,22 @@ describe('PRF-03 corpus representativo conservado por el configurador visual', (
     await quitar!.trigger('click')
     expect(wrapper.text()).toContain('Elige a dónde mover sus componentes')
     await wrapper.get('select[aria-label="Destino de componentes"]').setValue('g2')
-    const mover = wrapper.findAll('button').find((b) => b.text() === 'Mover componentes y quitar conjunto')
+    const mover = wrapper
+      .findAll('button')
+      .find((b) => b.text() === 'Mover componentes y quitar conjunto')
     expect(mover).toBeDefined()
     await mover!.trigger('click')
     await wrapper.get('form').trigger('submit')
-    const guardado = wrapper.emitted('save')?.[0]?.[0] as { datos_tecnicos: {
-      conjuntos: Array<{ uid: string }>
-      componentes: Array<{ uid: string; conjunto_uid: string }>
-    }}
+    const guardado = wrapper.emitted('save')?.[0]?.[0] as {
+      datos_tecnicos: {
+        conjuntos: Array<{ uid: string }>
+        componentes: Array<{ uid: string; conjunto_uid: string }>
+      }
+    }
     expect(guardado.datos_tecnicos.conjuntos.map((g) => g.uid)).toEqual(['g2'])
-    expect(guardado.datos_tecnicos.componentes).toMatchObject([{ uid: 'pieza', conjunto_uid: 'g2' }])
+    expect(guardado.datos_tecnicos.componentes).toMatchObject([
+      { uid: 'pieza', conjunto_uid: 'g2' },
+    ])
     wrapper.unmount()
   })
 
@@ -206,7 +223,13 @@ describe('PRF-03 corpus representativo conservado por el configurador visual', (
     const wrapper = mount(EspecificacionForm, {
       props: {
         ...opciones,
-        detalle: { nombre: 'Mesa', cantidad: '1', unidad: 20, precio_unitario: '200', descuento: '0' },
+        detalle: {
+          nombre: 'Mesa',
+          cantidad: '1',
+          unidad: 20,
+          precio_unitario: '200',
+          descuento: '0',
+        },
         especificacion: {
           tipo_mueble: 5,
           datos_tecnicos: {
@@ -218,17 +241,23 @@ describe('PRF-03 corpus representativo conservado por el configurador visual', (
     })
     await wrapper.get('input[name="componente-0-cantidad"]').setValue('')
     const quitarAccesorio = () =>
-      wrapper.get('#accesorios').findAll('button').find((b) => b.text() === 'Quitar')
+      wrapper
+        .get('#accesorios')
+        .findAll('button')
+        .find((b) => b.text() === 'Quitar')
     await quitarAccesorio()!.trigger('click')
     await quitarAccesorio()!.trigger('click')
-    const deshacer = () => wrapper.findAll('button').find((b) => b.text() === 'Deshacer eliminación de accesorio')
+    const deshacer = () =>
+      wrapper.findAll('button').find((b) => b.text() === 'Deshacer eliminación de accesorio')
     await deshacer()!.trigger('click')
     await deshacer()!.trigger('click')
     await wrapper.get('form').trigger('submit')
-    const guardado = wrapper.emitted('save')?.[0]?.[0] as { datos_tecnicos: {
-      accesorios: string[]
-      componentes: Array<{ cantidad_interna?: number }>
-    }}
+    const guardado = wrapper.emitted('save')?.[0]?.[0] as {
+      datos_tecnicos: {
+        accesorios: string[]
+        componentes: Array<{ cantidad_interna?: number }>
+      }
+    }
     expect(guardado.datos_tecnicos.accesorios).toEqual(['Tapones', 'Guías'])
     expect(guardado.datos_tecnicos.componentes[0]).not.toHaveProperty('cantidad_interna')
     wrapper.unmount()
@@ -238,13 +267,24 @@ describe('PRF-03 corpus representativo conservado por el configurador visual', (
     const wrapper = mount(EspecificacionForm, {
       props: {
         ...opciones,
-        detalle: { nombre: 'Mesa', cantidad: '1', unidad: 20, precio_unitario: '200', descuento: '0' },
+        detalle: {
+          nombre: 'Mesa',
+          cantidad: '1',
+          unidad: 20,
+          precio_unitario: '200',
+          descuento: '0',
+        },
         especificacion: {
           tipo_mueble: 5,
           datos_tecnicos: {
             componentes: [
-              { uid: 'original', nombre: 'Cubierta', cantidad_interna: 1, material: 'Melamina',
-                atributos: [{ nombre: 'Acabado', valor: 'Nogal' }] },
+              {
+                uid: 'original',
+                nombre: 'Cubierta',
+                cantidad_interna: 1,
+                material: 'Melamina',
+                atributos: [{ nombre: 'Acabado', valor: 'Nogal' }],
+              },
             ],
           },
         } as EspecificacionMueble,
@@ -255,18 +295,22 @@ describe('PRF-03 corpus representativo conservado por el configurador visual', (
     await duplicar!.trigger('click')
     await wrapper.get('#componente-material-1').setValue('Vidrio')
     await wrapper.get('form').trigger('submit')
-    const dato = wrapper.emitted('save')?.[0]?.[0] as { datos_tecnicos: {
-      componentes: Array<{ uid: string; material: string; atributos: unknown[] }>
-    }}
+    const dato = wrapper.emitted('save')?.[0]?.[0] as {
+      datos_tecnicos: {
+        componentes: Array<{ uid: string; material: string; atributos: unknown[] }>
+      }
+    }
     expect(dato.datos_tecnicos.componentes).toHaveLength(2)
     expect(dato.datos_tecnicos.componentes[0]).toMatchObject({
-      uid: 'original', material: 'Melamina', atributos: [{ nombre: 'Acabado', valor: 'Nogal' }],
+      uid: 'original',
+      material: 'Melamina',
+      atributos: [{ nombre: 'Acabado', valor: 'Nogal' }],
     })
     expect(dato.datos_tecnicos.componentes[1]).toMatchObject({
-      material: 'Vidrio', atributos: [{ nombre: 'Acabado', valor: 'Nogal' }],
+      material: 'Vidrio',
+      atributos: [{ nombre: 'Acabado', valor: 'Nogal' }],
     })
     expect(dato.datos_tecnicos.componentes[1]?.uid).not.toBe('original')
     wrapper.unmount()
   })
-
 })
