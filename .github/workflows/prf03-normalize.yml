@@ -21,12 +21,12 @@ jobs:
         with:
           node-version: '24.15.0'
       - run: npm ci
-      - run: npx prettier --write src/modules/proformas/components/EspecificacionForm.vue src/modules/proformas/views/ProformaEditorView.vue src/modules/proformas/services/muebleTecnico.ts src/shared/api/errors.ts src/tests/prf03/configurador.spec.ts src/tests/fe04/ap6-correcciones.spec.ts src/tests/e2e/fe04-proformas.spec.ts
+      - run: npx prettier --write src/modules/proformas/components/EspecificacionForm.vue src/modules/proformas/views/ProformaEditorView.vue src/modules/proformas/services/muebleTecnico.ts src/shared/api/errors.ts src/tests/prf03/configurador.spec.ts src/tests/fe04/ap6-correcciones.spec.ts src/tests/e2e/fe04-proformas.spec.ts src/tests/prf03/corpus-configurador.spec.ts
       - run: npm run format:check
       - run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- src/modules/proformas/components/EspecificacionForm.vue src/modules/proformas/views/ProformaEditorView.vue src/modules/proformas/services/muebleTecnico.ts src/shared/api/errors.ts src/tests/prf03/configurador.spec.ts src/tests/fe04/ap6-correcciones.spec.ts src/tests/e2e/fe04-proformas.spec.ts
+          git add -- src/modules/proformas/components/EspecificacionForm.vue src/modules/proformas/views/ProformaEditorView.vue src/modules/proformas/services/muebleTecnico.ts src/shared/api/errors.ts src/tests/prf03/configurador.spec.ts src/tests/fe04/ap6-correcciones.spec.ts src/tests/e2e/fe04-proformas.spec.ts src/tests/prf03/corpus-configurador.spec.ts
           git diff --cached --check
           if ! git diff --cached --quiet; then
             git commit -m "style(prf03): normalizar frontend"
