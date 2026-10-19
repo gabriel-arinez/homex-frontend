@@ -170,4 +170,67 @@ describe('PRF-03 corpus representativo conservado por el configurador visual', (
     expect(evento[1]).toMatchObject({ precio_unitario: '275.00' })
     wrapper.unmount()
   })
+  it('exige elegir el destino al quitar un conjunto con piezas y conserva sus UID', async () => {
+    const wrapper = mount(EspecificacionForm, {
+      props: {
+        ...opciones,
+        detalle: { nombre: 'Sillón', cantidad: '1', unidad: 20, precio_unitario: '300', descuento: '0' },
+        especificacion: {
+          tipo_mueble: 5,
+          datos_tecnicos: {
+            conjuntos: [{ uid: 'g1', nombre: 'Principal' }, { uid: 'g2', nombre: 'Alternativo' }],
+            componentes: [{ uid: 'pieza', conjunto_uid: 'g1', nombre: 'Asiento', cantidad_interna: 1 }],
+          },
+        } as EspecificacionMueble,
+      },
+    })
+    const quitar = wrapper.findAll('button').find((b) => b.text() === 'Quitar conjunto')
+    expect(quitar).toBeDefined()
+    await quitar!.trigger('click')
+    expect(wrapper.text()).toContain('Elige a dónde mover sus componentes')
+    await wrapper.get('select[aria-label="Destino de componentes"]').setValue('g2')
+    const mover = wrapper.findAll('button').find((b) => b.text() === 'Mover componentes y quitar conjunto')
+    expect(mover).toBeDefined()
+    await mover!.trigger('click')
+    await wrapper.get('form').trigger('submit')
+    const guardado = wrapper.emitted('save')?.[0]?.[0] as { datos_tecnicos: {
+      conjuntos: Array<{ uid: string }>
+      componentes: Array<{ uid: string; conjunto_uid: string }>
+    }}
+    expect(guardado.datos_tecnicos.conjuntos.map((g) => g.uid)).toEqual(['g2'])
+    expect(guardado.datos_tecnicos.componentes).toMatchObject([{ uid: 'pieza', conjunto_uid: 'g2' }])
+    wrapper.unmount()
+  })
+
+  it('deshace múltiples accesorios y permite vaciar cantidad interna sin inventar cero', async () => {
+    const wrapper = mount(EspecificacionForm, {
+      props: {
+        ...opciones,
+        detalle: { nombre: 'Mesa', cantidad: '1', unidad: 20, precio_unitario: '200', descuento: '0' },
+        especificacion: {
+          tipo_mueble: 5,
+          datos_tecnicos: {
+            componentes: [{ uid: 'pie', nombre: 'Pata', cantidad_interna: 4 }],
+            accesorios: ['Tapones', 'Guías'],
+          },
+        } as EspecificacionMueble,
+      },
+    })
+    await wrapper.get('input[name="componente-0-cantidad"]').setValue('')
+    const quitarAccesorio = () => wrapper.findAll('button').find((b) => b.text() === 'Quitar')
+    await quitarAccesorio()!.trigger('click')
+    await quitarAccesorio()!.trigger('click')
+    const deshacer = () => wrapper.findAll('button').find((b) => b.text() === 'Deshacer eliminación de accesorio')
+    await deshacer()!.trigger('click')
+    await deshacer()!.trigger('click')
+    await wrapper.get('form').trigger('submit')
+    const guardado = wrapper.emitted('save')?.[0]?.[0] as { datos_tecnicos: {
+      accesorios: string[]
+      componentes: Array<{ cantidad_interna?: number }>
+    }}
+    expect(guardado.datos_tecnicos.accesorios).toEqual(['Tapones', 'Guías'])
+    expect(guardado.datos_tecnicos.componentes[0]).not.toHaveProperty('cantidad_interna')
+    wrapper.unmount()
+  })
+
 })
