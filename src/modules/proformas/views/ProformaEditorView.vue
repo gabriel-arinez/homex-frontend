@@ -393,6 +393,10 @@ function saveLine(body: DetalleProformaWritable) {
     specModalDirty.value = false
   } else duplicateOrigin.value = null
 }
+function registrarTipoMueble(tipo: ValorCatalogoPublico) {
+  if (tiposMueble.value.some((item) => item.id === tipo.id)) return
+  tiposMueble.value = [...tiposMueble.value, tipo].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+}
 function saveSpec(
   body: EspecificacionMuebleWritable,
   comercial: {
@@ -1304,6 +1308,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         :unidades="unidades"
         :moneda="header.moneda_codigo === 'USD' ? 'USD' : 'BOB'"
         @save="saveSpec"
+        @type-created="registrarTipoMueble"
         @changed="specModalDirty = true"
         @cancel="closeSpec"
       />
