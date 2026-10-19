@@ -216,9 +216,10 @@ const editableDetail = computed(() => {
   return lineas.value[editingLine.value] as unknown as DetalleProforma
 })
 const editableSpecDetail = computed(() =>
-  specLine.value === null ? null : (lineas.value[specLine.value] ?? null),
+  draftingFurniture.value ?? (specLine.value === null ? null : (lineas.value[specLine.value] ?? null)),
 )
 const editableSpec = computed(() => {
+  if (draftingFurniture.value) return draftingFurniture.value.especificacion as EspecificacionMueble | null
   if (specLine.value === null) return null
   return (lineas.value[specLine.value]?.especificacion ?? null) as EspecificacionMueble | null
 })
