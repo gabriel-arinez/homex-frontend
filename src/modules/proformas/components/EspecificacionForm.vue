@@ -38,7 +38,7 @@ const props = defineProps<{
     total?: string | number
   } | null
 }>()
-export type ComercialMuebleEdit = {
+type ComercialMuebleEdit = {
   nombre: string
   descripcion: string
   cantidad: string
