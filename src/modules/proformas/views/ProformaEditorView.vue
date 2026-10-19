@@ -1285,7 +1285,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         :especificacion="editableSpec"
         :detalle="editableSpecDetail"
         :unidades="unidades"
-        :moneda="header.moneda_codigo as 'BOB' | 'USD'"
+        :moneda="header.moneda_codigo === 'USD' ? 'USD' : 'BOB'"
         @save="saveSpec"
         @changed="specModalDirty = true"
         @cancel="closeSpec"
