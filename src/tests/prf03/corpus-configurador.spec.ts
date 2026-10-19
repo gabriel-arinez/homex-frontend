@@ -1,7 +1,8 @@
-import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
+import { describe, expect, it, vi } from 'vitest'
 import type { EspecificacionMueble, ValorCatalogoPublico } from '@/generated/api'
 import EspecificacionForm from '@/modules/proformas/components/EspecificacionForm.vue'
+import { proformasService } from '@/modules/proformas/services/proformasService'
 
 const opciones = {
   tipos: [{ id: 5, codigo: 'ESCRITORIO', nombre: 'Escritorio' }] as ValorCatalogoPublico[],
@@ -312,5 +313,28 @@ describe('PRF-03 corpus representativo conservado por el configurador visual', (
     })
     expect(dato.datos_tecnicos.componentes[1]?.uid).not.toBe('original')
     wrapper.unmount()
+  })
+
+  it('propaga un tipo recién creado para que el editor pueda mostrarlo al reabrir la ficha', async () => {
+    const crear = vi
+      .spyOn(proformasService, 'createFurnitureType')
+      .mockResolvedValue({ id: 77, codigo: 'VITRINA_TEST', nombre: 'Vitrina Test' })
+    const wrapper = mount(EspecificacionForm, { props: opciones })
+    try {
+      await wrapper.get('input[name="nuevo-tipo"]').setValue('Vitrina Test')
+      const boton = wrapper.findAll('button').find((item) => item.text() === 'Crear tipo')
+      expect(boton).toBeDefined()
+      await boton!.trigger('click')
+      await flushPromises()
+      expect(wrapper.emitted('typeCreated')?.[0]?.[0]).toMatchObject({
+        id: 77,
+        codigo: 'VITRINA_TEST',
+        nombre: 'Vitrina Test',
+        concepto_codigo: 'TIPO_MUEBLE',
+      })
+    } finally {
+      wrapper.unmount()
+      crear.mockRestore()
+    }
   })
 })
