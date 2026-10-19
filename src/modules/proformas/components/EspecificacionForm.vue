@@ -12,6 +12,7 @@ import Select from '@/shared/ui/Select.vue'
 import TextField from '@/shared/ui/TextField.vue'
 import { proformasService } from '../services/proformasService'
 import {
+  clonarTecnica,
   fusionarDatosTecnicos,
   leerDatosTecnicos,
   tecnicaIgual,
@@ -336,7 +337,7 @@ function deshacerAccesorio() {
 function duplicateComponente(index: number) {
   if (componentes.length >= limites.max_componentes || componentes.some((c) => !c.nombre.trim()))
     return
-  const copy = structuredClone(componentes[index]!)
+  const copy = clonarTecnica(componentes[index]!)
   copy.uid = uid()
   componentes.splice(index + 1, 0, copy)
   changed()
