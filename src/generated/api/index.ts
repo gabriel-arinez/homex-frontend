@@ -92,6 +92,7 @@ export type {
   ProformaListadoWritable,
   ProformaWritable,
   Recibo,
+  TipoMuebleConflicto,
   TipoMuebleCrear,
   TipoMuebleRespuesta,
   TokenObtainPair,
