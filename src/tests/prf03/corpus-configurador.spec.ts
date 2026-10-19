@@ -110,10 +110,11 @@ describe('PRF-03 corpus representativo conservado por el configurador visual', (
       const editor = mount(EspecificacionForm, { props })
       await editor.get('form').trigger('submit')
       const emitido = editor.emitted('save')?.[0]
-      expect(emitido, editor.text()).toBeDefined()
-      const guardado = emitido?.[0] as { datos_tecnicos: unknown }
+      expect(emitido).toBeDefined()
+      if (!emitido) throw new Error(editor.text())
+      const guardado = emitido[0] as { datos_tecnicos: unknown }
       expect(guardado.datos_tecnicos).toEqual(caso.datos)
-      expect(emitido?.[1]).toMatchObject({
+      expect(emitido[1]).toMatchObject({
         nombre: caso.nombre,
         cantidad: '2',
         unidad: 20,
@@ -163,9 +164,10 @@ describe('PRF-03 corpus representativo conservado por el configurador visual', (
     await wrapper.get('#mueble-precio').setValue('275.00')
     await wrapper.get('form').trigger('submit')
     const evento = wrapper.emitted('save')?.[0]
-    expect(evento, wrapper.text()).toBeDefined()
-    expect((evento?.[0] as { datos_tecnicos: unknown }).datos_tecnicos).toEqual(datos)
-    expect(evento?.[1]).toMatchObject({ precio_unitario: '275.00' })
+    expect(evento).toBeDefined()
+    if (!evento) throw new Error(wrapper.text())
+    expect((evento[0] as { datos_tecnicos: unknown }).datos_tecnicos).toEqual(datos)
+    expect(evento[1]).toMatchObject({ precio_unitario: '275.00' })
     wrapper.unmount()
   })
 })

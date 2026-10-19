@@ -386,12 +386,22 @@ async function createType() {
 }
 function submit() {
   const dim = serializarDimensiones()
-  const datos = fusionarDatosTecnicos(base, {
-    caracteristicas_generales: { ...generales, dimensiones: dim, atributos: atributosGenerales },
-    conjuntos: conjuntos,
-    componentes: componentes,
-    accesorios: accesorios,
-  })
+  const generalesActuales: Record<string, unknown> = { ...generales }
+  const dimensionesPresentes =
+    dim != null && typeof dim === 'object' && !Array.isArray(dim)
+      ? Object.keys(dim).length > 0
+      : dim !== null && dim !== undefined
+  if (Object.hasOwn(generales, 'dimensiones') || dimensionesPresentes)
+    generalesActuales.dimensiones = dim
+  if (Object.hasOwn(generales, 'atributos') || atributosGenerales.length)
+    generalesActuales.atributos = atributosGenerales
+  const cambios: Record<string, unknown> = {}
+  if (Object.hasOwn(base, 'caracteristicas_generales') || Object.keys(generalesActuales).length)
+    cambios.caracteristicas_generales = generalesActuales
+  if (Object.hasOwn(base, 'conjuntos') || conjuntos.length) cambios.conjuntos = conjuntos
+  if (Object.hasOwn(base, 'componentes') || componentes.length) cambios.componentes = componentes
+  if (Object.hasOwn(base, 'accesorios') || accesorios.length) cambios.accesorios = accesorios
+  const datos = fusionarDatosTecnicos(base, cambios)
   // Un histórico anterior a PRF-03 puede exceder 10/40.
   // Solo admitir ese exceso si las colecciones permanecen idénticas.
   const limitesCompatibles = {
