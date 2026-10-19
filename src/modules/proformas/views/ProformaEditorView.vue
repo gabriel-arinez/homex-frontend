@@ -395,7 +395,9 @@ function saveLine(body: DetalleProformaWritable) {
 }
 function registrarTipoMueble(tipo: ValorCatalogoPublico) {
   if (tiposMueble.value.some((item) => item.id === tipo.id)) return
-  tiposMueble.value = [...tiposMueble.value, tipo].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+  tiposMueble.value = [...tiposMueble.value, tipo].sort((a, b) =>
+    a.nombre.localeCompare(b.nombre, 'es'),
+  )
 }
 function saveSpec(
   body: EspecificacionMuebleWritable,
