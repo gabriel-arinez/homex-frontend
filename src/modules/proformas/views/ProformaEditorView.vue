@@ -518,22 +518,9 @@ function duplicateFurniture(index: number) {
   const original = lineas.value[index]
   if (!original || tipos.value.find((x) => x.id === original.tipo_item)?.codigo !== 'MUEBLE_MEDIDA')
     return
-  preferredProductId.value = null
-  openLine()
   duplicateOrigin.value = original.localId
-  duplicateSpec.value = cloneEditorData(original.especificacion ?? null)
-  pendingLineDraft.value = {
-    tipo_item: String(original.tipo_item),
-    producto: '',
-    familia_producto: '',
-    nombre: original.nombre,
-    descripcion: original.descripcion ?? '',
-    cantidad: String(original.cantidad),
-    unidad: String(original.unidad),
-    precio_unitario: String(original.precio_unitario),
-    descuento: String(original.descuento),
-  }
-  success.value = 'Revisa la copia del mueble y confirma sus datos antes de incorporarla.'
+  openFurnitureDraft(original)
+  success.value = 'Revisa la copia y su ficha técnica antes de incorporarla.'
 }
 function editorSnapshot() {
   return {
