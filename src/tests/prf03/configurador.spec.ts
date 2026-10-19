@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { normalizeApiError } from '@/shared/api/errors'
 import {
   clonarTecnica,
   fusionarDatosTecnicos,
@@ -7,6 +8,16 @@ import {
 } from '@/modules/proformas/services/muebleTecnico'
 
 describe('PRF-03 configurador técnico', () => {
+  it('conserva ID numérico y nombre de tipo equivalente recibido en conflicto 409', () => {
+    const error = normalizeApiError(409, {
+      detail: 'Ya existe un tipo de mueble equivalente.',
+      existente: { id: 42, nombre: 'Escritorio en L', codigo: 'ESCRITORIO_EN_L' },
+    })
+    expect(error.status).toBe(409)
+    expect(error.fields['existente.id']).toEqual(['42'])
+    expect(error.fields['existente.nombre']).toEqual(['Escritorio en L'])
+    expect(error.fields['existente.codigo']).toEqual(['ESCRITORIO_EN_L'])
+  })
   it('preserva claves históricas al editar una sección', () => {
     const base = {
       descripcion_original: 'literal',
