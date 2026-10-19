@@ -687,7 +687,7 @@ test('PRF-01 protege cambios pendientes de la ficha técnica', async ({ page }) 
   await expect(page.locator('#componente-nombre-0')).toHaveValue('Mesón')
 
   page.once('dialog', (dialog) => dialog.accept())
-  await page.getByRole('button', { name: 'Cancelar', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancelar', exact: true }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
 })
 
