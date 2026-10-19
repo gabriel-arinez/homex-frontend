@@ -217,7 +217,8 @@ describe('PRF-03 corpus representativo conservado por el configurador visual', (
       },
     })
     await wrapper.get('input[name="componente-0-cantidad"]').setValue('')
-    const quitarAccesorio = () => wrapper.findAll('button').find((b) => b.text() === 'Quitar')
+    const quitarAccesorio = () =>
+      wrapper.get('#accesorios').findAll('button').find((b) => b.text() === 'Quitar')
     await quitarAccesorio()!.trigger('click')
     await quitarAccesorio()!.trigger('click')
     const deshacer = () => wrapper.findAll('button').find((b) => b.text() === 'Deshacer eliminación de accesorio')
