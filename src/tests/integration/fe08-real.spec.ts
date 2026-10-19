@@ -223,11 +223,44 @@ test.describe.serial('FE08 backend real', () => {
     test.setTimeout(360_000)
     await login(page)
     const casos = [
-      { nombre: 'Velador PRF03', componente: 'Cajón', cantidad: 2, medidas: [{ clave: 'ancho', valor: '40' }], accesorio: 'Jalador' },
-      { nombre: 'Escritorio en L PRF03', componente: 'Mesón', cantidad: 1, medidas: [{ clave: 'lado_1', valor: '160' }, { clave: 'lado_2', valor: '120' }], grupo: 'Ala principal', accesorio: 'Pasacables' },
-      { nombre: 'Mesa de reuniones PRF03', componente: 'Tablero', cantidad: 1, medidas: [{ clave: 'diámetro', valor: '180' }] },
-      { nombre: 'Sillones modulares PRF03', componente: 'Asiento', cantidad: 3, medidas: [{ clave: 'largo', valor: '250' }], grupo: 'Módulo principal' },
-      { nombre: 'Vitrina PRF03', componente: 'Cristal', cantidad: 2, medidas: [{ clave: 'alto', valor: '190' }], accesorio: 'Iluminación' },
+      {
+        nombre: 'Velador PRF03',
+        componente: 'Cajón',
+        cantidad: 2,
+        medidas: [{ clave: 'ancho', valor: '40' }],
+        accesorio: 'Jalador',
+      },
+      {
+        nombre: 'Escritorio en L PRF03',
+        componente: 'Mesón',
+        cantidad: 1,
+        medidas: [
+          { clave: 'lado_1', valor: '160' },
+          { clave: 'lado_2', valor: '120' },
+        ],
+        grupo: 'Ala principal',
+        accesorio: 'Pasacables',
+      },
+      {
+        nombre: 'Mesa de reuniones PRF03',
+        componente: 'Tablero',
+        cantidad: 1,
+        medidas: [{ clave: 'diámetro', valor: '180' }],
+      },
+      {
+        nombre: 'Sillones modulares PRF03',
+        componente: 'Asiento',
+        cantidad: 3,
+        medidas: [{ clave: 'largo', valor: '250' }],
+        grupo: 'Módulo principal',
+      },
+      {
+        nombre: 'Vitrina PRF03',
+        componente: 'Cristal',
+        cantidad: 2,
+        medidas: [{ clave: 'alto', valor: '190' }],
+        accesorio: 'Iluminación',
+      },
     ]
     for (const caso of casos) {
       const id = await createDraft(page, `Configuración real ${caso.nombre}`)
@@ -262,25 +295,34 @@ test.describe.serial('FE08 backend real', () => {
       await modal.getByRole('button', { name: 'Guardar especificación' }).click()
       await expect(page.locator('.line-card').getByText(caso.nombre, { exact: true })).toBeVisible()
 
-      const escritura = page.waitForResponse((r) =>
-        r.url().endsWith(`/api/v1/proformas/${id}/integral/`) && r.request().method() === 'PUT')
+      const escritura = page.waitForResponse(
+        (r) =>
+          r.url().endsWith(`/api/v1/proformas/${id}/integral/`) && r.request().method() === 'PUT',
+      )
       await page.getByRole('button', { name: 'Guardar borrador' }).click()
       expect((await escritura).ok(), `No se guardó ${caso.nombre} en PostgreSQL`).toBe(true)
 
-      const lectura = page.waitForResponse((r) =>
-        r.url().endsWith(`/api/v1/proformas/${id}/`) && r.request().method() === 'GET')
+      const lectura = page.waitForResponse(
+        (r) => r.url().endsWith(`/api/v1/proformas/${id}/`) && r.request().method() === 'GET',
+      )
       await page.reload()
       const respuesta = await lectura
       expect(respuesta.ok()).toBe(true)
       const datos = (await respuesta.json()) as {
         detalles: Array<{
           nombre: string
-          especificacion: { datos_tecnicos: {
-            componentes?: Array<{ nombre: string; cantidad_interna?: number; conjunto_uid?: string }>
-            conjuntos?: Array<{ uid: string; nombre: string }>
-            accesorios?: string[]
-            caracteristicas_generales?: { dimensiones?: Record<string, { valor: string }> }
-          }} | null
+          especificacion: {
+            datos_tecnicos: {
+              componentes?: Array<{
+                nombre: string
+                cantidad_interna?: number
+                conjunto_uid?: string
+              }>
+              conjuntos?: Array<{ uid: string; nombre: string }>
+              accesorios?: string[]
+              caracteristicas_generales?: { dimensiones?: Record<string, { valor: string }> }
+            }
+          } | null
         }>
       }
       const linea = datos.detalles.find((item) => item.nombre === caso.nombre)
@@ -291,7 +333,9 @@ test.describe.serial('FE08 backend real', () => {
         cantidad_interna: caso.cantidad,
       })
       for (const medida of caso.medidas)
-        expect(tecnico.caracteristicas_generales?.dimensiones?.[medida.clave]?.valor).toBe(medida.valor)
+        expect(tecnico.caracteristicas_generales?.dimensiones?.[medida.clave]?.valor).toBe(
+          medida.valor,
+        )
       if (caso.accesorio) expect(tecnico.accesorios).toContain(caso.accesorio)
       if (caso.grupo) {
         expect(tecnico.conjuntos?.[0]?.nombre).toBe(caso.grupo)
@@ -301,5 +345,4 @@ test.describe.serial('FE08 backend real', () => {
       await expect(page.locator('.line-card').getByText(caso.nombre, { exact: true })).toBeVisible()
     }
   })
-
 })
