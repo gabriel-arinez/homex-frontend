@@ -423,7 +423,7 @@ function saveSpec(
       const sameCommercial = commercialKeys.every(
         (key) => String(original[key] ?? '') === String(candidate[key] ?? ''),
       )
-      const sameSpec = JSON.stringify(original.especificacion ?? null) === JSON.stringify(body)
+      const sameSpec = tecnicaIgual(original.especificacion ?? null, body)
       if (sameCommercial && sameSpec) {
         if (!window.confirm('La copia es idéntica. ¿Aumentar la cantidad de la línea original?'))
           return
@@ -464,7 +464,7 @@ function saveSpec(
     const identical =
       original &&
       commercialKeys.every((key) => String(original[key] ?? '') === String(line[key] ?? '')) &&
-      JSON.stringify(original.especificacion ?? null) === JSON.stringify(body)
+      tecnicaIgual(original.especificacion ?? null, body)
     if (identical) {
       if (!window.confirm('La copia completa es idéntica. ¿Sumar su cantidad a la línea original?'))
         return
@@ -534,6 +534,7 @@ function openFurnitureDraft(source?: LineaLocal) {
     especificacion: cloneEditorData(source?.especificacion ?? null),
   } as LineaLocal
   delete draftingFurniture.value.id
+  markDirty()
   specLine.value = null
   lineModal.value = false
   specModalDirty.value = false
