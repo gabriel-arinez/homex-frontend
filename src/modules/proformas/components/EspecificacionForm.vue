@@ -52,6 +52,7 @@ const emit = defineEmits<{
   save: [body: EspecificacionMuebleWritable, comercial: ComercialMuebleEdit]
   cancel: []
   changed: []
+  typeCreated: [tipo: ValorCatalogoPublico]
 }>()
 const base = leerDatosTecnicos(props.especificacion?.datos_tecnicos)
 const catalogo = ref<AtributoMueble[]>([])
@@ -384,7 +385,9 @@ async function createType() {
   error.value = ''
   try {
     const value = await proformasService.createFurnitureType({ nombre: nuevoTipo.value })
-    tiposLocales.value.push({ ...value, concepto_codigo: 'TIPO_MUEBLE' })
+    const creado: ValorCatalogoPublico = { ...value, concepto_codigo: 'TIPO_MUEBLE' }
+    tiposLocales.value.push(creado)
+    emit('typeCreated', creado)
     form.tipo_mueble = String(value.id)
     nuevoTipo.value = ''
     changed()
@@ -393,9 +396,11 @@ async function createType() {
       const id = cause.fields['existente.id'][0]
       const nombre = cause.fields['existente.nombre']?.[0] ?? nuevoTipo.value.trim()
       const codigo = cause.fields['existente.codigo']?.[0] ?? ''
+      const existente: ValorCatalogoPublico = { id: Number(id), codigo, nombre, concepto_codigo: 'TIPO_MUEBLE' }
       if (!tiposLocales.value.some((item) => String(item.id) === id)) {
-        tiposLocales.value.push({ id: Number(id), codigo, nombre, concepto_codigo: 'TIPO_MUEBLE' })
+        tiposLocales.value.push(existente)
       }
+      emit('typeCreated', existente)
       form.tipo_mueble = id
       nuevoTipo.value = ''
       error.value = 'Ese tipo ya existía y fue seleccionado.'
