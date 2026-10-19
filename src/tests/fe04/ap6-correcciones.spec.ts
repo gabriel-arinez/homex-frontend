@@ -49,8 +49,13 @@ describe('AP6 correcciones funcionales', () => {
 
   it('registra datos técnicos únicos por componente sin mezclar atributos', async () => {
     const wrapper = mount(EspecificacionForm, {
-      props: { tipos: [opcion(5, 'ESCRITORIO', 'Escritorio')] },
+      props: {
+        tipos: [opcion(5, 'ESCRITORIO', 'Escritorio')],
+        unidades: [opcion(10, 'PIEZA', 'Pieza')],
+        detalle: { nombre: 'Escritorio', cantidad: '1', unidad: 10, precio_unitario: '125', descuento: '0' },
+      },
     })
+    await wrapper.findAll('button').find((b) => b.text() === 'Agregar componente')!.trigger('click')
     await wrapper.get('#componente-nombre-0').setValue('Mesón')
     await wrapper.get('#componente-material-0').setValue('Melamina')
     await wrapper.get('#componente-espesor-0').setValue('25 mm')
@@ -85,6 +90,8 @@ describe('AP6 correcciones funcionales', () => {
     const wrapper = mount(EspecificacionForm, {
       props: {
         tipos: [opcion(5, 'ESCRITORIO', 'Escritorio')],
+        unidades: [opcion(10, 'PIEZA', 'Pieza')],
+        detalle: { nombre: 'Escritorio', cantidad: '1', unidad: 10, precio_unitario: '125', descuento: '0' },
         especificacion: {
           id: 91,
           tipo_mueble: 5,
