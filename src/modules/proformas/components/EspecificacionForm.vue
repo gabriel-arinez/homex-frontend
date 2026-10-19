@@ -25,7 +25,11 @@ const props = defineProps<{
   especificacion?: EspecificacionMueble | null
   processing?: boolean
   externalError?: string
+  unidades?: ValorCatalogoPublico[]
+  moneda?: 'BOB' | 'USD'
   detalle?: {
+    tipo_item?: number
+    descripcion?: string
     nombre?: string
     cantidad?: string | number
     unidad?: string | number
@@ -34,7 +38,19 @@ const props = defineProps<{
     total?: string | number
   } | null
 }>()
-const emit = defineEmits<{ save: [body: EspecificacionMuebleWritable]; cancel: []; changed: [] }>()
+export type ComercialMuebleEdit = {
+  nombre: string
+  descripcion: string
+  cantidad: string
+  unidad: number
+  precio_unitario: string
+  descuento: string
+}
+const emit = defineEmits<{
+  save: [body: EspecificacionMuebleWritable, comercial: ComercialMuebleEdit]
+  cancel: []
+  changed: []
+}>()
 const base = leerDatosTecnicos(props.especificacion?.datos_tecnicos)
 const catalogo = ref<AtributoMueble[]>([])
 const limites = reactive({ max_conjuntos: 10, max_componentes: 40 })
@@ -48,18 +64,86 @@ const tiposLocales = ref([...props.tipos])
 const form = reactive({
   tipo_mueble: String(props.especificacion?.tipo_mueble ?? ''),
   observaciones: props.especificacion?.observaciones ?? '',
-  ancho: '',
-  alto: '',
-  profundidad: '',
-  unidad: 'cm',
 })
+const comercial = reactive({
+  nombre: String(props.detalle?.nombre ?? ''),
+  descripcion: String(props.detalle?.descripcion ?? ''),
+  cantidad: String(props.detalle?.cantidad ?? '1'),
+  unidad: String(props.detalle?.unidad ?? props.unidades?.find((x) => x.codigo === 'PIEZA')?.id ?? ''),
+  precio_unitario: String(props.detalle?.precio_unitario ?? ''),
+  descuento: String(props.detalle?.descuento ?? '0.00'),
+})
+const totalEstimado = computed(() => {
+  const cantidad = Number(comercial.cantidad)
+  const precio = Number(comercial.precio_unitario)
+  const descuento = Number(comercial.descuento)
+  return [cantidad, precio, descuento].every(Number.isFinite) ? cantidad * precio - descuento : null
+})
+type Medida = { clave: string; valor: string; unidad: string; original?: unknown }
+const clavesIniciales = ['ancho', 'alto', 'profundidad']
+const unidadesPermitidas = ['mm', 'cm', 'm', 'pulgadas']
+
 const generales = (base.caracteristicas_generales ?? {}) as Record<string, unknown>
-const dimensiones = (generales.dimensiones ?? {}) as Record<
-  string,
-  { valor?: unknown; unidad?: unknown }
->
-for (const key of ['ancho', 'alto', 'profundidad'] as const)
-  form[key] = String(dimensiones[key]?.valor ?? '')
+const dimensiones = (
+  generales.dimensiones && typeof generales.dimensiones === 'object' &&
+    !Array.isArray(generales.dimensiones)
+    ? generales.dimensiones
+    : {}
+) as Record<string, unknown>
+const medidas = reactive<Medida[]>(
+  [...new Set([...clavesIniciales, ...Object.keys(dimensiones)])].map((clave) => {
+    const original = dimensiones[clave]
+    const objeto = original !== null && typeof original === 'object' &&
+      !Array.isArray(original) ? original as Record<string, unknown> : null
+    return {
+      clave,
+      valor: String(objeto?.valor ?? (typeof original === 'string' || typeof original === 'number' ? original : '')),
+      unidad: String(objeto?.unidad ?? (original === undefined ? 'cm' : '')),
+      original: structuredClone(original),
+    }
+  }),
+)
+const nuevaMedida = ref('')
+const opcionesMedidas = ['largo', 'diámetro', 'lado_1', 'lado_2', 'altura_total', 'ancho_mesón']
+function agregarMedida() {
+  const clave = nuevaMedida.value.trim().toLowerCase().replace(/\s+/g, '_')
+  if (!clave || medidas.some((x) => x.clave === clave)) return
+  medidas.push({ clave, valor: '', unidad: 'cm' })
+  nuevaMedida.value = ''
+  changed()
+}
+function eliminarMedida(clave: string) {
+  const index = medidas.findIndex((m) => m.clave === clave)
+  if (index >= 0 && !clavesIniciales.includes(clave)) {
+    medidas.splice(index, 1)
+    changed()
+  }
+}
+function serializarDimensiones(): Record<string, unknown> {
+  const resultado: Record<string, unknown> = structuredClone(dimensiones)
+  for (const medida of medidas) {
+    const original = medida.original
+    const viejo = original && typeof original === 'object' && !Array.isArray(original)
+      ? original as Record<string, unknown> : null
+    const viejoValor = String(viejo?.valor ?? (typeof original === 'string' || typeof original === 'number' ? original : ''))
+    const viejaUnidad = String(viejo?.unidad ?? (original === undefined ? 'cm' : ''))
+    if (medida.valor === viejoValor && medida.unidad === viejaUnidad && original !== undefined) continue
+    if (!medida.valor.trim()) {
+      delete resultado[medida.clave]
+    } else {
+      resultado[medida.clave] = {
+        ...(viejo ?? {}),
+        valor: medida.valor,
+        ...(medida.unidad ? { unidad: medida.unidad } : {}),
+      }
+    }
+  }
+  for (const clave of Object.keys(resultado)) {
+    if (!clavesIniciales.includes(clave) && !medidas.some((m) => m.clave === clave))
+      delete resultado[clave]
+  }
+  return resultado
+}
 const conjuntos = reactive<ConjuntoTecnico[]>(structuredClone(base.conjuntos ?? []))
 const componentes = reactive<ComponenteTecnico[]>(
   structuredClone(
@@ -206,11 +290,7 @@ async function createType() {
   }
 }
 function submit() {
-  const dim = Object.fromEntries(
-    ['ancho', 'alto', 'profundidad'].flatMap((key) =>
-      form[key as 'ancho'] ? [[key, { valor: form[key as 'ancho'], unidad: form.unidad }]] : [],
-    ),
-  )
+  const dim = serializarDimensiones()
   const datos = fusionarDatosTecnicos(base, {
     caracteristicas_generales: { ...generales, dimensiones: dim, atributos: atributosGenerales },
     conjuntos: conjuntos,
@@ -220,6 +300,18 @@ function submit() {
   const errores = validarDatosTecnicos(datos, limites)
   if (accesorios.some((item) => !item.trim()))
     errores.push('Completa o elimina el accesorio sin descripción.')
+  const cantidad = Number(comercial.cantidad)
+  const precio = Number(comercial.precio_unitario)
+  const descuento = Number(comercial.descuento)
+  if (!comercial.nombre.trim()) errores.push('Indica el nombre comercial del mueble.')
+  if (!Number.isInteger(cantidad) || cantidad <= 0)
+    errores.push('La cantidad cotizada debe ser un entero positivo.')
+  if (!props.unidades?.some((u) => ['PIEZA', 'JUEGO'].includes(u.codigo) &&
+    String(u.id) === comercial.unidad)) errores.push('La unidad debe ser PIEZA o JUEGO.')
+  if (!Number.isFinite(precio) || precio <= 0)
+    errores.push('El precio unitario negociado debe ser positivo.')
+  if (!Number.isFinite(descuento) || descuento < 0 || descuento > cantidad * precio)
+    errores.push('El descuento de línea no puede superar el importe bruto.')
   if (errores.length) {
     error.value = errores.join(' ')
     return
@@ -228,6 +320,13 @@ function submit() {
     tipo_mueble: form.tipo_mueble ? Number(form.tipo_mueble) : null,
     datos_tecnicos: datos,
     observaciones: form.observaciones || null,
+  }, {
+    nombre: comercial.nombre.trim(),
+    descripcion: comercial.descripcion,
+    cantidad: comercial.cantidad,
+    unidad: Number(comercial.unidad),
+    precio_unitario: comercial.precio_unitario,
+    descuento: comercial.descuento,
   })
 }
 onMounted(loadCatalog)
@@ -243,11 +342,13 @@ onMounted(loadCatalog)
       <nav aria-label="Apartados del configurador">
         <a href="#identificacion">Identificación</a><a href="#dimensiones">Dimensiones</a
         ><a href="#componentes">Componentes</a><a href="#accesorios">Accesorios</a
-        ><a href="#revision">Revisar</a>
+        ><a href="#comercial">Datos comerciales</a><a href="#revision">Revisar</a>
       </nav>
     </header>
     <section id="identificacion">
       <h3>Identificación</h3>
+      <TextField v-model="comercial.nombre" name="mueble-nombre-comercial"
+        label="Nombre comercial del mueble" />
       <Select
         v-model="form.tipo_mueble"
         name="tipo-mueble"
@@ -268,16 +369,27 @@ onMounted(loadCatalog)
     </section>
     <section id="dimensiones">
       <h3>Dimensiones generales opcionales</h3>
-      <div class="grid">
-        <TextField v-model="form.ancho" name="ancho" label="Ancho" /><TextField
-          v-model="form.alto"
-          name="alto"
-          label="Alto"
-        /><TextField v-model="form.profundidad" name="profundidad" label="Profundidad" /><TextField
-          v-model="form.unidad"
-          name="unidad"
-          label="Unidad"
-        />
+      <p>Cada medida conserva su unidad y los datos técnicos originales.</p>
+      <div v-for="medida in medidas" :key="medida.clave" class="inline">
+        <TextField v-model="medida.valor" :name="medida.clave"
+          :label="medida.clave.replace(/_/g, ' ')" />
+        <label>Unidad
+          <select v-model="medida.unidad" :aria-label="'Unidad de ' + medida.clave">
+            <option value="">Sin unidad identificada</option>
+            <option v-for="unidad in unidadesPermitidas" :key="unidad" :value="unidad">{{ unidad }}</option>
+          </select>
+        </label>
+        <Button v-if="!clavesIniciales.includes(medida.clave)" variant="secondary"
+          @click="eliminarMedida(medida.clave)">Quitar medida</Button>
+      </div>
+      <div class="inline">
+        <label>Nueva medida
+          <input v-model="nuevaMedida" list="medidas-sugeridas" aria-label="Nueva medida" />
+        </label>
+        <datalist id="medidas-sugeridas">
+          <option v-for="opcion in opcionesMedidas" :key="opcion" :value="opcion" />
+        </datalist>
+        <Button variant="secondary" :disabled="!nuevaMedida.trim()" @click="agregarMedida">Añadir medida</Button>
       </div>
     </section>
     <section>
@@ -440,12 +552,32 @@ onMounted(loadCatalog)
         </ul>
       </div>
     </section>
+    <section id="comercial">
+      <h3>Datos comerciales de este mueble</h3>
+      <div class="grid">
+        <TextField v-model="comercial.descripcion" name="mueble-descripcion"
+          label="Descripción comercial opcional" />
+        <TextField v-model="comercial.cantidad" name="mueble-cantidad"
+          label="Cantidad cotizada" />
+        <Select v-model="comercial.unidad" name="mueble-unidad"
+          label="Unidad comercial"
+          :options="(unidades ?? []).filter((u) => ['PIEZA', 'JUEGO'].includes(u.codigo))
+            .map((u) => ({ label: u.nombre, value: String(u.id) }))" />
+        <TextField v-model="comercial.precio_unitario" name="mueble-precio"
+          :label="'Precio unitario negociado (' + (moneda ?? 'BOB') + ')'" />
+        <TextField v-model="comercial.descuento" name="mueble-descuento"
+          label="Descuento monetario total de línea" />
+      </div>
+      <p role="status">Total estimado en {{ moneda ?? 'BOB' }}:
+        {{ totalEstimado === null ? 'Pendiente' : totalEstimado.toFixed(2) }}.
+        El importe definitivo se calcula en PostgreSQL.</p>
+    </section>
     <section id="revision" aria-labelledby="revision-title">
       <h3 id="revision-title">Revisar mueble</h3>
       <dl class="review-grid">
         <div>
           <dt>Nombre comercial</dt>
-          <dd>{{ detalle?.nombre || 'Dato no especificado' }}</dd>
+          <dd>{{ comercial.nombre || 'Dato no especificado' }}</dd>
         </div>
         <div>
           <dt>Tipo</dt>
@@ -458,15 +590,16 @@ onMounted(loadCatalog)
         </div>
         <div>
           <dt>Cantidad cotizada</dt>
-          <dd>{{ detalle?.cantidad ?? 'Dato no especificado' }}</dd>
+          <dd>{{ comercial.cantidad || 'Dato no especificado' }}
+          {{ unidades?.find((u) => String(u.id) === comercial.unidad)?.nombre }}</dd>
         </div>
         <div>
           <dt>Precio unitario</dt>
-          <dd>{{ detalle?.precio_unitario ?? 'Dato no especificado' }}</dd>
+          <dd>{{ comercial.precio_unitario || 'Dato no especificado' }} {{ moneda ?? 'BOB' }}</dd>
         </div>
         <div>
           <dt>Descuento de línea</dt>
-          <dd>{{ detalle?.descuento ?? '0.00' }}</dd>
+          <dd>{{ comercial.descuento ?? '0.00' }}</dd>
         </div>
         <div>
           <dt>Componentes</dt>
