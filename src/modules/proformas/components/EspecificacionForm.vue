@@ -61,6 +61,15 @@ const componentSearch = reactive<Record<string, string>>({})
 const nuevoTipo = ref('')
 const creatingType = ref(false)
 const tiposLocales = ref([...props.tipos])
+const tiposParecidos = computed(() => {
+  const buscar = normalized(nuevoTipo.value)
+  if (buscar.length < 2) return []
+  return tiposLocales.value.filter((tipo) => {
+    const nombre = normalized(tipo.nombre)
+    return nombre.includes(buscar) || buscar.includes(nombre) ||
+      nombre.split(' ').some((parte) => parte.length >= 3 && buscar.includes(parte))
+  }).slice(0, 5)
+})
 const form = reactive({
   tipo_mueble: String(props.especificacion?.tipo_mueble ?? ''),
   observaciones: props.especificacion?.observaciones ?? '',
@@ -161,7 +170,9 @@ function normalized(value: string) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLocaleLowerCase('es')
+    .replace(/[^a-z0-9]+/g, ' ')
     .trim()
+    .replace(/\s+/g, ' ')
 }
 function matchingAttributes(query: string, ambit?: string) {
   const q = normalized(query)
@@ -270,7 +281,11 @@ function move(index: number, delta: number) {
 function addAttribute(target: AtributoTecnico[], option?: AtributoMueble, localName?: string) {
   const nombre = option?.nombre ?? localName?.trim() ?? search.value.trim()
   if (!nombre || target.some((a) => (a.codigo || a.nombre) === (option?.codigo || nombre))) return
-  target.push({ ...(option ? { codigo: option.codigo } : {}), nombre, valor: '' })
+  target.push({
+    ...(option ? { codigo: option.codigo, tipo_entrada: option.tipo_entrada } : {}),
+    nombre,
+    valor: '',
+  })
   if (!localName) search.value = ''
   changed()
 }
@@ -325,6 +340,17 @@ function submit() {
     accesorios: accesorios,
   })
   const errores = validarDatosTecnicos(datos, limites)
+  const atributos = [
+    ...atributosGenerales,
+    ...componentes.flatMap((parte) => parte.atributos ?? []),
+  ]
+  for (const atributo of atributos) {
+    if (atributo.tipo_entrada === 'entero' &&
+      (!/^\d+$/.test(atributo.valor.trim()) || Number(atributo.valor) < 0))
+      errores.push(`El atributo ${atributo.nombre} debe tener un número entero válido.`)
+    if (atributo.tipo_entrada === 'numero_unidad' && !atributo.unidad?.trim())
+      errores.push(`Indica la unidad de ${atributo.nombre}.`)
+  }
   if (accesorios.some((item) => !item.trim()))
     errores.push('Completa o elimina el accesorio sin descripción.')
   const cantidad = Number(comercial.cantidad)
@@ -386,12 +412,20 @@ onMounted(loadCatalog)
         ]"
       />
       <div class="inline">
-        <TextField v-model="nuevoTipo" name="nuevo-tipo" label="Nuevo tipo" /><Button
+        <TextField v-model="nuevoTipo" name="nuevo-tipo" label="Buscar o crear tipo de mueble" /><Button
           variant="secondary"
           :processing="creatingType"
           @click="createType"
           >Crear tipo</Button
         >
+      </div>
+      <div v-if="tiposParecidos.length" class="suggestions" role="group"
+        aria-label="Tipos de mueble similares existentes">
+        <p>Tipos existentes similares; selecciónalos para evitar duplicados:</p>
+        <button v-for="tipo in tiposParecidos" :key="tipo.id" type="button"
+          @click="form.tipo_mueble = String(tipo.id); nuevoTipo = ''; changed()">
+          {{ tipo.nombre }}
+        </button>
       </div>
     </section>
     <section id="dimensiones">
@@ -438,8 +472,18 @@ onMounted(loadCatalog)
       </div>
       <p v-if="catalogError" role="status">{{ catalogError }}</p>
       <div v-for="(a, i) in atributosGenerales" :key="a.codigo || a.nombre" class="inline">
-        <TextField v-model="a.valor" :name="`general-${i}`" :label="a.nombre" /><Button
-          variant="secondary"
+        <label v-if="a.tipo_entrada === 'entero'">
+          {{ a.nombre }}
+          <input v-model="a.valor" :name="`general-${i}`" type="number" step="1" />
+        </label>
+        <TextField v-else v-model="a.valor" :name="`general-${i}`" :label="a.nombre" />
+        <label v-if="a.tipo_entrada === 'numero_unidad'">Unidad de {{ a.nombre }}
+          <select v-model="a.unidad">
+            <option value="">No especificada</option>
+            <option v-for="unidad in unidadesPermitidas" :key="unidad" :value="unidad">{{ unidad }}</option>
+          </select>
+        </label>
+        <Button variant="secondary"
           @click="atributosGenerales.splice(i, 1)"
           >Quitar</Button
         >
@@ -539,8 +583,18 @@ onMounted(loadCatalog)
           </div>
         </div>
         <div v-for="(a, ai) in c.atributos" :key="a.codigo || a.nombre" class="inline">
-          <TextField v-model="a.valor" :name="`atributo-${i}-${ai}`" :label="a.nombre" /><Button
-            variant="secondary"
+          <label v-if="a.tipo_entrada === 'entero'">
+            {{ a.nombre }}
+            <input v-model="a.valor" :name="`atributo-${i}-${ai}`" type="number" step="1" />
+          </label>
+          <TextField v-else v-model="a.valor" :name="`atributo-${i}-${ai}`" :label="a.nombre" />
+          <label v-if="a.tipo_entrada === 'numero_unidad'">Unidad de {{ a.nombre }}
+            <select v-model="a.unidad">
+              <option value="">No especificada</option>
+              <option v-for="unidad in unidadesPermitidas" :key="unidad" :value="unidad">{{ unidad }}</option>
+            </select>
+          </label>
+          <Button variant="secondary"
             @click="c.atributos?.splice(ai, 1)"
             >Quitar</Button
           >
