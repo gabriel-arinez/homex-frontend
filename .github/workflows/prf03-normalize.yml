@@ -1,4 +1,5 @@
 name: PRF03 format
+# Final normalization after PRF03 interface and E2E changes
 
 on:
   push:
