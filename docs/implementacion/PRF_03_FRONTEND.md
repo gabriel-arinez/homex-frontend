@@ -160,20 +160,20 @@ Todos los casos son para pruebas y explicación del flujo; nunca insertar autom�
 
 ## 9. Pruebas PRF-03.6 y evidencias
 
-| Módulo | Aceptación requerida |
-|---|---|
-| Entrada | «Mueble a pedido» abre configurador completo; sin micrófono; volver sin pérdidas |
-| Dinámicos | búsqueda alfabética + alias, atributo local, sin duplicar, sticky sin scroll excesivo |
-| Medidas | opcionales, campo adicional, unidades y literal ambiguo no convertidos |
-| Conjuntos | 0–10 conjuntos, 0–40 componentes globales, no nuevos vacíos, mover sin pérdida |
+| Módulo      | Aceptación requerida                                                                     |
+| ----------- | ---------------------------------------------------------------------------------------- |
+| Entrada     | «Mueble a pedido» abre configurador completo; sin micrófono; volver sin pérdidas         |
+| Dinámicos   | búsqueda alfabética + alias, atributo local, sin duplicar, sticky sin scroll excesivo    |
+| Medidas     | opcionales, campo adicional, unidades y literal ambiguo no convertidos                   |
+| Conjuntos   | 0–10 conjuntos, 0–40 componentes globales, no nuevos vacíos, mover sin pérdida           |
 | Componentes | cantidad interna, detalles, expandir, duplicar independiente, reordenar, quitar/deshacer |
-| Accesorios | textos no vacíos, un vacío simultáneo, observaciones/advertencias se conservan |
-| Comercial | PIEZA/JUEGO, precio/moneda/descuento, total estimado, sin POST al confirmar local |
-| Edición | id/localId estables, JSON desconocido preservado, tipos creados sin borrar draft |
-| Duplicación | detectar diferencia en SOLO atributo técnico, copia real independiente, idéntico avisa |
-| Resiliencia | cierre sin guardar, cambio de ruta, refresh, fallo de red, 409, multi-pestaña |
-| Regresiones | catálogo PRF-02, lista/modales, otros tipos, aprobadas, PDF, documentos, NLP |
-| Corpus | cinco casos reales de sección 6, captura + revisión + guardado + reapertura |
+| Accesorios  | textos no vacíos, un vacío simultáneo, observaciones/advertencias se conservan           |
+| Comercial   | PIEZA/JUEGO, precio/moneda/descuento, total estimado, sin POST al confirmar local        |
+| Edición     | id/localId estables, JSON desconocido preservado, tipos creados sin borrar draft         |
+| Duplicación | detectar diferencia en SOLO atributo técnico, copia real independiente, idéntico avisa   |
+| Resiliencia | cierre sin guardar, cambio de ruta, refresh, fallo de red, 409, multi-pestaña            |
+| Regresiones | catálogo PRF-02, lista/modales, otros tipos, aprobadas, PDF, documentos, NLP             |
+| Corpus      | cinco casos reales de sección 6, captura + revisión + guardado + reapertura              |
 
 Ejecutar Vitest/unit/component para composables y adaptadores; E2E Playwright/Cypress según harness real y backend PostgreSQL según CI actual; TypeScript/generación cliente, lint/formato/build y accesibilidad con tamaños 360/390/768/1024/1440. Guardar evidencia de resultados, no solo capturas de diseño.
 
