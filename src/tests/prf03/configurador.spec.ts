@@ -27,7 +27,10 @@ describe('PRF-03 configurador técnico', () => {
   })
   it('rechaza cantidades fraccionarias e identificadores repetidos', () => {
     const errores = validarDatosTecnicos({
-      conjuntos: [{ uid: 'mismo', nombre: 'Conjunto A' }, { uid: 'mismo', nombre: 'Conjunto B' }],
+      conjuntos: [
+        { uid: 'mismo', nombre: 'Conjunto A' },
+        { uid: 'mismo', nombre: 'Conjunto B' },
+      ],
       componentes: [{ uid: 'pieza', nombre: 'Parte', cantidad_interna: 1.5 }],
     })
     expect(errores.join(' ')).toContain('únicos')

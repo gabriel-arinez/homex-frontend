@@ -52,10 +52,19 @@ describe('AP6 correcciones funcionales', () => {
       props: {
         tipos: [opcion(5, 'ESCRITORIO', 'Escritorio')],
         unidades: [opcion(10, 'PIEZA', 'Pieza')],
-        detalle: { nombre: 'Escritorio', cantidad: '1', unidad: 10, precio_unitario: '125', descuento: '0' },
+        detalle: {
+          nombre: 'Escritorio',
+          cantidad: '1',
+          unidad: 10,
+          precio_unitario: '125',
+          descuento: '0',
+        },
       },
     })
-    await wrapper.findAll('button').find((b) => b.text() === 'Agregar componente')!.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text() === 'Agregar componente')!
+      .trigger('click')
     await wrapper.get('#componente-nombre-0').setValue('Mesón')
     await wrapper.get('#componente-material-0').setValue('Melamina')
     await wrapper.get('#componente-espesor-0').setValue('25 mm')
@@ -91,7 +100,13 @@ describe('AP6 correcciones funcionales', () => {
       props: {
         tipos: [opcion(5, 'ESCRITORIO', 'Escritorio')],
         unidades: [opcion(10, 'PIEZA', 'Pieza')],
-        detalle: { nombre: 'Escritorio', cantidad: '1', unidad: 10, precio_unitario: '125', descuento: '0' },
+        detalle: {
+          nombre: 'Escritorio',
+          cantidad: '1',
+          unidad: 10,
+          precio_unitario: '125',
+          descuento: '0',
+        },
         especificacion: {
           id: 91,
           tipo_mueble: 5,

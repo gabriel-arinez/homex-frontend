@@ -215,11 +215,14 @@ const editableDetail = computed(() => {
   if (editingLine.value === null) return undefined
   return lineas.value[editingLine.value] as unknown as DetalleProforma
 })
-const editableSpecDetail = computed(() =>
-  draftingFurniture.value ?? (specLine.value === null ? null : (lineas.value[specLine.value] ?? null)),
+const editableSpecDetail = computed(
+  () =>
+    draftingFurniture.value ??
+    (specLine.value === null ? null : (lineas.value[specLine.value] ?? null)),
 )
 const editableSpec = computed(() => {
-  if (draftingFurniture.value) return draftingFurniture.value.especificacion as EspecificacionMueble | null
+  if (draftingFurniture.value)
+    return draftingFurniture.value.especificacion as EspecificacionMueble | null
   if (specLine.value === null) return null
   return (lineas.value[specLine.value]?.especificacion ?? null) as EspecificacionMueble | null
 })
@@ -395,9 +398,17 @@ function saveSpec(
       especificacion: body,
     }
     const original = duplicateOrigin.value
-      ? lineas.value.find((line) => line.localId === duplicateOrigin.value) : null
+      ? lineas.value.find((line) => line.localId === duplicateOrigin.value)
+      : null
     if (original) {
-      const commercialKeys = ['nombre', 'descripcion', 'cantidad', 'unidad', 'precio_unitario', 'descuento'] as const
+      const commercialKeys = [
+        'nombre',
+        'descripcion',
+        'cantidad',
+        'unidad',
+        'precio_unitario',
+        'descuento',
+      ] as const
       const sameCommercial = commercialKeys.every(
         (key) => String(original[key] ?? '') === String(candidate[key] ?? ''),
       )
@@ -660,8 +671,10 @@ function closeLineModal() {
 }
 function openLine(index: number | null = null) {
   if (index !== null && lineas.value[index]?.modo_calculo === 'TOTAL_NEGOCIADO') return
-  if (index !== null &&
-    tipos.value.find((x) => x.id === lineas.value[index]?.tipo_item)?.codigo === 'MUEBLE_MEDIDA') {
+  if (
+    index !== null &&
+    tipos.value.find((x) => x.id === lineas.value[index]?.tipo_item)?.codigo === 'MUEBLE_MEDIDA'
+  ) {
     openSpec(index)
     return
   }
@@ -1221,7 +1234,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       />
     </Modal>
     <Modal
-       :open="specLine !== null || draftingFurniture !== null"
+      :open="specLine !== null || draftingFurniture !== null"
       title="Configurador integral de mueble a pedido"
       fullscreen
       @close="closeSpec"

@@ -64,11 +64,16 @@ const tiposLocales = ref([...props.tipos])
 const tiposParecidos = computed(() => {
   const buscar = normalized(nuevoTipo.value)
   if (buscar.length < 2) return []
-  return tiposLocales.value.filter((tipo) => {
-    const nombre = normalized(tipo.nombre)
-    return nombre.includes(buscar) || buscar.includes(nombre) ||
-      nombre.split(' ').some((parte) => parte.length >= 3 && buscar.includes(parte))
-  }).slice(0, 5)
+  return tiposLocales.value
+    .filter((tipo) => {
+      const nombre = normalized(tipo.nombre)
+      return (
+        nombre.includes(buscar) ||
+        buscar.includes(nombre) ||
+        nombre.split(' ').some((parte) => parte.length >= 3 && buscar.includes(parte))
+      )
+    })
+    .slice(0, 5)
 })
 const form = reactive({
   tipo_mueble: String(props.especificacion?.tipo_mueble ?? ''),
@@ -78,7 +83,9 @@ const comercial = reactive({
   nombre: String(props.detalle?.nombre ?? ''),
   descripcion: String(props.detalle?.descripcion ?? ''),
   cantidad: String(props.detalle?.cantidad ?? '1'),
-  unidad: String(props.detalle?.unidad ?? props.unidades?.find((x) => x.codigo === 'PIEZA')?.id ?? ''),
+  unidad: String(
+    props.detalle?.unidad ?? props.unidades?.find((x) => x.codigo === 'PIEZA')?.id ?? '',
+  ),
   precio_unitario: String(props.detalle?.precio_unitario ?? ''),
   descuento: String(props.detalle?.descuento ?? '0.00'),
 })
@@ -94,19 +101,25 @@ const unidadesPermitidas = ['mm', 'cm', 'm', 'pulgadas']
 
 const generales = (base.caracteristicas_generales ?? {}) as Record<string, unknown>
 const dimensiones = (
-  generales.dimensiones && typeof generales.dimensiones === 'object' &&
-    !Array.isArray(generales.dimensiones)
+  generales.dimensiones &&
+  typeof generales.dimensiones === 'object' &&
+  !Array.isArray(generales.dimensiones)
     ? generales.dimensiones
     : {}
 ) as Record<string, unknown>
 const medidas = reactive<Medida[]>(
   [...new Set([...clavesIniciales, ...Object.keys(dimensiones)])].map((clave) => {
     const original = dimensiones[clave]
-    const objeto = original !== null && typeof original === 'object' &&
-      !Array.isArray(original) ? original as Record<string, unknown> : null
+    const objeto =
+      original !== null && typeof original === 'object' && !Array.isArray(original)
+        ? (original as Record<string, unknown>)
+        : null
     return {
       clave,
-      valor: String(objeto?.valor ?? (typeof original === 'string' || typeof original === 'number' ? original : '')),
+      valor: String(
+        objeto?.valor ??
+          (typeof original === 'string' || typeof original === 'number' ? original : ''),
+      ),
       unidad: String(objeto?.unidad ?? (original === undefined ? 'cm' : '')),
       original: structuredClone(original),
     }
@@ -132,11 +145,17 @@ function serializarDimensiones(): Record<string, unknown> {
   const resultado: Record<string, unknown> = structuredClone(dimensiones)
   for (const medida of medidas) {
     const original = medida.original
-    const viejo = original && typeof original === 'object' && !Array.isArray(original)
-      ? original as Record<string, unknown> : null
-    const viejoValor = String(viejo?.valor ?? (typeof original === 'string' || typeof original === 'number' ? original : ''))
+    const viejo =
+      original && typeof original === 'object' && !Array.isArray(original)
+        ? (original as Record<string, unknown>)
+        : null
+    const viejoValor = String(
+      viejo?.valor ??
+        (typeof original === 'string' || typeof original === 'number' ? original : ''),
+    )
     const viejaUnidad = String(viejo?.unidad ?? (original === undefined ? 'cm' : ''))
-    if (medida.valor === viejoValor && medida.unidad === viejaUnidad && original !== undefined) continue
+    if (medida.valor === viejoValor && medida.unidad === viejaUnidad && original !== undefined)
+      continue
     if (!medida.valor.trim()) {
       delete resultado[medida.clave]
     } else {
@@ -154,11 +173,7 @@ function serializarDimensiones(): Record<string, unknown> {
   return resultado
 }
 const conjuntos = reactive<ConjuntoTecnico[]>(structuredClone(base.conjuntos ?? []))
-const componentes = reactive<ComponenteTecnico[]>(
-  structuredClone(
-    base.componentes ?? [],
-  ),
-)
+const componentes = reactive<ComponenteTecnico[]>(structuredClone(base.componentes ?? []))
 const accesorios = reactive<string[]>(structuredClone(base.accesorios ?? []))
 const componenteRetirado = ref<{ item: ComponenteTecnico; index: number } | null>(null)
 const accesorioRetirado = ref<{ item: string; index: number } | null>(null)
@@ -210,9 +225,13 @@ function removeConjunto(index: number) {
   const id = conjuntos[index]?.uid
   if (!id) return
   const contienePiezas = componentes.some((c) => c.conjunto_uid === id)
-  if (contienePiezas && !window.confirm(
-    'Este conjunto contiene componentes. ¿Moverlos a Sin conjunto? Cancelar conservará el conjunto.',
-  )) return
+  if (
+    contienePiezas &&
+    !window.confirm(
+      'Este conjunto contiene componentes. ¿Moverlos a Sin conjunto? Cancelar conservará el conjunto.',
+    )
+  )
+    return
   componentes.forEach((c) => {
     if (c.conjunto_uid === id) delete c.conjunto_uid
   })
@@ -265,7 +284,8 @@ function deshacerAccesorio() {
   changed()
 }
 function duplicateComponente(index: number) {
-  if (componentes.length >= limites.max_componentes || componentes.some((c) => !c.nombre.trim())) return
+  if (componentes.length >= limites.max_componentes || componentes.some((c) => !c.nombre.trim()))
+    return
   const copy = structuredClone(componentes[index]!)
   copy.uid = uid()
   componentes.splice(index + 1, 0, copy)
@@ -345,8 +365,10 @@ function submit() {
     ...componentes.flatMap((parte) => parte.atributos ?? []),
   ]
   for (const atributo of atributos) {
-    if (atributo.tipo_entrada === 'entero' &&
-      (!/^\d+$/.test(atributo.valor.trim()) || Number(atributo.valor) < 0))
+    if (
+      atributo.tipo_entrada === 'entero' &&
+      (!/^\d+$/.test(atributo.valor.trim()) || Number(atributo.valor) < 0)
+    )
       errores.push(`El atributo ${atributo.nombre} debe tener un número entero válido.`)
     if (atributo.tipo_entrada === 'numero_unidad' && !atributo.unidad?.trim())
       errores.push(`Indica la unidad de ${atributo.nombre}.`)
@@ -359,8 +381,12 @@ function submit() {
   if (!comercial.nombre.trim()) errores.push('Indica el nombre comercial del mueble.')
   if (!Number.isInteger(cantidad) || cantidad <= 0)
     errores.push('La cantidad cotizada debe ser un entero positivo.')
-  if (!props.unidades?.some((u) => ['PIEZA', 'JUEGO'].includes(u.codigo) &&
-    String(u.id) === comercial.unidad)) errores.push('La unidad debe ser PIEZA o JUEGO.')
+  if (
+    !props.unidades?.some(
+      (u) => ['PIEZA', 'JUEGO'].includes(u.codigo) && String(u.id) === comercial.unidad,
+    )
+  )
+    errores.push('La unidad debe ser PIEZA o JUEGO.')
   if (!Number.isFinite(precio) || precio <= 0)
     errores.push('El precio unitario negociado debe ser positivo.')
   if (!Number.isFinite(descuento) || descuento < 0 || descuento > cantidad * precio)
@@ -369,18 +395,22 @@ function submit() {
     error.value = errores.join(' ')
     return
   }
-  emit('save', {
-    tipo_mueble: form.tipo_mueble ? Number(form.tipo_mueble) : null,
-    datos_tecnicos: datos,
-    observaciones: form.observaciones || null,
-  }, {
-    nombre: comercial.nombre.trim(),
-    descripcion: comercial.descripcion,
-    cantidad: comercial.cantidad,
-    unidad: Number(comercial.unidad),
-    precio_unitario: comercial.precio_unitario,
-    descuento: comercial.descuento,
-  })
+  emit(
+    'save',
+    {
+      tipo_mueble: form.tipo_mueble ? Number(form.tipo_mueble) : null,
+      datos_tecnicos: datos,
+      observaciones: form.observaciones || null,
+    },
+    {
+      nombre: comercial.nombre.trim(),
+      descripcion: comercial.descripcion,
+      cantidad: comercial.cantidad,
+      unidad: Number(comercial.unidad),
+      precio_unitario: comercial.precio_unitario,
+      descuento: comercial.descuento,
+    },
+  )
 }
 onMounted(loadCatalog)
 </script>
@@ -400,8 +430,11 @@ onMounted(loadCatalog)
     </header>
     <section id="identificacion">
       <h3>Identificación</h3>
-      <TextField v-model="comercial.nombre" name="mueble-nombre-comercial"
-        label="Nombre comercial del mueble" />
+      <TextField
+        v-model="comercial.nombre"
+        name="mueble-nombre-comercial"
+        label="Nombre comercial del mueble"
+      />
       <Select
         v-model="form.tipo_mueble"
         name="tipo-mueble"
@@ -412,18 +445,31 @@ onMounted(loadCatalog)
         ]"
       />
       <div class="inline">
-        <TextField v-model="nuevoTipo" name="nuevo-tipo" label="Buscar o crear tipo de mueble" /><Button
-          variant="secondary"
-          :processing="creatingType"
-          @click="createType"
+        <TextField
+          v-model="nuevoTipo"
+          name="nuevo-tipo"
+          label="Buscar o crear tipo de mueble"
+        /><Button variant="secondary" :processing="creatingType" @click="createType"
           >Crear tipo</Button
         >
       </div>
-      <div v-if="tiposParecidos.length" class="suggestions" role="group"
-        aria-label="Tipos de mueble similares existentes">
+      <div
+        v-if="tiposParecidos.length"
+        class="suggestions"
+        role="group"
+        aria-label="Tipos de mueble similares existentes"
+      >
         <p>Tipos existentes similares; selecciónalos para evitar duplicados:</p>
-        <button v-for="tipo in tiposParecidos" :key="tipo.id" type="button"
-          @click="form.tipo_mueble = String(tipo.id); nuevoTipo = ''; changed()">
+        <button
+          v-for="tipo in tiposParecidos"
+          :key="tipo.id"
+          type="button"
+          @click="
+            form.tipo_mueble = String(tipo.id)
+            nuevoTipo = ''
+            changed()
+          "
+        >
           {{ tipo.nombre }}
         </button>
       </div>
@@ -432,25 +478,38 @@ onMounted(loadCatalog)
       <h3>Dimensiones generales opcionales</h3>
       <p>Cada medida conserva su unidad y los datos técnicos originales.</p>
       <div v-for="medida in medidas" :key="medida.clave" class="inline">
-        <TextField v-model="medida.valor" :name="medida.clave"
-          :label="medida.clave.replace(/_/g, ' ')" />
-        <label>Unidad
+        <TextField
+          v-model="medida.valor"
+          :name="medida.clave"
+          :label="medida.clave.replace(/_/g, ' ')"
+        />
+        <label
+          >Unidad
           <select v-model="medida.unidad" :aria-label="'Unidad de ' + medida.clave">
             <option value="">Sin unidad identificada</option>
-            <option v-for="unidad in unidadesPermitidas" :key="unidad" :value="unidad">{{ unidad }}</option>
+            <option v-for="unidad in unidadesPermitidas" :key="unidad" :value="unidad">
+              {{ unidad }}
+            </option>
           </select>
         </label>
-        <Button v-if="!clavesIniciales.includes(medida.clave)" variant="secondary"
-          @click="eliminarMedida(medida.clave)">Quitar medida</Button>
+        <Button
+          v-if="!clavesIniciales.includes(medida.clave)"
+          variant="secondary"
+          @click="eliminarMedida(medida.clave)"
+          >Quitar medida</Button
+        >
       </div>
       <div class="inline">
-        <label>Nueva medida
+        <label
+          >Nueva medida
           <input v-model="nuevaMedida" list="medidas-sugeridas" aria-label="Nueva medida" />
         </label>
         <datalist id="medidas-sugeridas">
           <option v-for="opcion in opcionesMedidas" :key="opcion" :value="opcion" />
         </datalist>
-        <Button variant="secondary" :disabled="!nuevaMedida.trim()" @click="agregarMedida">Añadir medida</Button>
+        <Button variant="secondary" :disabled="!nuevaMedida.trim()" @click="agregarMedida"
+          >Añadir medida</Button
+        >
       </div>
     </section>
     <section>
@@ -477,16 +536,16 @@ onMounted(loadCatalog)
           <input v-model="a.valor" :name="`general-${i}`" type="number" step="1" />
         </label>
         <TextField v-else v-model="a.valor" :name="`general-${i}`" :label="a.nombre" />
-        <label v-if="a.tipo_entrada === 'numero_unidad'">Unidad de {{ a.nombre }}
+        <label v-if="a.tipo_entrada === 'numero_unidad'"
+          >Unidad de {{ a.nombre }}
           <select v-model="a.unidad">
             <option value="">No especificada</option>
-            <option v-for="unidad in unidadesPermitidas" :key="unidad" :value="unidad">{{ unidad }}</option>
+            <option v-for="unidad in unidadesPermitidas" :key="unidad" :value="unidad">
+              {{ unidad }}
+            </option>
           </select>
         </label>
-        <Button variant="secondary"
-          @click="atributosGenerales.splice(i, 1)"
-          >Quitar</Button
-        >
+        <Button variant="secondary" @click="atributosGenerales.splice(i, 1)">Quitar</Button>
       </div>
     </section>
     <section>
@@ -494,7 +553,10 @@ onMounted(loadCatalog)
         <h3>Conjuntos ({{ conjuntos.length }}/{{ limites.max_conjuntos }})</h3>
         <Button
           variant="secondary"
-          :disabled="conjuntos.length >= limites.max_conjuntos || conjuntos.some((g) => !componentes.some((c) => c.conjunto_uid === g.uid))"
+          :disabled="
+            conjuntos.length >= limites.max_conjuntos ||
+            conjuntos.some((g) => !componentes.some((c) => c.conjunto_uid === g.uid))
+          "
           @click="addConjunto"
           >Añadir conjunto</Button
         >
@@ -514,7 +576,10 @@ onMounted(loadCatalog)
         <h3>Componentes ({{ componentes.length }}/{{ limites.max_componentes }})</h3>
         <Button
           variant="secondary"
-          :disabled="componentes.length >= limites.max_componentes || componentes.some((c) => !c.nombre.trim())"
+          :disabled="
+            componentes.length >= limites.max_componentes ||
+            componentes.some((c) => !c.nombre.trim())
+          "
           @click="addComponente()"
           >Agregar componente</Button
         >
@@ -588,16 +653,16 @@ onMounted(loadCatalog)
             <input v-model="a.valor" :name="`atributo-${i}-${ai}`" type="number" step="1" />
           </label>
           <TextField v-else v-model="a.valor" :name="`atributo-${i}-${ai}`" :label="a.nombre" />
-          <label v-if="a.tipo_entrada === 'numero_unidad'">Unidad de {{ a.nombre }}
+          <label v-if="a.tipo_entrada === 'numero_unidad'"
+            >Unidad de {{ a.nombre }}
             <select v-model="a.unidad">
               <option value="">No especificada</option>
-              <option v-for="unidad in unidadesPermitidas" :key="unidad" :value="unidad">{{ unidad }}</option>
+              <option v-for="unidad in unidadesPermitidas" :key="unidad" :value="unidad">
+                {{ unidad }}
+              </option>
             </select>
           </label>
-          <Button variant="secondary"
-            @click="c.atributos?.splice(ai, 1)"
-            >Quitar</Button
-          >
+          <Button variant="secondary" @click="c.atributos?.splice(ai, 1)">Quitar</Button>
         </div>
         <div class="inline">
           <Button variant="secondary" @click="duplicateComponente(i)">Duplicar</Button
@@ -643,22 +708,38 @@ onMounted(loadCatalog)
     <section id="comercial">
       <h3>Datos comerciales de este mueble</h3>
       <div class="grid">
-        <TextField v-model="comercial.descripcion" name="mueble-descripcion"
-          label="Descripción comercial opcional" />
-        <TextField v-model="comercial.cantidad" name="mueble-cantidad"
-          label="Cantidad cotizada" />
-        <Select v-model="comercial.unidad" name="mueble-unidad"
+        <TextField
+          v-model="comercial.descripcion"
+          name="mueble-descripcion"
+          label="Descripción comercial opcional"
+        />
+        <TextField v-model="comercial.cantidad" name="mueble-cantidad" label="Cantidad cotizada" />
+        <Select
+          v-model="comercial.unidad"
+          name="mueble-unidad"
           label="Unidad comercial"
-          :options="(unidades ?? []).filter((u) => ['PIEZA', 'JUEGO'].includes(u.codigo))
-            .map((u) => ({ label: u.nombre, value: String(u.id) }))" />
-        <TextField v-model="comercial.precio_unitario" name="mueble-precio"
-          :label="'Precio unitario negociado (' + (moneda ?? 'BOB') + ')'" />
-        <TextField v-model="comercial.descuento" name="mueble-descuento"
-          label="Descuento monetario total de línea" />
+          :options="
+            (unidades ?? [])
+              .filter((u) => ['PIEZA', 'JUEGO'].includes(u.codigo))
+              .map((u) => ({ label: u.nombre, value: String(u.id) }))
+          "
+        />
+        <TextField
+          v-model="comercial.precio_unitario"
+          name="mueble-precio"
+          :label="'Precio unitario negociado (' + (moneda ?? 'BOB') + ')'"
+        />
+        <TextField
+          v-model="comercial.descuento"
+          name="mueble-descuento"
+          label="Descuento monetario total de línea"
+        />
       </div>
-      <p role="status">Total estimado en {{ moneda ?? 'BOB' }}:
-        {{ totalEstimado === null ? 'Pendiente' : totalEstimado.toFixed(2) }}.
-        El importe definitivo se calcula en PostgreSQL.</p>
+      <p role="status">
+        Total estimado en {{ moneda ?? 'BOB' }}:
+        {{ totalEstimado === null ? 'Pendiente' : totalEstimado.toFixed(2) }}. El importe definitivo
+        se calcula en PostgreSQL.
+      </p>
     </section>
     <section id="revision" aria-labelledby="revision-title">
       <h3 id="revision-title">Revisar mueble</h3>
@@ -678,8 +759,10 @@ onMounted(loadCatalog)
         </div>
         <div>
           <dt>Cantidad cotizada</dt>
-          <dd>{{ comercial.cantidad || 'Dato no especificado' }}
-          {{ unidades?.find((u) => String(u.id) === comercial.unidad)?.nombre }}</dd>
+          <dd>
+            {{ comercial.cantidad || 'Dato no especificado' }}
+            {{ unidades?.find((u) => String(u.id) === comercial.unidad)?.nombre }}
+          </dd>
         </div>
         <div>
           <dt>Precio unitario</dt>
@@ -699,7 +782,10 @@ onMounted(loadCatalog)
         </div>
         <div>
           <dt>Total estimado</dt>
-          <dd>{{ totalEstimado === null ? 'Pendiente' : totalEstimado.toFixed(2) }} {{ moneda ?? 'BOB' }}</dd>
+          <dd>
+            {{ totalEstimado === null ? 'Pendiente' : totalEstimado.toFixed(2) }}
+            {{ moneda ?? 'BOB' }}
+          </dd>
         </div>
       </dl>
       <div class="review-detail">
@@ -711,33 +797,54 @@ onMounted(loadCatalog)
         </ul>
         <p v-if="!medidas.some((m) => m.valor.trim())">Dato no especificado.</p>
         <h4>Atributos generales</h4>
-        <ul><li v-for="attr in atributosGenerales" :key="attr.codigo || attr.nombre">
-          {{ attr.nombre }}: {{ attr.valor }} {{ attr.unidad ?? '' }}
-        </li></ul>
+        <ul>
+          <li v-for="attr in atributosGenerales" :key="attr.codigo || attr.nombre">
+            {{ attr.nombre }}: {{ attr.valor }} {{ attr.unidad ?? '' }}
+          </li>
+        </ul>
         <h4>Conjuntos</h4>
-        <ul><li v-for="grupo in conjuntos" :key="grupo.uid">
-          {{ grupo.nombre }}:
-          {{ componentes.filter((c) => c.conjunto_uid === grupo.uid).map((c) => c.nombre).join(', ') || 'Sin componentes' }}
-        </li></ul>
+        <ul>
+          <li v-for="grupo in conjuntos" :key="grupo.uid">
+            {{ grupo.nombre }}:
+            {{
+              componentes
+                .filter((c) => c.conjunto_uid === grupo.uid)
+                .map((c) => c.nombre)
+                .join(', ') || 'Sin componentes'
+            }}
+          </li>
+        </ul>
         <h4>Componentes y sus características</h4>
         <article v-for="c in componentes" :key="c.uid" class="review-piece">
-          <h5>{{ c.nombre || 'Sin nombre' }} · Cantidad por mueble: {{ c.cantidad_interna ?? 'No indicada' }}</h5>
+          <h5>
+            {{ c.nombre || 'Sin nombre' }} · Cantidad por mueble:
+            {{ c.cantidad_interna ?? 'No indicada' }}
+          </h5>
           <p v-if="c.material">Material: {{ c.material }}</p>
           <p v-if="c.espesor">Espesor: {{ c.espesor }}</p>
           <p v-if="c.color">Color: {{ c.color }}</p>
           <p v-if="c.dimensiones">Dimensiones: {{ c.dimensiones }}</p>
-          <p v-if="c.conjunto_uid">Conjunto:
-            {{ conjuntos.find((g) => g.uid === c.conjunto_uid)?.nombre }}</p>
-          <ul><li v-for="attr in c.atributos ?? []" :key="attr.codigo || attr.nombre">
-            {{ attr.nombre }}: {{ attr.valor }} {{ attr.unidad ?? '' }}
-          </li></ul>
+          <p v-if="c.conjunto_uid">
+            Conjunto: {{ conjuntos.find((g) => g.uid === c.conjunto_uid)?.nombre }}
+          </p>
+          <ul>
+            <li v-for="attr in c.atributos ?? []" :key="attr.codigo || attr.nombre">
+              {{ attr.nombre }}: {{ attr.valor }} {{ attr.unidad ?? '' }}
+            </li>
+          </ul>
         </article>
         <h4>Accesorios incluidos</h4>
-        <ul><li v-for="(acc, i) in accesorios" :key="i">{{ acc || 'Pendiente de completar' }}</li></ul>
+        <ul>
+          <li v-for="(acc, i) in accesorios" :key="i">{{ acc || 'Pendiente de completar' }}</li>
+        </ul>
         <h4>Observaciones y pendientes</h4>
         <p>{{ form.observaciones || 'Sin observaciones adicionales.' }}</p>
-        <ul><li v-for="(warning, i) in base.advertencias ?? []" :key="i">{{ warning }}</li></ul>
-        <p v-if="base.descripcion_original">Descripción original conservada: {{ base.descripcion_original }}</p>
+        <ul>
+          <li v-for="(warning, i) in base.advertencias ?? []" :key="i">{{ warning }}</li>
+        </ul>
+        <p v-if="base.descripcion_original">
+          Descripción original conservada: {{ base.descripcion_original }}
+        </p>
       </div>
       <p>
         La ficha se incorporará localmente. La proforma sólo se enviará al servidor al guardar el
@@ -796,10 +903,20 @@ section,
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
 }
-h3 { margin: 0; }
-details.card > summary { cursor: pointer; font-weight: 600; }
-details.card > summary:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-details.card[open] > summary { margin-bottom: var(--space-3); }
+h3 {
+  margin: 0;
+}
+details.card > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+details.card > summary:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+details.card[open] > summary {
+  margin-bottom: var(--space-3);
+}
 
 .grid {
   display: grid;
