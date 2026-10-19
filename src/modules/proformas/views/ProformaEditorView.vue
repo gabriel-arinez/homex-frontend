@@ -425,7 +425,11 @@ function saveSpec(
       const sameCommercial = commercialKeys.every(
         (key) => String(original[key] ?? '') === String(candidate[key] ?? ''),
       )
-      const sameSpec = tecnicaIgual(original.especificacion ?? null, body)
+      const existingSpec = original.especificacion
+      const sameSpec =
+        (existingSpec?.tipo_mueble ?? null) === (body.tipo_mueble ?? null) &&
+        (existingSpec?.observaciones ?? null) === (body.observaciones ?? null) &&
+        tecnicaIgual(existingSpec?.datos_tecnicos ?? {}, body.datos_tecnicos ?? {})
       if (sameCommercial && sameSpec) {
         if (!window.confirm('La copia es idéntica. ¿Aumentar la cantidad de la línea original?'))
           return
