@@ -697,7 +697,48 @@ onMounted(loadCatalog)
           <dt>Accesorios</dt>
           <dd>{{ accesorios.filter((x) => x.trim()).length }}</dd>
         </div>
+        <div>
+          <dt>Total estimado</dt>
+          <dd>{{ totalEstimado === null ? 'Pendiente' : totalEstimado.toFixed(2) }} {{ moneda ?? 'BOB' }}</dd>
+        </div>
       </dl>
+      <div class="review-detail">
+        <h4>Dimensiones generales</h4>
+        <ul>
+          <li v-for="medida in medidas.filter((m) => m.valor.trim())" :key="medida.clave">
+            {{ medida.clave.replace(/_/g, ' ') }}: {{ medida.valor }} {{ medida.unidad }}
+          </li>
+        </ul>
+        <p v-if="!medidas.some((m) => m.valor.trim())">Dato no especificado.</p>
+        <h4>Atributos generales</h4>
+        <ul><li v-for="attr in atributosGenerales" :key="attr.codigo || attr.nombre">
+          {{ attr.nombre }}: {{ attr.valor }} {{ attr.unidad ?? '' }}
+        </li></ul>
+        <h4>Conjuntos</h4>
+        <ul><li v-for="grupo in conjuntos" :key="grupo.uid">
+          {{ grupo.nombre }}:
+          {{ componentes.filter((c) => c.conjunto_uid === grupo.uid).map((c) => c.nombre).join(', ') || 'Sin componentes' }}
+        </li></ul>
+        <h4>Componentes y sus características</h4>
+        <article v-for="c in componentes" :key="c.uid" class="review-piece">
+          <h5>{{ c.nombre || 'Sin nombre' }} · Cantidad por mueble: {{ c.cantidad_interna ?? 'No indicada' }}</h5>
+          <p v-if="c.material">Material: {{ c.material }}</p>
+          <p v-if="c.espesor">Espesor: {{ c.espesor }}</p>
+          <p v-if="c.color">Color: {{ c.color }}</p>
+          <p v-if="c.dimensiones">Dimensiones: {{ c.dimensiones }}</p>
+          <p v-if="c.conjunto_uid">Conjunto:
+            {{ conjuntos.find((g) => g.uid === c.conjunto_uid)?.nombre }}</p>
+          <ul><li v-for="attr in c.atributos ?? []" :key="attr.codigo || attr.nombre">
+            {{ attr.nombre }}: {{ attr.valor }} {{ attr.unidad ?? '' }}
+          </li></ul>
+        </article>
+        <h4>Accesorios incluidos</h4>
+        <ul><li v-for="(acc, i) in accesorios" :key="i">{{ acc || 'Pendiente de completar' }}</li></ul>
+        <h4>Observaciones y pendientes</h4>
+        <p>{{ form.observaciones || 'Sin observaciones adicionales.' }}</p>
+        <ul><li v-for="(warning, i) in base.advertencias ?? []" :key="i">{{ warning }}</li></ul>
+        <p v-if="base.descripcion_original">Descripción original conservada: {{ base.descripcion_original }}</p>
+      </div>
       <p>
         La ficha se incorporará localmente. La proforma sólo se enviará al servidor al guardar el
         borrador o emitirla.
