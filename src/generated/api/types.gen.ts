@@ -714,6 +714,11 @@ export type Recibo = {
   readonly updated_by: number | null
 }
 
+export type TipoMuebleConflicto = {
+  codigo: string
+  existente: TipoMuebleRespuesta
+}
+
 export type TipoMuebleCrear = {
   nombre: string
 }
@@ -1887,7 +1892,7 @@ export type V1CatalogoTiposMuebleCreateData = {
 }
 
 export type V1CatalogoTiposMuebleCreateErrors = {
-  409: TipoMuebleRespuesta
+  409: TipoMuebleConflicto
 }
 
 export type V1CatalogoTiposMuebleCreateError =
