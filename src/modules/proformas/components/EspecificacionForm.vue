@@ -1,320 +1,600 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import type {
+  AtributoMueble,
   EspecificacionMueble,
   EspecificacionMuebleWritable,
   ValorCatalogoPublico,
 } from '@/generated/api'
+import { ApiError } from '@/shared/api/errors'
 import Button from '@/shared/ui/Button.vue'
 import Select from '@/shared/ui/Select.vue'
 import TextField from '@/shared/ui/TextField.vue'
+import { proformasService } from '../services/proformasService'
+import {
+  fusionarDatosTecnicos,
+  leerDatosTecnicos,
+  validarDatosTecnicos,
+  type AtributoTecnico,
+  type ComponenteTecnico,
+  type ConjuntoTecnico,
+} from '../services/muebleTecnico'
 
-type ComponenteEditable = {
-  nombre: string
-  material: string
-  espesor: string
-  color: string
-  dimensiones: string
-  acabado: string
-  adicionales: string
-}
 const props = defineProps<{
   tipos: ValorCatalogoPublico[]
   especificacion?: EspecificacionMueble | null
   processing?: boolean
   externalError?: string
+  detalle?: {
+    nombre?: string
+    cantidad?: string | number
+    unidad?: string | number
+    precio_unitario?: string | number | null
+    descuento?: string | number
+    total?: string | number
+  } | null
 }>()
-const emit = defineEmits<{
-  save: [body: EspecificacionMuebleWritable]
-  cancel: []
-  changed: []
-}>()
-const saving = ref(false)
+const emit = defineEmits<{ save: [body: EspecificacionMuebleWritable]; cancel: []; changed: [] }>()
+const base = leerDatosTecnicos(props.especificacion?.datos_tecnicos)
+const catalogo = ref<AtributoMueble[]>([])
+const limites = reactive({ max_conjuntos: 10, max_componentes: 40 })
+const catalogError = ref('')
 const error = ref('')
-const stringify = (value: unknown) =>
-  typeof value === 'string' ? value : value == null ? '' : JSON.stringify(value)
-const datosIniciales = (props.especificacion?.datos_tecnicos ?? {}) as Record<string, unknown>
-// El formato comercial permite propiedades de nivel raíz desconocidas. Una
-// edición parcial del formulario no debe borrarlas silenciosamente.
-const clavesEditables = new Set([
-  'componentes',
-  'descripcion_original',
-  'advertencias',
-  'accesorios',
-  'caracteristicas_generales',
-])
-const datosAdicionales = Object.fromEntries(
-  Object.entries(datosIniciales).filter(([clave]) => !clavesEditables.has(clave)),
-)
-const initial = Array.isArray(datosIniciales.componentes)
-  ? (datosIniciales.componentes as Array<Record<string, unknown>>)
-  : []
-const componentes = reactive<ComponenteEditable[]>(
-  (initial.length ? initial : [{ nombre: '' }]).map((item) => ({
-    nombre: stringify(item.nombre),
-    material: stringify(item.material),
-    espesor: stringify(item.espesor),
-    color: stringify(item.color),
-    dimensiones: stringify(item.dimensiones),
-    acabado: stringify(item.acabado),
-    adicionales: stringify(
-      Object.fromEntries(
-        Object.entries(item).filter(
-          ([clave]) =>
-            !['nombre', 'material', 'espesor', 'color', 'dimensiones', 'acabado'].includes(clave),
-        ),
-      ),
-    ),
-  })),
-)
+const search = ref('')
+const componentSearch = reactive<Record<string, string>>({})
+const nuevoTipo = ref('')
+const creatingType = ref(false)
+const tiposLocales = ref([...props.tipos])
 const form = reactive({
   tipo_mueble: String(props.especificacion?.tipo_mueble ?? ''),
-  texto_original:
-    typeof datosIniciales.descripcion_original === 'string'
-      ? datosIniciales.descripcion_original
-      : '',
-  accesorios: Array.isArray(datosIniciales.accesorios)
-    ? datosIniciales.accesorios.join('\n')
-    : stringify(datosIniciales.accesorios),
-  advertencias: Array.isArray(datosIniciales.advertencias)
-    ? datosIniciales.advertencias.join('\n')
-    : '',
-  generales: stringify(datosIniciales.caracteristicas_generales),
   observaciones: props.especificacion?.observaciones ?? '',
+  ancho: '',
+  alto: '',
+  profundidad: '',
+  unidad: 'cm',
 })
-function quitarComponente(indice: number) {
-  componentes.splice(indice, 1)
+const generales = (base.caracteristicas_generales ?? {}) as Record<string, unknown>
+const dimensiones = (generales.dimensiones ?? {}) as Record<
+  string,
+  { valor?: unknown; unidad?: unknown }
+>
+for (const key of ['ancho', 'alto', 'profundidad'] as const)
+  form[key] = String(dimensiones[key]?.valor ?? '')
+const conjuntos = reactive<ConjuntoTecnico[]>(structuredClone(base.conjuntos ?? []))
+const componentes = reactive<ComponenteTecnico[]>(
+  structuredClone(
+    base.componentes?.length
+      ? base.componentes
+      : [{ uid: uid(), nombre: '', cantidad_interna: 1, atributos: [] }],
+  ),
+)
+const accesorios = reactive<string[]>(structuredClone(base.accesorios ?? []))
+const atributosGenerales = reactive<AtributoTecnico[]>(
+  structuredClone((generales.atributos as AtributoTecnico[] | undefined) ?? []),
+)
+function normalized(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('es')
+    .trim()
+}
+function matchingAttributes(query: string, ambit?: string) {
+  const q = normalized(query)
+  return catalogo.value
+    .filter((a) => {
+      const ambitos = Array.isArray(a.ambitos) ? (a.ambitos as string[]) : []
+      return !ambit || !ambitos.length || ambitos.includes(ambit)
+    })
+    .filter(
+      (a) =>
+        !q ||
+        normalized(
+          [a.nombre, ...(Array.isArray(a.sinonimos) ? (a.sinonimos as string[]) : [])].join(' '),
+        ).includes(q),
+    )
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+    .slice(0, 12)
+}
+const resultados = computed(() => {
+  const q = normalized(search.value)
+  if (!q) return catalogo.value.slice(0, 8)
+  return matchingAttributes(q, 'GENERAL')
+})
+function changed() {
   emit('changed')
 }
-function agregarComponente() {
-  emit('changed')
-  componentes.push({
-    nombre: '',
-    material: '',
-    espesor: '',
-    color: '',
-    dimensiones: '',
-    acabado: '',
-    adicionales: '',
+function uid() {
+  return crypto.randomUUID()
+}
+function addConjunto() {
+  if (conjuntos.some((g) => !componentes.some((c) => c.conjunto_uid === g.uid))) return
+  conjuntos.push({ uid: uid(), nombre: '' })
+  changed()
+}
+function removeConjunto(index: number) {
+  const id = conjuntos[index]?.uid
+  componentes.forEach((c) => {
+    if (c.conjunto_uid === id) delete c.conjunto_uid
   })
+  conjuntos.splice(index, 1)
+  changed()
 }
-function interpretar(valor: string): unknown {
-  const texto = valor.trim()
-  if (!texto) return null
-  if (texto.startsWith('{') || texto.startsWith('[')) {
-    try {
-      return JSON.parse(texto)
-    } catch {
-      throw new Error('Las medidas estructuradas deben contener JSON válido.')
-    }
+function addComponente(conjunto_uid?: string) {
+  if (componentes.some((c) => !c.nombre.trim()) || componentes.length >= limites.max_componentes)
+    return
+  componentes.push({
+    uid: uid(),
+    conjunto_uid: conjunto_uid || undefined,
+    nombre: '',
+    cantidad_interna: 1,
+    atributos: [],
+  })
+  changed()
+}
+function removeComponente(index: number) {
+  componentes.splice(index, 1)
+  changed()
+}
+function addAccesorio() {
+  accesorios.push('')
+  changed()
+}
+function removeAccesorio(index: number) {
+  accesorios.splice(index, 1)
+  changed()
+}
+function duplicateComponente(index: number) {
+  if (componentes.length >= limites.max_componentes) return
+  const copy = structuredClone(componentes[index]!)
+  copy.uid = uid()
+  componentes.splice(index + 1, 0, copy)
+  changed()
+}
+function move(index: number, delta: number) {
+  const target = index + delta
+  if (target < 0 || target >= componentes.length) return
+  const [item] = componentes.splice(index, 1)
+  if (item) componentes.splice(target, 0, item)
+  changed()
+}
+function addAttribute(target: AtributoTecnico[], option?: AtributoMueble, localName?: string) {
+  const nombre = option?.nombre ?? localName?.trim() ?? search.value.trim()
+  if (!nombre || target.some((a) => (a.codigo || a.nombre) === (option?.codigo || nombre))) return
+  target.push({ ...(option ? { codigo: option.codigo } : {}), nombre, valor: '' })
+  if (!localName) search.value = ''
+  changed()
+}
+function addComponentAttribute(component: ComponenteTecnico, key: string, option?: AtributoMueble) {
+  const query = componentSearch[key] || ''
+  addAttribute(component.atributos || (component.atributos = []), option, query)
+  componentSearch[key] = ''
+}
+async function loadCatalog() {
+  try {
+    const value = await proformasService.furnitureAttributes()
+    catalogo.value = value.atributos
+    Object.assign(limites, value.limites)
+  } catch {
+    catalogError.value =
+      'Las sugerencias no están disponibles. Puedes añadir atributos personalizados.'
   }
-  return texto
 }
-function listaDeTextos(valor: string): string[] {
-  return valor
-    .split(/\r?\n/)
-    .map((linea) => linea.trim())
-    .filter(Boolean)
-}
-function accesorios(): unknown {
-  if (form.accesorios.trim().startsWith('{') || form.accesorios.trim().startsWith('[')) {
-    return interpretar(form.accesorios)
-  }
-  return listaDeTextos(form.accesorios)
-}
-function construirComponente(item: ComponenteEditable) {
-  const componente: Record<string, unknown> = { nombre: item.nombre.trim() }
-  for (const clave of ['material', 'espesor', 'color', 'dimensiones', 'acabado'] as const) {
-    const valor = interpretar(item[clave])
-    if (valor !== null) componente[clave] = valor
-  }
-  const adicionales = interpretar(item.adicionales)
-  if (adicionales !== null) {
-    if (typeof adicionales !== 'object' || Array.isArray(adicionales)) {
-      throw new Error('Los atributos adicionales deben ser un objeto JSON.')
-    }
-    Object.assign(componente, adicionales)
-    componente.nombre = item.nombre.trim()
-  }
-  return componente
-}
-function submit() {
-  if (props.processing || saving.value) return
-  saving.value = true
+async function createType() {
+  if (!nuevoTipo.value.trim() || creatingType.value) return
+  creatingType.value = true
   error.value = ''
   try {
-    if (componentes.some((item) => !item.nombre.trim())) {
-      throw new Error('Cada componente debe tener un nombre.')
-    }
-    const generales = interpretar(form.generales)
-    if (generales !== null && (typeof generales !== 'object' || Array.isArray(generales))) {
-      throw new Error('Las características generales deben ser un objeto JSON.')
-    }
-    emit('save', {
-      tipo_mueble: form.tipo_mueble ? Number(form.tipo_mueble) : null,
-      datos_tecnicos: {
-        ...datosAdicionales,
-        componentes: componentes.map(construirComponente),
-        ...(form.texto_original ? { descripcion_original: form.texto_original } : {}),
-        advertencias: listaDeTextos(form.advertencias),
-        accesorios: accesorios(),
-        ...(generales ? { caracteristicas_generales: generales } : {}),
-      },
-      observaciones: form.observaciones || null,
-    })
+    const value = await proformasService.createFurnitureType({ nombre: nuevoTipo.value })
+    tiposLocales.value.push({ ...value, concepto_codigo: 'TIPO_MUEBLE' })
+    form.tipo_mueble = String(value.id)
+    nuevoTipo.value = ''
+    changed()
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : 'Datos inválidos.'
+    if (cause instanceof ApiError && cause.status === 409 && cause.fields['existente.id']?.[0]) {
+      form.tipo_mueble = cause.fields['existente.id'][0]
+      nuevoTipo.value = ''
+      error.value = 'Ese tipo ya existía y fue seleccionado.'
+      changed()
+    } else error.value = cause instanceof Error ? cause.message : 'No se pudo crear el tipo.'
   } finally {
-    saving.value = false
+    creatingType.value = false
   }
 }
+function submit() {
+  const dim = Object.fromEntries(
+    ['ancho', 'alto', 'profundidad'].flatMap((key) =>
+      form[key as 'ancho'] ? [[key, { valor: form[key as 'ancho'], unidad: form.unidad }]] : [],
+    ),
+  )
+  const datos = fusionarDatosTecnicos(base, {
+    caracteristicas_generales: { ...generales, dimensiones: dim, atributos: atributosGenerales },
+    conjuntos: conjuntos,
+    componentes: componentes,
+    accesorios: accesorios.filter((a) => a.trim()),
+  })
+  const errores = validarDatosTecnicos(datos, limites)
+  if (errores.length) {
+    error.value = errores.join(' ')
+    return
+  }
+  emit('save', {
+    tipo_mueble: form.tipo_mueble ? Number(form.tipo_mueble) : null,
+    datos_tecnicos: datos,
+    observaciones: form.observaciones || null,
+  })
+}
+onMounted(loadCatalog)
 </script>
 
 <template>
-  <form class="spec" @input="emit('changed')" @change="emit('changed')" @submit.prevent="submit">
-    <Select
-      v-model="form.tipo_mueble"
-      name="tipo-mueble"
-      label="Tipo de mueble"
-      :options="[
-        { label: 'Sin especificar', value: '' },
-        ...tipos.map((item) => ({ label: item.nombre, value: String(item.id) })),
-      ]"
-    />
-    <p class="hint">
-      Cada parte puede tener su propio material, espesor, color y dimensiones. Puedes escribir «a
-      elección» si la característica aún no está definida.
-    </p>
-    <section v-for="(componente, indice) in componentes" :key="indice" class="component">
-      <div class="component-header">
-        <strong>Componente {{ indice + 1 }}</strong>
-        <Button
-          v-if="componentes.length > 1"
+  <form class="configurator" @input="changed" @change="changed" @submit.prevent="submit">
+    <header class="config-header">
+      <div>
+        <p class="eyebrow">Mueble a pedido · Sin guardar</p>
+        <h2>{{ detalle?.nombre || 'Nuevo mueble a pedido' }}</h2>
+      </div>
+      <nav aria-label="Apartados del configurador">
+        <a href="#identificacion">Identificación</a><a href="#dimensiones">Dimensiones</a
+        ><a href="#componentes">Componentes</a><a href="#accesorios">Accesorios</a
+        ><a href="#revision">Revisar</a>
+      </nav>
+    </header>
+    <section id="identificacion">
+      <h3>Identificación</h3>
+      <Select
+        v-model="form.tipo_mueble"
+        name="tipo-mueble"
+        label="Tipo de mueble"
+        :options="[
+          { label: 'Sin especificar', value: '' },
+          ...tiposLocales.map((x) => ({ label: x.nombre, value: String(x.id) })),
+        ]"
+      />
+      <div class="inline">
+        <TextField v-model="nuevoTipo" name="nuevo-tipo" label="Nuevo tipo" /><Button
           variant="secondary"
-          :disabled="processing"
-          @click="quitarComponente(indice)"
-          >Quitar componente</Button
+          :processing="creatingType"
+          @click="createType"
+          >Crear tipo</Button
         >
       </div>
-      <TextField
-        v-model="componente.nombre"
-        :name="`componente-nombre-${indice}`"
-        label="Nombre de la parte"
-        placeholder="Mesón, estructura, cajonera..."
-      />
-      <div class="two">
-        <TextField
-          v-model="componente.material"
-          :name="`componente-material-${indice}`"
-          label="Material"
-        />
-        <TextField
-          v-model="componente.espesor"
-          :name="`componente-espesor-${indice}`"
-          label="Espesor"
-          placeholder="18 mm"
-        />
-        <TextField v-model="componente.color" :name="`componente-color-${indice}`" label="Color" />
-        <TextField
-          v-model="componente.dimensiones"
-          :name="`componente-dimensiones-${indice}`"
-          label="Dimensiones"
-          hint='Texto o JSON, por ejemplo {"ancho":"1,40 m"}'
-        />
-        <TextField
-          v-model="componente.acabado"
-          :name="`componente-acabado-${indice}`"
-          label="Acabado"
-        />
-        <TextField
-          v-model="componente.adicionales"
-          :name="`componente-adicionales-${indice}`"
-          label="Otros atributos JSON"
-          hint='Objeto libre, por ejemplo {"cantidad_interna":2,"tirador":"negro"}'
+    </section>
+    <section id="dimensiones">
+      <h3>Dimensiones generales opcionales</h3>
+      <div class="grid">
+        <TextField v-model="form.ancho" name="ancho" label="Ancho" /><TextField
+          v-model="form.alto"
+          name="alto"
+          label="Alto"
+        /><TextField v-model="form.profundidad" name="profundidad" label="Profundidad" /><TextField
+          v-model="form.unidad"
+          name="unidad"
+          label="Unidad"
         />
       </div>
     </section>
-    <Button variant="secondary" :disabled="processing" @click="agregarComponente">
-      Agregar componente
-    </Button>
-    <TextField
-      v-model="form.generales"
-      name="caracteristicas-generales"
-      label="Características generales JSON"
-      hint="Objeto libre para medidas o atributos del mueble completo."
-    />
-    <TextField
-      v-model="form.texto_original"
-      name="texto-original"
-      label="Descripción original del cliente"
-      hint="Se conserva sin cambiar el texto de la cotización."
-    />
-    <TextField
-      v-model="form.accesorios"
-      name="accesorios"
-      label="Accesorios incluidos"
-      hint="Uno por línea. No se crean ítems comerciales adicionales."
-    />
-    <TextField
-      v-model="form.advertencias"
-      name="advertencias"
-      label="Advertencias o características pendientes"
-      hint="Una por línea; no se completan automáticamente."
-    />
-    <TextField
-      v-model="form.observaciones"
-      name="observaciones-especificacion"
-      label="Observaciones de fabricación"
-    />
+    <section>
+      <h3>Características generales</h3>
+      <div class="attribute-search">
+        <TextField v-model="search" name="buscar-atributo" label="Buscar característica" />
+        <div v-if="search" class="suggestions">
+          <button
+            v-for="item in resultados"
+            :key="item.id"
+            type="button"
+            @click="addAttribute(atributosGenerales, item)"
+          >
+            {{ item.nombre }} · {{ item.grupo }}</button
+          ><button type="button" @click="addAttribute(atributosGenerales)">
+            Añadir “{{ search }}” como atributo local
+          </button>
+        </div>
+      </div>
+      <p v-if="catalogError" role="status">{{ catalogError }}</p>
+      <div v-for="(a, i) in atributosGenerales" :key="a.codigo || a.nombre" class="inline">
+        <TextField v-model="a.valor" :name="`general-${i}`" :label="a.nombre" /><Button
+          variant="secondary"
+          @click="atributosGenerales.splice(i, 1)"
+          >Quitar</Button
+        >
+      </div>
+    </section>
+    <section>
+      <div class="heading">
+        <h3>Conjuntos ({{ conjuntos.length }}/{{ limites.max_conjuntos }})</h3>
+        <Button
+          variant="secondary"
+          :disabled="conjuntos.length >= limites.max_conjuntos"
+          @click="addConjunto"
+          >Añadir conjunto</Button
+        >
+      </div>
+      <article v-for="(g, gi) in conjuntos" :key="g.uid" class="card">
+        <div class="inline">
+          <TextField v-model="g.nombre" :name="`grupo-${gi}`" label="Nombre del conjunto" /><Button
+            variant="secondary"
+            @click="addComponente(g.uid)"
+            >Añadir componente</Button
+          ><Button variant="secondary" @click="removeConjunto(gi)">Quitar conjunto</Button>
+        </div>
+      </article>
+    </section>
+    <section id="componentes">
+      <div class="heading">
+        <h3>Componentes ({{ componentes.length }}/{{ limites.max_componentes }})</h3>
+        <Button
+          variant="secondary"
+          :disabled="componentes.length >= limites.max_componentes"
+          @click="addComponente()"
+          >Agregar componente</Button
+        >
+      </div>
+      <article v-for="(c, i) in componentes" :key="c.uid || i" class="card">
+        <div class="heading">
+          <strong>Componente {{ i + 1 }}</strong>
+          <div>
+            <button type="button" @click="move(i, -1)">Subir</button
+            ><button type="button" @click="move(i, 1)">Bajar</button>
+          </div>
+        </div>
+        <div class="grid">
+          <TextField v-model="c.nombre" :name="`componente-nombre-${i}`" label="Nombre" /><label
+            class="number-field"
+            >Cantidad por mueble<input
+              v-model.number="c.cantidad_interna"
+              :name="`componente-${i}-cantidad`"
+              type="number"
+              min="1" /></label
+          ><TextField
+            v-model="c.material"
+            :name="`componente-material-${i}`"
+            label="Material"
+          /><TextField
+            v-model="c.espesor"
+            :name="`componente-espesor-${i}`"
+            label="Espesor"
+          /><TextField v-model="c.color" :name="`componente-color-${i}`" label="Color" /><TextField
+            v-model="c.dimensiones"
+            :name="`componente-dimensiones-${i}`"
+            label="Dimensiones literales"
+          />
+        </div>
+        <Select
+          v-model="c.conjunto_uid"
+          :name="`componente-${i}-grupo`"
+          label="Conjunto"
+          :options="[
+            { label: 'Sin conjunto', value: '' },
+            ...conjuntos.map((g) => ({ label: g.nombre || 'Sin nombre', value: g.uid })),
+          ]"
+        />
+        <div class="attribute-search component-attribute-search">
+          <TextField
+            v-model="componentSearch[c.uid || String(i)]"
+            :name="`buscar-atributo-componente-${i}`"
+            label="Buscar característica para este componente"
+          />
+          <div v-if="componentSearch[c.uid || String(i)]" class="suggestions">
+            <button
+              v-for="item in matchingAttributes(
+                componentSearch[c.uid || String(i)] || '',
+                'COMPONENTE',
+              )"
+              :key="item.id"
+              type="button"
+              @click="addComponentAttribute(c, c.uid || String(i), item)"
+            >
+              {{ item.nombre }} · {{ item.grupo }}
+            </button>
+            <button type="button" @click="addComponentAttribute(c, c.uid || String(i))">
+              Añadir atributo personalizado local
+            </button>
+          </div>
+        </div>
+        <div v-for="(a, ai) in c.atributos" :key="a.codigo || a.nombre" class="inline">
+          <TextField v-model="a.valor" :name="`atributo-${i}-${ai}`" :label="a.nombre" /><Button
+            variant="secondary"
+            @click="c.atributos?.splice(ai, 1)"
+            >Quitar</Button
+          >
+        </div>
+        <div class="inline">
+          <Button variant="secondary" @click="duplicateComponente(i)">Duplicar</Button
+          ><Button variant="secondary" @click="removeComponente(i)">Quitar</Button>
+        </div>
+      </article>
+    </section>
+    <section id="accesorios">
+      <h3>Accesorios incluidos</h3>
+      <div v-for="(_, i) in accesorios" :key="i" class="inline">
+        <TextField v-model="accesorios[i]" :name="`accesorio-${i}`" label="Descripción" /><Button
+          variant="secondary"
+          @click="removeAccesorio(i)"
+          >Quitar</Button
+        >
+      </div>
+      <Button
+        variant="secondary"
+        :disabled="accesorios.some((a) => !a.trim())"
+        @click="addAccesorio"
+        >Añadir accesorio</Button
+      >
+    </section>
+    <section>
+      <TextField
+        v-model="form.observaciones"
+        name="observaciones-especificacion"
+        label="Observaciones"
+      />
+      <div v-if="base.advertencias?.length">
+        <h4>Información pendiente histórica</h4>
+        <ul>
+          <li v-for="item in base.advertencias" :key="item">{{ item }}</li>
+        </ul>
+      </div>
+    </section>
+    <section id="revision" aria-labelledby="revision-title">
+      <h3 id="revision-title">Revisar mueble</h3>
+      <dl class="review-grid">
+        <div>
+          <dt>Nombre comercial</dt>
+          <dd>{{ detalle?.nombre || 'Dato no especificado' }}</dd>
+        </div>
+        <div>
+          <dt>Tipo</dt>
+          <dd>
+            {{
+              tiposLocales.find((x) => String(x.id) === form.tipo_mueble)?.nombre ||
+              'Dato no especificado'
+            }}
+          </dd>
+        </div>
+        <div>
+          <dt>Cantidad cotizada</dt>
+          <dd>{{ detalle?.cantidad ?? 'Dato no especificado' }}</dd>
+        </div>
+        <div>
+          <dt>Precio unitario</dt>
+          <dd>{{ detalle?.precio_unitario ?? 'Dato no especificado' }}</dd>
+        </div>
+        <div>
+          <dt>Descuento de línea</dt>
+          <dd>{{ detalle?.descuento ?? '0.00' }}</dd>
+        </div>
+        <div>
+          <dt>Componentes</dt>
+          <dd>{{ componentes.length }}</dd>
+        </div>
+        <div>
+          <dt>Accesorios</dt>
+          <dd>{{ accesorios.filter((x) => x.trim()).length }}</dd>
+        </div>
+      </dl>
+      <p>
+        La ficha se incorporará localmente. La proforma sólo se enviará al servidor al guardar el
+        borrador o emitirla.
+      </p>
+    </section>
     <p v-if="error || externalError" role="alert">{{ error || externalError }}</p>
     <div class="actions">
-      <Button type="submit" :processing="saving || processing">Guardar especificación</Button>
-      <Button variant="secondary" :disabled="saving || processing" @click="emit('cancel')">
-        Cancelar
-      </Button>
+      <Button type="submit" :disabled="processing" aria-label="Guardar especificación"
+        >Agregar mueble a la proforma</Button
+      ><Button variant="secondary" @click="emit('cancel')">Cancelar</Button>
     </div>
   </form>
 </template>
-
 <style scoped>
-.spec {
-  display: grid;
-  gap: var(--space-4);
-}
-.component {
+.config-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   display: grid;
   gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+.config-header nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.eyebrow {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+.review-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.review-grid div {
   padding: var(--space-3);
+  background: var(--color-surface-muted);
+}
+.review-grid dt {
+  font-weight: 700;
+}
+.configurator {
+  display: grid;
+  gap: var(--space-6);
+}
+section,
+.card {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
 }
-.component-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
+h3 {
+  margin: 0;
 }
-.two {
+.grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
 }
+.inline,
+.heading,
 .actions {
   display: flex;
+  align-items: end;
   gap: var(--space-3);
+  flex-wrap: wrap;
 }
-.hint {
-  color: var(--color-text-secondary);
+.heading {
+  align-items: center;
+  justify-content: space-between;
+}
+.component-attribute-search {
+  position: sticky;
+  top: var(--space-2);
+  z-index: 1;
+  background: var(--color-surface);
+}
+.attribute-search {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: var(--space-2);
+  background: var(--color-surface-raised);
+}
+.suggestions {
+  display: grid;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+}
+.suggestions button {
+  padding: var(--space-2);
+  text-align: left;
+  border: 0;
+  background: transparent;
+}
+.suggestions button:hover {
+  background: var(--color-surface);
 }
 [role='alert'] {
   color: var(--color-danger);
 }
-@media (max-width: 35rem) {
-  .two,
-  .actions {
-    display: grid;
+@media (max-width: 48rem) {
+  .grid {
     grid-template-columns: 1fr;
+  }
+  .inline,
+  .actions {
+    align-items: stretch;
+    display: grid;
+  }
+  .component-attribute-search {
+    position: sticky;
+    top: var(--space-2);
+    z-index: 1;
+    background: var(--color-surface);
+  }
+  .attribute-search {
+    position: static;
   }
 }
 </style>

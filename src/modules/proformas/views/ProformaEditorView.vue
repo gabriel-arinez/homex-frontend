@@ -214,6 +214,9 @@ const editableDetail = computed(() => {
   if (editingLine.value === null) return undefined
   return lineas.value[editingLine.value] as unknown as DetalleProforma
 })
+const editableSpecDetail = computed(() =>
+  specLine.value === null ? null : (lineas.value[specLine.value] ?? null),
+)
 const editableSpec = computed(() => {
   if (specLine.value === null) return null
   return (lineas.value[specLine.value]?.especificacion ?? null) as EspecificacionMueble | null
@@ -337,39 +340,6 @@ async function loadReferences() {
   }
 }
 function saveLine(body: DetalleProformaWritable) {
-  if (duplicateOrigin.value) {
-    const original = lineas.value.find((item) => item.localId === duplicateOrigin.value)
-    if (original) {
-      const fields: (keyof DetalleProformaWritable)[] = [
-        'tipo_item',
-        'producto',
-        'familia_producto',
-        'nombre',
-        'descripcion',
-        'cantidad',
-        'unidad',
-        'precio_unitario',
-        'descuento',
-      ]
-      const identical = fields.every(
-        (field) => String(original[field] ?? '') === String(body[field] ?? ''),
-      )
-      if (identical) {
-        if (
-          !window.confirm(
-            'La copia es idéntica. ¿Sumar su cantidad a la línea original en lugar de duplicarla?',
-          )
-        )
-          return
-        original.cantidad = String(Number(original.cantidad) + Number(body.cantidad))
-        duplicateOrigin.value = null
-        duplicateSpec.value = null
-        closeLineModal()
-        markDirty()
-        return
-      }
-    }
-  }
   preferredProductId.value = null
   pendingLineDraft.value = null
   const line: LineaLocal = {
@@ -377,13 +347,15 @@ function saveLine(body: DetalleProformaWritable) {
     localId: localId(),
     especificacion: duplicateOrigin.value ? cloneEditorData(duplicateSpec.value) : null,
   }
-  duplicateOrigin.value = null
+  const duplicateSource = duplicateOrigin.value
   duplicateSpec.value = null
-  if (editingLine.value === null) lineas.value.push(line)
+  const editingIndex = editingLine.value
+  const wasNew = editingIndex === null
+  if (wasNew) lineas.value.push(line)
   else {
-    const previous = lineas.value[editingLine.value]
+    const previous = lineas.value[editingIndex!]
     if (!previous) return
-    lineas.value[editingLine.value] = {
+    lineas.value[editingIndex!] = {
       ...line,
       id: previous.id,
       localId: previous.localId,
@@ -395,12 +367,45 @@ function saveLine(body: DetalleProformaWritable) {
   editingLine.value = null
   additionMode.value = 'none'
   markDirty()
+  const isFurniture =
+    tipos.value.find((x) => x.id === Number(body.tipo_item))?.codigo === 'MUEBLE_MEDIDA'
+  if (wasNew && isFurniture && duplicateSource) {
+    duplicateOrigin.value = duplicateSource
+    specLine.value = lineas.value.length - 1
+    specModalDirty.value = false
+  } else duplicateOrigin.value = null
 }
 function saveSpec(body: EspecificacionMuebleWritable) {
-  if (specLine.value !== null) {
-    const line = lineas.value[specLine.value]
-    if (line) line.especificacion = body
+  if (specLine.value === null) return
+  const index = specLine.value
+  const line = lineas.value[index]
+  if (!line) return
+  line.especificacion = body
+  if (duplicateOrigin.value) {
+    const original = lineas.value.find((item) => item.localId === duplicateOrigin.value)
+    const commercialKeys: (keyof DetalleProformaWritable)[] = [
+      'tipo_item',
+      'producto',
+      'familia_producto',
+      'nombre',
+      'descripcion',
+      'cantidad',
+      'unidad',
+      'precio_unitario',
+      'descuento',
+    ]
+    const identical =
+      original &&
+      commercialKeys.every((key) => String(original[key] ?? '') === String(line[key] ?? '')) &&
+      JSON.stringify(original.especificacion ?? null) === JSON.stringify(body)
+    if (identical) {
+      if (!window.confirm('La copia completa es idéntica. ¿Sumar su cantidad a la línea original?'))
+        return
+      original.cantidad = String(Number(original.cantidad) + Number(line.cantidad))
+      lineas.value.splice(index, 1)
+    }
   }
+  duplicateOrigin.value = null
   specLine.value = null
   specModalDirty.value = false
   markDirty()
@@ -1152,11 +1157,17 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         @cancel="closeLineModal"
       />
     </Modal>
-    <Modal :open="specLine !== null" title="Ficha técnica" @close="closeSpec">
+    <Modal
+      :open="specLine !== null"
+      title="Configurador integral de mueble a pedido"
+      fullscreen
+      @close="closeSpec"
+    >
       <EspecificacionForm
         :key="specLine ?? -1"
         :tipos="tiposMueble"
         :especificacion="editableSpec"
+        :detalle="editableSpecDetail"
         @save="saveSpec"
         @changed="specModalDirty = true"
         @cancel="closeSpec"
