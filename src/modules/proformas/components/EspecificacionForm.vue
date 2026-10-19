@@ -14,6 +14,7 @@ import { proformasService } from '../services/proformasService'
 import {
   fusionarDatosTecnicos,
   leerDatosTecnicos,
+  tecnicaIgual,
   validarDatosTecnicos,
   type AtributoTecnico,
   type ComponenteTecnico,
@@ -391,7 +392,21 @@ function submit() {
     componentes: componentes,
     accesorios: accesorios,
   })
-  const errores = validarDatosTecnicos(datos, limites)
+  // Un histórico anterior a PRF-03 puede exceder 10/40.
+  // Solo admitir ese exceso si las colecciones permanecen idénticas.
+  const limitesCompatibles = {
+    max_conjuntos:
+      conjuntos.length > limites.max_conjuntos &&
+      tecnicaIgual(conjuntos, base.conjuntos ?? [])
+        ? conjuntos.length
+        : limites.max_conjuntos,
+    max_componentes:
+      componentes.length > limites.max_componentes &&
+      tecnicaIgual(componentes, base.componentes ?? [])
+        ? componentes.length
+        : limites.max_componentes,
+  }
+  const errores = validarDatosTecnicos(datos, limitesCompatibles)
   const atributos = [
     ...atributosGenerales,
     ...componentes.flatMap((parte) => parte.atributos ?? []),
