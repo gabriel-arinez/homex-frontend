@@ -151,6 +151,8 @@ const componentes = reactive<ComponenteTecnico[]>(
   ),
 )
 const accesorios = reactive<string[]>(structuredClone(base.accesorios ?? []))
+const componenteRetirado = ref<{ item: ComponenteTecnico; index: number } | null>(null)
+const accesorioRetirado = ref<{ item: string; index: number } | null>(null)
 const atributosGenerales = reactive<AtributoTecnico[]>(
   structuredClone((generales.atributos as AtributoTecnico[] | undefined) ?? []),
 )
@@ -195,6 +197,11 @@ function addConjunto() {
 }
 function removeConjunto(index: number) {
   const id = conjuntos[index]?.uid
+  if (!id) return
+  const contienePiezas = componentes.some((c) => c.conjunto_uid === id)
+  if (contienePiezas && !window.confirm(
+    'Este conjunto contiene componentes. ¿Moverlos a Sin conjunto? Cancelar conservará el conjunto.',
+  )) return
   componentes.forEach((c) => {
     if (c.conjunto_uid === id) delete c.conjunto_uid
   })
@@ -214,7 +221,17 @@ function addComponente(conjunto_uid?: string) {
   changed()
 }
 function removeComponente(index: number) {
+  const item = componentes[index]
+  if (!item) return
+  componenteRetirado.value = { item: structuredClone({ ...item }), index }
   componentes.splice(index, 1)
+  changed()
+}
+function deshacerComponente() {
+  const removed = componenteRetirado.value
+  if (!removed) return
+  componentes.splice(Math.min(removed.index, componentes.length), 0, removed.item)
+  componenteRetirado.value = null
   changed()
 }
 function addAccesorio() {
@@ -223,11 +240,21 @@ function addAccesorio() {
   changed()
 }
 function removeAccesorio(index: number) {
+  const item = accesorios[index]
+  if (item === undefined) return
+  accesorioRetirado.value = { item, index }
   accesorios.splice(index, 1)
   changed()
 }
+function deshacerAccesorio() {
+  const removed = accesorioRetirado.value
+  if (!removed) return
+  accesorios.splice(Math.min(removed.index, accesorios.length), 0, removed.item)
+  accesorioRetirado.value = null
+  changed()
+}
 function duplicateComponente(index: number) {
-  if (componentes.length >= limites.max_componentes) return
+  if (componentes.length >= limites.max_componentes || componentes.some((c) => !c.nombre.trim())) return
   const copy = structuredClone(componentes[index]!)
   copy.uid = uid()
   componentes.splice(index + 1, 0, copy)
@@ -423,7 +450,7 @@ onMounted(loadCatalog)
         <h3>Conjuntos ({{ conjuntos.length }}/{{ limites.max_conjuntos }})</h3>
         <Button
           variant="secondary"
-          :disabled="conjuntos.length >= limites.max_conjuntos"
+          :disabled="conjuntos.length >= limites.max_conjuntos || conjuntos.some((g) => !componentes.some((c) => c.conjunto_uid === g.uid))"
           @click="addConjunto"
           >Añadir conjunto</Button
         >
@@ -443,12 +470,13 @@ onMounted(loadCatalog)
         <h3>Componentes ({{ componentes.length }}/{{ limites.max_componentes }})</h3>
         <Button
           variant="secondary"
-          :disabled="componentes.length >= limites.max_componentes"
+          :disabled="componentes.length >= limites.max_componentes || componentes.some((c) => !c.nombre.trim())"
           @click="addComponente()"
           >Agregar componente</Button
         >
       </div>
-      <article v-for="(c, i) in componentes" :key="c.uid || i" class="card">
+      <details v-for="(c, i) in componentes" :key="c.uid || i" class="card" open>
+        <summary>Componente {{ i + 1 }}: {{ c.nombre || 'Sin nombre' }}</summary>
         <div class="heading">
           <strong>Componente {{ i + 1 }}</strong>
           <div>
@@ -521,7 +549,10 @@ onMounted(loadCatalog)
           <Button variant="secondary" @click="duplicateComponente(i)">Duplicar</Button
           ><Button variant="secondary" @click="removeComponente(i)">Quitar</Button>
         </div>
-      </article>
+      </details>
+      <Button v-if="componenteRetirado" variant="secondary" @click="deshacerComponente">
+        Deshacer eliminación de componente
+      </Button>
     </section>
     <section id="accesorios">
       <h3>Accesorios incluidos</h3>
@@ -538,6 +569,9 @@ onMounted(loadCatalog)
         @click="addAccesorio"
         >Añadir accesorio</Button
       >
+      <Button v-if="accesorioRetirado" variant="secondary" @click="deshacerAccesorio">
+        Deshacer eliminación de accesorio
+      </Button>
     </section>
     <section>
       <TextField
@@ -667,9 +701,11 @@ section,
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
 }
-h3 {
-  margin: 0;
-}
+h3 { margin: 0; }
+details.card > summary { cursor: pointer; font-weight: 600; }
+details.card > summary:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+details.card[open] > summary { margin-bottom: var(--space-3); }
+
 .grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
