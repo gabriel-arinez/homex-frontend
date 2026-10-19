@@ -123,7 +123,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: gabriel-arinez/homex-backend
-          ref: c771b35699c598ad816a100ffb471832e49f0fda
+          ref: c9a9edd61236776c475e90f0bf6fb9e68cf72a94
           path: backend-f10
       - uses: actions/setup-node@v4
         with: { node-version: 24.12.0, cache: npm }
@@ -183,7 +183,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: gabriel-arinez/homex-backend
-          ref: c771b35699c598ad816a100ffb471832e49f0fda
+          ref: c9a9edd61236776c475e90f0bf6fb9e68cf72a94
           path: backend
       - uses: actions/setup-node@v4
         with: { node-version: 24.12.0, cache: npm }
