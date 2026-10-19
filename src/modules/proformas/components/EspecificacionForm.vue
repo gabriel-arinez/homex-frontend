@@ -141,7 +141,18 @@ function eliminarMedida(clave: string) {
     changed()
   }
 }
-function serializarDimensiones(): Record<string, unknown> {
+function serializarDimensiones(): unknown {
+  const legado = generales.dimensiones
+  const hayCambios = medidas.some((medida) => {
+    const original = medida.original
+    const objeto = original && typeof original === 'object' && !Array.isArray(original)
+      ? original as Record<string, unknown> : null
+    const valor = String(objeto?.valor ?? (typeof original === 'string' || typeof original === 'number' ? original : ''))
+    const unidad = String(objeto?.unidad ?? (original === undefined ? 'cm' : ''))
+    return medida.valor !== valor || medida.unidad !== unidad
+  })
+  if (legado !== undefined && (typeof legado !== 'object' || legado === null ||
+    Array.isArray(legado)) && !hayCambios) return structuredClone(legado)
   const resultado: Record<string, unknown> = structuredClone(dimensiones)
   for (const medida of medidas) {
     const original = medida.original
@@ -213,6 +224,12 @@ const resultados = computed(() => {
 function changed() {
   emit('changed')
 }
+function readableDimension(value: unknown): string {
+  if (value === null || value === undefined) return ''
+  if (typeof value !== 'object') return String(value)
+  return Object.entries(value as Record<string, unknown>)
+    .map(([key, item]) => `${key}: ${readableDimension(item)}`).join(' · ')
+}
 function uid() {
   return crypto.randomUUID()
 }
@@ -253,7 +270,7 @@ function addComponente(conjunto_uid?: string) {
 function removeComponente(index: number) {
   const item = componentes[index]
   if (!item) return
-  componenteRetirado.value = { item: structuredClone({ ...item }), index }
+  componenteRetirado.value = { item: JSON.parse(JSON.stringify(item)) as ComponenteTecnico, index }
   componentes.splice(index, 1)
   changed()
 }
@@ -609,8 +626,11 @@ onMounted(loadCatalog)
             v-model="c.espesor"
             :name="`componente-espesor-${i}`"
             label="Espesor"
-          /><TextField v-model="c.color" :name="`componente-color-${i}`" label="Color" /><TextField
-            v-model="c.dimensiones"
+          /><TextField v-model="c.color" :name="`componente-color-${i}`" label="Color" />
+          <p v-if="c.dimensiones && typeof c.dimensiones !== 'string'">
+            Dimensiones históricas: {{ readableDimension(c.dimensiones) }}
+          </p>
+          <TextField v-else v-model="c.dimensiones"
             :name="`componente-dimensiones-${i}`"
             label="Dimensiones literales"
           />
