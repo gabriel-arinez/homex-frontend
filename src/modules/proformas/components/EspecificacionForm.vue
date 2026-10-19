@@ -171,7 +171,7 @@ function serializarDimensiones(): unknown {
       delete resultado[medida.clave]
     } else {
       resultado[medida.clave] = {
-        ...(viejo ?? {}),
+        ...viejo,
         valor: medida.valor,
         ...(medida.unidad ? { unidad: medida.unidad } : {}),
       }
