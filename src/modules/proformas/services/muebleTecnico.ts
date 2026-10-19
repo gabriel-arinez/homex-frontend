@@ -1,4 +1,11 @@
-export type AtributoTecnico = { codigo?: string; nombre: string; valor: string }
+export type AtributoTecnico = {
+  codigo?: string
+  nombre: string
+  valor: string
+  tipo_entrada?: string
+  unidad?: string
+  [key: string]: unknown
+}
 export type ConjuntoTecnico = { uid: string; nombre: string }
 export type ComponenteTecnico = {
   uid?: string
@@ -59,6 +66,10 @@ export function validarDatosTecnicos(datos: DatosTecnicos, limites = LIMITES_PRF
   if (componentes.length > limites.max_componentes)
     errores.push(`Máximo ${limites.max_componentes} componentes.`)
   const ids = new Set(conjuntos.map((item) => item.uid))
+  if (ids.size !== conjuntos.length) errores.push('Los identificadores de conjuntos deben ser únicos.')
+  const componentesIds = componentes.filter((item) => item.uid).map((item) => item.uid)
+  if (new Set(componentesIds).size !== componentesIds.length)
+    errores.push('Los identificadores de componentes deben ser únicos.')
   for (const conjunto of conjuntos) {
     if (!conjunto.nombre.trim()) errores.push('Cada conjunto necesita nombre.')
     if (!componentes.some((item) => item.conjunto_uid === conjunto.uid))
@@ -68,7 +79,8 @@ export function validarDatosTecnicos(datos: DatosTecnicos, limites = LIMITES_PRF
     if (!componente.nombre.trim()) errores.push('Cada componente necesita nombre.')
     if (componente.conjunto_uid && !ids.has(componente.conjunto_uid))
       errores.push('Un componente referencia un conjunto inexistente.')
-    if (componente.cantidad_interna != null && componente.cantidad_interna <= 0)
+    if (componente.cantidad_interna != null &&
+      (!Number.isInteger(componente.cantidad_interna) || componente.cantidad_interna <= 0))
       errores.push('La cantidad por mueble debe ser positiva.')
     const claves = new Set<string>()
     for (const atributo of componente.atributos ?? []) {
@@ -79,9 +91,22 @@ export function validarDatosTecnicos(datos: DatosTecnicos, limites = LIMITES_PRF
       claves.add(clave)
     }
   }
+  for (const atributo of (datos.caracteristicas_generales?.atributos ?? []) as AtributoTecnico[]) {
+    if (typeof atributo?.nombre !== 'string' || typeof atributo?.valor !== 'string' ||
+      !atributo.nombre.trim() || !atributo.valor.trim()) errores.push('Completa o quita el atributo general vacío.')
+  }
   return [...new Set(errores)]
 }
 
+function ordenarJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(ordenarJson)
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, ordenarJson(v)]),
+    )
+  }
+  return value
+}
 export function tecnicaIgual(a: unknown, b: unknown) {
-  return JSON.stringify(a) === JSON.stringify(b)
+  return JSON.stringify(ordenarJson(a)) === JSON.stringify(ordenarJson(b))
 }

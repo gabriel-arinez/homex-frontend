@@ -63,9 +63,7 @@ for (const key of ['ancho', 'alto', 'profundidad'] as const)
 const conjuntos = reactive<ConjuntoTecnico[]>(structuredClone(base.conjuntos ?? []))
 const componentes = reactive<ComponenteTecnico[]>(
   structuredClone(
-    base.componentes?.length
-      ? base.componentes
-      : [{ uid: uid(), nombre: '', cantidad_interna: 1, atributos: [] }],
+    base.componentes ?? [],
   ),
 )
 const accesorios = reactive<string[]>(structuredClone(base.accesorios ?? []))
@@ -98,8 +96,7 @@ function matchingAttributes(query: string, ambit?: string) {
 }
 const resultados = computed(() => {
   const q = normalized(search.value)
-  if (!q) return catalogo.value.slice(0, 8)
-  return matchingAttributes(q, 'GENERAL')
+  return matchingAttributes(q, 'mueble').slice(0, q ? 12 : 8)
 })
 function changed() {
   emit('changed')
@@ -137,6 +134,7 @@ function removeComponente(index: number) {
   changed()
 }
 function addAccesorio() {
+  if (accesorios.some((item) => !item.trim())) return
   accesorios.push('')
   changed()
 }
@@ -192,7 +190,13 @@ async function createType() {
     changed()
   } catch (cause) {
     if (cause instanceof ApiError && cause.status === 409 && cause.fields['existente.id']?.[0]) {
-      form.tipo_mueble = cause.fields['existente.id'][0]
+      const id = cause.fields['existente.id'][0]
+      const nombre = cause.fields['existente.nombre']?.[0] ?? nuevoTipo.value.trim()
+      const codigo = cause.fields['existente.codigo']?.[0] ?? ''
+      if (!tiposLocales.value.some((item) => String(item.id) === id)) {
+        tiposLocales.value.push({ id: Number(id), codigo, nombre, concepto_codigo: 'TIPO_MUEBLE' })
+      }
+      form.tipo_mueble = id
       nuevoTipo.value = ''
       error.value = 'Ese tipo ya existía y fue seleccionado.'
       changed()
@@ -211,9 +215,11 @@ function submit() {
     caracteristicas_generales: { ...generales, dimensiones: dim, atributos: atributosGenerales },
     conjuntos: conjuntos,
     componentes: componentes,
-    accesorios: accesorios.filter((a) => a.trim()),
+    accesorios: accesorios,
   })
   const errores = validarDatosTecnicos(datos, limites)
+  if (accesorios.some((item) => !item.trim()))
+    errores.push('Completa o elimina el accesorio sin descripción.')
   if (errores.length) {
     error.value = errores.join(' ')
     return
@@ -379,7 +385,7 @@ onMounted(loadCatalog)
             <button
               v-for="item in matchingAttributes(
                 componentSearch[c.uid || String(i)] || '',
-                'COMPONENTE',
+                'componente',
               )"
               :key="item.id"
               type="button"
