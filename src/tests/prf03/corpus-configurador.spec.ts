@@ -233,4 +233,39 @@ describe('PRF-03 corpus representativo conservado por el configurador visual', (
     wrapper.unmount()
   })
 
+  it('duplica profundamente una tarjeta y permite modificarla sin alterar el original', async () => {
+    const wrapper = mount(EspecificacionForm, {
+      props: {
+        ...opciones,
+        detalle: { nombre: 'Mesa', cantidad: '1', unidad: 20, precio_unitario: '200', descuento: '0' },
+        especificacion: {
+          tipo_mueble: 5,
+          datos_tecnicos: {
+            componentes: [
+              { uid: 'original', nombre: 'Cubierta', cantidad_interna: 1, material: 'Melamina',
+                atributos: [{ nombre: 'Acabado', valor: 'Nogal' }] },
+            ],
+          },
+        } as EspecificacionMueble,
+      },
+    })
+    const duplicar = wrapper.findAll('button').find((b) => b.text() === 'Duplicar')
+    expect(duplicar).toBeDefined()
+    await duplicar!.trigger('click')
+    await wrapper.get('#componente-material-1').setValue('Vidrio')
+    await wrapper.get('form').trigger('submit')
+    const dato = wrapper.emitted('save')?.[0]?.[0] as { datos_tecnicos: {
+      componentes: Array<{ uid: string; material: string; atributos: unknown[] }>
+    }}
+    expect(dato.datos_tecnicos.componentes).toHaveLength(2)
+    expect(dato.datos_tecnicos.componentes[0]).toMatchObject({
+      uid: 'original', material: 'Melamina', atributos: [{ nombre: 'Acabado', valor: 'Nogal' }],
+    })
+    expect(dato.datos_tecnicos.componentes[1]).toMatchObject({
+      material: 'Vidrio', atributos: [{ nombre: 'Acabado', valor: 'Nogal' }],
+    })
+    expect(dato.datos_tecnicos.componentes[1]?.uid).not.toBe('original')
+    wrapper.unmount()
+  })
+
 })
