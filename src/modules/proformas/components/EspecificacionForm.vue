@@ -224,6 +224,11 @@ const resultados = computed(() => {
 function changed() {
   emit('changed')
 }
+function elegirTipoSimilar(id: number) {
+  form.tipo_mueble = String(id)
+  nuevoTipo.value = ''
+  changed()
+}
 function readableDimension(value: unknown): string {
   if (value === null || value === undefined) return ''
   if (typeof value !== 'object') return String(value)
@@ -481,11 +486,7 @@ onMounted(loadCatalog)
           v-for="tipo in tiposParecidos"
           :key="tipo.id"
           type="button"
-          @click="
-            form.tipo_mueble = String(tipo.id)
-            nuevoTipo = ''
-            changed()
-          "
+          @click="elegirTipoSimilar(tipo.id)"
         >
           {{ tipo.nombre }}
         </button>
