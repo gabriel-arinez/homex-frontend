@@ -194,8 +194,10 @@ const readingTechnical = computed(() =>
 function readableTechnical(value: unknown): string {
   if (value === null || value === undefined) return 'No especificado'
   if (Array.isArray(value)) return value.map(readableTechnical).join(', ')
-  if (typeof value === 'object') return Object.entries(value as Record<string, unknown>)
-    .map(([key, v]) => `${key.replace(/_/g, ' ')}: ${readableTechnical(v)}`).join(' · ')
+  if (typeof value === 'object')
+    return Object.entries(value as Record<string, unknown>)
+      .map(([key, v]) => `${key.replace(/_/g, ' ')}: ${readableTechnical(v)}`)
+      .join(' · ')
   return String(value)
 }
 async function openLineRead(id: string) {
@@ -1208,7 +1210,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           <h3>Ficha técnica · solo lectura</h3>
           <p v-if="readingLine.especificacion.tipo_mueble">
             Tipo de mueble:
-            {{ tiposMueble.find((t) => t.id === readingLine?.especificacion?.tipo_mueble)?.nombre ?? 'Histórico' }}
+            {{
+              tiposMueble.find((t) => t.id === readingLine?.especificacion?.tipo_mueble)?.nombre ??
+              'Histórico'
+            }}
           </p>
           <p v-if="readingLine.especificacion.observaciones">
             Observaciones: {{ readingLine.especificacion.observaciones }}
@@ -1216,7 +1221,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           <h4>Características y dimensiones</h4>
           <p>{{ readableTechnical(readingTechnical.caracteristicas_generales) }}</p>
           <h4>Conjuntos</h4>
-          <ul><li v-for="g in readingTechnical.conjuntos ?? []" :key="g.uid">{{ g.nombre }}</li></ul>
+          <ul>
+            <li v-for="g in readingTechnical.conjuntos ?? []" :key="g.uid">{{ g.nombre }}</li>
+          </ul>
           <h4>Componentes</h4>
           <ul>
             <li v-for="(c, i) in readingTechnical.componentes ?? []" :key="c.uid ?? i">
@@ -1232,10 +1239,16 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             </li>
           </ul>
           <h4>Accesorios</h4>
-          <ul><li v-for="(a, i) in readingTechnical.accesorios ?? []" :key="i">{{ a }}</li></ul>
+          <ul>
+            <li v-for="(a, i) in readingTechnical.accesorios ?? []" :key="i">{{ a }}</li>
+          </ul>
           <h4 v-if="readingTechnical.advertencias?.length">Información pendiente histórica</h4>
-          <ul><li v-for="(a, i) in readingTechnical.advertencias ?? []" :key="i">{{ a }}</li></ul>
-          <p v-if="readingTechnical.descripcion_original">Descripción original: {{ readingTechnical.descripcion_original }}</p>
+          <ul>
+            <li v-for="(a, i) in readingTechnical.advertencias ?? []" :key="i">{{ a }}</li>
+          </ul>
+          <p v-if="readingTechnical.descripcion_original">
+            Descripción original: {{ readingTechnical.descripcion_original }}
+          </p>
         </template>
         <div class="actions">
           <Button

@@ -643,8 +643,12 @@ test('PRF-01 previene líneas inválidas y conserva edición al cerrar', async (
   await page.getByLabel('Cantidad cotizada').fill('1.5')
   await page.getByLabel('Precio unitario negociado (BOB)').fill('0')
   await page.getByRole('button', { name: 'Guardar especificación' }).click()
-  await expect(page.getByRole('alert')).toContainText('La cantidad cotizada debe ser un entero positivo.')
-  await expect(page.getByRole('alert')).toContainText('El precio unitario negociado debe ser positivo.')
+  await expect(page.getByRole('alert')).toContainText(
+    'La cantidad cotizada debe ser un entero positivo.',
+  )
+  await expect(page.getByRole('alert')).toContainText(
+    'El precio unitario negociado debe ser positivo.',
+  )
   await expect(page.getByRole('dialog')).toBeVisible()
 
   page.once('dialog', (dialog) => dialog.dismiss())
