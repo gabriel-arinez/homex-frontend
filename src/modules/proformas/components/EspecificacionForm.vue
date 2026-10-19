@@ -196,8 +196,10 @@ function serializarDimensiones(): unknown {
 const conjuntos = reactive<ConjuntoTecnico[]>(structuredClone(base.conjuntos ?? []))
 const componentes = reactive<ComponenteTecnico[]>(structuredClone(base.componentes ?? []))
 const accesorios = reactive<string[]>(structuredClone(base.accesorios ?? []))
-const componenteRetirado = ref<{ item: ComponenteTecnico; index: number } | null>(null)
-const accesorioRetirado = ref<{ item: string; index: number } | null>(null)
+const componentesRetirados = ref<Array<{ item: ComponenteTecnico; index: number }>>([])
+const accesoriosRetirados = ref<Array<{ item: string; index: number }>>([])
+const conjuntoPorEliminar = ref<string | null>(null)
+const destinoDelConjunto = ref('')
 const atributosGenerales = reactive<AtributoTecnico[]>(
   structuredClone((generales.atributos as AtributoTecnico[] | undefined) ?? []),
 )
@@ -257,18 +259,29 @@ function addConjunto() {
 function removeConjunto(index: number) {
   const id = conjuntos[index]?.uid
   if (!id) return
-  const contienePiezas = componentes.some((c) => c.conjunto_uid === id)
-  if (
-    contienePiezas &&
-    !window.confirm(
-      'Este conjunto contiene componentes. ¿Moverlos a Sin conjunto? Cancelar conservará el conjunto.',
-    )
-  )
+  if (componentes.some((c) => c.conjunto_uid === id)) {
+    conjuntoPorEliminar.value = id
+    destinoDelConjunto.value = ''
     return
-  componentes.forEach((c) => {
-    if (c.conjunto_uid === id) delete c.conjunto_uid
-  })
+  }
   conjuntos.splice(index, 1)
+  changed()
+}
+function confirmarDestinoDelConjunto(id: string) {
+  if (conjuntoPorEliminar.value !== id) return
+  const index = conjuntos.findIndex((g) => g.uid === id)
+  if (index < 0) return
+  const destino = destinoDelConjunto.value
+  if (destino && (destino === id || !conjuntos.some((g) => g.uid === destino))) return
+  for (const parte of componentes) {
+    if (parte.conjunto_uid === id) {
+      if (destino) parte.conjunto_uid = destino
+      else delete parte.conjunto_uid
+    }
+  }
+  conjuntos.splice(index, 1)
+  conjuntoPorEliminar.value = null
+  destinoDelConjunto.value = ''
   changed()
 }
 function addComponente(conjunto_uid?: string) {
@@ -283,18 +296,23 @@ function addComponente(conjunto_uid?: string) {
   })
   changed()
 }
+function setCantidadInterna(componente: ComponenteTecnico, event: Event) {
+  const value = (event.target as HTMLInputElement).value
+  if (value === '') delete componente.cantidad_interna
+  else componente.cantidad_interna = Number(value)
+  changed()
+}
 function removeComponente(index: number) {
   const item = componentes[index]
   if (!item) return
-  componenteRetirado.value = { item: JSON.parse(JSON.stringify(item)) as ComponenteTecnico, index }
+  componentesRetirados.value.push({ item: JSON.parse(JSON.stringify(item)) as ComponenteTecnico, index })
   componentes.splice(index, 1)
   changed()
 }
 function deshacerComponente() {
-  const removed = componenteRetirado.value
+  const removed = componentesRetirados.value.pop()
   if (!removed) return
   componentes.splice(Math.min(removed.index, componentes.length), 0, removed.item)
-  componenteRetirado.value = null
   changed()
 }
 function addAccesorio() {
@@ -305,15 +323,14 @@ function addAccesorio() {
 function removeAccesorio(index: number) {
   const item = accesorios[index]
   if (item === undefined) return
-  accesorioRetirado.value = { item, index }
+  accesoriosRetirados.value.push({ item, index })
   accesorios.splice(index, 1)
   changed()
 }
 function deshacerAccesorio() {
-  const removed = accesorioRetirado.value
+  const removed = accesoriosRetirados.value.pop()
   if (!removed) return
   accesorios.splice(Math.min(removed.index, accesorios.length), 0, removed.item)
-  accesorioRetirado.value = null
   changed()
 }
 function duplicateComponente(index: number) {
@@ -426,8 +443,12 @@ function submit() {
       (!/^\d+$/.test(atributo.valor.trim()) || Number(atributo.valor) < 0)
     )
       errores.push(`El atributo ${atributo.nombre} debe tener un número entero válido.`)
-    if (atributo.tipo_entrada === 'numero_unidad' && !atributo.unidad?.trim())
-      errores.push(`Indica la unidad de ${atributo.nombre}.`)
+    if (atributo.tipo_entrada === 'numero_unidad') {
+      if (!atributo.unidad?.trim())
+        errores.push(`Indica la unidad de ${atributo.nombre}.`)
+      if (!atributo.valor.trim() || !Number.isFinite(Number(atributo.valor)))
+        errores.push(`El atributo ${atributo.nombre} requiere un número válido.`)
+    }
   }
   if (accesorios.some((item) => !item.trim()))
     errores.push('Completa o elimina el accesorio sin descripción.')
@@ -587,6 +608,10 @@ onMounted(loadCatalog)
           {{ a.nombre }}
           <input v-model="a.valor" :name="`general-${i}`" type="number" step="1" />
         </label>
+        <label v-else-if="a.tipo_entrada === 'numero_unidad'">
+          {{ a.nombre }}
+          <input v-model="a.valor" :name="`general-${i}`" type="number" step="any" />
+        </label>
         <TextField v-else v-model="a.valor" :name="`general-${i}`" :label="a.nombre" />
         <label v-if="a.tipo_entrada === 'numero_unidad'"
           >Unidad de {{ a.nombre }}
@@ -621,6 +646,23 @@ onMounted(loadCatalog)
             >Añadir componente</Button
           ><Button variant="secondary" @click="removeConjunto(gi)">Quitar conjunto</Button>
         </div>
+        <div v-if="conjuntoPorEliminar === g.uid" class="conjunto-destino" role="group"
+          :aria-label="'Reasignación del conjunto ' + g.nombre">
+          <p>Elige a dónde mover sus componentes. Ninguna pieza se eliminará.</p>
+          <label>Destino de componentes
+            <select v-model="destinoDelConjunto" aria-label="Destino de componentes">
+              <option value="">Sin conjunto</option>
+              <option v-for="otro in conjuntos.filter((c) => c.uid !== g.uid)"
+                :key="otro.uid" :value="otro.uid">
+                {{ otro.nombre }}
+              </option>
+            </select>
+          </label>
+          <Button variant="secondary" @click="confirmarDestinoDelConjunto(g.uid)">
+            Mover componentes y quitar conjunto
+          </Button>
+          <Button variant="secondary" @click="conjuntoPorEliminar = null">Cancelar traslado</Button>
+        </div>
       </article>
     </section>
     <section id="componentes">
@@ -649,7 +691,8 @@ onMounted(loadCatalog)
           <TextField v-model="c.nombre" :name="`componente-nombre-${i}`" label="Nombre" /><label
             class="number-field"
             >Cantidad por mueble<input
-              v-model.number="c.cantidad_interna"
+              :value="c.cantidad_interna ?? ''"
+              @input="setCantidadInterna(c, $event)"
               :name="`componente-${i}-cantidad`"
               type="number"
               min="1" /></label
@@ -709,7 +752,11 @@ onMounted(loadCatalog)
             {{ a.nombre }}
             <input v-model="a.valor" :name="`atributo-${i}-${ai}`" type="number" step="1" />
           </label>
-          <TextField v-else v-model="a.valor" :name="`atributo-${i}-${ai}`" :label="a.nombre" />
+          <label v-else-if="a.tipo_entrada === 'numero_unidad'">
+          {{ a.nombre }}
+          <input v-model="a.valor" :name="`atributo-${i}-${ai}`" type="number" step="any" />
+        </label>
+        <TextField v-else v-model="a.valor" :name="`atributo-${i}-${ai}`" :label="a.nombre" />
           <label v-if="a.tipo_entrada === 'numero_unidad'"
             >Unidad de {{ a.nombre }}
             <select v-model="a.unidad">
@@ -726,7 +773,7 @@ onMounted(loadCatalog)
           ><Button variant="secondary" @click="removeComponente(i)">Quitar</Button>
         </div>
       </details>
-      <Button v-if="componenteRetirado" variant="secondary" @click="deshacerComponente">
+      <Button v-if="componentesRetirados.length" variant="secondary" @click="deshacerComponente">
         Deshacer eliminación de componente
       </Button>
     </section>
@@ -745,7 +792,7 @@ onMounted(loadCatalog)
         @click="addAccesorio"
         >Añadir accesorio</Button
       >
-      <Button v-if="accesorioRetirado" variant="secondary" @click="deshacerAccesorio">
+      <Button v-if="accesoriosRetirados.length" variant="secondary" @click="deshacerAccesorio">
         Deshacer eliminación de accesorio
       </Button>
     </section>
