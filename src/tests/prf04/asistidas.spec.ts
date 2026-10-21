@@ -134,9 +134,9 @@ describe('PRF-04 trazabilidad visible de reinterpretaciones', () => {
       ] as const) {
         await wrapper.setProps({ dirty: true })
         await wrapper.get('textarea').setValue(texto)
-        const reinterpretar = wrapper.findAll('button').find(
-          (b) => b.text() === 'Interpretar texto corregido',
-        )
+        const reinterpretar = wrapper
+          .findAll('button')
+          .find((b) => b.text() === 'Interpretar texto corregido')
         await reinterpretar!.trigger('click')
         expect(wrapper.text()).toContain('reemplazará toda la información')
         const continuar = wrapper.findAll('button').find((b) => b.text() === 'Continuar con voz')
