@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
-import type { PropuestaConfigurador, ValorCatalogoPublico } from '@/generated/api'
+import { flushPromises, mount } from '@vue/test-utils'
+import type { PropuestaConfigurador, ResultadoAsistida, ValorCatalogoPublico } from '@/generated/api'
 import { mapearCapturaAsistida } from '@/modules/proformas/services/capturaAsistidaMapper'
 import CapturaAsistida from '@/modules/proformas/components/CapturaAsistida.vue'
+import { asistidasService } from '@/modules/capturas/services/asistidasService'
 
 const tipos = [{ id: 1, codigo: 'MUEBLE_MEDIDA' }] as ValorCatalogoPublico[]
 const unidades = [
@@ -80,5 +81,70 @@ describe('PRF-04 confirmación del reemplazo', () => {
     expect(wrapper.text()).not.toContain('reemplazará toda la información')
     wrapper.unmount()
     vi.unstubAllGlobals()
+  })
+})
+
+describe('PRF-04 trazabilidad visible de reinterpretaciones', () => {
+  it('conserva el ASR original, encadena capturas y aísla los contextos de borrador', async () => {
+    const original = 'Un escritorio con cajones'
+    const primeraCorreccion = 'Un escritorio con dos cajones'
+    const segundaCorreccion = 'Un escritorio con tres cajones'
+    let siguienteId = 0
+    const create = vi.spyOn(asistidasService, 'create').mockImplementation(async () => ({
+      id: ++siguienteId,
+      estado: 'PENDIENTE',
+      intento_id: siguienteId,
+      numero_intento: 1,
+      reutilizada: false,
+    }))
+    vi.spyOn(asistidasService, 'get').mockImplementation(async (id) => ({
+      id,
+      estado: 'COMPLETADA',
+      intento_id: id,
+      texto_transcrito_original:
+        id === 1 ? original : id === 2 ? primeraCorreccion : segundaCorreccion,
+      resultado: 'REQUIRES_REVIEW',
+      propuesta_configurador: propuesta(),
+      pendientes: [],
+      version_proyeccion: 'PRF04_1',
+      motor: null,
+      error_codigo: null,
+    }) as ResultadoAsistida)
+    const wrapper = mount(CapturaAsistida, {
+      props: { dirty: false, sesion: crypto.randomUUID(), moneda: 'BOB' },
+      global: { stubs: { AudioRecorder: true, Teleport: true } },
+    })
+    try {
+      await wrapper.get('button').trigger('click')
+      wrapper.findComponent({ name: 'AudioRecorder' }).vm.$emit('ready', new Blob(['audio']))
+      await flushPromises()
+      expect(wrapper.text()).toContain(original)
+      expect(wrapper.emitted('applied')).toHaveLength(1)
+
+      for (const [texto, origen] of [
+        [primeraCorreccion, 1],
+        [segundaCorreccion, 2],
+      ] as const) {
+        await wrapper.setProps({ dirty: true })
+        await wrapper.get('textarea').setValue(texto)
+        await wrapper.findAll('button').find((b) => b.text() === 'Interpretar texto corregido')!.trigger('click')
+        expect(wrapper.text()).toContain('reemplazará toda la información')
+        await wrapper.findAll('button').find((b) => b.text() === 'Continuar con voz')!.trigger('click')
+        await flushPromises()
+        expect(create).toHaveBeenLastCalledWith(
+          expect.objectContaining({ texto, captura_origen: origen }),
+          expect.anything(),
+        )
+        expect(wrapper.get('details').text()).toContain(original)
+        expect(wrapper.get('details').text()).toContain('Última interpretación: ' + texto)
+        expect(wrapper.emitted('applied')).toHaveLength(origen + 1)
+      }
+      expect(wrapper.get('details').text()).not.toContain('Última interpretación: ' + original)
+      await wrapper.setProps({ sesion: crypto.randomUUID(), moneda: 'USD' })
+      expect(wrapper.find('details').exists()).toBe(false)
+    } finally {
+      wrapper.unmount()
+      vi.restoreAllMocks()
+    }
   })
 })
