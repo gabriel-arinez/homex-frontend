@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import type { PropuestaConfigurador, ResultadoAsistida, ValorCatalogoPublico } from '@/generated/api'
+import type {
+  PropuestaConfigurador,
+  ResultadoAsistida,
+  ValorCatalogoPublico,
+} from '@/generated/api'
 import { mapearCapturaAsistida } from '@/modules/proformas/services/capturaAsistidaMapper'
 import CapturaAsistida from '@/modules/proformas/components/CapturaAsistida.vue'
 import { asistidasService } from '@/modules/capturas/services/asistidasService'
