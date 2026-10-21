@@ -97,19 +97,22 @@ describe('PRF-04 trazabilidad visible de reinterpretaciones', () => {
       numero_intento: 1,
       reutilizada: false,
     }))
-    vi.spyOn(asistidasService, 'get').mockImplementation(async (id) => ({
-      id,
-      estado: 'COMPLETADA',
-      intento_id: id,
-      texto_transcrito_original:
-        id === 1 ? original : id === 2 ? primeraCorreccion : segundaCorreccion,
-      resultado: 'REQUIRES_REVIEW',
-      propuesta_configurador: propuesta(),
-      pendientes: [],
-      version_proyeccion: 'PRF04_1',
-      motor: null,
-      error_codigo: null,
-    }) as ResultadoAsistida)
+    vi.spyOn(asistidasService, 'get').mockImplementation(async (id) => {
+      const resultado: ResultadoAsistida = {
+        id,
+        estado: 'COMPLETADA',
+        intento_id: id,
+        texto_transcrito_original:
+          id === 1 ? original : id === 2 ? primeraCorreccion : segundaCorreccion,
+        resultado: 'REQUIRES_REVIEW',
+        propuesta_configurador: propuesta(),
+        pendientes: [],
+        version_proyeccion: 'PRF04_1',
+        motor: null,
+        error_codigo: null,
+      }
+      return resultado
+    })
     const wrapper = mount(CapturaAsistida, {
       props: { dirty: false, sesion: crypto.randomUUID(), moneda: 'BOB' },
       global: { stubs: { AudioRecorder: true, Teleport: true } },
@@ -127,9 +130,13 @@ describe('PRF-04 trazabilidad visible de reinterpretaciones', () => {
       ] as const) {
         await wrapper.setProps({ dirty: true })
         await wrapper.get('textarea').setValue(texto)
-        await wrapper.findAll('button').find((b) => b.text() === 'Interpretar texto corregido')!.trigger('click')
+        const reinterpretar = wrapper.findAll('button').find(
+          (b) => b.text() === 'Interpretar texto corregido',
+        )
+        await reinterpretar!.trigger('click')
         expect(wrapper.text()).toContain('reemplazará toda la información')
-        await wrapper.findAll('button').find((b) => b.text() === 'Continuar con voz')!.trigger('click')
+        const continuar = wrapper.findAll('button').find((b) => b.text() === 'Continuar con voz')
+        await continuar!.trigger('click')
         await flushPromises()
         expect(create).toHaveBeenLastCalledWith(
           expect.objectContaining({ texto, captura_origen: origen }),
@@ -139,7 +146,9 @@ describe('PRF-04 trazabilidad visible de reinterpretaciones', () => {
         expect(wrapper.get('details').text()).toContain('Última interpretación: ' + texto)
         expect(wrapper.emitted('applied')).toHaveLength(origen + 1)
       }
-      expect(wrapper.get('details').text()).not.toContain('Última interpretación: ' + original)
+      expect(wrapper.get('details').text()).not.toContain(
+        'Última interpretación: ' + original,
+      )
       await wrapper.setProps({ sesion: crypto.randomUUID(), moneda: 'USD' })
       expect(wrapper.find('details').exists()).toBe(false)
     } finally {
