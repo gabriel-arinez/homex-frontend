@@ -49,8 +49,10 @@ describe('PRF-04 proyección del servidor', () => {
   it('rechaza contratos incompatibles y referencias ausentes', () => {
     const p = propuesta()
     p.especificacion.datos_tecnicos = { schema_version: '1' }
-    expect(() => mapearCapturaAsistida(p, tipos, unidades)).toThrow()
-    expect(() => mapearCapturaAsistida(propuesta(), [], unidades)).toThrow()
+    expect(() => mapearCapturaAsistida(p, tipos, unidades)).toThrow(
+      'La propuesta técnica no es compatible',
+    )
+    expect(() => mapearCapturaAsistida(propuesta(), [], unidades)).toThrow('Faltan referencias')
   })
 })
 describe('PRF-04 confirmación del reemplazo', () => {
