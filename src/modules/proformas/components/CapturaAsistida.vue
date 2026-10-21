@@ -18,6 +18,7 @@ const confirm = ref(false)
 const recording = ref(false)
 const original = ref('')
 const corrected = ref('')
+const lastInterpretation = ref('')
 const captureId = ref<number | null>(null)
 const pendingText = ref('')
 watch(voice.processing, (value) => emit('processing', value))
@@ -26,6 +27,12 @@ watch(
   () => {
     voice.cancel()
     recording.value = false
+    confirm.value = false
+    original.value = ''
+    corrected.value = ''
+    lastInterpretation.value = ''
+    captureId.value = null
+    pendingText.value = ''
   },
 )
 function start() {
@@ -56,8 +63,15 @@ async function send(audio?: Blob, texto?: string) {
     ...(texto && captureId.value ? { captura_origen: captureId.value } : {}),
   })
   if (!result || context !== JSON.stringify([props.sesion, props.moneda, props.proforma])) return
-  original.value = result.texto_transcrito_original ?? ''
-  corrected.value = original.value
+  if (texto) {
+    // La nueva interpretación conserva la transcripción original de la captura por voz.
+    lastInterpretation.value = texto
+    corrected.value = texto
+  } else {
+    original.value = result.texto_transcrito_original ?? ''
+    lastInterpretation.value = original.value
+    corrected.value = original.value
+  }
   captureId.value = result.id
   emit('applied', result)
 }
@@ -79,8 +93,11 @@ function cancel() {
     >
     <p v-if="voice.error.value" role="alert">{{ voice.error.value }}</p>
     <details v-if="original">
-      <summary>Ver transcripción</summary>
+      <summary>Ver transcripción original</summary>
       <p>{{ original }}</p>
+      <p v-if="lastInterpretation && lastInterpretation !== original">
+        Última interpretación: {{ lastInterpretation }}
+      </p>
       <label
         >Corregir texto para una nueva interpretación<textarea
           v-model="corrected"
@@ -88,7 +105,7 @@ function cancel() {
         />
       </label>
       <Button
-        :disabled="voice.processing.value || !corrected.trim() || corrected === original"
+        :disabled="voice.processing.value || !corrected.trim() || corrected === lastInterpretation"
         @click="reinterpret"
         >Interpretar texto corregido</Button
       >
