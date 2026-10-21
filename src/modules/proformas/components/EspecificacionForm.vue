@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import type {
   AtributoMueble,
+  PendienteAsistida,
   EspecificacionMueble,
   EspecificacionMuebleWritable,
   ValorCatalogoPublico,
@@ -10,6 +11,7 @@ import { ApiError } from '@/shared/api/errors'
 import Button from '@/shared/ui/Button.vue'
 import Select from '@/shared/ui/Select.vue'
 import TextField from '@/shared/ui/TextField.vue'
+import { pendienteResuelto } from '../services/pendientesAsistencia'
 import { proformasService } from '../services/proformasService'
 import {
   clonarTecnica,
@@ -25,7 +27,7 @@ import {
 const props = defineProps<{
   tipos: ValorCatalogoPublico[]
   especificacion?: EspecificacionMueble | null
-  pendientesAsistencia?: { codigo: string; ruta: string; mensaje: string }[]
+  pendientesAsistencia?: PendienteAsistida[]
   processing?: boolean
   externalError?: string
   unidades?: ValorCatalogoPublico[]
@@ -99,7 +101,7 @@ const pendientesVisibles = computed(() =>
     if (p.codigo === 'NO_QUANTITY') return !comercial.cantidad || Number(comercial.cantidad) <= 0
     if (p.codigo === 'TOTAL_NEGOCIADO')
       return !comercial.precio_unitario || Number(comercial.precio_unitario) <= 0
-    return true
+    return !pendienteResuelto(p, medidas, componentes, atributosGenerales)
   }),
 )
 const totalEstimado = computed(() => {

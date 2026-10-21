@@ -605,6 +605,7 @@ export type Pedido = {
 }
 
 export type PendienteAsistida = {
+  resolucion?: ResolucionPendiente | null
   codigo: string
   ruta: string
   mensaje: string
@@ -764,6 +765,14 @@ export type Recibo = {
   readonly updated_by: number | null
 }
 
+export type ResolucionPendiente = {
+  tipo: TipoEnum
+  clave?: string
+  uid?: string
+  campo?: string
+  cantidad?: number
+}
+
 export type ResultadoAsistida = {
   id: number
   estado: string
@@ -784,6 +793,14 @@ export type ResultadoAsistida = {
  * * `ERROR` - ERROR
  */
 export type ResultadoEnum = 'PROCESSING' | 'REQUIRES_REVIEW' | 'NO_PROPOSAL' | 'ERROR'
+
+/**
+ * * `DIMENSION` - DIMENSION
+ * * `DIMENSIONES_NUEVAS` - DIMENSIONES_NUEVAS
+ * * `COMPONENTE` - COMPONENTE
+ * * `ATRIBUTO_GENERAL` - ATRIBUTO_GENERAL
+ */
+export type TipoEnum = 'DIMENSION' | 'DIMENSIONES_NUEVAS' | 'COMPONENTE' | 'ATRIBUTO_GENERAL'
 
 export type TipoMuebleConflicto = {
   codigo: string
