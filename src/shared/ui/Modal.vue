@@ -5,6 +5,7 @@ import { useFocusTrap } from '@/shared/composables/useFocusTrap'
 const props = defineProps<{
   open: boolean
   title: string
+  titleId?: string
   description?: string
   wide?: boolean
   fullscreen?: boolean
@@ -25,12 +26,12 @@ useFocusTrap(
         :class="{ 'modal--wide': wide, 'modal--fullscreen': fullscreen }"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="modal-title"
+        :aria-labelledby="titleId || 'modal-title'"
         @keydown.esc="emit('close')"
       >
-        <header>
+        <header role="presentation">
           <div>
-            <h2 id="modal-title">{{ title }}</h2>
+            <h2 :id="titleId || 'modal-title'">{{ title }}</h2>
             <p v-if="description">{{ description }}</p>
           </div>
           <button type="button" aria-label="Cerrar" @click="emit('close')"><X /></button>

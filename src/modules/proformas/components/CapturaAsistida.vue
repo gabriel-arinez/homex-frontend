@@ -93,7 +93,12 @@ function cancel() {
         >Interpretar texto corregido</Button
       >
     </details>
-    <Modal :open="confirm" title="Reemplazar información del mueble" @close="confirm = false">
+    <Modal
+      :open="confirm"
+      title="Reemplazar información del mueble"
+      title-id="prf04-replace-title"
+      @close="confirm = false"
+    >
       <p>
         La captura por voz reemplazará toda la información de este mueble. No afectará los demás
         ítems de la proforma.
