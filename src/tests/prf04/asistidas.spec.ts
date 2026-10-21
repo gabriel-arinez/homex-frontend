@@ -150,9 +150,7 @@ describe('PRF-04 trazabilidad visible de reinterpretaciones', () => {
         expect(wrapper.get('details').text()).toContain('Última interpretación: ' + texto)
         expect(wrapper.emitted('applied')).toHaveLength(origen + 1)
       }
-      expect(wrapper.get('details').text()).not.toContain(
-        'Última interpretación: ' + original,
-      )
+      expect(wrapper.get('details').text()).not.toContain('Última interpretación: ' + original)
       await wrapper.setProps({ sesion: crypto.randomUUID(), moneda: 'USD' })
       expect(wrapper.find('details').exists()).toBe(false)
     } finally {
