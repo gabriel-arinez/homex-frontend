@@ -97,6 +97,14 @@ export type ClienteResumenProforma = {
   celular: string | null
 }
 
+export type ComercialAsistida = {
+  nombre: string
+  cantidad: number | null
+  unidad_codigo: UnidadCodigoEnum | NullEnum | null
+  precio_unitario: string | null
+  descuento: string | null
+}
+
 export type ConfirmacionHitlRespuesta = {
   readonly captura_id: number
   readonly detalle_id: number
@@ -110,6 +118,15 @@ export type ConfirmarCaptura = {
   item_ia_id: number
   item_corregido: ItemCorregido
   linea_comercial: LineaComercialHitl
+}
+
+export type CrearAsistida = {
+  clave_idempotencia: string
+  proforma?: number | null
+  texto?: string
+  sesion_borrador: string
+  moneda_codigo?: MonedaCodigoEnum
+  captura_origen?: number | null
 }
 
 /**
@@ -228,6 +245,12 @@ export type EmitirRecibo = {
   pago_actual: string
 }
 
+export type EspecificacionAsistida = {
+  tipo_mueble: number | null
+  datos_tecnicos: unknown
+  observaciones: string | null
+}
+
 export type EspecificacionMueble = {
   readonly id: number
   readonly proforma_detalle: number
@@ -314,6 +337,12 @@ export type LineaComercialHitl = {
 }
 
 /**
+ * * `RULES_ONLY` - RULES_ONLY
+ * * `HYBRID` - HYBRID
+ */
+export type ModeEnum = 'RULES_ONLY' | 'HYBRID'
+
+/**
  * * `PRECIO_UNITARIO` - PRECIO_UNITARIO
  */
 export type ModoCalculoEnum = 'PRECIO_UNITARIO'
@@ -323,6 +352,13 @@ export type ModoCalculoEnum = 'PRECIO_UNITARIO'
  * * `USD` - USD
  */
 export type MonedaCodigoEnum = 'BOB' | 'USD'
+
+export type MotorAsistida = {
+  mode: ModeEnum
+  rules_version: string
+  model_version: string | null
+  normalization_version: string
+}
 
 export type MovimientoStock = {
   readonly id: number
@@ -349,6 +385,8 @@ export type NotaEntrega = {
   readonly created_by: number | null
   readonly updated_by: number | null
 }
+
+export type NullEnum = never
 
 export type OrdenTrabajo = {
   readonly id: number
@@ -566,6 +604,12 @@ export type Pedido = {
   readonly updated_by: number | null
 }
 
+export type PendienteAsistida = {
+  codigo: string
+  ruta: string
+  mensaje: string
+}
+
 export type Producto = {
   readonly id: number
   readonly revision: string
@@ -694,6 +738,12 @@ export type ProformaListado = {
   readonly total: string
 }
 
+export type PropuestaConfigurador = {
+  comercial: ComercialAsistida
+  especificacion: EspecificacionAsistida
+  pendientes: Array<PendienteAsistida>
+}
+
 export type Recibo = {
   readonly id: number
   readonly numero: number
@@ -713,6 +763,27 @@ export type Recibo = {
   readonly created_by: number | null
   readonly updated_by: number | null
 }
+
+export type ResultadoAsistida = {
+  id: number
+  estado: string
+  intento_id: number | null
+  texto_transcrito_original: string | null
+  resultado: ResultadoEnum
+  propuesta_configurador: PropuestaConfigurador | null
+  pendientes: Array<PendienteAsistida>
+  version_proyeccion: string
+  motor: MotorAsistida | null
+  error_codigo: string | null
+}
+
+/**
+ * * `PROCESSING` - PROCESSING
+ * * `REQUIRES_REVIEW` - REQUIRES_REVIEW
+ * * `NO_PROPOSAL` - NO_PROPOSAL
+ * * `ERROR` - ERROR
+ */
+export type ResultadoEnum = 'PROCESSING' | 'REQUIRES_REVIEW' | 'NO_PROPOSAL' | 'ERROR'
 
 export type TipoMuebleConflicto = {
   codigo: string
@@ -740,6 +811,12 @@ export type TokenRefresh = {
   readonly access: string
   refresh: string
 }
+
+/**
+ * * `PIEZA` - PIEZA
+ * * `JUEGO` - JUEGO
+ */
+export type UnidadCodigoEnum = 'PIEZA' | 'JUEGO'
 
 export type UsuarioResumenMovimiento = {
   readonly id: number
@@ -775,6 +852,16 @@ export type ClienteWritable = {
   direccion?: string | null
   observaciones?: string | null
   activo?: boolean
+}
+
+export type CrearAsistidaWritable = {
+  clave_idempotencia: string
+  proforma?: number | null
+  texto?: string
+  audio?: Blob | File
+  sesion_borrador: string
+  moneda_codigo?: MonedaCodigoEnum
+  captura_origen?: number | null
 }
 
 /**
@@ -827,6 +914,7 @@ export type DetalleIntegralWritable = {
   importe_negociado?: string | null
   descuento?: string
   especificacion?: EspecificacionMuebleWritable | null
+  captura_asistida_id?: number
 }
 
 export type DetalleOrdenTrabajoWritable = {
@@ -1050,6 +1138,7 @@ export type ProformaWritable = {
 }
 
 export type ProformaIntegralWritable = {
+  sesion_borrador?: string
   clave_idempotencia: string
   revision_esperada?: string
   emitir?: boolean
@@ -1196,6 +1285,39 @@ export type V1CapturasConfirmarCreateResponses = {
 
 export type V1CapturasConfirmarCreateResponse =
   V1CapturasConfirmarCreateResponses[keyof V1CapturasConfirmarCreateResponses]
+
+export type V1CapturasAsistidasCreateData = {
+  body: CrearAsistidaWritable
+  path?: never
+  query?: never
+  url: '/api/v1/capturas/asistidas/'
+}
+
+export type V1CapturasAsistidasCreateResponses = {
+  202: CapturaAceptada
+}
+
+export type V1CapturasAsistidasCreateResponse =
+  V1CapturasAsistidasCreateResponses[keyof V1CapturasAsistidasCreateResponses]
+
+export type V1CapturasAsistidasRetrieveData = {
+  body?: never
+  path: {
+    /**
+     * Un valor de entero único que identifique este captura.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/capturas/asistidas/{id}/'
+}
+
+export type V1CapturasAsistidasRetrieveResponses = {
+  200: ResultadoAsistida
+}
+
+export type V1CapturasAsistidasRetrieveResponse =
+  V1CapturasAsistidasRetrieveResponses[keyof V1CapturasAsistidasRetrieveResponses]
 
 export type V1CatalogoAtributosMuebleListData = {
   body?: never

@@ -25,6 +25,7 @@ import {
 const props = defineProps<{
   tipos: ValorCatalogoPublico[]
   especificacion?: EspecificacionMueble | null
+  pendientesAsistencia?: { codigo: string; ruta: string; mensaje: string }[]
   processing?: boolean
   externalError?: string
   unidades?: ValorCatalogoPublico[]
@@ -92,6 +93,15 @@ const comercial = reactive({
   precio_unitario: String(props.detalle?.precio_unitario ?? ''),
   descuento: String(props.detalle?.descuento ?? '0.00'),
 })
+const pendientesVisibles = computed(() =>
+  (props.pendientesAsistencia ?? []).filter((p) => {
+    if (p.codigo === 'TIPO_NO_RESUELTO') return !form.tipo_mueble
+    if (p.codigo === 'NO_QUANTITY') return !comercial.cantidad || Number(comercial.cantidad) <= 0
+    if (p.codigo === 'TOTAL_NEGOCIADO')
+      return !comercial.precio_unitario || Number(comercial.precio_unitario) <= 0
+    return true
+  }),
+)
 const totalEstimado = computed(() => {
   const cantidad = Number(comercial.cantidad)
   const precio = Number(comercial.precio_unitario)
@@ -524,6 +534,12 @@ onMounted(loadCatalog)
         ><a href="#comercial">Datos comerciales</a><a href="#revision">Revisar</a>
       </nav>
     </header>
+    <aside v-if="pendientesVisibles.length" aria-label="Información pendiente">
+      <h3>Información pendiente</h3>
+      <ul>
+        <li v-for="p in pendientesVisibles" :key="p.codigo + p.ruta">{{ p.mensaje }}</li>
+      </ul>
+    </aside>
     <section id="identificacion">
       <h3>Identificación</h3>
       <TextField
