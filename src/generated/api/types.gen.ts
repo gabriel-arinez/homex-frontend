@@ -1293,6 +1293,33 @@ export type V1CapturasAsistidasCreateData = {
   url: '/api/v1/capturas/asistidas/'
 }
 
+export type V1CapturasAsistidasCreateErrors = {
+  /**
+   * Entrada o contexto de borrador inválidos.
+   */
+  400: unknown
+  /**
+   * Se requiere autenticación.
+   */
+  401: unknown
+  /**
+   * Sin permiso comercial o de proforma.
+   */
+  403: unknown
+  /**
+   * Captura de origen o proforma no disponible.
+   */
+  404: unknown
+  /**
+   * Idempotencia incompatible.
+   */
+  409: unknown
+  /**
+   * Tipo de contenido no admitido.
+   */
+  415: unknown
+}
+
 export type V1CapturasAsistidasCreateResponses = {
   202: CapturaAceptada
 }

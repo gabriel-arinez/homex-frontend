@@ -121,6 +121,7 @@ export type {
   V1AuthTokenRefreshCreateResponse,
   V1AuthTokenRefreshCreateResponses,
   V1CapturasAsistidasCreateData,
+  V1CapturasAsistidasCreateErrors,
   V1CapturasAsistidasCreateResponse,
   V1CapturasAsistidasCreateResponses,
   V1CapturasAsistidasRetrieveData,
