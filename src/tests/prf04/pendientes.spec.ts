@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { pendienteResuelto } from '@/modules/proformas/services/pendientesAsistencia'
+import {
+  asignarEspesorPendiente,
+  pendienteResuelto,
+} from '@/modules/proformas/services/pendientesAsistencia'
 import type { PendienteAsistida } from '@/generated/api'
 const aviso = (resolucion: PendienteAsistida['resolucion']): PendienteAsistida => ({
   codigo: 'MISSING_AXIS',
@@ -43,5 +46,27 @@ describe('corrección manual de avisos asistidos', () => {
     const p = aviso({ tipo: 'ATRIBUTO_GENERAL', clave: 'material' })
     expect(pendienteResuelto(p, [], [], [{ nombre: 'Material', valor: '' }])).toBe(false)
     expect(pendienteResuelto(p, [], [], [{ nombre: 'Material', valor: 'MDP' }])).toBe(true)
+  })
+})
+
+describe('asignación explícita de espesor ambiguo', () => {
+  it('no reasigna un espesor ambiguo sin decisión ni sobrescribe otro valor', () => {
+    const p: PendienteAsistida = {
+      codigo: 'ESPESOR_SIN_COMPONENTE',
+      ruta: 'especificacion.datos_tecnicos.componentes',
+      mensaje: 'Revise la asociación de 27 mm',
+      resolucion: { tipo: 'ESPESOR_SIN_COMPONENTE', valor: '27 mm' },
+    }
+
+    const componentes = [
+      { uid: 'tablero', nombre: 'Tablero', espesor: '18 mm' },
+      { uid: 'meson', nombre: 'Mesón' },
+    ]
+
+    expect(asignarEspesorPendiente(p, '', componentes)).toBe(false)
+    expect(asignarEspesorPendiente(p, 'tablero', componentes)).toBe(false)
+    expect(componentes[0]?.espesor).toBe('18 mm')
+    expect(asignarEspesorPendiente(p, 'meson', componentes)).toBe(true)
+    expect(componentes[1]).toHaveProperty('espesor', '27 mm')
   })
 })

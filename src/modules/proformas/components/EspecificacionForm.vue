@@ -11,7 +11,7 @@ import { ApiError } from '@/shared/api/errors'
 import Button from '@/shared/ui/Button.vue'
 import Select from '@/shared/ui/Select.vue'
 import TextField from '@/shared/ui/TextField.vue'
-import { pendienteResuelto } from '../services/pendientesAsistencia'
+import { asignarEspesorPendiente, pendienteResuelto } from '../services/pendientesAsistencia'
 import { proformasService } from '../services/proformasService'
 import {
   clonarTecnica,
@@ -95,15 +95,37 @@ const comercial = reactive({
   precio_unitario: String(props.detalle?.precio_unitario ?? ''),
   descuento: String(props.detalle?.descuento ?? '0.00'),
 })
+const destinosEspesor = reactive<Record<number, string>>({})
+const espesoresConfirmados = reactive<Record<number, string>>({})
+
 const pendientesVisibles = computed(() =>
-  (props.pendientesAsistencia ?? []).filter((p) => {
-    if (p.codigo === 'TIPO_NO_RESUELTO') return !form.tipo_mueble
-    if (p.codigo === 'NO_QUANTITY') return !comercial.cantidad || Number(comercial.cantidad) <= 0
-    if (p.codigo === 'TOTAL_NEGOCIADO')
-      return !comercial.precio_unitario || Number(comercial.precio_unitario) <= 0
-    return !pendienteResuelto(p, medidas, componentes, atributosGenerales)
-  }),
+  (props.pendientesAsistencia ?? [])
+    .map((p, indice) => ({ ...p, indice }))
+    .filter((p) => {
+      if (p.codigo === 'TIPO_NO_RESUELTO') return !form.tipo_mueble
+      if (p.codigo === 'NO_QUANTITY') return !comercial.cantidad || Number(comercial.cantidad) <= 0
+      if (p.codigo === 'TOTAL_NEGOCIADO')
+        return !comercial.precio_unitario || Number(comercial.precio_unitario) <= 0
+      if (p.codigo === 'ESPESOR_SIN_COMPONENTE') {
+        const uid = espesoresConfirmados[p.indice]
+        const valor = p.resolucion?.valor?.trim()
+        return !uid || !componentes.some((c) => c.uid === uid && c.espesor?.trim() === valor)
+      }
+      return !pendienteResuelto(p, medidas, componentes, atributosGenerales)
+    }),
 )
+
+function aplicarEspesor(p: PendienteAsistida & { indice: number }) {
+  const uid = destinosEspesor[p.indice]
+  if (!uid || !asignarEspesorPendiente(p, uid, componentes)) {
+    error.value =
+      'Seleccione un componente válido. No se reemplazará un espesor diferente sin revisión.'
+    return
+  }
+  espesoresConfirmados[p.indice] = uid
+  error.value = ''
+  changed()
+}
 const totalEstimado = computed(() => {
   const cantidad = Number(comercial.cantidad)
   const precio = Number(comercial.precio_unitario)
@@ -539,7 +561,28 @@ onMounted(loadCatalog)
     <aside v-if="pendientesVisibles.length" aria-label="Información pendiente">
       <h3>Información pendiente</h3>
       <ul>
-        <li v-for="p in pendientesVisibles" :key="p.codigo + p.ruta">{{ p.mensaje }}</li>
+        <li v-for="p in pendientesVisibles" :key="p.indice">
+          <span>{{ p.mensaje }}</span>
+          <div
+            v-if="
+              p.codigo === 'ESPESOR_SIN_COMPONENTE' &&
+              p.resolucion?.tipo === 'ESPESOR_SIN_COMPONENTE' &&
+              p.resolucion.valor
+            "
+            class="inline"
+          >
+            <label>
+              Componente para {{ p.resolucion.valor }}
+              <select v-model="destinosEspesor[p.indice]">
+                <option value="">Seleccione un componente</option>
+                <option v-for="c in componentes" :key="c.uid" :value="c.uid">
+                  {{ c.nombre }}
+                </option>
+              </select>
+            </label>
+            <Button variant="secondary" @click="aplicarEspesor(p)"> Asignar espesor </Button>
+          </div>
+        </li>
       </ul>
     </aside>
     <section id="identificacion">

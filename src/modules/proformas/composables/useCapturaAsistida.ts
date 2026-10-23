@@ -32,7 +32,7 @@ export function useCapturaAsistida() {
           if (
             result.resultado !== 'REQUIRES_REVIEW' ||
             !result.propuesta_configurador ||
-            result.version_proyeccion !== 'PRF04_1'
+            result.version_proyeccion !== 'PRF04_2'
           )
             throw new Error('No se obtuvo una propuesta utilizable. Tu mueble se conserva.')
           return result

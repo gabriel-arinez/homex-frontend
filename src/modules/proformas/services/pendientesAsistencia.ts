@@ -2,6 +2,27 @@ import type { PendienteAsistida } from '@/generated/api'
 import type { AtributoTecnico, ComponenteTecnico } from './muebleTecnico'
 
 type Medida = { clave: string; valor: string; unidad: string; original?: unknown }
+export function asignarEspesorPendiente(
+  pendiente: PendienteAsistida,
+  uid: string,
+  componentes: ComponenteTecnico[],
+): boolean {
+  const resolucion = pendiente.resolucion
+  if (resolucion?.tipo !== 'ESPESOR_SIN_COMPONENTE') return false
+
+  const valor = resolucion.valor?.trim()
+  if (!valor) return false
+
+  const componente = componentes.find((item) => item.uid === uid)
+  if (!componente) return false
+
+  const existente = componente.espesor?.trim()
+  if (existente && existente !== valor) return false
+
+  componente.espesor = valor
+  return true
+}
+
 export function pendienteResuelto(
   pendiente: PendienteAsistida,
   medidas: Medida[],

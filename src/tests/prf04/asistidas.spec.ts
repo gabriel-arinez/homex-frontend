@@ -111,7 +111,7 @@ describe('PRF-04 trazabilidad visible de reinterpretaciones', () => {
         resultado: 'REQUIRES_REVIEW',
         propuesta_configurador: propuesta(),
         pendientes: [],
-        version_proyeccion: 'PRF04_1',
+        version_proyeccion: 'PRF04_2',
         motor: null,
         error_codigo: null,
       }

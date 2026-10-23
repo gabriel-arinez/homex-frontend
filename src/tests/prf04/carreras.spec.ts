@@ -20,7 +20,7 @@ const entrada = {
 const result = {
   id: 1,
   resultado: 'REQUIRES_REVIEW',
-  version_proyeccion: 'PRF04_1',
+  version_proyeccion: 'PRF04_2',
   propuesta_configurador: { comercial: { nombre: 'Escritorio' } },
 } as ResultadoAsistida
 
@@ -72,5 +72,33 @@ describe('PRF-04 respuestas obsoletas', () => {
     expect(await old).toBeNull()
     scope.stop()
     vi.restoreAllMocks()
+  })
+
+  it('rechaza una proyección antigua sin aplicarla', async () => {
+    vi.spyOn(asistidasService, 'create').mockResolvedValue({
+      id: 1,
+      estado: 'PENDIENTE',
+      intento_id: 1,
+      numero_intento: 1,
+      reutilizada: false,
+    })
+    vi.spyOn(asistidasService, 'get').mockResolvedValue({
+      ...result,
+      version_proyeccion: 'PRF04_1',
+    })
+
+    const scope = effectScope()
+    const voice = scope.run(useCapturaAsistida)!
+
+    try {
+      expect(await voice.capture(entrada)).toBeNull()
+      expect(voice.error.value).toBe(
+        'No se obtuvo una propuesta utilizable. Tu mueble se conserva.',
+      )
+      expect(voice.processing.value).toBe(false)
+    } finally {
+      scope.stop()
+      vi.restoreAllMocks()
+    }
   })
 })

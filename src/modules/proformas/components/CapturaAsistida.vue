@@ -16,6 +16,9 @@ const emit = defineEmits<{ applied: [result: ResultadoAsistida]; processing: [va
 const voice = useCapturaAsistida()
 const confirm = ref(false)
 const recording = ref(false)
+const fileError = ref('')
+const MAX_AUDIO_BYTES = 25_000_000
+const EXTENSIONES_AUDIO = new Set(['.wav', '.mp3', '.m4a', '.ogg', '.webm'])
 const original = ref('')
 const corrected = ref('')
 const lastInterpretation = ref('')
@@ -27,6 +30,7 @@ watch(
   () => {
     voice.cancel()
     recording.value = false
+    fileError.value = ''
     confirm.value = false
     original.value = ''
     corrected.value = ''
@@ -37,6 +41,7 @@ watch(
 )
 function start() {
   pendingText.value = ''
+  fileError.value = ''
   if (voice.processing.value) return
   if (props.dirty) confirm.value = true
   else recording.value = true
@@ -51,6 +56,34 @@ function reinterpret() {
   if (props.dirty) confirm.value = true
   else void send(undefined, pendingText.value)
 }
+function seleccionarAudio(event: Event) {
+  const input = event.target as HTMLInputElement
+  const archivo = input.files?.[0]
+  input.value = ''
+  fileError.value = ''
+
+  if (!archivo || !recording.value || voice.processing.value) return
+
+  const extension = archivo.name.slice(archivo.name.lastIndexOf('.')).toLowerCase()
+
+  if (!EXTENSIONES_AUDIO.has(extension)) {
+    fileError.value = 'Formato no admitido. Utiliza WAV, MP3, M4A, OGG o WebM.'
+    return
+  }
+
+  if (archivo.size === 0) {
+    fileError.value = 'El archivo de audio está vacío.'
+    return
+  }
+
+  if (archivo.size > MAX_AUDIO_BYTES) {
+    fileError.value = 'El archivo supera el límite de 25 MB.'
+    return
+  }
+
+  void send(archivo)
+}
+
 async function send(audio?: Blob, texto?: string) {
   recording.value = false
   const context = JSON.stringify([props.sesion, props.moneda, props.proforma])
@@ -78,6 +111,7 @@ async function send(audio?: Blob, texto?: string) {
 function cancel() {
   voice.cancel()
   recording.value = false
+  fileError.value = ''
 }
 </script>
 <template>
@@ -85,6 +119,19 @@ function cancel() {
     <Button :disabled="voice.processing.value" @click="start">Dictar especificaciones</Button>
     <template v-if="recording">
       <AudioRecorder @ready="(audio) => audio && send(audio)" />
+      <div class="audio-file-option">
+        <label>
+          O seleccionar archivo de audio
+          <input
+            type="file"
+            accept=".wav,.mp3,.m4a,.ogg,.webm"
+            aria-label="Seleccionar archivo de audio"
+            @change="seleccionarAudio"
+          />
+        </label>
+        <p>Formatos: WAV, MP3, M4A, OGG y WebM. Máximo 25 MB.</p>
+        <p v-if="fileError" role="alert">{{ fileError }}</p>
+      </div>
       <Button variant="secondary" @click="cancel">Cancelar dictado</Button>
     </template>
     <p v-if="voice.processing.value" role="status">Procesando… El mueble anterior se conserva.</p>
@@ -125,3 +172,30 @@ function cancel() {
     </Modal>
   </section>
 </template>
+
+<style scoped>
+.audio-file-option {
+  display: grid;
+  gap: var(--space-2);
+  margin-block: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+.audio-file-option label {
+  display: grid;
+  gap: var(--space-2);
+  font-weight: 600;
+}
+.audio-file-option input {
+  max-width: 100%;
+  font-weight: 400;
+}
+.audio-file-option p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+.audio-file-option [role='alert'] {
+  color: var(--color-danger-text);
+}
+</style>

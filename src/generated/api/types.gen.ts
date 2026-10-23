@@ -771,6 +771,7 @@ export type ResolucionPendiente = {
   uid?: string
   campo?: string
   cantidad?: number
+  valor?: string
 }
 
 export type ResultadoAsistida = {
@@ -799,8 +800,10 @@ export type ResultadoEnum = 'PROCESSING' | 'REQUIRES_REVIEW' | 'NO_PROPOSAL' | '
  * * `DIMENSIONES_NUEVAS` - DIMENSIONES_NUEVAS
  * * `COMPONENTE` - COMPONENTE
  * * `ATRIBUTO_GENERAL` - ATRIBUTO_GENERAL
+ * * `ESPESOR_SIN_COMPONENTE` - ESPESOR_SIN_COMPONENTE
  */
-export type TipoEnum = 'DIMENSION' | 'DIMENSIONES_NUEVAS' | 'COMPONENTE' | 'ATRIBUTO_GENERAL'
+export type TipoEnum =
+  'DIMENSION' | 'DIMENSIONES_NUEVAS' | 'COMPONENTE' | 'ATRIBUTO_GENERAL' | 'ESPESOR_SIN_COMPONENTE'
 
 export type TipoMuebleConflicto = {
   codigo: string
