@@ -609,6 +609,8 @@ export type PendienteAsistida = {
   codigo: string
   ruta: string
   mensaje: string
+  total_negociado?: string
+  moneda_codigo?: MonedaCodigoEnum
 }
 
 export type Producto = {
