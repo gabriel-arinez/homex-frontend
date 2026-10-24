@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type {
   AtributoMueble,
+  PendienteAsistida,
   EspecificacionMueble,
   EspecificacionMuebleWritable,
   ValorCatalogoPublico,
@@ -10,6 +11,7 @@ import { ApiError } from '@/shared/api/errors'
 import Button from '@/shared/ui/Button.vue'
 import Select from '@/shared/ui/Select.vue'
 import TextField from '@/shared/ui/TextField.vue'
+import { asignarEspesorPendiente, pendienteResuelto } from '../services/pendientesAsistencia'
 import { proformasService } from '../services/proformasService'
 import {
   clonarTecnica,
@@ -22,9 +24,12 @@ import {
   type ConjuntoTecnico,
 } from '../services/muebleTecnico'
 
+import { calcularUnitarioExacto, totalComercialCoincide } from '../services/precioAsistido'
+
 const props = defineProps<{
   tipos: ValorCatalogoPublico[]
   especificacion?: EspecificacionMueble | null
+  pendientesAsistencia?: PendienteAsistida[]
   processing?: boolean
   externalError?: string
   unidades?: ValorCatalogoPublico[]
@@ -92,6 +97,103 @@ const comercial = reactive({
   precio_unitario: String(props.detalle?.precio_unitario ?? ''),
   descuento: String(props.detalle?.descuento ?? '0.00'),
 })
+const destinosEspesor = reactive<Record<number, string>>({})
+const espesoresConfirmados = reactive<Record<number, string>>({})
+
+// El total dictado llega estructurado; nunca se extraen números de mensajes.
+type PendienteComercial = PendienteAsistida & {
+  total_negociado?: string | null
+  moneda_codigo?: 'BOB' | 'USD'
+}
+const totalDictado = computed(() =>
+  (props.pendientesAsistencia as PendienteComercial[] | undefined)?.find(
+    (p) => p.codigo === 'TOTAL_NEGOCIADO' && p.total_negociado,
+  ),
+)
+const unitarioSugerido = computed(() => {
+  const total = totalDictado.value
+  return total
+    ? calcularUnitarioExacto(total.total_negociado!, comercial.cantidad, comercial.descuento)
+    : null
+})
+const diferenciaComercial = computed(
+  () =>
+    !!totalDictado.value &&
+    !!comercial.precio_unitario &&
+    !totalComercialCoincide(
+      totalDictado.value.total_negociado ?? '',
+      comercial.cantidad,
+      comercial.precio_unitario,
+      comercial.descuento,
+    ),
+)
+const diferenciaConfirmada = ref(false)
+watch(
+  () => [comercial.cantidad, comercial.precio_unitario, comercial.descuento],
+  () => {
+    diferenciaConfirmada.value = false
+  },
+)
+// Propuesta exacta: completar de forma automática, sin botón de aceptación.
+// Un precio ya ingresado o modificado manualmente nunca se sobrescribe.
+const ultimoUnitarioAutomatico = ref<string | null>(null)
+const precioEditadoManualmente = ref(Boolean(comercial.precio_unitario))
+watch(
+  () => comercial.precio_unitario,
+  (valor) => {
+    if (ultimoUnitarioAutomatico.value !== null && valor !== ultimoUnitarioAutomatico.value)
+      precioEditadoManualmente.value = true
+  },
+  { flush: 'sync' },
+)
+watch(
+  unitarioSugerido,
+  (unitario) => {
+    if (!totalDictado.value || precioEditadoManualmente.value) return
+    if (unitario) {
+      if (comercial.precio_unitario && ultimoUnitarioAutomatico.value === null) return
+      ultimoUnitarioAutomatico.value = unitario
+      comercial.precio_unitario = unitario
+      changed()
+    } else if (
+      ultimoUnitarioAutomatico.value !== null &&
+      comercial.precio_unitario === ultimoUnitarioAutomatico.value
+    ) {
+      ultimoUnitarioAutomatico.value = null
+      comercial.precio_unitario = ''
+      changed()
+    }
+  },
+  { immediate: true, flush: 'sync' },
+)
+const pendientesVisibles = computed(() =>
+  (props.pendientesAsistencia ?? [])
+    .map((p, indice) => ({ ...p, indice }))
+    .filter((p) => {
+      if (p.codigo === 'TIPO_NO_RESUELTO') return !form.tipo_mueble
+      if (p.codigo === 'NO_QUANTITY') return !comercial.cantidad || Number(comercial.cantidad) <= 0
+      if (p.codigo === 'TOTAL_NEGOCIADO')
+        return !comercial.precio_unitario || Number(comercial.precio_unitario) <= 0
+      if (p.codigo === 'ESPESOR_SIN_COMPONENTE') {
+        const uid = espesoresConfirmados[p.indice]
+        const valor = p.resolucion?.valor?.trim()
+        return !uid || !componentes.some((c) => c.uid === uid && c.espesor?.trim() === valor)
+      }
+      return !pendienteResuelto(p, medidas, componentes, atributosGenerales)
+    }),
+)
+
+function aplicarEspesor(p: PendienteAsistida & { indice: number }) {
+  const uid = destinosEspesor[p.indice]
+  if (!uid || !asignarEspesorPendiente(p, uid, componentes)) {
+    error.value =
+      'Seleccione un componente válido. No se reemplazará un espesor diferente sin revisión.'
+    return
+  }
+  espesoresConfirmados[p.indice] = uid
+  error.value = ''
+  changed()
+}
 const totalEstimado = computed(() => {
   const cantidad = Number(comercial.cantidad)
   const precio = Number(comercial.precio_unitario)
@@ -487,6 +589,8 @@ function submit() {
     errores.push('El precio unitario negociado debe ser positivo.')
   if (!Number.isFinite(descuento) || descuento < 0 || descuento > cantidad * precio)
     errores.push('El descuento de línea no puede superar el importe bruto.')
+  if (diferenciaComercial.value && !diferenciaConfirmada.value)
+    errores.push('Confirma la diferencia entre el total dictado y el importe comercial ingresado.')
   if (errores.length) {
     error.value = errores.join(' ')
     return
@@ -524,6 +628,33 @@ onMounted(loadCatalog)
         ><a href="#comercial">Datos comerciales</a><a href="#revision">Revisar</a>
       </nav>
     </header>
+    <aside v-if="pendientesVisibles.length" aria-label="Información pendiente">
+      <h3>Información pendiente</h3>
+      <ul>
+        <li v-for="p in pendientesVisibles" :key="p.indice">
+          <span>{{ p.mensaje }}</span>
+          <div
+            v-if="
+              p.codigo === 'ESPESOR_SIN_COMPONENTE' &&
+              p.resolucion?.tipo === 'ESPESOR_SIN_COMPONENTE' &&
+              p.resolucion.valor
+            "
+            class="inline"
+          >
+            <label>
+              Componente para {{ p.resolucion.valor }}
+              <select v-model="destinosEspesor[p.indice]">
+                <option value="">Seleccione un componente</option>
+                <option v-for="c in componentes" :key="c.uid" :value="c.uid">
+                  {{ c.nombre }}
+                </option>
+              </select>
+            </label>
+            <Button variant="secondary" @click="aplicarEspesor(p)"> Asignar espesor </Button>
+          </div>
+        </li>
+      </ul>
+    </aside>
     <section id="identificacion">
       <h3>Identificación</h3>
       <TextField
@@ -838,6 +969,27 @@ onMounted(loadCatalog)
     </section>
     <section id="comercial">
       <h3>Datos comerciales de este mueble</h3>
+      <aside v-if="totalDictado" aria-label="Revisión de precio total dictado">
+        <p>
+          Total reconocido en el dictado:
+          <strong>{{ totalDictado.total_negociado }} {{ moneda ?? 'BOB' }}</strong
+          >. Es un total de línea, no un precio unitario.
+        </p>
+        <p v-if="unitarioSugerido">
+          Para {{ comercial.cantidad }} muebles, precio unitario calculado:
+          <strong>{{ unitarioSugerido }} {{ moneda ?? 'BOB' }}</strong
+          >. Se completa automáticamente en el campo editable si no había un precio previo.
+        </p>
+        <p v-else role="status">
+          Para calcular el unitario, indica una cantidad válida, sin descuento, y una división
+          exacta a centavos. Si no es posible, introduce el precio manualmente.
+        </p>
+        <label v-if="diferenciaComercial">
+          <input v-model="diferenciaConfirmada" type="checkbox" />
+          Confirmo que el importe comercial difiere del total dictado y deseo guardar esa
+          diferencia.
+        </label>
+      </aside>
       <div class="grid">
         <TextField
           v-model="comercial.descripcion"

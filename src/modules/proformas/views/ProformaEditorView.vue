@@ -15,6 +15,7 @@ import type {
   ProformaIntegralWritable,
   Producto,
   ValorCatalogoPublico,
+  ResultadoAsistida,
 } from '@/generated/api'
 import { ApiError } from '@/shared/api'
 import Button from '@/shared/ui/Button.vue'
@@ -31,6 +32,8 @@ import DetalleForm from '../components/DetalleForm.vue'
 import CatalogoContextual from '../components/CatalogoContextual.vue'
 import type { CatalogoContextState } from '../services/catalogoContext'
 import EspecificacionForm from '../components/EspecificacionForm.vue'
+import CapturaAsistida from '../components/CapturaAsistida.vue'
+import { mapearCapturaAsistida } from '../services/capturaAsistidaMapper'
 import { leerDatosTecnicos, tecnicaIgual } from '../services/muebleTecnico'
 import { proformasService } from '../services/proformasService'
 import { useSessionStore } from '@/app/stores/useSessionStore'
@@ -82,6 +85,22 @@ const readMaster = ref<Producto | null>(null)
 let readRequestId = 0
 const specLine = ref<number | null>(null)
 const draftingFurniture = ref<LineaLocal | null>(null)
+const sesionBorrador = ref(crypto.randomUUID())
+const specRenderVersion = ref(0)
+const voiceProcessing = ref(false)
+const pendientesAsistencia = ref<ResultadoAsistida['pendientes']>([])
+function aplicarCaptura(result: ResultadoAsistida) {
+  if (!draftingFurniture.value || !result.propuesta_configurador) return
+  try {
+    const linea = mapearCapturaAsistida(result.propuesta_configurador, tipos.value, unidades.value)
+    draftingFurniture.value = { ...linea, localId: localId(), captura_asistida_id: result.id }
+    pendientesAsistencia.value = result.pendientes
+    specRenderVersion.value++
+    specModalDirty.value = true
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : 'La propuesta no es compatible.'
+  }
+}
 const removedLines = ref<{ line: LineaLocal; index: number }[]>([])
 const contextualNavigation = ref(false)
 const preferredProductId = ref<number | null>(null)
@@ -113,10 +132,6 @@ function updateNuevoCliente(field: keyof typeof nuevoCliente, value: string) {
   nuevoCliente[field] = value
 }
 const lineas = ref<LineaLocal[]>([])
-const reviewedCurrency = ref('BOB')
-const priceReviewRequired = computed(
-  () => lineas.value.length > 0 && header.moneda_codigo !== reviewedCurrency.value,
-)
 const existingProductIds = computed(() =>
   lineas.value.flatMap((line) => (line.producto ? [line.producto] : [])),
 )
@@ -124,8 +139,6 @@ const totalPreview = computed(() => totalEstimadoCompleto(lineas.value))
 const emissionPending = computed(() => {
   const pendientes: string[] = []
   if (!lineas.value.length) pendientes.push('agregar al menos una línea')
-  if (priceReviewRequired.value)
-    pendientes.push('revisar explícitamente precios y descuentos tras cambiar de moneda')
   if (clienteMode.value === 'pendiente') pendientes.push('elegir o registrar un cliente')
   if (clienteMode.value === 'existente' && !header.cliente) pendientes.push('elegir un cliente')
   if (clienteMode.value === 'nuevo') {
@@ -240,7 +253,7 @@ const editableSpec = computed(() => {
   return (lineas.value[specLine.value]?.especificacion ?? null) as EspecificacionMueble | null
 })
 const canEmit = computed(() => {
-  if (!lineas.value.length || priceReviewRequired.value) return false
+  if (!lineas.value.length) return false
   if (clienteMode.value === 'existente') return Boolean(header.cliente)
   if (clienteMode.value !== 'nuevo' || !nuevoCliente.tipo_cliente) return false
   const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
@@ -251,10 +264,6 @@ const canEmit = computed(() => {
 
 function markDirty() {
   dirty.value = true
-}
-function confirmCurrencyReview() {
-  reviewedCurrency.value = header.moneda_codigo
-  markDirty()
 }
 function nombreClienteVisible() {
   const cliente = clienteSeleccionado.value
@@ -304,7 +313,6 @@ function fill(value: Proforma) {
   header.cliente = value.cliente ? String(value.cliente) : ''
   header.titulo = value.titulo ?? ''
   header.moneda_codigo = value.moneda_info.codigo
-  reviewedCurrency.value = value.moneda_info.codigo
   header.plazo_entrega = value.plazo_entrega ?? ''
   header.validez_oferta = value.validez_oferta ? String(value.validez_oferta) : ''
   header.porcentaje_adelanto = value.porcentaje_adelanto ?? ''
@@ -546,10 +554,13 @@ function openFurnitureDraft(source?: LineaLocal) {
     especificacion: cloneEditorData(source?.especificacion ?? null),
   } as LineaLocal
   delete draftingFurniture.value.id
+  delete draftingFurniture.value.captura_asistida_id
+  pendientesAsistencia.value = []
+  specRenderVersion.value++
   markDirty()
   specLine.value = null
   lineModal.value = false
-  specModalDirty.value = false
+  specModalDirty.value = Boolean(source)
 }
 function duplicateFurniture(index: number) {
   const original = lineas.value[index]
@@ -564,7 +575,6 @@ function editorSnapshot() {
     userId: session.identity?.id ?? null,
     expiresAt: Date.now() + 60 * 60 * 1000,
     header: cloneEditorData(header),
-    reviewedCurrency: reviewedCurrency.value,
     nuevoCliente: cloneEditorData(nuevoCliente),
     clienteMode: clienteMode.value,
     clienteSeleccionado: cloneEditorData(clienteSeleccionado.value),
@@ -577,6 +587,7 @@ function editorSnapshot() {
     catalogState: cloneEditorData(catalogState.value),
     currentStep: currentStep.value,
     key: key.value,
+    sesionBorrador: sesionBorrador.value,
     lineDraft: cloneEditorData(pendingLineDraft.value),
     editingLine: editingLine.value,
   }
@@ -626,7 +637,6 @@ function restoreContextualDraft() {
     return
   }
   Object.assign(header, snapshot.header)
-  reviewedCurrency.value = snapshot.reviewedCurrency ?? header.moneda_codigo
   Object.assign(nuevoCliente, snapshot.nuevoCliente)
   clienteMode.value = snapshot.clienteMode
   clienteSeleccionado.value =
@@ -639,6 +649,7 @@ function restoreContextualDraft() {
   catalogState.value = snapshot.catalogState ?? null
   currentStep.value = snapshot.currentStep
   key.value = snapshot.key
+  sesionBorrador.value = snapshot.sesionBorrador ?? crypto.randomUUID()
   pendingLineDraft.value = snapshot.lineDraft
   lineModalDirty.value = Boolean(snapshot.lineModalDirty || snapshot.lineDraft)
   editingLine.value = snapshot.editingLine
@@ -776,6 +787,7 @@ function body(emitir: boolean): ProformaIntegralWritable {
   })
   return {
     clave_idempotencia: key.value,
+    sesion_borrador: sesionBorrador.value,
     ...(proformaId.value && persisted.value ? { revision_esperada: persisted.value.revision } : {}),
     emitir,
     cliente: clienteMode.value === 'existente' && header.cliente ? Number(header.cliente) : null,
@@ -797,11 +809,6 @@ function body(emitir: boolean): ProformaIntegralWritable {
 }
 async function persist(emitir: boolean) {
   if (saving.value) return
-  if (priceReviewRequired.value) {
-    currentStep.value = 2
-    error.value = 'Antes de guardar, revisa los precios negociados y confirma la nueva moneda.'
-    return
-  }
   saving.value = true
   error.value = ''
   success.value = ''
@@ -1055,16 +1062,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           />
           <TextField v-model="header.observaciones" name="observaciones" label="Observaciones" />
         </div>
-        <div v-if="priceReviewRequired" class="warning" role="status">
-          <p>
-            La moneda cambió. Los precios y descuentos existentes no se convirtieron
-            automáticamente.
-          </p>
-          <p>Revisa cada importe en {{ header.moneda_codigo }} antes de continuar.</p>
-          <Button variant="secondary" @click="confirmCurrencyReview"
-            >He revisado los precios en esta moneda</Button
-          >
-        </div>
       </section>
 
       <section v-if="currentStep === 3" aria-labelledby="revisar-title">
@@ -1302,18 +1299,30 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       fullscreen
       @close="closeSpec"
     >
-      <EspecificacionForm
-        :key="specLine ?? -1"
-        :tipos="tiposMueble"
-        :especificacion="editableSpec"
-        :detalle="editableSpecDetail"
-        :unidades="unidades"
+      <CapturaAsistida
+        v-if="draftingFurniture"
+        :dirty="specModalDirty"
+        :sesion="sesionBorrador"
         :moneda="header.moneda_codigo === 'USD' ? 'USD' : 'BOB'"
-        @save="saveSpec"
-        @type-created="registrarTipoMueble"
-        @changed="specModalDirty = true"
-        @cancel="closeSpec"
+        :proforma="proformaId"
+        @applied="aplicarCaptura"
+        @processing="voiceProcessing = $event"
       />
+      <fieldset :disabled="voiceProcessing" style="border: 0; padding: 0; min-width: 0">
+        <EspecificacionForm
+          :key="`${specLine ?? -1}:${specRenderVersion}`"
+          :tipos="tiposMueble"
+          :especificacion="editableSpec"
+          :detalle="editableSpecDetail"
+          :unidades="unidades"
+          :pendientes-asistencia="draftingFurniture ? pendientesAsistencia : []"
+          :moneda="header.moneda_codigo === 'USD' ? 'USD' : 'BOB'"
+          @save="saveSpec"
+          @type-created="registrarTipoMueble"
+          @changed="specModalDirty = true"
+          @cancel="closeSpec"
+        />
+      </fieldset>
     </Modal>
   </div>
 </template>
