@@ -30,6 +30,18 @@ test('PRF-04 voz real hasta guardado integral sin escrituras prematuras', async 
   expect(comerciales).toEqual([])
   await page.getByLabel('Cantidad cotizada').fill('3')
   await page.getByLabel('Precio unitario negociado (BOB)').fill('100')
+  // El dictado comunica 100 BOB de total, mientras que 3 × 100 BOB = 300 BOB.
+  // El guardado no debe omitir la confirmación comercial explícita.
+  await page.getByRole('button', { name: 'Guardar especificación' }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'Confirma la diferencia entre el total dictado' }),
+  ).toBeVisible()
+  await page
+    .getByRole('checkbox', {
+      name: /Confirmo que el importe comercial difiere del total dictado/,
+    })
+    .check()
   await page.getByRole('button', { name: 'Guardar especificación' }).click()
   await expect(page.getByRole('dialog')).not.toBeVisible()
   expect(comerciales).toEqual([])
