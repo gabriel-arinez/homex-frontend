@@ -90,7 +90,13 @@ const specRenderVersion = ref(0)
 const voiceProcessing = ref(false)
 const pendientesAsistencia = ref<ResultadoAsistida['pendientes']>([])
 function aplicarCaptura(result: ResultadoAsistida) {
-  if (!draftingFurniture.value || !result.propuesta_configurador) return
+  if (
+    !draftingFurniture.value ||
+    result.resultado !== 'REQUIRES_REVIEW' ||
+    result.version_proyeccion !== 'PRF04_2' ||
+    !result.propuesta_configurador
+  )
+    return
   try {
     const linea = mapearCapturaAsistida(result.propuesta_configurador, tipos.value, unidades.value)
     draftingFurniture.value = { ...linea, localId: localId(), captura_asistida_id: result.id }
