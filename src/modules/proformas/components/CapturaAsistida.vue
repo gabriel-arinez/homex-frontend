@@ -106,7 +106,15 @@ async function send(audio?: Blob, texto?: string) {
     corrected.value = original.value
   }
   captureId.value = result.id
-  emit('applied', result)
+  // Una respuesta terminal sin propuesta no debe sustituir el mueble.
+  // La transcripción queda disponible para revisión y reinterpretación.
+  if (
+    result.resultado === 'REQUIRES_REVIEW' &&
+    result.propuesta_configurador &&
+    result.version_proyeccion === 'PRF04_2'
+  ) {
+    emit('applied', result)
+  }
 }
 function cancel() {
   voice.cancel()
