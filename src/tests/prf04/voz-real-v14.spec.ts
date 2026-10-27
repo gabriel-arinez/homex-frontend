@@ -91,3 +91,34 @@ describe('voz real v14, contrato PRF04_2', () => {
     }
   })
 })
+
+it('mantiene precio ambiguo vacío hasta la confirmación humana', async () => {
+  vi.spyOn(proformasService, 'furnitureAttributes').mockResolvedValue({
+    atributos: [],
+    limites: { max_conjuntos: 10, max_componentes: 40 },
+  })
+  const wrapper = mount(EspecificacionForm, {
+    props: {
+      tipos: [],
+      pendientesAsistencia: [
+        {
+          codigo: 'INVALID_PRICE',
+          ruta: '/item_proposal/price',
+          mensaje: 'Confirme el importe dictado 8.50; no se infiere su escala.',
+        },
+      ],
+    },
+  })
+  try {
+    await flushPromises()
+    const price = wrapper.get('input[name="mueble-precio"]')
+    expect((price.element as HTMLInputElement).value).toBe('')
+    expect(wrapper.get('aside').text()).toContain('8.50')
+    await price.setValue('0')
+    expect(wrapper.find('aside').exists()).toBe(true)
+    await price.setValue('8500')
+    expect(wrapper.find('aside').exists()).toBe(false)
+  } finally {
+    wrapper.unmount()
+  }
+})

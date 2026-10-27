@@ -51,3 +51,24 @@ test('PRF-04 voz real hasta guardado integral sin escrituras prematuras', async 
   await page.reload()
   await expect(page.getByText(/escritorio/i).first()).toBeVisible()
 })
+
+test('PRF-04 cancelar configurador no persiste datos comerciales', async ({ page }) => {
+  const commercialWrites: string[] = []
+  page.on('request', (request) => {
+    if (['POST', 'PUT', 'PATCH'].includes(request.method()) && /\/proformas\//.test(request.url()))
+      commercialWrites.push(request.url())
+  })
+  await page.goto('/login')
+  await page.getByLabel('Usuario').fill('fe08-admin')
+  await page.getByLabel('Contraseña').fill('fe08-integration-only')
+  await page.getByRole('button', { name: 'Ingresar' }).click()
+  await expect(page).toHaveURL(/\/resumen$/)
+  await page.goto('/proformas/nueva')
+  await page.getByRole('button', { name: 'Añadir ítem' }).click()
+  await page.getByRole('button', { name: 'Mueble a pedido' }).click()
+  await page.getByLabel('Nombre comercial del mueble').fill('Mueble cancelado de laboratorio')
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancelar', exact: true }).click()
+  await expect(page.getByRole('dialog')).not.toBeVisible()
+  expect(commercialWrites).toEqual([])
+})

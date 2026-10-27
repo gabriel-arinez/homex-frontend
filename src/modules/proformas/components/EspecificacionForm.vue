@@ -172,7 +172,7 @@ const pendientesVisibles = computed(() =>
     .filter((p) => {
       if (p.codigo === 'TIPO_NO_RESUELTO') return !form.tipo_mueble
       if (p.codigo === 'NO_QUANTITY') return !comercial.cantidad || Number(comercial.cantidad) <= 0
-      if (p.codigo === 'TOTAL_NEGOCIADO')
+      if (p.codigo === 'TOTAL_NEGOCIADO' || p.codigo === 'INVALID_PRICE')
         return !comercial.precio_unitario || Number(comercial.precio_unitario) <= 0
       if (p.codigo === 'ESPESOR_SIN_COMPONENTE') {
         const uid = espesoresConfirmados[p.indice]
