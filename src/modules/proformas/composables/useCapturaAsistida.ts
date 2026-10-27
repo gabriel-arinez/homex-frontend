@@ -5,6 +5,7 @@ import { asistidasService } from '@/modules/capturas/services/asistidasService'
 export function useCapturaAsistida() {
   const processing = ref(false)
   const error = ref('')
+  const terminalResult = ref<ResultadoAsistida | null>(null)
   let generation = 0
   let controller: AbortController | null = null
   function cancel() {
@@ -12,6 +13,7 @@ export function useCapturaAsistida() {
     controller?.abort()
     controller = null
     processing.value = false
+    terminalResult.value = null
   }
   async function capture(
     datos: Omit<CrearAsistida, 'audio'> & { audio?: Blob },
@@ -34,9 +36,10 @@ export function useCapturaAsistida() {
             !result.propuesta_configurador ||
             result.version_proyeccion !== 'PRF04_2'
           ) {
-            // Conservar la transcripción obtenida aunque NLP se abstenga.
-            // El componente decide si puede aplicar una propuesta al formulario.
-            error.value = 'No se obtuvo una propuesta utilizable. Tu mueble se conserva.'
+            // No se entrega una propuesta inválida al llamador. La transcripción
+            // queda accesible sólo para revisión textual y reinterpretación.
+            terminalResult.value = result
+            throw new Error('No se obtuvo una propuesta utilizable. Tu mueble se conserva.')
           }
           return result
         }
@@ -61,5 +64,5 @@ export function useCapturaAsistida() {
     return null
   }
   onScopeDispose(cancel)
-  return { processing, error, capture, cancel }
+  return { processing, error, terminalResult, capture, cancel }
 }
