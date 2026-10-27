@@ -1,0 +1,68 @@
+import { onScopeDispose, ref } from 'vue'
+import type { CrearAsistida, ResultadoAsistida } from '@/generated/api'
+import { asistidasService } from '@/modules/capturas/services/asistidasService'
+
+export function useCapturaAsistida() {
+  const processing = ref(false)
+  const error = ref('')
+  const terminalResult = ref<ResultadoAsistida | null>(null)
+  let generation = 0
+  let controller: AbortController | null = null
+  function cancel() {
+    generation++
+    controller?.abort()
+    controller = null
+    processing.value = false
+    terminalResult.value = null
+  }
+  async function capture(
+    datos: Omit<CrearAsistida, 'audio'> & { audio?: Blob },
+  ): Promise<ResultadoAsistida | null> {
+    cancel()
+    const current = generation
+    const abort = new AbortController()
+    controller = abort
+    processing.value = true
+    error.value = ''
+    try {
+      const created = await asistidasService.create(datos, abort.signal)
+      const deadline = Date.now() + 120_000
+      while (!abort.signal.aborted && current === generation) {
+        const result = await asistidasService.get(created.id, abort.signal)
+        if (current !== generation) return null
+        if (result.resultado !== 'PROCESSING') {
+          if (
+            result.resultado !== 'REQUIRES_REVIEW' ||
+            !result.propuesta_configurador ||
+            result.version_proyeccion !== 'PRF04_2'
+          ) {
+            // No se entrega una propuesta inválida al llamador. La transcripción
+            // queda accesible sólo para revisión textual y reinterpretación.
+            terminalResult.value = result
+            throw new Error('No se obtuvo una propuesta utilizable. Tu mueble se conserva.')
+          }
+          return result
+        }
+        if (Date.now() >= deadline)
+          throw new Error('El procesamiento sigue pendiente. Tu mueble se conserva.')
+        await new Promise<void>((resolve) => {
+          const finish = () => {
+            clearTimeout(timer)
+            abort.signal.removeEventListener('abort', finish)
+            resolve()
+          }
+          const timer = setTimeout(finish, 750)
+          abort.signal.addEventListener('abort', finish, { once: true })
+        })
+      }
+    } catch (cause) {
+      if (current === generation && !abort.signal.aborted)
+        error.value = cause instanceof Error ? cause.message : 'No se pudo procesar la captura.'
+    } finally {
+      if (current === generation) processing.value = false
+    }
+    return null
+  }
+  onScopeDispose(cancel)
+  return { processing, error, terminalResult, capture, cancel }
+}

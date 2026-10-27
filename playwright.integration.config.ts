@@ -11,6 +11,16 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:4174',
     headless: true,
+    permissions: ['microphone'],
+    launchOptions: {
+      args: process.env.HOMEX_PRF04_AUDIO
+        ? [
+            '--use-fake-ui-for-media-stream',
+            '--use-fake-device-for-media-stream',
+            `--use-file-for-fake-audio-capture=${process.env.HOMEX_PRF04_AUDIO}`,
+          ]
+        : [],
+    },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
@@ -19,6 +29,6 @@ export default defineConfig({
     url: 'http://127.0.0.1:4174/login',
     reuseExistingServer: false,
     timeout: 90_000,
-    env: { VITE_API_BASE_URL: 'http://127.0.0.1:8000' },
+    env: { VITE_API_BASE_URL: process.env.HOMEX_INTEGRATION_API_URL ?? 'http://127.0.0.1:8000' },
   },
 })

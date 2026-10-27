@@ -5,3 +5,5 @@ coverage/
 docs/PLAN_MAESTRO_FRONTEND_HOMEX.md
 test-results/
 playwright-report/
+# Mirror byte-for-byte del OpenAPI generado por backend; integridad validada en CI.
+contracts/backend-openapi.yaml

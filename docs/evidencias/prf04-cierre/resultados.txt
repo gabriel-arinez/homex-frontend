@@ -1,0 +1,121 @@
+=== unit ===
+npm notice run homex-frontend@0.1.0 test:unit
+npm notice run vitest --run --maxWorkers=2
+
+ RUN  v4.1.12 /home/gabriel/HOMEX/homex-frontend-prf04
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+
+ Test Files  31 passed (31)
+      Tests  159 passed (159)
+   Start at  05:11:47
+   Duration  50.80s (transform 8.94s, setup 8.73s, import 18.44s, tests 13.53s, environment 49.21s)
+
+
+=== target ===
+npm notice run homex-frontend@0.1.0 npx
+npm notice run 'vitest' run src/tests/prf04 --maxWorkers=2
+
+ RUN  v4.1.12 /home/gabriel/HOMEX/homex-frontend-prf04
+
+
+ Test Files  9 passed (9)
+      Tests  30 passed (30)
+   Start at  05:13:52
+   Duration  11.31s (transform 1.91s, setup 2.08s, import 4.19s, tests 1.79s, environment 11.01s)
+
+
+=== baseline ===
+npm notice run homex-frontend@0.1.0 npx
+npm notice run 'vitest' run src/tests/prf04/missing-unit-baseline.spec.ts --maxWorkers=1
+
+ RUN  v4.1.12 /home/gabriel/HOMEX/homex-frontend-prf04
+
+ ❯ src/tests/prf04/missing-unit-baseline.spec.ts (2 tests | 2 failed) 230ms
+     × no filtra el pendiente por alto/profundidad completos (ancho ausente: false) 159ms
+     × no filtra el pendiente por alto/profundidad completos (ancho ausente: true) 59ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/tests/prf04/missing-unit-baseline.spec.ts > PRF04 MISSING_UNIT contextual > no filtra el pendiente por alto/profundidad completos (ancho ausente: false)
+AssertionError: expected undefined to be 'pendiente-ancho' // Object.is equality
+
+- Expected:
+"pendiente-ancho"
+
++ Received:
+undefined
+
+ ❯ src/tests/prf04/missing-unit-baseline.spec.ts:38:53
+     36|       const unidad = wrapper.get('select[aria-label="Unidad de ancho"]…
+     37|       expect((unidad.element as HTMLSelectElement).value).toBe('')
+     38|       expect(unidad.attributes('aria-describedby')).toBe('pendiente-an…
+       |                                                     ^
+     39|       expect(wrapper.get('#pendiente-ancho').text()).toContain('Revisa…
+     40|       await wrapper.get('aside button').trigger('click')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/tests/prf04/missing-unit-baseline.spec.ts > PRF04 MISSING_UNIT contextual > no filtra el pendiente por alto/profundidad completos (ancho ausente: true)
+AssertionError: expected 'cm' to be '' // Object.is equality
+
+- Expected
++ Received
+
++ cm
+
+ ❯ src/tests/prf04/missing-unit-baseline.spec.ts:37:59
+     35|       expect(wrapper.get('aside').text()).toContain('unidad del ancho')
+     36|       const unidad = wrapper.get('select[aria-label="Unidad de ancho"]…
+     37|       expect((unidad.element as HTMLSelectElement).value).toBe('')
+       |                                                           ^
+     38|       expect(unidad.attributes('aria-describedby')).toBe('pendiente-an…
+     39|       expect(wrapper.get('#pendiente-ancho').text()).toContain('Revisa…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  05:14:16
+   Duration  4.72s (transform 1.33s, setup 432ms, import 1.45s, tests 230ms, environment 2.25s)
+
+
+=== e2e ===
+Running 4 tests using 1 worker
+
+(node:1751523) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 src/tests/e2e/fe04-proformas.spec.ts:883:1 › @a11y PRF04 cancelar reemplazo conserva formulario y devuelve foco (2.3s)
+  ✓  2 src/tests/e2e/fe04-proformas.spec.ts:905:3 › PRF04 captura24 MISSING_UNIT contextual a 360px (3.5s)
+  ✓  3 src/tests/e2e/fe04-proformas.spec.ts:905:3 › PRF04 captura24 MISSING_UNIT contextual a 768px (2.5s)
+  ✓  4 src/tests/e2e/fe04-proformas.spec.ts:905:3 › PRF04 captura24 MISSING_UNIT contextual a 1440px (3.2s)
+
+  4 passed (39.0s)
+
+=== types ===
+npm notice run homex-frontend@0.1.0 type-check
+npm notice run vue-tsc --build
+
+=== lint ===
+npm notice run homex-frontend@0.1.0 lint:check
+npm notice run run-s lint:oxlint:check lint:eslint:check
+npm notice run homex-frontend@0.1.0 lint:oxlint:check
+npm notice run oxlint .
+npm notice run homex-frontend@0.1.0 lint:eslint:check
+npm notice run eslint . --cache
+
+=== contract ===
+npm notice run homex-frontend@0.1.0 contract:check
+npm notice run node scripts/check-contract.mjs
+npm notice run homex-frontend@0.1.0 npx
+npm notice run 'openapi-ts' -i ./contracts/backend-openapi.yaml -o /tmp/homex-openapi-DYlFs5 -p @hey-api/typescript
+[90m@hey-api/openapi-ts v0.99.0[39m
+
+[90m[Job 1] [39m[90m~[39m [36mGenerating...[39m
+[90m[Job 1] [39m[36m  [1] [39m./contracts/backend-openapi.yaml
+[90m[Job 1] [39m[32m✓[39m [96m./../../../../tmp/homex-openapi-DYlFs5[39m [90m· 2 files · 617ms[39m
+npm notice run homex-frontend@0.1.0 npx
+npm notice run 'prettier' --config .prettierrc.json --write /tmp/homex-openapi-DYlFs5
+../../../../tmp/homex-openapi-DYlFs5/index.ts 137ms
+../../../../tmp/homex-openapi-DYlFs5/types.gen.ts 668ms
