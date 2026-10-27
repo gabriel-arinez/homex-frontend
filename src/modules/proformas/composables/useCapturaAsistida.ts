@@ -33,8 +33,11 @@ export function useCapturaAsistida() {
             result.resultado !== 'REQUIRES_REVIEW' ||
             !result.propuesta_configurador ||
             result.version_proyeccion !== 'PRF04_2'
-          )
-            throw new Error('No se obtuvo una propuesta utilizable. Tu mueble se conserva.')
+          ) {
+            // Conservar la transcripción obtenida aunque NLP se abstenga.
+            // El componente decide si puede aplicar una propuesta al formulario.
+            error.value = 'No se obtuvo una propuesta utilizable. Tu mueble se conserva.'
+          }
           return result
         }
         if (Date.now() >= deadline)
