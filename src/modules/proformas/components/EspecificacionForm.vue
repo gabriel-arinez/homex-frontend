@@ -225,11 +225,28 @@ const medidas = reactive<Medida[]>(
         objeto?.valor ??
           (typeof original === 'string' || typeof original === 'number' ? original : ''),
       ),
-      unidad: String(objeto?.unidad ?? (original === undefined ? 'cm' : '')),
+      unidad: String(
+        objeto?.unidad ??
+          (original === undefined &&
+          !props.pendientesAsistencia?.some(
+            (p) => p.resolucion?.tipo === 'DIMENSION' && p.resolucion.clave === clave,
+          )
+            ? 'cm'
+            : ''),
+      ),
       original: structuredClone(original),
     }
   }),
 )
+function pendientesDimension(clave: string) {
+  return pendientesVisibles.value.filter(
+    (p) => p.resolucion?.tipo === 'DIMENSION' && p.resolucion.clave === clave,
+  )
+}
+function enfocarDimension(clave: string) {
+  document.getElementById(`unidad-${clave}`)?.focus()
+}
+
 const nuevaMedida = ref('')
 const opcionesMedidas = ['largo', 'diámetro', 'lado_1', 'lado_2', 'altura_total', 'ancho_mesón']
 function agregarMedida() {
@@ -258,7 +275,15 @@ function serializarDimensiones(): unknown {
       objeto?.valor ??
         (typeof original === 'string' || typeof original === 'number' ? original : ''),
     )
-    const unidad = String(objeto?.unidad ?? (original === undefined ? 'cm' : ''))
+    const unidad = String(
+      objeto?.unidad ??
+        (original === undefined &&
+        !props.pendientesAsistencia?.some(
+          (p) => p.resolucion?.tipo === 'DIMENSION' && p.resolucion.clave === medida.clave,
+        )
+          ? 'cm'
+          : ''),
+    )
     return medida.valor !== valor || medida.unidad !== unidad
   })
   if (
@@ -628,11 +653,25 @@ onMounted(loadCatalog)
         ><a href="#comercial">Datos comerciales</a><a href="#revision">Revisar</a>
       </nav>
     </header>
-    <aside v-if="pendientesVisibles.length" aria-label="Información pendiente">
+    <aside
+      v-if="pendientesVisibles.length"
+      class="pending-summary"
+      aria-label="Información pendiente"
+      aria-live="polite"
+    >
       <h3>Información pendiente</h3>
       <ul>
         <li v-for="p in pendientesVisibles" :key="p.indice">
           <span>{{ p.mensaje }}</span>
+          <Button
+            v-if="
+              p.resolucion?.tipo === 'DIMENSION' &&
+              medidas.some((m) => m.clave === p.resolucion?.clave)
+            "
+            variant="secondary"
+            @click="enfocarDimension(p.resolucion.clave!)"
+            >Revisar {{ p.resolucion.clave }}</Button
+          >
           <div
             v-if="
               p.codigo === 'ESPESOR_SIN_COMPONENTE' &&
@@ -708,13 +747,33 @@ onMounted(loadCatalog)
         />
         <label
           >Unidad
-          <select v-model="medida.unidad" :aria-label="'Unidad de ' + medida.clave">
+          <select
+            :id="`unidad-${medida.clave}`"
+            v-model="medida.unidad"
+            :aria-label="'Unidad de ' + medida.clave"
+            :aria-invalid="pendientesDimension(medida.clave).length ? true : undefined"
+            :aria-describedby="
+              pendientesDimension(medida.clave).length ? `pendiente-${medida.clave}` : undefined
+            "
+          >
             <option value="">Sin unidad identificada</option>
             <option v-for="unidad in unidadesPermitidas" :key="unidad" :value="unidad">
               {{ unidad }}
             </option>
           </select>
         </label>
+        <p
+          v-if="pendientesDimension(medida.clave).length"
+          :id="`pendiente-${medida.clave}`"
+          class="dimension-pending"
+        >
+          <strong>Revisar {{ medida.clave }}:</strong>
+          {{
+            pendientesDimension(medida.clave)
+              .map((p) => p.mensaje)
+              .join(' ')
+          }}
+        </p>
         <Button
           v-if="!clavesIniciales.includes(medida.clave)"
           variant="secondary"
@@ -1143,6 +1202,21 @@ onMounted(loadCatalog)
   </form>
 </template>
 <style scoped>
+.config-header .eyebrow {
+  color: var(--color-text);
+}
+.pending-summary {
+  padding: var(--space-4);
+  border: 2px solid var(--color-danger);
+  border-radius: var(--radius-control);
+}
+.dimension-pending {
+  flex-basis: 100%;
+  color: var(--color-danger);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .config-header {
   position: sticky;
   top: 0;
