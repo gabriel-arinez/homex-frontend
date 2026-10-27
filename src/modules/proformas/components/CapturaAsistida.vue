@@ -95,18 +95,29 @@ async function send(audio?: Blob, texto?: string) {
     ...(audio ? { audio } : { texto }),
     ...(texto && captureId.value ? { captura_origen: captureId.value } : {}),
   })
-  if (!result || context !== JSON.stringify([props.sesion, props.moneda, props.proforma])) return
+  const visibleResult = result ?? voice.terminalResult.value
+  if (!visibleResult || context !== JSON.stringify([props.sesion, props.moneda, props.proforma]))
+    return
   if (texto) {
     // La nueva interpretación conserva la transcripción original de la captura por voz.
     lastInterpretation.value = texto
     corrected.value = texto
   } else {
-    original.value = result.texto_transcrito_original ?? ''
+    original.value = visibleResult.texto_transcrito_original ?? ''
     lastInterpretation.value = original.value
     corrected.value = original.value
   }
-  captureId.value = result.id
-  emit('applied', result)
+  captureId.value = visibleResult.id
+  // Una respuesta terminal sin propuesta no debe sustituir el mueble.
+  // La transcripción queda disponible para revisión y reinterpretación.
+  if (
+    result &&
+    result.resultado === 'REQUIRES_REVIEW' &&
+    result.propuesta_configurador &&
+    result.version_proyeccion === 'PRF04_2'
+  ) {
+    emit('applied', result)
+  }
 }
 function cancel() {
   voice.cancel()
