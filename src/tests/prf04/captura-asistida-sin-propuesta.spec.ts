@@ -4,7 +4,7 @@ import CapturaAsistida from '@/modules/proformas/components/CapturaAsistida.vue'
 import { asistidasService } from '@/modules/capturas/services/asistidasService'
 
 vi.mock('@/modules/capturas/services/asistidasService', () => ({
-  asistidasService: { create: vi.fn(), get: vi.fn() },
+  asistidasService: { create: vi.fn<() => Promise<unknown>>(), get: vi.fn<() => Promise<unknown>>() },
 }))
 
 async function enviarArchivo() {
