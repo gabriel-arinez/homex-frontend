@@ -103,7 +103,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: gabriel-arinez/homex-backend
-          ref: f98d93c3400bec50bd4754c91c933ef92a8f207c
+          ref: 06940e8a45b9aae4654612723f49b534151cb418
           path: backend-prf04-contract
       - name: Verificar snapshot OpenAPI idéntico al Backend PRF-04
         run: cmp contracts/backend-openapi.yaml backend-prf04-contract/docs/openapi.yaml
@@ -195,7 +195,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: gabriel-arinez/homex-backend
-          ref: f98d93c3400bec50bd4754c91c933ef92a8f207c
+          ref: 06940e8a45b9aae4654612723f49b534151cb418
           path: backend
       - uses: actions/setup-node@v4
         with: { node-version: 24.12.0, cache: npm }
