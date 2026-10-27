@@ -1,7 +1,7 @@
 # Confirmación comercial v15
 
 Base #42 / ba6de1bf4aa79ee32a14c12d8b795c451a1fcda6. Consumidor de backend
-#40 / 4b663bf2f827e835e6948ea92ea4101487ab4065, NLP #33 / 0.1.15.
+#40 / f98d93c3400bec50bd4754c91c933ef92a8f207c, NLP #33 / 0.1.15.
 
 INVALID_PRICE permanece visible con campo vacío; sólo un precio humano positivo
 resuelve la advertencia comercial. No se ofrece como sugerencia otro importe.
