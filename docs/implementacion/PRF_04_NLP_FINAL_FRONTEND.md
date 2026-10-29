@@ -6,7 +6,7 @@ diferencia de precio no equivale a confirmar descuento cero. El mapeador y el
 formulario impiden esa sustitución. El vendedor conserva sus cambios manuales;
 la voz no guarda automáticamente y una respuesta tardía no reemplaza su edición.
 
-La integración real CI fija el commit consumidor del paquete final0.1.17 y ejecuta
+La integración real CI fija el commit consumidor del paquete final0.1.18 y ejecuta
 API, worker, ASR de prueba, navegador y persistencia sobre datos ficticios. El
 contrato sigue siendo PRF04_2 y OpenAPI no cambia. No se rediseña la interfaz ni
 se añaden formularios. La revisión normal del vendedor no exige participar en

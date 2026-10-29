@@ -195,7 +195,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: gabriel-arinez/homex-backend
-          ref: fe595b61d21ea4017722ac158047ff51f232cb23
+          ref: ce588cc3912ac062a067bb6a3cb1c144b5070822
           path: backend
       - uses: actions/setup-node@v4
         with: { node-version: 24.12.0, cache: npm }
