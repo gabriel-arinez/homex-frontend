@@ -149,3 +149,21 @@ describe('PRF-04: confirmación comercial en el configurador', () => {
     }
   })
 })
+
+it('exige descuento explícito antes de derivar el unitario de un total', async () => {
+  vi.spyOn(proformasService, 'furnitureAttributes').mockResolvedValue({
+    atributos: [],
+    limites: { max_conjuntos: 10, max_componentes: 40 },
+  })
+  const props = propsBase('2')
+  props.detalle.descuento = ''
+  const wrapper = mount(EspecificacionForm, { props })
+  try {
+    await flushPromises()
+    expect(precioVisible(wrapper)).toBe('')
+    await wrapper.get('input[name="mueble-descuento"]').setValue('0.00')
+    expect(precioVisible(wrapper)).toBe('3650.00')
+  } finally {
+    wrapper.unmount()
+  }
+})

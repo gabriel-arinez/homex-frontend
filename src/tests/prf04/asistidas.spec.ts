@@ -44,6 +44,15 @@ describe('PRF-04 proyección del servidor', () => {
     })
     expect(line).not.toHaveProperty('id')
   })
+  it('no convierte un descuento desconocido en cero para repartir un total', () => {
+    const p = propuesta()
+    p.pendientes = [
+      { codigo: 'TOTAL_NEGOCIADO', ruta: 'comercial.precio_unitario', mensaje: 'Total pendiente' },
+    ]
+    expect(mapearCapturaAsistida(p, tipos, unidades).descuento).toBe('')
+    p.comercial.descuento = '0.00'
+    expect(mapearCapturaAsistida(p, tipos, unidades).descuento).toBe('0.00')
+  })
   it('usa ID real de JUEGO y clona datos técnicos', () => {
     const p = propuesta()
     p.comercial.unidad_codigo = 'JUEGO'
