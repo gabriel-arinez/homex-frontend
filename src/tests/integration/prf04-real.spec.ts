@@ -30,6 +30,7 @@ test('PRF-04 voz real hasta guardado integral sin escrituras prematuras', async 
   expect(comerciales).toEqual([])
   await page.getByLabel('Cantidad cotizada').fill('3')
   await page.getByLabel('Precio unitario negociado (BOB)').fill('100')
+  await page.locator('input[name="mueble-descuento"]').fill('0.00')
   // El dictado comunica 100 BOB de total, mientras que 3 × 100 BOB = 300 BOB.
   // El guardado no debe omitir la confirmación comercial explícita.
   await page.getByRole('button', { name: 'Guardar especificación' }).click()

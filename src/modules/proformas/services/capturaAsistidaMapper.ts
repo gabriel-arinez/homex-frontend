@@ -27,7 +27,10 @@ export function mapearCapturaAsistida(
     unidad: unidad.id,
     modo_calculo: 'PRECIO_UNITARIO',
     precio_unitario: propuesta.comercial.precio_unitario ?? '',
-    descuento: propuesta.comercial.descuento ?? '0.00',
+    // Un total dictado exige descuento confirmado para derivar el unitario.
+    descuento:
+      propuesta.comercial.descuento ??
+      (propuesta.pendientes.some((p) => p.codigo === 'TOTAL_NEGOCIADO') ? '' : '0.00'),
     especificacion: { ...propuesta.especificacion, datos_tecnicos: datos },
   }
 }
