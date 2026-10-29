@@ -167,3 +167,22 @@ it('exige descuento explícito antes de derivar el unitario de un total', async 
     wrapper.unmount()
   }
 })
+
+it('no confirma un descuento desconocido aunque se acepte una diferencia de precio', async () => {
+  vi.spyOn(proformasService, 'furnitureAttributes').mockResolvedValue({
+    atributos: [],
+    limites: { max_conjuntos: 10, max_componentes: 40 },
+  })
+  const props = propsBase('2', '3600.00')
+  props.detalle.descuento = ''
+  const wrapper = mount(EspecificacionForm, { props })
+  try {
+    await flushPromises()
+    await wrapper.get('aside input[type="checkbox"]').setValue(true)
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.emitted('save')).toBeUndefined()
+    expect(wrapper.get('[role="alert"]').text()).toContain('descuento')
+  } finally {
+    wrapper.unmount()
+  }
+})
