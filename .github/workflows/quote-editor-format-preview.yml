@@ -1,0 +1,24 @@
+name: Format preview for quote editor
+on:
+  push:
+    branches:
+      - feat/ux-proformas-20261101
+  workflow_dispatch:
+jobs:
+  prettier-preview:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Render formatted editor in log
+        run: |
+          npx prettier --write src/modules/proformas/views/ProformaEditorView.vue
+          printf 'FORMATTED:'
+          base64 -w0 src/modules/proformas/views/ProformaEditorView.vue
+          printf '\n'
