@@ -18,6 +18,19 @@ import type {
   ResultadoAsistida,
 } from '@/generated/api'
 import { ApiError } from '@/shared/api'
+import {
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  ClipboardCheck,
+  FileText,
+  Info,
+  PackageOpen,
+  Plus,
+  SlidersHorizontal,
+  Sofa,
+  UserRound,
+} from '@lucide/vue'
 import Button from '@/shared/ui/Button.vue'
 import Card from '@/shared/ui/Card.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
@@ -859,7 +872,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 </script>
 
 <template>
-  <div @input="markDirty" @change="markDirty">
+  <div class="quote-workspace" @input="markDirty" @change="markDirty">
+    <div class="quote-topline" aria-label="Ubicación en el proceso">
+      <span>COMERCIAL <span class="quote-divider">/</span> PROFORMAS</span>
+      <span class="quote-progress">Paso {{ currentStep + 1 }} de {{ steps.length }}</span>
+    </div>
     <PageHeader
       :title="persisted ? `Editar proforma #${persisted.numero}` : 'Nueva proforma'"
       description="Prepara productos, cliente y condiciones antes de guardar."
@@ -875,18 +892,23 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         <button
           v-for="(step, index) in steps"
           :key="step"
+          type="button"
           :class="{ active: currentStep === index }"
           :aria-current="currentStep === index ? 'step' : undefined"
           @click="currentStep = index"
         >
-          <span>{{ index + 1 }}</span
-          >{{ step }}
+          <span class="step-number">{{ String(index + 1).padStart(2, '0') }}</span>
+          <span class="step-label">{{ step }}</span>
+          <span class="step-marker" aria-hidden="true" />
         </button>
       </nav>
       <p v-if="success" role="status" class="success">{{ success }}</p>
       <div class="editor-status" role="status" aria-live="polite">
-        <span>{{ editingStatus }}</span>
-        <span v-if="persisted">
+        <div class="editor-status__main">
+          <span class="status-icon" aria-hidden="true"><CheckCircle2 v-if="persisted && !dirty && !saving && !conflicted" :size="18" /><Info v-else :size="18" /></span>
+          <span>{{ editingStatus }}</span>
+        </div>
+        <span v-if="persisted" class="editor-status__reference">
           Estado comercial: <strong>{{ persisted.estado_info.nombre }}</strong> · Proforma
           {{ persisted.numero }}
         </span>
@@ -903,20 +925,47 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         </Button>
       </div>
 
-      <section v-show="currentStep === 0" aria-labelledby="productos-title">
+      <section v-show="currentStep === 0" class="quote-panel products-panel" aria-labelledby="productos-title">
         <div class="section-title">
-          <div>
-            <h2 id="productos-title">Productos</h2>
-            <p>Agrega productos antes o después de elegir cliente.</p>
+          <div class="section-title__identity">
+            <span class="section-icon"><PackageOpen :size="22" aria-hidden="true" /></span>
+            <div>
+              <p class="section-kicker">01 · COMPOSICIÓN</p>
+              <h2 id="productos-title">Productos</h2>
+              <p>Agrega productos antes o después de elegir cliente.</p>
+            </div>
           </div>
-          <Button @click="additionMode = 'choose'">Añadir ítem</Button>
+          <div class="section-title__tools">
+            <span v-if="lineas.length" class="count-pill">{{ lineas.length }} {{ lineas.length === 1 ? 'ítem' : 'ítems' }}</span>
+            <Button @click="additionMode = 'choose'"><Plus :size="17" aria-hidden="true" />Añadir ítem</Button>
+          </div>
         </div>
         <div v-if="additionMode === 'choose'" class="choice-panel">
-          <h3>¿Qué deseas incorporar a la cotización?</h3>
-          <div class="actions">
-            <Button @click="chooseCatalog">Producto de catálogo</Button>
-            <Button variant="secondary" @click="chooseManualFurniture">Mueble a pedido</Button>
+          <div class="choice-panel__heading">
+            <div>
+              <p class="section-kicker">AGREGAR A LA PROFORMA</p>
+              <h3>¿Qué deseas incorporar a la cotización?</h3>
+              <p>Selecciona cómo quieres incorporar el siguiente ítem.</p>
+            </div>
             <Button variant="secondary" @click="additionMode = 'none'">Cancelar</Button>
+          </div>
+          <div class="choice-grid">
+            <button type="button" class="choice-card" @click="chooseCatalog">
+              <span class="choice-card__icon"><PackageOpen :size="24" aria-hidden="true" /></span>
+              <span class="choice-card__copy">
+                <strong>Producto de catálogo</strong>
+                <small>Busca un producto existente y añádelo a la cotización.</small>
+              </span>
+              <ArrowRight :size="20" aria-hidden="true" />
+            </button>
+            <button type="button" class="choice-card" @click="chooseManualFurniture">
+              <span class="choice-card__icon"><Sofa :size="24" aria-hidden="true" /></span>
+              <span class="choice-card__copy">
+                <strong>Mueble a pedido</strong>
+                <small>Define las características y el importe de un mueble a medida.</small>
+              </span>
+              <ArrowRight :size="20" aria-hidden="true" />
+            </button>
           </div>
         </div>
         <div v-if="catalogInitialized" v-show="additionMode === 'catalog'">
@@ -936,6 +985,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           />
         </div>
         <Card v-for="(line, index) in lineas" :key="line.localId" class="line-card">
+          <span class="line-index" aria-hidden="true">{{ String(index + 1).padStart(2, '0') }}</span>
           <div
             :id="`ap3-linea-${line.localId}`"
             class="line-summary"
@@ -1006,18 +1056,44 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           {{ removedLines.length }} eliminación(es) provisional(es) pendiente(s) de guardar.
           <button type="button" @click="undoRemove">Deshacer última eliminación</button>
         </p>
-        <p v-if="!lineas.length" class="empty">Aún no agregaste productos.</p>
+        <div v-if="!lineas.length && additionMode === 'none'" class="empty empty-products">
+          <span class="empty-products__icon"><PackageOpen :size="30" aria-hidden="true" /></span>
+          <h3>Aún no agregaste productos.</h3>
+          <p>Comienza con un producto de catálogo o un mueble a pedido para construir esta proforma.</p>
+          <div class="empty-actions">
+            <Button @click="chooseCatalog"><PackageOpen :size="17" aria-hidden="true" />Producto de catálogo</Button>
+            <Button variant="secondary" @click="chooseManualFurniture"><Sofa :size="17" aria-hidden="true" />Mueble a pedido</Button>
+          </div>
+        </div>
         <p v-if="lineas.some((line) => line.modo_calculo === 'TOTAL_NEGOCIADO')" class="warning">
           Las líneas de importe histórico negociado se conservan sin conversión automática.
         </p>
       </section>
 
-      <section v-show="currentStep === 1" aria-labelledby="cliente-title">
-        <h2 id="cliente-title">Cliente</h2>
+      <section v-show="currentStep === 1" class="quote-panel client-panel" aria-labelledby="cliente-title">
+        <div class="section-title">
+          <div class="section-title__identity">
+            <span class="section-icon"><UserRound :size="22" aria-hidden="true" /></span>
+            <div>
+              <p class="section-kicker">02 · DESTINATARIO</p>
+              <h2 id="cliente-title">Cliente</h2>
+              <p>Indica a quién corresponde la cotización. Puedes dejarlo pendiente para el borrador.</p>
+            </div>
+          </div>
+        </div>
         <div class="mode" role="radiogroup" aria-label="Origen del cliente">
-          <label><input v-model="clienteMode" type="radio" value="pendiente" /> Pendiente</label>
-          <label><input v-model="clienteMode" type="radio" value="existente" /> Existente</label>
-          <label><input v-model="clienteMode" type="radio" value="nuevo" /> Registrar nuevo</label>
+          <label class="client-option" :class="{ 'client-option--active': clienteMode === 'pendiente' }">
+            <input v-model="clienteMode" type="radio" value="pendiente" />
+            <span><strong>Pendiente</strong><small>Completar el cliente más adelante</small></span>
+          </label>
+          <label class="client-option" :class="{ 'client-option--active': clienteMode === 'existente' }">
+            <input v-model="clienteMode" type="radio" value="existente" />
+            <span><strong>Existente</strong><small>Seleccionar desde clientes registrados</small></span>
+          </label>
+          <label class="client-option" :class="{ 'client-option--active': clienteMode === 'nuevo' }">
+            <input v-model="clienteMode" type="radio" value="nuevo" />
+            <span><strong>Registrar nuevo</strong><small>Registrar al guardar la proforma</small></span>
+          </label>
         </div>
         <ClienteSelector
           v-if="clienteMode === 'existente'"
@@ -1025,7 +1101,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           label="Cliente existente"
           @select="clienteSeleccionado = $event"
         />
-        <Card v-if="clienteMode === 'nuevo'">
+        <Card v-if="clienteMode === 'nuevo'" class="client-fields">
           <ClienteFormFields
             :model="nuevoCliente"
             :tipos="tiposCliente"
@@ -1034,28 +1110,30 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             @change="updateNuevoCliente"
           />
         </Card>
-        <p v-if="clienteMode === 'pendiente'">
-          Puedes guardar el borrador sin cliente. Para emitir deberás definirlo.
-        </p>
+        <div v-if="clienteMode === 'pendiente'" class="context-note"><Info :size="19" aria-hidden="true" /><p>Puedes guardar el borrador sin cliente. Para emitir deberás definirlo.</p></div>
       </section>
 
-      <section v-show="currentStep === 2" aria-labelledby="condiciones-title">
-        <h2 id="condiciones-title">Condiciones</h2>
+      <section v-show="currentStep === 2" class="quote-panel conditions-panel" aria-labelledby="condiciones-title">
+        <div class="section-title">
+          <div class="section-title__identity">
+            <span class="section-icon"><SlidersHorizontal :size="22" aria-hidden="true" /></span>
+            <div>
+              <p class="section-kicker">03 · ACUERDOS</p>
+              <h2 id="condiciones-title">Condiciones</h2>
+              <p>Especifica los datos comerciales que acompañarán a la proforma.</p>
+            </div>
+          </div>
+        </div>
         <div class="form-grid">
-          <TextField v-model="header.titulo" name="titulo" label="Título" />
+          <div class="form-grid__full">
+            <TextField v-model="header.titulo" name="titulo" label="Título" />
+            <small>Un título breve que identifique esta cotización.</small>
+          </div>
           <Select
             v-model="header.moneda_codigo"
             name="moneda"
             label="Moneda"
             :options="monedas.map((x) => ({ label: `${x.nombre} (${x.codigo})`, value: x.codigo }))"
-          />
-          <TextField v-model="header.plazo_entrega" name="plazo" label="Plazo de entrega" />
-          <TextField
-            v-model="header.validez_oferta"
-            name="validez"
-            label="Validez de la oferta (días)"
-            type="number"
-            min="1"
           />
           <TextField
             v-model="header.porcentaje_adelanto"
@@ -1066,20 +1144,46 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             max="100"
             step="0.01"
           />
-          <TextField v-model="header.observaciones" name="observaciones" label="Observaciones" />
+          <TextField v-model="header.plazo_entrega" name="plazo" label="Plazo de entrega" />
+          <TextField
+            v-model="header.validez_oferta"
+            name="validez"
+            label="Validez de la oferta (días)"
+            type="number"
+            min="1"
+          />
+          <label class="quote-textarea form-grid__full" for="quote-observaciones">
+            <span>Observaciones</span>
+            <textarea
+              id="quote-observaciones"
+              v-model="header.observaciones"
+              name="observaciones"
+              rows="4"
+              placeholder="Condiciones adicionales para esta cotización..."
+            />
+          </label>
         </div>
       </section>
 
-      <section v-if="currentStep === 3" aria-labelledby="revisar-title">
-        <h2 id="revisar-title">Revisar</h2>
+      <section v-if="currentStep === 3" class="quote-panel review-panel" aria-labelledby="revisar-title">
+        <div class="section-title">
+          <div class="section-title__identity">
+            <span class="section-icon"><ClipboardCheck :size="22" aria-hidden="true" /></span>
+            <div>
+              <p class="section-kicker">04 · COMPROBACIÓN</p>
+              <h2 id="revisar-title">Revisar</h2>
+              <p>Comprueba los datos registrados antes de guardar o emitir.</p>
+            </div>
+          </div>
+        </div>
         <div class="review-grid">
-          <Card
-            ><h3>Productos</h3>
+          <Card class="review-summary-card"
+            ><h3><PackageOpen :size="17" aria-hidden="true" />Productos</h3>
             <p>{{ lineas.length }} línea(s)</p>
             <button @click="currentStep = 0">Corregir productos</button></Card
           >
-          <Card
-            ><h3>Cliente</h3>
+          <Card class="review-summary-card"
+            ><h3><UserRound :size="17" aria-hidden="true" />Cliente</h3>
             <p>
               {{
                 clienteMode === 'pendiente'
@@ -1091,16 +1195,16 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             </p>
             <button @click="currentStep = 1">Corregir cliente</button></Card
           >
-          <Card
-            ><h3>Condiciones</h3>
+          <Card class="review-summary-card"
+            ><h3><SlidersHorizontal :size="17" aria-hidden="true" />Condiciones</h3>
             <p>{{ header.plazo_entrega || 'Plazo pendiente' }} · {{ header.moneda_codigo }}</p>
             <button @click="currentStep = 2">Corregir condiciones</button></Card
           >
         </div>
         <Card class="commercial-preview"
-          ><p class="brand">HOMEX</p>
+          ><div class="preview-brand"><span class="preview-mark">H</span><p class="brand">HOMEX · VISTA PREVIA</p></div>
           <h3>{{ header.titulo || 'Cotización comercial' }}</h3>
-          <p v-for="line in lineas" :key="line.localId">
+          <p v-for="line in lineas" :key="line.localId" class="review-line">
             <strong>{{ line.nombre }}</strong> —
             <template v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
               importe negociado {{ money(Number(line.importe_negociado || 0)) }}
@@ -1145,23 +1249,21 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       </section>
 
       <footer class="editor-actions">
-        <Button variant="secondary" :disabled="currentStep === 0" @click="currentStep--"
-          >Anterior</Button
-        >
-        <Button v-if="currentStep < 3" @click="currentStep++">Continuar</Button>
-        <Button variant="secondary" :processing="saving" @click="persist(false)"
-          >Guardar borrador</Button
-        >
-        <Button :disabled="!canEmit" :processing="saving" @click="persist(true)"
-          >Emitir proforma</Button
-        >
-        <Button
-          v-if="persisted"
-          variant="secondary"
-          @click="router.push(`/proformas/${persisted.id}`)"
-        >
-          Ver detalle, aprobar y gestionar adjuntos
-        </Button>
+        <div class="editor-actions__inner">
+          <div class="editor-actions__navigation">
+            <Button variant="secondary" :disabled="currentStep === 0" @click="currentStep--"><ArrowLeft :size="17" aria-hidden="true" />Anterior</Button>
+            <Button v-if="currentStep < 3" @click="currentStep++">Continuar<ArrowRight :size="17" aria-hidden="true" /></Button>
+          </div>
+          <div class="editor-actions__operations">
+            <Button variant="secondary" :processing="saving" @click="persist(false)">Guardar borrador</Button>
+            <Button :disabled="!canEmit" :processing="saving" @click="persist(true)">Emitir proforma</Button>
+            <Button
+              v-if="persisted"
+              variant="secondary"
+              @click="router.push(`/proformas/${persisted.id}`)"
+            >Ver detalle, aprobar y gestionar adjuntos</Button>
+          </div>
+        </div>
       </footer>
     </template>
 
@@ -1334,207 +1436,437 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 </template>
 
 <style scoped>
-.steps {
+.quote-workspace {
+  --quote-shadow: 0 4px 24px rgb(0 0 0 / 4%);
+  --quote-muted: color-mix(in srgb, var(--color-surface) 76%, var(--color-background));
+  --quote-border: color-mix(in srgb, var(--color-border) 80%, transparent);
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-2);
-  margin-bottom: var(--space-6);
+  align-content: start;
+  gap: 0;
+  padding-bottom: var(--space-8);
 }
-.steps button {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
-  justify-content: center;
-  min-height: 3rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-}
-.steps button.active {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-  font-weight: 700;
-}
-.steps span {
-  display: grid;
-  place-items: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: 50%;
-  background: var(--color-surface-muted);
-}
-section {
-  display: grid;
-  gap: var(--space-4);
-}
-.section-title,
-.line-card,
-.editor-actions {
+.quote-topline {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-}
-.choice-panel {
-  padding: var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
-}
-.choice-panel h3 {
-  margin-top: 0;
-}
-.line-summary {
-  cursor: pointer;
-  min-width: 0;
-  flex: 1;
-}
-.line-summary:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
-}
-.line-menu {
-  position: relative;
-  flex-shrink: 0;
-}
-.menu-trigger {
-  padding: var(--space-2);
-  border-radius: var(--radius-control);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font-size: 1.25rem;
-  cursor: pointer;
-}
-.menu-panel {
-  position: absolute;
-  z-index: 10;
-  top: 100%;
-  right: 0;
-  min-width: 10rem;
-  display: grid;
-  padding: var(--space-2);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-raised);
-  box-shadow: 0 4px 16px #0002;
-}
-.menu-panel button {
-  text-align: left;
-  padding: var(--space-2);
-  background: transparent;
-  color: var(--color-text);
-  border: 0;
-  cursor: pointer;
-}
-.menu-panel button:focus-visible {
-  outline: 2px solid var(--color-primary);
-}
-.read-line {
-  display: grid;
-  gap: var(--space-2);
-}
-.read-line p {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-.read-line pre {
-  max-width: 100%;
-  overflow: auto;
-  white-space: pre-wrap;
-}
-.line-card {
   margin-bottom: var(--space-3);
+  color: var(--color-text-secondary);
+  font-size: 0.69rem;
+  font-weight: 700;
+  letter-spacing: 0.11em;
 }
-.actions,
-.mode {
+.quote-divider { padding: 0 var(--space-2); color: var(--color-border-strong); }
+.quote-progress {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-primary-accent);
+  background: var(--color-primary-soft);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.quote-workspace :deep(.page-header) { margin-bottom: var(--space-6); }
+.quote-workspace :deep(.page-header h1) {
+  font-size: clamp(1.65rem, 2.4vw, 2.25rem);
+  font-weight: 750;
+  letter-spacing: -0.035em;
+}
+.steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+.steps button {
+  position: relative;
   display: flex;
-  flex-wrap: wrap;
+  min-width: 0;
+  min-height: 4.1rem;
+  align-items: center;
   gap: var(--space-3);
-}
-.form-grid,
-.client-grid,
-.review-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-4);
-}
-.review-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-.totals {
-  display: grid;
-  justify-items: end;
-  padding: var(--space-5);
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-weight: 600;
+  text-align: left;
+  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 }
-.totals strong {
-  font-size: 1.5rem;
+.steps button:hover { border-color: var(--color-border-strong); background: var(--color-surface-hover); }
+.steps button:focus-visible { outline: 2px solid var(--color-primary-accent); outline-offset: 2px; }
+.steps button.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-accent);
 }
-.editor-actions {
-  position: sticky;
-  bottom: 0;
-  margin-top: var(--space-6);
-  padding: var(--space-4);
-  border-top: 1px solid var(--color-border);
-  background: var(--color-background);
+.step-number {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.6rem;
+  background: var(--color-surface-muted);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 750;
 }
-.error,
-.warning {
-  color: var(--color-danger);
+.steps button.active .step-number { color: #fff; background: var(--color-primary); }
+.step-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.step-marker {
+  position: absolute;
+  right: var(--space-4);
+  bottom: -1px;
+  left: var(--space-4);
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: transparent;
 }
-.success {
-  color: var(--color-success);
-}
+.steps button.active .step-marker { background: var(--color-primary); }
 .editor-status {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
   justify-content: space-between;
   gap: var(--space-2) var(--space-5);
-  margin-bottom: var(--space-4);
-  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-5);
+  padding: 0.8rem var(--space-4);
+  border: 1px solid var(--quote-border);
+  border-radius: var(--radius-card);
+  background: var(--quote-muted);
+  color: var(--color-text-secondary);
+  font-size: 0.81rem;
+}
+.editor-status__main { display: flex; align-items: center; gap: var(--space-3); font-weight: 650; color: var(--color-text); }
+.status-icon {
+  display: grid;
+  width: 1.9rem;
+  height: 1.9rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.55rem;
+  color: var(--color-primary-accent);
+  background: var(--color-primary-soft);
+}
+.editor-status__reference strong { color: var(--color-text); }
+.quote-panel {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-5);
+  padding: clamp(1rem, 2.5vw, 2rem);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
+  border-radius: 1rem;
+  background: var(--color-surface);
+  box-shadow: var(--quote-shadow);
+}
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--quote-border);
+}
+.section-title__identity { display: flex; min-width: 0; align-items: center; gap: var(--space-4); }
+.section-icon {
+  display: grid;
+  width: 3.15rem;
+  height: 3.15rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 12%, transparent);
+  border-radius: 0.85rem;
+  color: var(--color-primary-accent);
+  background: var(--color-primary-soft);
+}
+.section-title h2 { margin: 0.1rem 0 0; color: var(--color-text); font-size: 1.35rem; letter-spacing: -0.025em; }
+.section-title p:not(.section-kicker) { margin: var(--space-1) 0 0; color: var(--color-text-secondary); }
+.section-kicker { margin: 0; color: var(--color-primary-accent); font-size: 0.67rem; font-weight: 750; letter-spacing: 0.12em; }
+.section-title__tools { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.count-pill {
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
   background: var(--color-surface-muted);
   color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 650;
+  white-space: nowrap;
 }
-.pending-value {
-  color: var(--color-warning-text, var(--color-text-secondary));
+.choice-panel { display: grid; gap: var(--space-4); padding: var(--space-5); border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--quote-muted); }
+.choice-panel__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
+.choice-panel h3 { margin: var(--space-1) 0; font-size: 1.05rem; }
+.choice-panel__heading p:last-child { margin: var(--space-2) 0 0; color: var(--color-text-secondary); }
+.choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.choice-card {
+  display: flex;
+  min-width: 0;
+  min-height: 7.75rem;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
 }
-.error-summary ul,
-.warning ul {
-  margin-bottom: 0;
+.choice-card:hover { border-color: var(--color-primary); background: var(--color-primary-soft); transform: translateY(-1px); }
+.choice-card:focus-visible { outline: 2px solid var(--color-primary-accent); outline-offset: 2px; }
+.choice-card > svg { flex: 0 0 auto; margin-left: auto; color: var(--color-text-secondary); }
+.choice-card__icon {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: var(--radius-card);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-accent);
 }
-.empty {
-  padding: var(--space-6);
+.choice-card__copy { display: grid; min-width: 0; gap: 0.45rem; }
+.choice-card__copy strong { font-size: 0.95rem; }
+.choice-card__copy small { color: var(--color-text-secondary); line-height: 1.5; }
+.empty-products {
+  display: grid;
+  min-height: 16rem;
+  justify-items: center;
+  align-content: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-5);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-card);
+  background: var(--quote-muted);
   text-align: center;
-  border: 1px dashed var(--color-border);
+}
+.empty-products__icon {
+  display: grid;
+  width: 4rem;
+  height: 4rem;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  background: var(--color-surface);
+  color: var(--color-primary-accent);
+}
+.empty-products h3 { margin: var(--space-2) 0 0; font-size: 1.12rem; }
+.empty-products p { max-width: 32rem; margin: 0; color: var(--color-text-secondary); line-height: 1.6; }
+.empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-3); margin-top: var(--space-2); }
+.line-card {
+  display: flex;
+  position: relative;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border-color: var(--quote-border);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 3%);
+}
+.line-card:hover { border-color: var(--color-border-strong); }
+.line-index {
+  display: grid;
+  width: 2.4rem;
+  height: 2.4rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.6rem;
+  background: var(--color-surface-muted);
+  color: var(--color-text-secondary);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+.line-summary { min-width: 0; flex: 1; cursor: pointer; }
+.line-summary strong { display: block; overflow-wrap: anywhere; font-size: 0.94rem; }
+.line-summary p { margin: var(--space-2) 0 0; color: var(--color-text-secondary); font-size: 0.83rem; }
+.line-summary:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 4px; border-radius: 2px; }
+.line-card > strong { flex: 0 0 auto; color: var(--color-text); white-space: nowrap; }
+.line-menu { position: relative; z-index: 1; flex: 0 0 auto; }
+.menu-trigger {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+.menu-trigger:hover { background: var(--color-surface-hover); color: var(--color-text); }
+.menu-panel {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 0.3rem);
+  right: 0;
+  display: grid;
+  min-width: 11rem;
+  gap: 0.15rem;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+  box-shadow: 0 12px 26px rgb(0 0 0 / 16%);
+}
+.menu-panel button { padding: 0.65rem 0.8rem; border: 0; border-radius: 0.35rem; background: transparent; color: var(--color-text); cursor: pointer; text-align: left; }
+.menu-panel button:hover:not(:disabled), .menu-panel button:focus-visible { background: var(--color-surface-hover); }
+.menu-panel button:disabled { opacity: 0.5; cursor: not-allowed; }
+.undo, .context-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--quote-muted);
+  color: var(--color-text-secondary);
+}
+.context-note svg { flex-shrink: 0; color: var(--color-info); }
+.context-note p { margin: 0; }
+.undo button { border: 0; background: transparent; color: var(--color-primary-accent); text-decoration: underline; cursor: pointer; }
+.client-panel { align-content: start; }
+.mode { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+.client-option {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+.client-option:hover { border-color: var(--color-border-strong); background: var(--quote-muted); }
+.client-option--active { border-color: var(--color-primary); background: var(--color-primary-soft); }
+.client-option input { margin-top: 0.2rem; flex: 0 0 auto; accent-color: var(--color-primary); }
+.client-option span { display: grid; min-width: 0; gap: 0.35rem; }
+.client-option strong { font-size: 0.87rem; }
+.client-option small { color: var(--color-text-secondary); line-height: 1.45; }
+.client-option:focus-within { outline: 2px solid var(--color-primary-accent); outline-offset: 2px; }
+.client-fields { border-color: var(--quote-border); }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); max-width: 68rem; }
+.form-grid__full { grid-column: 1 / -1; }
+.form-grid__full > small { display: block; margin-top: var(--space-2); color: var(--color-text-secondary); }
+.quote-textarea { display: grid; gap: var(--space-2); color: var(--color-text); font-weight: 600; }
+.quote-textarea textarea {
+  display: block;
+  width: 100%;
+  min-height: 7.5rem;
+  resize: vertical;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 400;
+  line-height: 1.6;
+}
+.quote-textarea textarea::placeholder { color: var(--color-text-muted); }
+.quote-textarea textarea:hover { border-color: var(--color-text-muted); }
+.quote-textarea textarea:focus-visible { outline: 2px solid var(--color-primary-accent); outline-offset: 1px; }
+.review-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+.review-summary-card { display: grid; gap: var(--space-3); min-width: 0; padding: var(--space-4); background: var(--quote-muted); border-color: var(--quote-border); }
+.review-summary-card h3 { display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: 0.84rem; }
+.review-summary-card h3 svg { color: var(--color-primary-accent); }
+.review-summary-card p { min-width: 0; margin: 0; overflow-wrap: anywhere; color: var(--color-text-secondary); }
+.review-summary-card button { justify-self: start; padding: 0; border: 0; background: transparent; color: var(--color-primary-accent); cursor: pointer; font-weight: 650; }
+.review-summary-card button:hover { text-decoration: underline; }
+.commercial-preview { display: grid; gap: var(--space-4); padding: var(--space-6); border-color: var(--quote-border); }
+.preview-brand { display: flex; align-items: center; gap: var(--space-3); padding-bottom: var(--space-3); border-bottom: 1px solid var(--quote-border); }
+.preview-mark { display: grid; width: 2rem; height: 2rem; place-items: center; border-radius: 0.45rem; background: var(--color-primary); color: #fff; font-weight: 800; }
+.brand { margin: 0; color: var(--color-primary-accent); font-size: 0.72rem; font-weight: 750; letter-spacing: 0.1em; }
+.commercial-preview h3 { margin: 0; font-size: 1.2rem; letter-spacing: -0.02em; }
+.review-line { margin: 0; padding: var(--space-3) 0; border-bottom: 1px solid var(--quote-border); line-height: 1.7; overflow-wrap: anywhere; }
+.review-line strong { color: var(--color-text); }
+.commercial-preview :deep(.button) { justify-self: start; }
+.totals {
+  display: grid;
+  justify-items: end;
+  gap: var(--space-2);
+  padding: var(--space-6);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 20%, var(--color-border));
+  border-radius: var(--radius-card);
+  background: var(--color-primary-soft);
+  text-align: right;
+}
+.totals span { color: var(--color-text-secondary); font-weight: 650; }
+.totals strong { color: var(--color-text); font-size: clamp(1.5rem, 3vw, 2rem); letter-spacing: -0.04em; }
+.totals small { color: var(--color-text-secondary); }
+.error, .warning { color: var(--color-danger); }
+.error-summary, .warning { margin: 0; padding: var(--space-4); border: 1px solid color-mix(in srgb, var(--color-danger) 24%, var(--color-border)); border-radius: var(--radius-card); background: var(--color-danger-soft); }
+.error-summary ul, .warning ul { margin-bottom: 0; }
+.success { margin: 0 0 var(--space-3); color: var(--color-success); font-weight: 650; }
+.pending-value { color: var(--color-warning); }
+.read-line { display: grid; gap: var(--space-2); }
+.read-line p { margin: 0; overflow-wrap: anywhere; }
+.read-line pre { max-width: 100%; overflow: auto; white-space: pre-wrap; }
+.actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.editor-actions {
+  position: sticky;
+  z-index: 5;
+  bottom: 0;
+  margin-top: var(--space-5);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-background) 96%, transparent);
+  backdrop-filter: blur(12px);
+}
+.editor-actions__inner { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: 0 var(--space-2); }
+.editor-actions__navigation, .editor-actions__operations { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+.editor-actions__operations { justify-content: flex-end; }
+.editor-actions :deep(.button) { white-space: normal; text-align: center; }
+@media (max-width: 64rem) {
+  .steps button { justify-content: center; padding: var(--space-3); gap: var(--space-2); }
+  .choice-card { align-items: flex-start; flex-wrap: wrap; }
+  .choice-card > svg { margin-left: auto; }
 }
 @media (max-width: 48rem) {
-  .steps {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .review-grid {
-    grid-template-columns: 1fr;
-  }
-  .editor-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-  }
+  .steps button { min-height: 3.7rem; }
+  .step-number { width: 1.7rem; height: 1.7rem; }
+  .quote-panel { padding: var(--space-5); }
+  .mode, .review-grid { grid-template-columns: 1fr; }
+  .editor-actions__inner { flex-direction: column; align-items: stretch; }
+  .editor-actions__navigation, .editor-actions__operations { justify-content: flex-end; }
+  .editor-actions__navigation { justify-content: space-between; }
 }
-@media (max-width: 35rem) {
-  .steps,
-  .form-grid,
-  .client-grid,
-  .editor-actions {
-    grid-template-columns: 1fr;
-  }
-  .line-card,
-  .section-title {
-    align-items: stretch;
-    flex-direction: column;
-  }
+@media (max-width: 36rem) {
+  .quote-topline { align-items: flex-start; }
+  .steps { gap: 0.35rem; }
+  .steps button { min-height: 4.25rem; flex-direction: column; gap: 0.35rem; padding: 0.55rem 0.25rem; text-align: center; }
+  .step-label { width: 100%; font-size: 0.69rem; }
+  .step-marker { right: 0.3rem; left: 0.3rem; }
+  .section-title { align-items: stretch; flex-direction: column; }
+  .section-title__identity { align-items: flex-start; gap: var(--space-3); }
+  .section-icon { width: 2.6rem; height: 2.6rem; }
+  .section-title__tools :deep(.button) { flex: 1; }
+  .choice-panel__heading { flex-direction: column; }
+  .choice-grid, .form-grid { grid-template-columns: 1fr; }
+  .form-grid__full { grid-column: auto; }
+  .choice-card { min-height: 5.5rem; flex-wrap: nowrap; }
+  .empty-products { padding: var(--space-6) var(--space-3); }
+  .empty-actions { width: 100%; }
+  .empty-actions :deep(.button) { width: 100%; }
+  .line-card { flex-wrap: wrap; align-items: flex-start; }
+  .line-summary { flex-basis: calc(100% - 4rem); }
+  .line-card > strong { margin-left: 3rem; }
+  .line-menu { margin-left: auto; }
+  .editor-actions { position: static; }
+  .editor-actions__navigation, .editor-actions__operations { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .editor-actions__operations :deep(.button:last-child:nth-child(3)) { grid-column: 1 / -1; }
+  .editor-actions :deep(.button) { min-width: 0; width: 100%; }
+  .commercial-preview, .totals { padding: var(--space-4); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .steps button, .choice-card, .client-option { transition: none; transform: none; }
 }
 </style>
