@@ -10,6 +10,8 @@ export function useAudioRecorder() {
     stream: MediaStream | null = null,
     timer: number | undefined,
     chunks: Blob[] = []
+  let generation = 0
+  let unmounted = false
   const supported = computed(
     () =>
       typeof navigator !== 'undefined' &&
@@ -23,6 +25,8 @@ export function useAudioRecorder() {
     stream = null
   }
   async function start() {
+    if (unmounted || state.value === 'REQUESTING' || state.value === 'RECORDING') return
+    const request = ++generation
     error.value = ''
     blob.value = null
     elapsed.value = 0
@@ -33,7 +37,12 @@ export function useAudioRecorder() {
     }
     state.value = 'REQUESTING'
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const acquired = await navigator.mediaDevices.getUserMedia({ audio: true })
+      if (request !== generation || unmounted) {
+        acquired.getTracks().forEach((track) => track.stop())
+        return
+      }
+      stream = acquired
       const preferred = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/webm'].find(
         (x) => MediaRecorder.isTypeSupported(x),
       )
@@ -51,6 +60,7 @@ export function useAudioRecorder() {
       state.value = 'RECORDING'
       timer = window.setInterval(() => elapsed.value++, 1000)
     } catch (e) {
+      if (request !== generation || unmounted) return
       cleanup()
       state.value =
         e instanceof DOMException && ['NotAllowedError', 'SecurityError'].includes(e.name)
@@ -66,6 +76,7 @@ export function useAudioRecorder() {
     if (recorder?.state === 'recording') recorder.stop()
   }
   function cancel() {
+    generation++
     if (recorder) {
       recorder.onstop = null
       if (recorder.state === 'recording') recorder.stop()
@@ -78,6 +89,9 @@ export function useAudioRecorder() {
     state.value = 'IDLE'
     error.value = ''
   }
-  onBeforeUnmount(cancel)
+  onBeforeUnmount(() => {
+    unmounted = true
+    cancel()
+  })
   return { state, elapsed, blob, error, supported, start, stop, cancel }
 }
