@@ -50,9 +50,11 @@ const preferences = usePreferencesStore()
 .shell--compact main {
   margin-left: var(--sidebar-compact);
 }
+/* La zona de trabajo ocupa todo el espacio libre, incluso con zoom reducido.
+   Los límites de lectura, si hacen falta, pertenecen al contenido específico. */
 .shell main > :deep(*) {
-  width: min(100%, var(--content-max));
-  margin-inline: auto;
+  width: 100%;
+  min-width: 0;
 }
 @media (min-width: 48rem) and (max-width: 63.99rem) {
   .shell main {
