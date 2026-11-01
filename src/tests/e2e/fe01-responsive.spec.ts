@@ -176,7 +176,7 @@ test('FE01 no bloquea las acciones del contenido en tablet', async ({ page }) =>
 })
 
 for (const theme of ['light', 'dark'] as const) {
-  test('FE01 usa ancho fluido a 2880px con tema ' + theme + ' (zoom reducido)', async ({ page }) => {
+  test(`FE01 ancho fluido 2880px ${theme}`, async ({ page }) => {
     await page.addInitScript((selected) => localStorage.setItem('homex.theme', selected), theme)
     await page.setViewportSize({ width: 2880, height: 900 })
     await page.goto('/resumen')
