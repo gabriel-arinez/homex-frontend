@@ -7,6 +7,19 @@
 *::after {
   box-sizing: border-box;
 }
+
+/* HOMEX: ocultar indicadores visuales sin bloquear el desplazamiento.
+   Afecta al documento y a todos los contenedores (sidebar, categorías,
+   tablas y diálogos) en los temas claro y oscuro. */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
 html {
   min-width: 20rem;
   background: var(--color-background);
