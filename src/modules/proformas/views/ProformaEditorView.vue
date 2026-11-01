@@ -23,7 +23,6 @@ import {
   ArrowRight,
   CheckCircle2,
   ClipboardCheck,
-  FileText,
   Info,
   PackageOpen,
   Plus,
