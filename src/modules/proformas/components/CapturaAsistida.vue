@@ -54,7 +54,7 @@ async function activate() {
   }
   recording.value = true
   await nextTick()
-  await recorder.value?.startRecording()
+  await recorder.value?.startRecording?.()
 }
 function start(mode: 'record' | 'upload' = 'record') {
   pendingMode.value = mode
@@ -184,7 +184,7 @@ function cancel() {
     </details>
     <p v-else-if="hasResult" role="status">La interpretación se ha procesado. Revisa la ficha antes de incorporarla.</p>
     <Modal :open="confirm" title="Reemplazar información del mueble" title-id="prf04-replace-title" @close="confirm = false">
-      <p>La información obtenida por voz puede reemplazar los datos actuales de este mueble. No afectará los demás ítems de la proforma.</p>
+      <p>La captura por voz reemplazará toda la información de este mueble. No afectará los demás ítems de la proforma.</p>
       <Button variant="secondary" @click="confirm = false">Cancelar</Button>
       <Button @click="proceed">Continuar con voz</Button>
     </Modal>
