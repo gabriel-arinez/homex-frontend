@@ -12,8 +12,9 @@ const props = defineProps<{
   sesion: string
   moneda: 'BOB' | 'USD'
   proforma?: number | null
+  reviewBeforeApply?: boolean
 }>()
-const emit = defineEmits<{ applied: [result: ResultadoAsistida]; processing: [value: boolean] }>()
+const emit = defineEmits<{ applied: [result: ResultadoAsistida]; proposed: [result: ResultadoAsistida]; processing: [value: boolean] }>()
 const voice = useCapturaAsistida()
 const confirm = ref(false)
 const recording = ref(false)
@@ -60,7 +61,7 @@ function start(mode: 'record' | 'upload' = 'record') {
   pendingText.value = ''
   fileError.value = ''
   if (voice.processing.value) return
-  if (props.dirty) confirm.value = true
+  if (props.dirty && !props.reviewBeforeApply) confirm.value = true
   else void activate()
 }
 function proceed() {
@@ -69,7 +70,7 @@ function proceed() {
 }
 function reinterpret() {
   pendingText.value = corrected.value
-  if (props.dirty) confirm.value = true
+  if (props.dirty && !props.reviewBeforeApply) confirm.value = true
   else void send(undefined, pendingText.value)
 }
 function seleccionarAudio(event: Event) {
@@ -133,7 +134,8 @@ async function send(audio?: Blob, texto?: string) {
     result.propuesta_configurador &&
     result.version_proyeccion === 'PRF04_2'
   ) {
-    emit('applied', result)
+    if (props.reviewBeforeApply) emit('proposed', result)
+    else emit('applied', result)
   }
 }
 function cancel() {
