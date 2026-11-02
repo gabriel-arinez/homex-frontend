@@ -973,24 +973,17 @@ for (const width of [360, 390, 768, 1024, 1440])
     }
   })
 
-test('@a11y PRF04 cancelar reemplazo conserva formulario y devuelve foco', async ({ page }) => {
+test('@a11y PRF04 acciones directas de voz accesibles y sin reemplazo prematuro', async ({ page }) => {
   await mockBackend(page)
   await page.goto('/proformas/nueva')
   await page.getByRole('button', { name: 'Añadir ítem' }).click()
   await page.getByRole('button', { name: 'Mueble a pedido' }).click()
   await page.getByLabel('Nombre comercial del mueble').fill('Mueble previo')
-  const voice = page.getByRole('button', { name: 'Grabar descripción' })
-  await voice.click()
-  const dialog = page.getByRole('dialog', { name: 'Reemplazar información del mueble' })
-  await expect(dialog).toBeVisible()
-  const results = await new AxeBuilder({ page })
-    .include('[aria-labelledby="prf04-replace-title"]')
-    .analyze()
+  await expect(page.getByRole('button', { name: 'Grabar descripción' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Subir audio' })).toBeVisible()
+  const results = await new AxeBuilder({ page }).include('.voice-workflow').analyze()
   expect(results.violations).toEqual([])
-  await page.keyboard.press('Escape')
-  await expect(dialog).not.toBeVisible()
   await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Mueble previo')
-  await expect(voice).toBeFocused()
 })
 
 // HTTP fixture → composable → captura → editor/aplicarCaptura → formulario real.
@@ -1016,15 +1009,17 @@ for (const width of [360, 768, 1440]) {
     await page.getByRole('button', { name: 'Mueble a pedido' }).click()
     await page.getByLabel('Nombre comercial del mueble').fill('Mueble previo')
     await page.getByRole('button', { name: 'Subir audio' }).click()
-    await expect(
-      page.getByRole('dialog', { name: 'Reemplazar información del mueble' }),
-    ).toBeVisible()
     expect(captures).toBe(0)
     await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Mueble previo')
-    await page.getByRole('button', { name: 'Continuar con voz' }).click()
     await page
       .getByLabel('Seleccionar archivo de audio')
       .setInputFiles({ name: '24.wav', mimeType: 'audio/wav', buffer: Buffer.from('fixture') })
+    await expect(page.getByRole('heading', { name: 'Propuesta obtenida por voz' })).toBeVisible()
+    await expect(page.getByText('unidad del ancho', { exact: false }).first()).toBeVisible()
+    await studioStep(page, 'General')
+    await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Mueble previo')
+    await studioStep(page, 'Revisar')
+    await page.getByRole('button', { name: 'Aplicar propuesta al mueble' }).click()
     await studioStep(page, 'General')
     await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Escritorio')
     await studioStep(page, 'Precio')
@@ -1033,7 +1028,6 @@ for (const width of [360, 768, 1440]) {
     await studioStep(page, 'General')
     await expect(page.locator('#pendiente-ancho')).toContainText('ancho')
     const unit = page.getByLabel('Unidad de ancho', { exact: true })
-    await expect(unit).toBeFocused()
     await expect(unit).toHaveValue('')
     await expect(unit).toHaveAccessibleDescription(/unidad del ancho/)
     await expect(page.locator('#pendiente-ancho')).toBeVisible()
@@ -1065,7 +1059,6 @@ for (const width of [360, 768, 1440]) {
         .getByLabel('Corregir texto para una nueva interpretación')
         .fill(`Corrección ${terminal}`)
       await page.getByRole('button', { name: 'Interpretar texto corregido' }).click()
-      await page.getByRole('button', { name: 'Continuar con voz' }).click()
       await expect(
         page.getByRole('alert').filter({ hasText: 'No se obtuvo una propuesta utilizable' }),
       ).toBeVisible()
