@@ -1125,7 +1125,7 @@ test('PRF-FINAL convierte observaciones del cliente en área multilínea compart
   await page.goto('/proformas/nueva')
   await page.getByRole('button', { name: /Cliente$/ }).click()
   await page.getByRole('radio', { name: /Registrar nuevo/ }).check()
-  const comments = page.getByLabel('Observaciones')
+  const comments = page.locator('#proforma-cliente-observaciones')
   await expect(comments).toHaveJSProperty('tagName', 'TEXTAREA')
   await expect(comments).toHaveAttribute('maxlength', '250')
   await comments.fill('Recibir en la mañana.\nConfirmar dirección al llamar.')
