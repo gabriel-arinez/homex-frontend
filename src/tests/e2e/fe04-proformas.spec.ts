@@ -1070,7 +1070,7 @@ test('PRF-UX valida condiciones y mantiene mensaje de WhatsApp editable', async 
   await page.getByLabel('Validez de la oferta (días)').fill('99')
   await page.getByRole('button', { name: /Revisar$/ }).click()
   const message = page.getByLabel('Mensaje para WhatsApp')
-  await expect(message).toHaveValue(/Te saluda el equipo de HOMEX\./g)
+  await expect(message).toHaveValue(/Te saluda el equipo de HOMEX\./)
   await message.fill('Saludos, enviamos la proforma de HOMEX.')
   await page.getByRole('button', { name: 'Restaurar mensaje sugerido' }).click()
   await expect(message).toContainText('Te saluda el equipo de HOMEX.')
