@@ -80,6 +80,13 @@ const success = ref('')
 const fields = ref<Record<string, string[]>>({})
 const validationAttempted = ref(false)
 const localErrors = ref<Record<string, string>>({})
+const conditionsTouched = ref<Record<string, boolean>>({})
+function conditionError(field: keyof ReturnType<typeof validateQuoteConditions>): string {
+  return localErrors.value[field] ||
+    ((conditionsTouched.value[field] || validationAttempted.value)
+      ? validateQuoteConditions(header)[field] || ''
+      : '')
+}
 const dirty = ref(false)
 const conflicted = ref(false)
 const persisted = ref<Proforma | null>(null)
@@ -1255,7 +1262,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         </div>
         <div class="form-grid">
           <div class="form-grid__full">
-            <TextField v-model="header.titulo" name="titulo" label="Título" :max-length="QUOTE_LIMITS.titulo" :error="localErrors.titulo" />
+            <TextField v-model="header.titulo" name="titulo" label="Título" :max-length="QUOTE_LIMITS.titulo" :error="conditionError('titulo')" @blur="conditionsTouched.titulo = true" />
             <small>Un título breve que identifique esta cotización.</small>
           </div>
           <fieldset class="currency-choice form-grid__full">
@@ -1280,10 +1287,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             input-mode="decimal"
             input-rule="decimal"
             :max-length="6"
-            :error="localErrors.porcentaje_adelanto"
+            :error="conditionError('porcentaje_adelanto')" @blur="conditionsTouched.porcentaje_adelanto = true"
             hint="Opcional: 0–100 %, hasta 2 decimales."
           />
-          <TextField v-model="header.plazo_entrega" name="plazo" label="Plazo de entrega" :max-length="QUOTE_LIMITS.plazo_entrega" :error="localErrors.plazo_entrega" hint="Máximo 45 caracteres." />
+          <TextField v-model="header.plazo_entrega" name="plazo" label="Plazo de entrega" :max-length="QUOTE_LIMITS.plazo_entrega" :error="conditionError('plazo_entrega')" @blur="conditionsTouched.plazo_entrega = true" hint="Máximo 45 caracteres." />
           <TextField
             v-model="header.validez_oferta"
             name="validez"
@@ -1292,7 +1299,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             input-mode="numeric"
             input-rule="digits"
             :max-length="2"
-            :error="localErrors.validez_oferta"
+            :error="conditionError('validez_oferta')" @blur="conditionsTouched.validez_oferta = true"
             hint="Opcional: entre 1 y 99 días."
           />
           <label class="quote-textarea form-grid__full" for="quote-observaciones">
@@ -1303,10 +1310,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               name="observaciones"
               rows="4"
               :maxlength="QUOTE_LIMITS.observaciones"
-              :aria-invalid="Boolean(localErrors.observaciones)"
+              @blur="conditionsTouched.observaciones = true"
+              :aria-invalid="Boolean(conditionError('observaciones'))"
               placeholder="Condiciones adicionales para esta cotización..."
             />
-            <small v-if="localErrors.observaciones" class="condition-error" role="alert">{{ localErrors.observaciones }}</small>
+            <small v-if="conditionError('observaciones')" class="condition-error" role="alert">{{ conditionError('observaciones') }}</small>
             <small v-else class="field-count">{{ header.observaciones.length }}/250 caracteres</small>
           </label>
         </div>
