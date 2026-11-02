@@ -1292,178 +1292,104 @@ onMounted(loadCatalog)
             definitivo se calcula en PostgreSQL.
           </p>
         </section>
-        <section
-          id="revision"
-          v-show="!studio || activeSection === 'revision'"
-          aria-labelledby="revision-title"
-        >
-          <h3 id="revision-title">Revisar mueble</h3>
-          <dl class="review-grid">
+        <section id="revision" v-show="!studio || activeSection === 'revision'" class="furniture-review" aria-labelledby="revision-title">
+          <header class="review-hero">
             <div>
-              <dt>Nombre comercial</dt>
-              <dd>{{ comercial.nombre || 'Dato no especificado' }}</dd>
+              <p class="review-eyebrow">FICHA TÉCNICO-COMERCIAL</p>
+              <h3 id="revision-title">Revisar mueble</h3>
+              <h4>{{ comercial.nombre || 'Mueble pendiente de nombre' }}</h4>
+              <p>{{ tiposLocales.find((x) => String(x.id) === form.tipo_mueble)?.nombre || 'Tipo de mueble no especificado' }}</p>
             </div>
-            <div>
-              <dt>Tipo</dt>
-              <dd>
-                {{
-                  tiposLocales.find((x) => String(x.id) === form.tipo_mueble)?.nombre ||
-                  'Dato no especificado'
-                }}
-              </dd>
+            <span class="review-check"><CheckCircle2 :size="24" aria-hidden="true" /></span>
+          </header>
+          <div v-if="Object.values(erroresSecciones).some((lista) => lista.length)" class="review-alert" aria-label="Datos que debes revisar">
+            <h4><AlertCircle :size="19" aria-hidden="true" /> Información por completar</h4>
+            <p>Revisa estos datos antes de incorporar el mueble a la proforma.</p>
+            <div v-for="section in (['general','estructura','accesorios','comercial'] as const)" :key="section">
+              <button v-for="(issue, index) in erroresSecciones[section]" :key="index" type="button" @click="irASeccion(section)">
+                <AlertCircle :size="15" aria-hidden="true" /> {{ issue }} <Pencil :size="14" aria-hidden="true" />
+              </button>
             </div>
-            <div>
-              <dt>Cantidad cotizada</dt>
-              <dd>
-                {{ comercial.cantidad || 'Dato no especificado' }}
-                {{ unidades?.find((u) => String(u.id) === comercial.unidad)?.nombre }}
-              </dd>
-            </div>
-            <div>
-              <dt>Precio unitario</dt>
-              <dd>
-                {{ comercial.precio_unitario || 'Dato no especificado' }} {{ moneda ?? 'BOB' }}
-              </dd>
-            </div>
-            <div>
-              <dt>Descuento de línea</dt>
-              <dd>{{ comercial.descuento ?? '0.00' }}</dd>
-            </div>
-            <div>
-              <dt>Componentes</dt>
-              <dd>{{ componentes.length }}</dd>
-            </div>
-            <div>
-              <dt>Accesorios</dt>
-              <dd>{{ accesorios.filter((x) => x.trim()).length }}</dd>
-            </div>
-            <div>
-              <dt>Total estimado</dt>
-              <dd>
-                {{ totalEstimado === null ? 'Pendiente' : totalEstimado.toFixed(2) }}
-                {{ moneda ?? 'BOB' }}
-              </dd>
-            </div>
-          </dl>
-          <div class="review-detail">
-            <h4>Dimensiones generales</h4>
-            <ul>
-              <li v-for="medida in medidas.filter((m) => m.valor.trim())" :key="medida.clave">
-                {{ medida.clave.replace(/_/g, ' ') }}: {{ medida.valor }} {{ medida.unidad }}
-              </li>
-            </ul>
-            <p v-if="!medidas.some((m) => m.valor.trim())">Dato no especificado.</p>
-            <h4>Atributos generales</h4>
-            <ul>
-              <li v-for="attr in atributosGenerales" :key="attr.codigo || attr.nombre">
-                {{ attr.nombre }}: {{ attr.valor }} {{ attr.unidad ?? '' }}
-              </li>
-            </ul>
-            <h4>Conjuntos</h4>
-            <ul>
-              <li v-for="grupo in conjuntos" :key="grupo.uid">
-                {{ grupo.nombre }}:
-                {{
-                  componentes
-                    .filter((c) => c.conjunto_uid === grupo.uid)
-                    .map((c) => c.nombre)
-                    .join(', ') || 'Sin componentes'
-                }}
-              </li>
-            </ul>
-            <h4>Componentes y sus características</h4>
-            <article v-for="c in componentes" :key="c.uid" class="review-piece">
-              <h5>
-                {{ c.nombre || 'Sin nombre' }} · Cantidad por mueble:
-                {{ c.cantidad_interna ?? 'No indicada' }}
-              </h5>
-              <p v-if="c.material">Material: {{ c.material }}</p>
-              <p v-if="c.espesor">Espesor: {{ c.espesor }}</p>
-              <p v-if="c.color">Color: {{ c.color }}</p>
-              <p v-if="c.dimensiones">Dimensiones: {{ c.dimensiones }}</p>
-              <p v-if="c.conjunto_uid">
-                Conjunto: {{ conjuntos.find((g) => g.uid === c.conjunto_uid)?.nombre }}
-              </p>
-              <ul>
-                <li v-for="attr in c.atributos ?? []" :key="attr.codigo || attr.nombre">
-                  {{ attr.nombre }}: {{ attr.valor }} {{ attr.unidad ?? '' }}
-                </li>
-              </ul>
-            </article>
-            <h4>Accesorios incluidos</h4>
-            <ul>
-              <li v-for="(acc, i) in accesorios" :key="i">{{ acc || 'Pendiente de completar' }}</li>
-            </ul>
-            <h4>Observaciones y pendientes</h4>
-            <p>{{ form.observaciones || 'Sin observaciones adicionales.' }}</p>
-            <ul>
-              <li v-for="(warning, i) in base.advertencias ?? []" :key="i">{{ warning }}</li>
-            </ul>
-            <p v-if="base.descripcion_original">
-              Descripción original conservada: {{ base.descripcion_original }}
-            </p>
           </div>
-          <p>
-            La ficha se incorporará localmente. La proforma sólo se enviará al servidor al guardar
-            el borrador o emitirla.
-          </p>
+          <div v-if="pendientesVisibles.length" class="review-pending">
+            <h4>Datos reconocidos por voz pendientes de comprobación</h4>
+            <p>Revisa las propuestas del dictado. Los datos ambiguos no se confirmarán automáticamente.</p>
+            <ul><li v-for="p in pendientesVisibles" :key="p.indice">{{ p.mensaje }}</li></ul>
+          </div>
+          <article class="review-card">
+            <header><h4>Información general</h4><button type="button" @click="irASeccion('general')"><Pencil :size="15" aria-hidden="true" /> Editar</button></header>
+            <div class="review-info">
+              <div><span>Nombre comercial</span><strong>{{ comercial.nombre || 'Pendiente' }}</strong></div>
+              <div><span>Tipo de mueble</span><strong>{{ tiposLocales.find((x) => String(x.id) === form.tipo_mueble)?.nombre || 'No especificado' }}</strong></div>
+            </div>
+            <h5>Dimensiones generales</h5>
+            <div v-if="medidas.some((m) => m.valor.trim())" class="review-measures">
+              <div v-for="medida in medidas.filter((m) => m.valor.trim())" :key="medida.clave">
+                <span>{{ medida.clave.replace(/_/g, ' ') }}</span>
+                <strong>{{ medida.valor }} {{ medida.unidad || 'Unidad pendiente' }}</strong>
+              </div>
+            </div>
+            <p v-else class="review-empty">No se especificaron medidas generales.</p>
+            <div v-if="atributosGenerales.length">
+              <h5>Características generales</h5>
+              <div class="review-attributes">
+                <p v-for="attr in atributosGenerales" :key="attr.codigo || attr.nombre">{{ attr.nombre }}: <strong>{{ attr.valor || 'Pendiente' }} {{ attr.unidad ?? '' }}</strong></p>
+              </div>
+            </div>
+          </article>
+          <article class="review-card">
+            <header><h4>Estructura y componentes</h4><button type="button" @click="irASeccion('estructura')"><Pencil :size="15" aria-hidden="true" /> Editar</button></header>
+            <div class="review-metrics">
+              <span>{{ conjuntos.length }} conjuntos</span><span>{{ componentes.length }} componentes</span>
+            </div>
+            <p v-if="!componentes.length" class="review-empty">No se agregaron componentes técnicos.</p>
+            <details v-for="grupo in gruposArbol" :key="grupo.id" class="review-group" open>
+              <summary>{{ grupo.nombre }} <small>{{ grupo.piezas.length }} componentes</small></summary>
+              <div v-for="item in grupo.piezas" :key="item.pieza.uid || item.index" class="review-piece">
+                <div><strong>{{ item.pieza.nombre || 'Componente pendiente de nombre' }}</strong><span>{{ item.pieza.cantidad_interna ?? '—' }} por mueble</span></div>
+                <dl class="review-piece-attributes">
+                  <div v-if="item.pieza.material"><dt>Material</dt><dd>{{ item.pieza.material }}</dd></div>
+                  <div v-if="item.pieza.espesor"><dt>Espesor</dt><dd>{{ item.pieza.espesor }}</dd></div>
+                  <div v-if="item.pieza.color"><dt>Color</dt><dd>{{ item.pieza.color }}</dd></div>
+                  <div v-if="item.pieza.dimensiones"><dt>Dimensiones</dt><dd>{{ readableDimension(item.pieza.dimensiones) }}</dd></div>
+                  <div v-for="attr in item.pieza.atributos ?? []" :key="attr.codigo || attr.nombre"><dt>{{ attr.nombre }}</dt><dd>{{ attr.valor }} {{ attr.unidad ?? '' }}</dd></div>
+                </dl>
+              </div>
+            </details>
+          </article>
+          <article class="review-card">
+            <header><h4>Accesorios y observaciones</h4><button type="button" @click="irASeccion('accesorios')"><Pencil :size="15" aria-hidden="true" /> Editar</button></header>
+            <ul v-if="accesorios.filter((a) => a.trim()).length" class="review-accessories">
+              <li v-for="(acc, index) in accesorios.filter((a) => a.trim())" :key="index"><CheckCircle2 :size="16" aria-hidden="true" /> {{ acc }}</li>
+            </ul>
+            <p v-else class="review-empty">Sin accesorios registrados.</p>
+            <h5>Observaciones</h5>
+            <p>{{ form.observaciones || 'Sin observaciones adicionales.' }}</p>
+            <div v-if="base.advertencias?.length" class="review-history">
+              <h5>Advertencias de la información anterior</h5>
+              <ul><li v-for="warning in base.advertencias" :key="warning">{{ warning }}</li></ul>
+            </div>
+            <details v-if="base.descripcion_original"><summary>Ver descripción técnica original conservada</summary><p>{{ base.descripcion_original }}</p></details>
+          </article>
+          <article class="review-card review-commercial">
+            <header><h4>Datos comerciales</h4><button type="button" @click="irASeccion('comercial')"><Pencil :size="15" aria-hidden="true" /> Editar</button></header>
+            <div class="review-price-grid">
+              <div><span>Cantidad cotizada</span><strong>{{ comercial.cantidad || 'Pendiente' }} {{ unidades?.find((u) => String(u.id) === comercial.unidad)?.nombre ?? '' }}</strong></div>
+              <div><span>Precio unitario</span><strong>{{ comercial.precio_unitario || 'Pendiente' }} {{ moneda ?? 'BOB' }}</strong></div>
+              <div><span>Descuento</span><strong>{{ comercial.descuento || 'Pendiente' }} {{ moneda ?? 'BOB' }}</strong></div>
+            </div>
+            <p v-if="comercial.descripcion">Descripción comercial: {{ comercial.descripcion }}</p>
+            <div class="review-price-total"><span>Total estimado del mueble</span><strong>{{ totalEstimado === null ? 'Importe pendiente' : totalEstimado.toFixed(2) + ' ' + (moneda ?? 'BOB') }}</strong></div>
+            <p class="review-price-hint">El total definitivo se confirmará cuando guardes la proforma.</p>
+          </article>
+          <p class="review-final-note">El mueble se añadirá a esta proforma. Después podrás guardar la proforma o emitirla.</p>
         </section>
       </div>
-      <aside v-if="studio" class="studio-summary" aria-label="Resumen del mueble">
-        <div class="summary-heading">
-          <p>RESUMEN DE CONFIGURACIÓN</p>
-          <h3>{{ comercial.nombre || 'Mueble sin nombre' }}</h3>
-          <span>{{
-            tiposLocales.find((t) => String(t.id) === form.tipo_mueble)?.nombre ||
-            'Tipo sin especificar'
-          }}</span>
-        </div>
-        <div class="summary-measures">
-          <p>Dimensiones generales</p>
-          <ul v-if="medidaResumen.length">
-            <li v-for="medida in medidaResumen" :key="medida">{{ medida }}</li>
-          </ul>
-          <span v-else>Aún no se indicaron medidas.</span>
-        </div>
-        <div class="summary-counts">
-          <div>
-            <span>Conjuntos</span
-            ><strong>{{ conjuntos.length }} / {{ limites.max_conjuntos }}</strong>
-          </div>
-          <div>
-            <span>Componentes</span
-            ><strong>{{ componentes.length }} / {{ limites.max_componentes }}</strong>
-          </div>
-          <div>
-            <span>Accesorios</span><strong>{{ accesorios.filter((a) => a.trim()).length }}</strong>
-          </div>
-        </div>
-        <button
-          v-if="pendientesVisibles.length"
-          type="button"
-          class="summary-pending"
-          @click="emit('requestSection', 'revision')"
-        >
-          {{ pendientesVisibles.length }}
-          {{ pendientesVisibles.length === 1 ? 'dato requiere' : 'datos requieren' }} revisión. Ver
-          en el último apartado.
-        </button>
-        <div class="summary-total">
-          <span>Total estimado de línea</span>
-          <strong>{{
-            totalEstimado === null
-              ? 'Pendiente'
-              : totalEstimado.toFixed(2) + ' ' + (moneda ?? 'BOB')
-          }}</strong>
-          <small>El importe definitivo se calcula al guardar la proforma.</small>
-        </div>
-      </aside>
     </div>
     <p v-if="error || externalError" role="alert">{{ error || externalError }}</p>
-    <div class="actions">
-      <Button type="submit" :disabled="processing" aria-label="Guardar especificación"
-        >Agregar mueble a la proforma</Button
-      ><Button variant="secondary" @click="emit('cancel')">Cancelar</Button>
+    <div v-if="!studio || activeSection === 'revision'" class="actions review-actions">
+      <Button type="submit" :disabled="processing" aria-label="Guardar especificación">Agregar mueble a la proforma</Button>
+      <Button v-if="!studio" variant="secondary" @click="emit('cancel')">Cancelar</Button>
     </div>
   </form>
 </template>
