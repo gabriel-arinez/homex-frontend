@@ -162,6 +162,13 @@ const nuevoCliente = reactive({
 })
 function updateNuevoCliente(field: keyof typeof nuevoCliente, value: string) {
   nuevoCliente[field] = value
+  const backendField = 'cliente_nuevo.' + field
+  if (fields.value[backendField]) {
+    const remaining = { ...fields.value }
+    delete remaining[backendField]
+    fields.value = remaining
+  }
+  if (error.value.startsWith('Revisa los campos señalados')) error.value = ''
 }
 const lineas = ref<LineaLocal[]>([])
 const confirmation = ref<{ title: string; description: string; confirmLabel: string } | null>(null)
