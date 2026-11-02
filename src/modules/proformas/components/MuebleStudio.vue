@@ -193,7 +193,7 @@ function retroceder() {
       </details>
       <div v-if="propuestaPorConfirmar.pendientes.length" class="studio-proposal-pending">
         <h4>{{ propuestaPorConfirmar.pendientes.length }} datos que requieren revisión</h4>
-        <ul><li v-for="p in propuestaPorConfirmar.pendientes" :key="p.indice">{{ p.mensaje }}</li></ul>
+        <ul><li v-for="(p, i) in propuestaPorConfirmar.pendientes" :key="p.codigo + ':' + p.ruta + ':' + i">{{ p.mensaje }}</li></ul>
       </div>
       <p class="studio-proposal-disclaimer">La ficha que aparece debajo todavía contiene los datos anteriores. Al aplicar la propuesta se reemplazarán los datos de este mueble, pero no los demás ítems de la proforma.</p>
       <div class="studio-proposal-actions">
