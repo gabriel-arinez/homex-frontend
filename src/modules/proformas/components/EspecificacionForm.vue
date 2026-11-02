@@ -349,14 +349,6 @@ function serializarDimensiones(): unknown {
 const conjuntos = reactive<ConjuntoTecnico[]>(structuredClone(base.conjuntos ?? []))
 const componentes = reactive<ComponenteTecnico[]>(structuredClone(base.componentes ?? []))
 const activeComponentUid = ref(componentes[0]?.uid ?? (componentes.length ? '0' : ''))
-const componentesOrganizados = computed(() => {
-  const withIndex = componentes.map((parte, index) => ({ parte, index }))
-  return withIndex.sort((a, b) => {
-    const ga = conjuntos.findIndex((g) => g.uid === a.parte.conjunto_uid)
-    const gb = conjuntos.findIndex((g) => g.uid === b.parte.conjunto_uid)
-    return (ga < 0 ? conjuntos.length : ga) - (gb < 0 ? conjuntos.length : gb) || a.index - b.index
-  })
-})
 const gruposArbol = computed(() => [
   ...conjuntos.map((grupo) => ({
     id: grupo.uid, nombre: grupo.nombre.trim() || 'Conjunto pendiente de nombre',
@@ -367,17 +359,6 @@ const gruposArbol = computed(() => [
     piezas: componentes.map((pieza, index) => ({ pieza, index })).filter((x) => !x.pieza.conjunto_uid),
   },
 ].filter((grupo) => grupo.piezas.length > 0))
-const medidaResumen = computed(() =>
-  medidas
-    .filter((m) => m.valor.trim())
-    .map(
-      (m) =>
-        m.clave.replace(/_/g, ' ') +
-        ': ' +
-        m.valor +
-        (m.unidad ? ' ' + m.unidad : ' · unidad pendiente'),
-    ),
-)
 const accesorios = reactive<string[]>(structuredClone(base.accesorios ?? []))
 const accesorioEnEdicion = ref<number | null>(null)
 const componentesRetirados = ref<Array<{ item: ComponenteTecnico; index: number }>>([])
@@ -1539,314 +1520,110 @@ details.card[open] > summary {
   }
 }
 
-/* Espacio de trabajo del mueble: la ficha técnica se conserva, la presentación se divide por etapas. */
-.configurator--studio {
-  display: grid;
-  gap: var(--space-4);
-}
-.configurator--studio .configurator-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(15rem, 19rem);
-  align-items: start;
-  gap: var(--space-5);
-}
-.configurator--studio .configurator-fields {
-  min-width: 0;
-  display: grid;
-  align-content: start;
-  gap: var(--space-4);
-}
-.configurator--studio .configurator-fields > section {
-  min-width: 0;
-  padding: var(--space-5);
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
-}
-.configurator--studio section h3 {
-  font-size: 1rem;
-  letter-spacing: -0.01em;
-}
-.configurator--studio .configurator-fields > section > p {
-  color: var(--color-text-secondary);
-  font-size: 0.85rem;
-}
-.configurator--studio :deep(input:not([type='checkbox'])),
-.configurator--studio :deep(select),
-.configurator--studio :deep(textarea) {
-  min-height: 2.55rem;
-  max-width: 100%;
-}
-.configurator--studio .inline {
-  align-items: end;
-  gap: var(--space-3);
-}
-.configurator--studio .inline > * {
-  min-width: 0;
-}
-.configurator--studio #dimensiones .inline {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(8rem, 11rem) auto;
-  align-items: end;
-}
-.configurator--studio #dimensiones .inline > p {
-  grid-column: 1 / -1;
-}
-.configurator--studio #dimensiones .inline > label {
-  min-width: 0;
-}
-.configurator--studio #identificacion > .inline {
-  display: flex;
-}
-.configurator--studio .studio-component-layout {
-  display: grid;
-  grid-template-columns: minmax(12rem, 0.85fr) minmax(0, 1.6fr);
-  gap: var(--space-3);
-  align-items: start;
-}
-.configurator--studio .studio-component-tree {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-muted);
-}
-.configurator--studio .tree-heading {
-  margin: 0 0 0.2rem;
-  color: var(--color-text-secondary);
-  font-size: 0.7rem;
-  font-weight: 750;
-  letter-spacing: 0.08em;
-}
-.configurator--studio .tree-item {
-  display: grid;
-  gap: 0.2rem;
-  width: 100%;
-  min-width: 0;
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  color: var(--color-text);
-  background: var(--color-surface);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.configurator--studio .tree-item--active {
-  border-color: var(--color-primary);
-  background: var(--color-primary-soft);
-}
-.configurator--studio .tree-item:focus-visible {
-  outline: 3px solid var(--color-primary);
-  outline-offset: 2px;
-}
-.configurator--studio .tree-item strong {
-  font-size: 0.8rem;
-  overflow-wrap: anywhere;
-}
-.configurator--studio .tree-item small,
-.configurator--studio .tree-empty {
-  color: var(--color-text-secondary);
-  font-size: 0.72rem;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-.configurator--studio .studio-component-detail {
-  min-width: 0;
-  display: grid;
-  gap: var(--space-3);
-}
-.configurator--studio .studio-component-detail details {
-  margin: 0;
-  background: var(--color-surface-muted);
-}
-.configurator--studio .studio-component-detail .grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-.configurator--studio .studio-component-detail .attribute-search,
-.configurator--studio .attribute-search {
-  position: static;
-}
-.configurator--studio .empty-editor {
-  border: 1px dashed var(--color-border-strong);
-  border-radius: var(--radius-card);
-  padding: var(--space-6);
-  text-align: center;
-}
-.configurator--studio .empty-editor h4 {
-  margin: 0;
-}
-.configurator--studio .empty-editor p {
-  color: var(--color-text-secondary);
-  font-size: 0.82rem;
-}
-.configurator--studio .studio-summary {
-  display: grid;
-  gap: var(--space-4);
-  position: sticky;
-  top: var(--space-4);
-  min-width: 0;
-  padding: var(--space-5);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
-  box-shadow: 0 8px 30px rgb(0 0 0 / 3%);
-}
-.configurator--studio .summary-heading p,
-.configurator--studio .summary-measures > p {
-  margin: 0 0 0.45rem;
-  color: var(--color-text-secondary);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-}
-.configurator--studio .summary-heading h3 {
-  font-size: 1.04rem;
-  margin-bottom: 0.25rem;
-  overflow-wrap: anywhere;
-}
-.configurator--studio .summary-heading span,
-.configurator--studio .summary-measures span {
-  color: var(--color-text-secondary);
-  font-size: 0.77rem;
-}
-.configurator--studio .summary-measures,
-.configurator--studio .summary-counts,
-.configurator--studio .summary-total {
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--color-border);
-}
-.configurator--studio .summary-measures ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 0.35rem;
-  font-size: 0.77rem;
-}
-.configurator--studio .summary-counts {
-  display: grid;
-  gap: 0.65rem;
-}
-.configurator--studio .summary-counts div {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-2);
-  font-size: 0.8rem;
-}
-.configurator--studio .summary-counts span {
-  color: var(--color-text-secondary);
-}
-.configurator--studio .summary-pending {
-  background: var(--color-danger-soft, var(--color-surface-muted));
-  color: var(--color-text);
-  padding: var(--space-3);
-  border: 1px solid var(--color-danger);
-  border-radius: var(--radius-control);
-  text-align: left;
-  cursor: pointer;
-  font-size: 0.75rem;
-}
-.configurator--studio .summary-total {
-  display: grid;
-  gap: 0.35rem;
-}
-.configurator--studio .summary-total span {
-  color: var(--color-text-secondary);
-  font-size: 0.75rem;
-}
-.configurator--studio .summary-total strong {
-  font-size: 1.35rem;
-  font-variant-numeric: tabular-nums;
-}
-.configurator--studio .summary-total small {
-  color: var(--color-text-secondary);
-  font-size: 0.7rem;
-  line-height: 1.4;
-}
-.configurator--studio .actions {
-  justify-content: end;
-  background: var(--color-surface);
-  padding: var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-}
-.configurator--studio #revision .review-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-2);
-}
-.configurator--studio #revision .review-grid div {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-}
-.configurator--studio #revision .review-grid dt {
-  color: var(--color-text-secondary);
-  font-size: 0.72rem;
-  font-weight: 650;
-}
-.configurator--studio #revision .review-grid dd {
-  margin: 0.4rem 0 0;
-  font-size: 0.88rem;
-  overflow-wrap: anywhere;
-}
-.configurator--studio #revision .review-detail {
-  display: grid;
-  gap: var(--space-2);
-}
-.configurator--studio #revision .review-detail h4 {
-  margin: var(--space-2) 0 0;
-  font-size: 0.86rem;
-}
-.configurator--studio #revision .review-detail p,
-.configurator--studio #revision .review-detail li {
-  font-size: 0.78rem;
-}
-@media (max-width: 85rem) {
-  .configurator--studio .configurator-layout {
-    grid-template-columns: minmax(0, 1fr) 15rem;
-  }
-  .configurator--studio .studio-component-layout {
-    grid-template-columns: 1fr;
-  }
-  .configurator--studio .studio-component-tree {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .configurator--studio .tree-heading,
-  .configurator--studio .tree-empty {
-    grid-column: 1 / -1;
-  }
-}
-@media (max-width: 65rem) {
-  .configurator--studio .configurator-layout {
-    grid-template-columns: 1fr;
-  }
-  .configurator--studio .studio-summary {
-    position: static;
-    grid-row: 1;
-  }
-  .configurator--studio .summary-counts {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .configurator--studio .summary-counts div {
-    display: grid;
-  }
-}
-@media (max-width: 36rem) {
-  .configurator--studio #dimensiones .inline {
-    grid-template-columns: minmax(0, 1fr) minmax(6rem, 0.65fr);
-  }
-  .configurator--studio .studio-component-tree,
-  .configurator--studio .studio-component-detail .grid,
-  .configurator--studio #revision .review-grid {
-    grid-template-columns: 1fr;
-  }
-  .configurator--studio .actions,
-  .configurator--studio #identificacion > .inline {
-    align-items: stretch;
-    flex-direction: column;
-  }
-  .configurator--studio .configurator-fields > section {
-    padding: var(--space-3);
-  }
-}
+
+/* Furniture Studio 2.0 — el editor ocupa toda la superficie disponible. */
+.configurator--studio .configurator-layout { display:block; min-width:0; }
+.configurator--studio .configurator-fields { display:grid; gap:var(--space-4); min-width:0; }
+.configurator--studio .configurator-fields > section { min-width:0; padding:clamp(1rem,2.2vw,1.6rem); border:1px solid var(--color-border); background:var(--color-surface); border-radius:var(--radius-card); }
+.configurator--studio .configurator-fields > section > h3 { margin-bottom:.4rem; font-size:1rem; }
+.configurator--studio .configurator-fields > section > p { color:var(--color-text-secondary); font-size:.83rem; }
+.configurator--studio .configurator-fields #identificacion { gap:1.05rem; }
+.configurator--studio #identificacion .field:first-of-type { max-width:46rem; }
+.configurator--studio .dimensions-section .measure-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--space-3); margin:var(--space-3) 0; }
+.configurator--studio .dimensions-section .measure-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(5.8rem,.38fr); gap:.6rem; align-items:start; min-width:0; }
+.configurator--studio .dimensions-section .measure-row label { min-width:0; font-size:.82rem; font-weight:600; }
+.configurator--studio .dimensions-section .measure-row label select { width:100%; min-height:2.75rem; margin-top:.45rem; background:var(--color-surface); color:var(--color-text); border:1px solid var(--color-border-strong); border-radius:var(--radius-control); }
+.configurator--studio .dimensions-section .dimension-pending { grid-column:1/-1; color:var(--color-danger-text); margin:0; font-size:.77rem; }
+.configurator--studio .dimensions-section .measure-row > button { grid-column:1/-1; justify-self:start; }
+.configurator--studio .dimensions-section .mueble-picker { max-width:36rem; }
+.configurator--studio .attribute-search { position:static; background:transparent; padding:0; max-width:40rem; }
+.configurator--studio #componentes { display:grid; gap:1rem; }
+.configurator--studio .studio-component-layout { display:grid; grid-template-columns:minmax(13rem,.72fr) minmax(0,1.6fr); gap:1rem; align-items:start; min-width:0; }
+.configurator--studio .studio-component-tree { display:grid; align-content:start; gap:.65rem; padding:1rem; background:var(--color-surface-muted); border:1px solid var(--color-border); border-radius:var(--radius-control); min-width:0; }
+.configurator--studio .tree-heading { display:flex; align-items:center; gap:.5rem; margin:0 0 .5rem; font-size:.7rem; color:var(--color-text-secondary); font-weight:750; letter-spacing:.06em; }
+.configurator--studio .tree-empty { font-size:.78rem; color:var(--color-text-secondary); line-height:1.5; }
+.configurator--studio .tree-group { display:grid; gap:.4rem; }
+.configurator--studio .tree-group h4 { display:flex; align-items:center; justify-content:space-between; gap:.5rem; font-size:.83rem; margin:.5rem 0 .15rem; }
+.configurator--studio .tree-group h4 small { color:var(--color-text-secondary); }
+.configurator--studio .tree-item { display:grid; gap:.2rem; text-align:left; padding:.75rem; min-width:0; border:1px solid var(--color-border); border-radius:var(--radius-control); color:var(--color-text); background:var(--color-surface); font:inherit; cursor:pointer; }
+.configurator--studio .tree-item:hover { border-color:var(--color-border-strong); }
+.configurator--studio .tree-item--active { border-color:var(--color-primary); background:var(--color-primary-soft); }
+.configurator--studio .tree-item:focus-visible { outline:2px solid var(--color-primary); outline-offset:2px; }
+.configurator--studio .tree-item strong { overflow-wrap:anywhere; font-size:.85rem; }
+.configurator--studio .tree-item small { color:var(--color-text-secondary); font-size:.73rem; }
+.configurator--studio .studio-component-detail { min-width:0; }
+.configurator--studio .studio-component-detail details.card { background:var(--color-surface-muted); min-width:0; margin:0; }
+.configurator--studio .studio-component-detail .heading { gap:.5rem; align-items:center; }
+.configurator--studio .studio-component-detail .grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.configurator--studio .studio-component-detail button { cursor:pointer; }
+.configurator--studio .studio-component-detail button:focus-visible { outline:2px solid var(--color-primary); }
+.configurator--studio .studio-component-detail .attribute-search { margin-top:1rem; }
+.configurator--studio .empty-editor { padding:2.5rem; border:1px dashed var(--color-border-strong); border-radius:var(--radius-card); text-align:center; }
+.configurator--studio .empty-editor h4 { margin:0 0 .3rem; }
+.configurator--studio .empty-editor p { font-size:.83rem; color:var(--color-text-secondary); }
+.configurator--studio .studio-group-card { background:var(--color-surface-muted); }
+.configurator--studio .studio-group-card .inline { align-items:end; }
+.configurator--studio .undo-notice { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.5rem; padding:.6rem .9rem; border:1px solid var(--color-border); border-radius:var(--radius-control); background:var(--color-surface-muted); font-size:.8rem; }
+.configurator--studio .undo-notice button { border:0; background:none; color:var(--color-primary-accent); font-weight:700; cursor:pointer; }
+.configurator--studio .accessory-count { color:var(--color-text-secondary); font-size:.78rem; }
+.configurator--studio .accessory-item--studio { display:flex; flex-wrap:wrap; gap:.8rem; align-items:center; max-width:55rem; background:var(--color-surface-muted); border:1px solid var(--color-border); padding:.75rem; border-radius:var(--radius-control); }
+.configurator--studio .accessory-item--studio .field { flex:1; min-width:13rem; }
+.configurator--studio .accessory-item-label { display:flex; gap:.6rem; flex:1; align-items:center; min-width:0; }
+.configurator--studio .accessory-item-label svg { color:var(--color-success); flex-shrink:0; }
+.configurator--studio .accessory-item-label strong { overflow-wrap:anywhere; font-size:.85rem; }
+.configurator--studio .commercial-total { display:grid; gap:.7rem; padding:1rem; border-radius:var(--radius-card); border:1px solid var(--color-border); background:var(--color-surface-muted); max-width:45rem; }
+.configurator--studio .commercial-total > div { display:flex; justify-content:space-between; gap:1rem; align-items:baseline; font-size:.86rem; }
+.configurator--studio .commercial-total > div span { color:var(--color-text-secondary); }
+.configurator--studio .commercial-total .commercial-total-main { padding-top:1rem; border-top:1px solid var(--color-border-strong); font-weight:700; }
+.configurator--studio .commercial-total .commercial-total-main strong { font-size:1.45rem; font-variant-numeric:tabular-nums; }
+.configurator--studio .commercial-total p { margin:.1rem 0 0; color:var(--color-text-secondary); font-size:.72rem; }
+.configurator--studio #revision { display:grid; gap:1.2rem; border:0; padding:0; background:transparent; }
+.configurator--studio .review-hero { display:flex; justify-content:space-between; align-items:start; gap:1rem; padding:1.6rem; background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-card); }
+.configurator--studio .review-eyebrow { margin:0; color:var(--color-text-secondary); font-size:.67rem; font-weight:750; letter-spacing:.09em; }
+.configurator--studio .review-hero h3 { margin:.3rem 0 .65rem; font-size:.87rem; color:var(--color-text-secondary); }
+.configurator--studio .review-hero h4 { margin:0 0 .35rem; font-size:clamp(1.25rem,2vw,1.65rem); }
+.configurator--studio .review-hero p:last-child { margin:0; font-size:.8rem; color:var(--color-text-secondary); }
+.configurator--studio .review-check { color:var(--color-success); }
+.configurator--studio .review-check--pending { color:var(--color-danger); }
+.configurator--studio .review-card { display:grid; gap:1rem; padding:clamp(1rem,2vw,1.6rem); background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-card); min-width:0; }
+.configurator--studio .review-card > header { display:flex; justify-content:space-between; align-items:center; gap:1rem; }
+.configurator--studio .review-card h4 { font-size:1.02rem; margin:0; }
+.configurator--studio .review-card h5 { font-size:.83rem; margin:.2rem 0 .25rem; }
+.configurator--studio .review-card header button { display:flex; gap:.4rem; align-items:center; color:var(--color-primary-accent); background:transparent; border:0; font:inherit; font-size:.8rem; font-weight:700; cursor:pointer; }
+.configurator--studio .review-info, .configurator--studio .review-measures, .configurator--studio .review-price-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.6rem; }
+.configurator--studio .review-info { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.configurator--studio .review-info > div, .configurator--studio .review-measures > div, .configurator--studio .review-price-grid > div { display:grid; gap:.4rem; border:1px solid var(--color-border); border-radius:var(--radius-control); padding:.8rem; min-width:0; overflow-wrap:anywhere; }
+.configurator--studio .review-card span, .configurator--studio .review-card dt { color:var(--color-text-secondary); font-size:.75rem; }
+.configurator--studio .review-card strong { font-size:.92rem; }
+.configurator--studio .review-empty { color:var(--color-text-secondary); font-size:.83rem; }
+.configurator--studio .review-attributes { display:flex; flex-wrap:wrap; gap:.6rem; font-size:.8rem; }
+.configurator--studio .review-attributes p { background:var(--color-surface-muted); padding:.5rem .75rem; border-radius:var(--radius-control); margin:0; }
+.configurator--studio .review-metrics { display:flex; gap:.7rem; flex-wrap:wrap; }
+.configurator--studio .review-metrics span { background:var(--color-surface-muted); border-radius:999px; padding:.4rem .7rem; font-size:.74rem; }
+.configurator--studio .review-group { border:1px solid var(--color-border); padding:1rem; border-radius:var(--radius-control); min-width:0; }
+.configurator--studio .review-group summary { display:flex; justify-content:space-between; cursor:pointer; font-weight:700; font-size:.87rem; gap:1rem; }
+.configurator--studio .review-group summary small { color:var(--color-text-secondary); font-weight:400; }
+.configurator--studio .review-piece { display:grid; gap:.45rem; padding:.9rem 0; border-bottom:1px solid var(--color-border); }
+.configurator--studio .review-piece:last-child { border-bottom:0; }
+.configurator--studio .review-piece > div:first-child { display:flex; justify-content:space-between; gap:1rem; align-items:center; }
+.configurator--studio .review-piece-attributes { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.6rem; margin:0; }
+.configurator--studio .review-piece-attributes > div { display:grid; gap:.25rem; padding:.5rem; background:var(--color-surface-muted); border-radius:var(--radius-control); }
+.configurator--studio .review-piece-attributes dd { margin:0; font-size:.82rem; overflow-wrap:anywhere; }
+.configurator--studio .review-accessories { display:grid; gap:.55rem; list-style:none; padding:0; margin:0; }
+.configurator--studio .review-accessories li { display:flex; align-items:center; gap:.6rem; font-size:.84rem; }
+.configurator--studio .review-accessories svg { color:var(--color-success); flex-shrink:0; }
+.configurator--studio .review-history { padding:.8rem; background:var(--color-surface-muted); border-radius:var(--radius-control); }
+.configurator--studio .review-price-total { display:flex; align-items:baseline; flex-wrap:wrap; justify-content:space-between; gap:1rem; padding:1rem; background:var(--color-surface-muted); border-radius:var(--radius-control); }
+.configurator--studio .review-price-total strong { font-size:1.75rem; font-variant-numeric:tabular-nums; }
+.configurator--studio .review-price-hint { font-size:.77rem; color:var(--color-text-secondary); margin:0; }
+.configurator--studio .review-alert, .configurator--studio .review-pending { display:grid; gap:.65rem; padding:1.1rem; border:1px solid var(--color-danger); border-radius:var(--radius-card); background:var(--color-surface); }
+.configurator--studio .review-pending { border-color:var(--color-border-strong); }
+.configurator--studio .review-alert h4, .configurator--studio .review-pending h4 { display:flex; align-items:center; gap:.6rem; margin:0; font-size:.96rem; }
+.configurator--studio .review-alert p, .configurator--studio .review-pending p { color:var(--color-text-secondary); font-size:.8rem; margin:0; }
+.configurator--studio .review-alert button { display:flex; gap:.6rem; align-items:center; text-align:left; border:0; background:transparent; color:var(--color-text); font:inherit; font-size:.8rem; cursor:pointer; padding:.4rem .1rem; }
+.configurator--studio .review-final-note { color:var(--color-text-secondary); font-size:.78rem; }
+.configurator--studio .review-actions { display:flex; justify-content:end; background:var(--color-surface); padding:1rem; border:1px solid var(--color-border); border-radius:var(--radius-card); }
+@media(max-width:75rem) { .configurator--studio .studio-component-layout { grid-template-columns:minmax(11rem,.7fr) minmax(0,1.4fr); } .configurator--studio .dimensions-section .measure-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:55rem) { .configurator--studio .studio-component-layout { grid-template-columns:1fr; } .configurator--studio .studio-component-tree { grid-template-columns:repeat(2,minmax(0,1fr)); } .configurator--studio .tree-heading,.configurator--studio .tree-empty { grid-column:1/-1; } .configurator--studio .review-piece-attributes { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:38rem) { .configurator--studio .dimensions-section .measure-grid, .configurator--studio .review-price-grid, .configurator--studio .review-info { grid-template-columns:1fr; } .configurator--studio .review-measures { grid-template-columns:repeat(2,minmax(0,1fr)); } .configurator--studio .studio-component-tree,.configurator--studio .studio-component-detail .grid { grid-template-columns:1fr; } .configurator--studio .review-piece-attributes { grid-template-columns:1fr; } .configurator--studio .review-price-total strong { font-size:1.35rem; } .configurator--studio .configurator-fields > section { padding:var(--space-3); } }
 </style>
