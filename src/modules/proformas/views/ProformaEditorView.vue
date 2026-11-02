@@ -27,7 +27,6 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
-  Building2,
   MessageCircle,
   CircleAlert,
   ClipboardCheck,
