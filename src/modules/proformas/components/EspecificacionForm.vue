@@ -214,6 +214,9 @@ function aplicarEspesor(p: PendienteAsistida & { indice: number }) {
   error.value = ''
   changed()
 }
+const cantidadValida = computed(() => comercial.cantidad.trim() !== '' && Number.isInteger(Number(comercial.cantidad)) && Number(comercial.cantidad) > 0)
+const precioValido = computed(() => comercial.precio_unitario.trim() !== '' && Number.isFinite(Number(comercial.precio_unitario)) && Number(comercial.precio_unitario) > 0)
+const descuentoValido = computed(() => comercial.descuento.trim() !== '' && Number.isFinite(Number(comercial.descuento)) && Number(comercial.descuento) >= 0)
 const totalEstimado = computed(() => {
   const cantidad = Number(comercial.cantidad)
   const precio = Number(comercial.precio_unitario)
@@ -1780,7 +1783,7 @@ onMounted(loadCatalog)
               <div>
                 <span>Cantidad cotizada</span
                 ><strong
-                  >{{ comercial.cantidad || 'Pendiente' }}
+                  >{{ cantidadValida ? comercial.cantidad : 'Pendiente' }}
                   {{
                     unidades?.find((u) => String(u.id) === comercial.unidad)?.nombre ?? ''
                   }}</strong
@@ -1789,12 +1792,12 @@ onMounted(loadCatalog)
               <div>
                 <span>Precio unitario</span
                 ><strong
-                  >{{ comercial.precio_unitario || 'Pendiente' }} {{ moneda ?? 'BOB' }}</strong
+                  >{{ precioValido ? comercial.precio_unitario + ' ' + (moneda ?? 'BOB') : 'Pendiente' }}</strong
                 >
               </div>
               <div>
                 <span>Descuento</span
-                ><strong>{{ comercial.descuento || 'Pendiente' }} {{ moneda ?? 'BOB' }}</strong>
+                ><strong>{{ descuentoValido ? comercial.descuento + ' ' + (moneda ?? 'BOB') : 'Pendiente' }}</strong>
               </div>
             </div>
             <p v-if="comercial.descripcion">Descripción comercial: {{ comercial.descripcion }}</p>
