@@ -181,3 +181,4 @@ function changeType(value: string) {
 @media (max-width: 47.99rem) {
   .client-fields, .client-type__options { grid-template-columns: 1fr; }
 }
+</style>
