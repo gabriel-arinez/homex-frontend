@@ -251,6 +251,7 @@ void ensureSelected()
             type="button"
             variant="secondary"
             :processing="loading"
+            @mousedown.prevent
             @click="load(false)"
             >Cargar más clientes</Button
           >
