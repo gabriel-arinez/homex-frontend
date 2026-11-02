@@ -72,8 +72,13 @@ async function loadTypes() {
   }
 }
 async function save() {
-  if (saving.value || !form.tipo_cliente) return
+  if (saving.value) return
   validationAttempted.value = true
+  if (!form.tipo_cliente) {
+    fields.value = { tipo_cliente: ['Selecciona el tipo de cliente.'] }
+    error.value = 'Selecciona Persona natural o Empresa antes de registrar.'
+    return
+  }
   const company =
     tipos.value.find((item) => String(item.id) === form.tipo_cliente)?.codigo === 'EMPRESA'
   const validation = validateClient(form, company)
