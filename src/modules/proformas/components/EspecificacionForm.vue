@@ -983,7 +983,7 @@ onMounted(loadCatalog)
             <Button variant="secondary" @click="atributosGenerales.splice(i, 1)">Quitar</Button>
           </div>
         </section>
-        <section v-show="!studio || activeSection === 'estructura'">
+        <section v-show="!studio || activeSection === 'estructura'" :class="{ 'studio-group-management': studio }">
           <div class="heading">
             <h3>Conjuntos ({{ conjuntos.length }}/{{ limites.max_conjuntos }})</h3>
             <Button
@@ -996,7 +996,7 @@ onMounted(loadCatalog)
               >Añadir conjunto</Button
             >
           </div>
-          <article v-for="(g, gi) in conjuntos" :key="g.uid" class="card">
+          <article v-for="(g, gi) in conjuntos" :key="g.uid" class="card studio-group-card">
             <div class="inline">
               <TextField
                 v-model="g.nombre"
@@ -1053,31 +1053,23 @@ onMounted(loadCatalog)
               class="studio-component-tree"
               aria-label="Explorador de componentes"
             >
-              <p class="tree-heading">PIEZAS DEL MUEBLE</p>
+              <p class="tree-heading"><Layers3 :size="15" aria-hidden="true" /> ELEMENTOS DEL MUEBLE</p>
               <p v-if="!componentes.length" class="tree-empty">
-                Todavía no agregaste componentes. Utiliza «Agregar componente» para comenzar.
+                No hay piezas todavía. Utiliza «Agregar componente» para comenzar.
               </p>
-              <button
-                v-for="item in componentesOrganizados"
-                :key="item.parte.uid || item.index"
-                type="button"
-                class="tree-item"
-                :class="{
-                  'tree-item--active':
-                    activeComponentUid === (item.parte.uid || String(item.index)),
-                }"
-                :aria-pressed="activeComponentUid === (item.parte.uid || String(item.index))"
-                @click="activeComponentUid = item.parte.uid || String(item.index)"
-              >
-                <strong>{{ item.parte.nombre || 'Componente sin nombre' }}</strong>
-                <small
-                  >{{
-                    conjuntos.find((g) => g.uid === item.parte.conjunto_uid)?.nombre ||
-                    'Sin conjunto'
-                  }}
-                  · {{ item.parte.cantidad_interna ?? '—' }} por mueble</small
+              <div v-for="grupo in gruposArbol" :key="grupo.id" class="tree-group">
+                <h4>{{ grupo.nombre }} <small>{{ grupo.piezas.length }}</small></h4>
+                <button
+                  v-for="item in grupo.piezas" :key="item.pieza.uid || item.index"
+                  type="button" class="tree-item"
+                  :class="{ 'tree-item--active': activeComponentUid === (item.pieza.uid || String(item.index)) }"
+                  :aria-pressed="activeComponentUid === (item.pieza.uid || String(item.index))"
+                  @click="activeComponentUid = item.pieza.uid || String(item.index)"
                 >
-              </button>
+                  <strong>{{ item.pieza.nombre || 'Componente sin nombre' }}</strong>
+                  <small>{{ item.pieza.cantidad_interna ?? '—' }} por mueble</small>
+                </button>
+              </div>
             </aside>
             <div class="studio-component-detail">
               <details
@@ -1087,12 +1079,12 @@ onMounted(loadCatalog)
                 class="card"
                 open
               >
-                <summary>Componente {{ i + 1 }}: {{ c.nombre || 'Sin nombre' }}</summary>
+                <summary v-if="!studio">Componente {{ i + 1 }}: {{ c.nombre || 'Sin nombre' }}</summary>
                 <div class="heading">
                   <strong>Componente {{ i + 1 }}</strong>
                   <div>
-                    <button type="button" @click="move(i, -1)">Subir</button
-                    ><button type="button" @click="move(i, 1)">Bajar</button>
+                    <button type="button" :disabled="i === 0" @click="move(i, -1)">Subir</button
+                    ><button type="button" :disabled="i === componentes.length - 1" @click="move(i, 1)">Bajar</button>
                   </div>
                 </div>
                 <div class="grid">
@@ -1123,7 +1115,7 @@ onMounted(loadCatalog)
                     v-else
                     v-model="c.dimensiones"
                     :name="`componente-dimensiones-${i}`"
-                    label="Dimensiones literales"
+                    label="Medidas o dimensiones de la pieza"
                   />
                 </div>
                 <Select
@@ -1203,32 +1195,26 @@ onMounted(loadCatalog)
               </div>
             </div>
           </div>
-          <Button
-            v-if="componentesRetirados.length"
-            variant="secondary"
-            @click="deshacerComponente"
-          >
-            Deshacer eliminación de componente
-          </Button>
+          <div v-if="componentesRetirados.length" class="undo-notice" role="status">
+            Se quitó un componente.
+            <button type="button" @click="deshacerComponente">Deshacer</button>
+          </div>
         </section>
         <section id="accesorios" v-show="!studio || activeSection === 'accesorios'">
-          <h3>Accesorios incluidos</h3>
-          <div v-for="(_, i) in accesorios" :key="i" class="inline">
-            <TextField
-              v-model="accesorios[i]"
-              :name="`accesorio-${i}`"
-              label="Descripción"
-            /><Button variant="secondary" @click="removeAccesorio(i)">Quitar</Button>
+          <div class="heading"><h3>Accesorios incluidos</h3><span v-if="studio" class="accessory-count">{{ accesorios.filter((a) => a.trim()).length }} registrados</span></div>
+          <div v-for="(_, i) in accesorios" :key="i" class="accessory-item" :class="{ 'accessory-item--studio': studio }">
+            <template v-if="studio && accesorios[i]?.trim() && accesorioEnEdicion !== i">
+              <div class="accessory-item-label"><CheckCircle2 :size="18" aria-hidden="true" /><strong>{{ accesorios[i] }}</strong></div>
+              <Button variant="secondary" @click="accesorioEnEdicion = i"><Pencil :size="15" aria-hidden="true" /> Editar</Button>
+            </template>
+            <TextField v-else v-model="accesorios[i]" :name="`accesorio-${i}`" label="Descripción del accesorio" />
+            <Button variant="secondary" @click="removeAccesorio(i)">Quitar</Button>
+            <Button v-if="studio && accesorioEnEdicion === i && accesorios[i]?.trim()" variant="secondary" @click="accesorioEnEdicion = null">Listo</Button>
           </div>
-          <Button
-            variant="secondary"
-            :disabled="accesorios.some((a) => !a.trim())"
-            @click="addAccesorio"
-            >Añadir accesorio</Button
-          >
-          <Button v-if="accesoriosRetirados.length" variant="secondary" @click="deshacerAccesorio">
-            Deshacer eliminación de accesorio
-          </Button>
+          <Button variant="secondary" :disabled="accesorios.some((a) => !a.trim())" @click="addAccesorio"><Plus :size="16" aria-hidden="true" /> Añadir accesorio</Button>
+          <div v-if="accesoriosRetirados.length" class="undo-notice" role="status">
+            Se quitó un accesorio. <button type="button" @click="deshacerAccesorio">Deshacer</button>
+          </div>
         </section>
         <section v-show="!studio || activeSection === 'accesorios'">
           <TextAreaField
