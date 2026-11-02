@@ -97,7 +97,7 @@ function close(event: FocusEvent) {
         :placeholder="selected && !open ? selected.label : placeholder"
         @focus="open = true"
         @input="
-          open = true
+          open = true;
           active = -1
         "
         @keydown="keydown"

@@ -165,7 +165,7 @@ function retroceder() {
         :class="{ 'studio-step--active': seccion === item.id }"
         :aria-current="seccion === item.id ? 'step' : undefined"
         @click="
-          seccion = item.id
+          seccion = item.id;
           volverARevision = false
         "
       >
