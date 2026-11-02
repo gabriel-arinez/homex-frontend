@@ -74,6 +74,11 @@ function changeType(value: string) {
           </span>
         </label>
       </div>
+      <small
+        v-if="errors?.tipo_cliente?.[0] || (validate && !model.tipo_cliente)"
+        class="client-type__error"
+        role="alert"
+      >{{ errors?.tipo_cliente?.[0] || 'Selecciona el tipo de cliente.' }}</small>
     </fieldset>
     <TextField
       :model-value="model.nombres"
@@ -163,6 +168,11 @@ function changeType(value: string) {
   margin: 0;
   padding: 0;
   border: 0;
+}
+.client-type__error {
+  display: block;
+  margin-top: var(--space-2);
+  color: var(--color-danger);
 }
 .client-type legend {
   margin-bottom: var(--space-2);
