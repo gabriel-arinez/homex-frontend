@@ -594,17 +594,20 @@ const erroresSecciones = computed<Record<SeccionStudio, string[]>>(() => {
   const problemas: Record<SeccionStudio, string[]> = { general: [], estructura: [], accesorios: [], comercial: [], revision: [] }
   if (!comercial.nombre.trim()) problemas.general.push('Indica el nombre comercial del mueble.')
   for (const medida of medidas) {
-    if (!medida.valor.trim()) continue
+    if (!medida.valor.trim() || dimensionSinModificar(medida)) continue
     const numero = Number(medida.valor)
     if (!Number.isFinite(numero) || numero <= 0) problemas.general.push('Introduce una medida válida y positiva para ' + medida.clave.replace(/_/g, ' ') + '.')
     if (!medida.unidad) problemas.general.push('Confirma la unidad de ' + medida.clave.replace(/_/g, ' ') + '.')
   }
+  if (atributosGenerales.some((a) => !a.nombre.trim() || !a.valor.trim())) problemas.general.push('Completa o quita las características generales sin valor.')
   if (conjuntos.some((g) => !g.nombre.trim())) problemas.estructura.push('Pon un nombre a cada conjunto.')
   if (componentes.some((c) => !c.nombre.trim())) problemas.estructura.push('Pon un nombre a cada componente.')
   if (componentes.some((c) => c.cantidad_interna !== undefined && (!Number.isInteger(c.cantidad_interna) || c.cantidad_interna <= 0)))
     problemas.estructura.push('La cantidad de cada componente debe ser un número entero positivo.')
   if (conjuntos.some((g) => !componentes.some((c) => c.conjunto_uid === g.uid)))
     problemas.estructura.push('Cada conjunto necesita al menos un componente.')
+  if (componentes.some((c) => c.atributos?.some((a) => !a.nombre.trim() || !a.valor.trim())))
+    problemas.estructura.push('Completa o quita las características vacías de los componentes.')
   if (accesorios.some((a) => !a.trim())) problemas.accesorios.push('Completa o quita los accesorios sin descripción.')
   if (!comercial.cantidad.trim() || !Number.isInteger(Number(comercial.cantidad)) || Number(comercial.cantidad) <= 0)
     problemas.comercial.push('La cantidad cotizada debe ser un número entero mayor que cero.')
@@ -628,9 +631,18 @@ const estadoSecciones = computed<Record<SeccionStudio, 'pending' | 'issues' | 'c
   revision: 'pending',
 }))
 watch(estadoSecciones, (value) => emit('sectionStatus', value), { immediate: true })
+function dimensionSinModificar(medida: Medida): boolean {
+  const original = medida.original
+  if (original === undefined) return false
+  if (typeof original === 'object' && original !== null && !Array.isArray(original)) {
+    const dim = original as Record<string, unknown>
+    return String(dim.valor ?? '') === medida.valor && String(dim.unidad ?? '') === medida.unidad
+  }
+  return String(original) === medida.valor
+}
 function errorMedida(medida: Medida): string {
   if (!touchedMedidas[medida.clave] && !submitAttempted.value) return ''
-  if (!medida.valor.trim()) return ''
+  if (!medida.valor.trim() || dimensionSinModificar(medida)) return ''
   if (!Number.isFinite(Number(medida.valor)) || Number(medida.valor) <= 0) return 'Introduce una medida numérica mayor que cero.'
   if (!medida.unidad) return 'Confirma la unidad de la medida.'
   return ''
@@ -695,6 +707,12 @@ function submit() {
         : limites.max_componentes,
   }
   const errores = validarDatosTecnicos(datos, limitesCompatibles)
+  for (const medida of medidas) {
+    if (!medida.valor.trim() || dimensionSinModificar(medida)) continue
+    if (!Number.isFinite(Number(medida.valor)) || Number(medida.valor) <= 0)
+      errores.push('La medida ' + medida.clave.replace(/_/g, ' ') + ' debe ser un número positivo.')
+    if (!medida.unidad) errores.push('Indica la unidad de ' + medida.clave.replace(/_/g, ' ') + '.')
+  }
   const atributos = [
     ...atributosGenerales,
     ...componentes.flatMap((parte) => parte.atributos ?? []),
