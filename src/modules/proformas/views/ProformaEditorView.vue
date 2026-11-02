@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import type {
   Cliente,
@@ -18,10 +18,14 @@ import type {
   ResultadoAsistida,
 } from '@/generated/api'
 import { ApiError } from '@/shared/api'
+import { QUOTE_LIMITS, validateClient, validateQuoteConditions } from '@/shared/validation/commercialFields'
 import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
+  Building2,
+  MessageCircle,
+  CircleAlert,
   ClipboardCheck,
   Info,
   PackageOpen,
@@ -36,7 +40,8 @@ import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
 import Modal from '@/shared/ui/Modal.vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
-import Select from '@/shared/ui/Select.vue'
+import Toast from '@/shared/ui/Toast.vue'
+import ConfirmDialog from '@/shared/ui/ConfirmDialog.vue'
 import TextField from '@/shared/ui/TextField.vue'
 import ClienteSelector from '../components/ClienteSelector.vue'
 import ClienteFormFields from '@/modules/clientes/components/ClienteFormFields.vue'
@@ -73,6 +78,8 @@ const referenceLoading = ref(true)
 const error = ref('')
 const success = ref('')
 const fields = ref<Record<string, string[]>>({})
+const validationAttempted = ref(false)
+const localErrors = ref<Record<string, string>>({})
 const dirty = ref(false)
 const conflicted = ref(false)
 const persisted = ref<Proforma | null>(null)
@@ -125,7 +132,7 @@ const preferredProductId = ref<number | null>(null)
 const pendingLineDraft = ref<Record<string, string> | null>(null)
 const duplicateOrigin = ref<string | null>(null)
 const duplicateSpec = ref<EspecificacionMuebleWritable | null>(null)
-const clienteMode = ref<'existente' | 'nuevo' | 'pendiente'>('existente')
+const clienteMode = ref<'existente' | 'nuevo' | 'pendiente'>('pendiente')
 const clienteSeleccionado = ref<Cliente | ClienteResumenProforma | null>(null)
 const key = ref(crypto.randomUUID())
 const header = reactive({
@@ -150,6 +157,50 @@ function updateNuevoCliente(field: keyof typeof nuevoCliente, value: string) {
   nuevoCliente[field] = value
 }
 const lineas = ref<LineaLocal[]>([])
+const confirmation = ref<{ title: string; description: string; confirmLabel: string } | null>(null)
+let confirmResolver: ((answer: boolean) => void) | null = null
+function askConfirmation(description: string, title = 'Confirmar acción', confirmLabel = 'Continuar') {
+  if (confirmResolver) confirmResolver(false)
+  confirmation.value = { title, description, confirmLabel }
+  return new Promise<boolean>((resolve) => { confirmResolver = resolve })
+}
+function answerConfirmation(answer: boolean) {
+  confirmation.value = null
+  const resolver = confirmResolver
+  confirmResolver = null
+  resolver?.(answer)
+}
+const whatsappEdited = ref(false)
+const whatsappDraft = ref('')
+const whatsappSuggested = computed(() => {
+  const firstName = clienteMode.value === 'nuevo'
+    ? nuevoCliente.nombres.trim().split(/\s+/)[0]
+    : clienteMode.value === 'existente' && clienteSeleccionado.value && 'nombres' in clienteSeleccionado.value
+      ? (clienteSeleccionado.value.nombres || '').trim().split(/\s+/)[0]
+      : ''
+  const greeting = firstName ? 'Hola, ' + firstName + '.' : 'Hola.'
+  const title = header.titulo.trim()
+  return [
+    greeting,
+    'Te saluda el equipo de HOMEX.',
+    'Te compartimos nuestra proforma' + (title ? ' "' + title + '"' : '') + ' para que puedas revisar los productos, precios y condiciones.',
+    'Quedamos atentos a tus consultas. ¡Gracias por confiar en HOMEX!',
+  ].join('\n\n')
+})
+watch(whatsappSuggested, (value) => { if (!whatsappEdited.value) whatsappDraft.value = value }, { immediate: true })
+function editWhatsapp(value: string) {
+  whatsappEdited.value = true
+  whatsappDraft.value = value
+}
+function resetWhatsapp() {
+  whatsappEdited.value = false
+  whatsappDraft.value = whatsappSuggested.value
+}
+function pendingStep(message: string): number {
+  if (/línea|producto/i.test(message)) return 0
+  if (/cliente|contacto|razón social/i.test(message)) return 1
+  return 2
+}
 const existingProductIds = computed(() =>
   lineas.value.flatMap((line) => (line.producto ? [line.producto] : [])),
 )
@@ -167,6 +218,12 @@ const emissionPending = computed(() => {
     if (/EMPRESA|JURID/.test(tipo?.codigo ?? '') && !nuevoCliente.empresa.trim()) {
       pendientes.push('completar la razón social')
     }
+  }
+  if (Object.keys(validateQuoteConditions(header)).length) pendientes.push('revisar los valores de condiciones')
+  if (clienteMode.value === 'nuevo') {
+    const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
+    if (Object.keys(validateClient(nuevoCliente, tipo?.codigo === 'EMPRESA')).length && nuevoCliente.nombres && nuevoCliente.apellidos)
+      pendientes.push('corregir los datos del cliente')
   }
   return pendientes
 })
@@ -271,12 +328,14 @@ const editableSpec = computed(() => {
   return (lineas.value[specLine.value]?.especificacion ?? null) as EspecificacionMueble | null
 })
 const canEmit = computed(() => {
+  if (Object.keys(validateQuoteConditions(header)).length) return false
   if (!lineas.value.length) return false
   if (clienteMode.value === 'existente') return Boolean(header.cliente)
   if (clienteMode.value !== 'nuevo' || !nuevoCliente.tipo_cliente) return false
   const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
   const esEmpresa = /EMPRESA|JURID/.test(tipo?.codigo ?? '')
   const contacto = Boolean(nuevoCliente.nombres.trim() && nuevoCliente.apellidos.trim())
+  if (Object.keys(validateClient(nuevoCliente, esEmpresa)).length) return false
   return esEmpresa ? contacto && Boolean(nuevoCliente.empresa.trim()) : contacto
 })
 
@@ -425,7 +484,7 @@ function registrarTipoMueble(tipo: ValorCatalogoPublico) {
     a.nombre.localeCompare(b.nombre, 'es'),
   )
 }
-function saveSpec(
+async function saveSpec(
   body: EspecificacionMuebleWritable,
   comercial: {
     nombre: string
@@ -463,7 +522,7 @@ function saveSpec(
         (existingSpec?.observaciones ?? null) === (body.observaciones ?? null) &&
         tecnicaIgual(existingSpec?.datos_tecnicos ?? {}, body.datos_tecnicos ?? {})
       if (sameCommercial && sameSpec) {
-        if (!window.confirm('La copia es idéntica. ¿Aumentar la cantidad de la línea original?'))
+        if (!(await askConfirmation('La copia es idéntica. ¿Aumentar la cantidad de la línea original?', 'Mueble duplicado', 'Sumar cantidad')))
           return
         original.cantidad = String(Number(original.cantidad) + Number(candidate.cantidad))
       } else lineas.value.push(candidate)
@@ -504,7 +563,7 @@ function saveSpec(
       commercialKeys.every((key) => String(original[key] ?? '') === String(line[key] ?? '')) &&
       tecnicaIgual(original.especificacion ?? null, body)
     if (identical) {
-      if (!window.confirm('La copia completa es idéntica. ¿Sumar su cantidad a la línea original?'))
+      if (!(await askConfirmation('La copia completa es idéntica. ¿Sumar su cantidad a la línea original?', 'Mueble duplicado', 'Sumar cantidad')))
         return
       original.cantidad = String(Number(original.cantidad) + Number(line.cantidad))
       lineas.value.splice(index, 1)
@@ -526,10 +585,10 @@ function openSpec(index: number) {
   specModalDirty.value = false
   specLine.value = index
 }
-function closeSpec() {
+async function closeSpec() {
   if (
     specModalDirty.value &&
-    !window.confirm('Hay cambios sin guardar en la ficha técnica. ¿Deseas descartarlos?')
+    !(await askConfirmation('Hay cambios sin guardar en la ficha técnica. ¿Deseas descartarlos?', 'Descartar ficha técnica', 'Descartar cambios'))
   )
     return
   specLine.value = null
@@ -684,35 +743,18 @@ function restoreContextualDraft() {
   }
 }
 async function copyCommercialSummary() {
-  const client =
-    clienteMode.value === 'nuevo'
-      ? nuevoCliente.empresa || `${nuevoCliente.nombres} ${nuevoCliente.apellidos}`.trim()
-      : nombreClienteVisible()
-  const lines = lineas.value
-    .map((line) =>
-      line.modo_calculo === 'TOTAL_NEGOCIADO'
-        ? `• ${line.nombre}: importe negociado ${money(Number(line.importe_negociado || 0))}`
-        : totalEstimadoLinea(line) === null
-          ? `• ${line.nombre}: precio pendiente`
-          : `• ${line.nombre}: ${line.cantidad} × ${money(Number(line.precio_unitario))}`,
-    )
-    .join('\n')
-  const conditions = [
-    header.plazo_entrega && `Plazo: ${header.plazo_entrega}`,
-    header.validez_oferta && `Validez: ${header.validez_oferta} días`,
-  ]
-    .filter(Boolean)
-    .join('\n')
-  await navigator.clipboard.writeText(
-    `HOMEX — Cotización\n${client}\n${lines}\n${totalPreview.value === null ? 'Total estimado pendiente' : `Total estimado: ${money(totalPreview.value)}`}${conditions ? `\n${conditions}` : ''}`,
-  )
-  success.value = 'Resumen copiado. Puedes pegarlo manualmente en WhatsApp.'
+  try {
+    await navigator.clipboard.writeText(whatsappDraft.value)
+    success.value = 'Mensaje copiado. Puedes pegarlo en WhatsApp y adjuntar el PDF.'
+  } catch {
+    error.value = 'No fue posible copiar el mensaje. Selecciónalo manualmente para copiarlo.'
+  }
 }
 
-function closeLineModal() {
+async function closeLineModal() {
   if (
     lineModalDirty.value &&
-    !window.confirm('Hay cambios sin agregar en esta línea. ¿Deseas descartarlos?')
+    !(await askConfirmation('Hay cambios sin agregar en esta línea. ¿Deseas descartarlos?', 'Descartar línea', 'Descartar cambios'))
   )
     return
   lineModal.value = false
@@ -779,9 +821,11 @@ async function focusDuplicateProduct(productId: number) {
   if (index < 0) return
   if (
     lineModalDirty.value &&
-    !window.confirm(
+    !(await askConfirmation(
       'La variante ya está incluida. ¿Deseas descartar esta edición y ver la línea existente?',
-    )
+      'Variante duplicada',
+      'Ver línea existente',
+    ))
   )
     return
   lineModal.value = false
@@ -813,6 +857,7 @@ function body(emitir: boolean): ProformaIntegralWritable {
       clienteMode.value === 'nuevo'
         ? ({
             ...nuevoCliente,
+            empresa: tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)?.codigo === 'EMPRESA' ? nuevoCliente.empresa : '',
             tipo_cliente: Number(nuevoCliente.tipo_cliente),
           } satisfies ClienteNuevoProforma)
         : null,
@@ -827,6 +872,18 @@ function body(emitir: boolean): ProformaIntegralWritable {
 }
 async function persist(emitir: boolean) {
   if (saving.value) return
+  validationAttempted.value = true
+  localErrors.value = validateQuoteConditions(header)
+  if (clienteMode.value === 'nuevo') {
+    const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
+    const errors = validateClient(nuevoCliente, tipo?.codigo === 'EMPRESA')
+    for (const [field, message] of Object.entries(errors)) localErrors.value['cliente_nuevo.' + field] = message
+  }
+  if (Object.keys(localErrors.value).length) {
+    error.value = 'Revisa los campos señalados antes de guardar.'
+    currentStep.value = Object.keys(localErrors.value).some((field) => field.startsWith('cliente_nuevo.')) ? 1 : 2
+    return
+  }
   saving.value = true
   error.value = ''
   success.value = ''
@@ -856,12 +913,10 @@ function beforeUnload(event: BeforeUnloadEvent) {
   if (!dirty.value && !lineModalDirty.value && !specModalDirty.value) return
   event.preventDefault()
 }
-onBeforeRouteLeave(
-  () =>
-    contextualNavigation.value ||
-    (!dirty.value && !lineModalDirty.value && !specModalDirty.value) ||
-    window.confirm('Hay cambios sin guardar. ¿Deseas salir?'),
-)
+onBeforeRouteLeave(async () => {
+  if (contextualNavigation.value || (!dirty.value && !lineModalDirty.value && !specModalDirty.value)) return true
+  return askConfirmation('Hay cambios sin guardar. Si sales, podrías perder los datos introducidos.', 'Salir sin guardar', 'Salir sin guardar')
+})
 onMounted(async () => {
   window.addEventListener('beforeunload', beforeUnload)
   await Promise.all([loadReferences(), load()])
@@ -872,6 +927,15 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 
 <template>
   <div class="quote-workspace" @input="markDirty" @change="markDirty">
+    <Toast :visible="Boolean(success)" :message="success" tone="success" @close="success = ''" />
+    <ConfirmDialog
+      :open="Boolean(confirmation)"
+      :title="confirmation?.title || 'Confirmar'"
+      :description="confirmation?.description || ''"
+      :confirm-label="confirmation?.confirmLabel"
+      @close="answerConfirmation(false)"
+      @confirm="answerConfirmation(true)"
+    />
     <div class="quote-topline" aria-label="Ubicación en el proceso">
       <span>COMERCIAL <span class="quote-divider">/</span> PROFORMAS</span>
       <span class="quote-progress">Paso {{ currentStep + 1 }} de {{ steps.length }}</span>
@@ -901,7 +965,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           <span class="step-marker" aria-hidden="true" />
         </button>
       </nav>
-      <p v-if="success" role="status" class="success">{{ success }}</p>
+
       <div class="editor-status" role="status" aria-live="polite">
         <div class="editor-status__main">
           <span class="status-icon" aria-hidden="true"
@@ -1138,12 +1202,15 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           v-model="header.cliente"
           label="Cliente existente"
           @select="clienteSeleccionado = $event"
+          @input.stop
+          @change.stop
         />
         <Card v-if="clienteMode === 'nuevo'" class="client-fields">
           <ClienteFormFields
             :model="nuevoCliente"
             :tipos="tiposCliente"
             :errors="clientErrors"
+            :validate="validationAttempted"
             prefix="proforma-cliente"
             @change="updateNuevoCliente"
           />
@@ -1171,31 +1238,45 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         </div>
         <div class="form-grid">
           <div class="form-grid__full">
-            <TextField v-model="header.titulo" name="titulo" label="Título" />
+            <TextField v-model="header.titulo" name="titulo" label="Título" :max-length="QUOTE_LIMITS.titulo" :error="localErrors.titulo" />
             <small>Un título breve que identifique esta cotización.</small>
           </div>
-          <Select
-            v-model="header.moneda_codigo"
-            name="moneda"
-            label="Moneda"
-            :options="monedas.map((x) => ({ label: `${x.nombre} (${x.codigo})`, value: x.codigo }))"
-          />
+          <fieldset class="currency-choice form-grid__full">
+            <legend>Moneda</legend>
+            <div class="currency-choice__options">
+              <label
+                v-for="moneda in monedas.filter((item) => ['BOB', 'USD'].includes(item.codigo))"
+                :key="moneda.id"
+                class="currency-choice__option"
+                :class="{ 'currency-choice__option--selected': header.moneda_codigo === moneda.codigo }"
+              >
+                <input v-model="header.moneda_codigo" type="radio" name="moneda" :value="moneda.codigo" />
+                <span><strong>{{ moneda.codigo === 'BOB' ? 'Bolivianos (BOB)' : 'Dólares (USD)' }}</strong><small>{{ moneda.codigo === 'BOB' ? 'Moneda nacional' : 'Cotización en dólares' }}</small></span>
+              </label>
+            </div>
+          </fieldset>
           <TextField
             v-model="header.porcentaje_adelanto"
             name="adelanto"
             label="Adelanto (%)"
-            type="number"
-            min="0"
-            max="100"
-            step="0.01"
+            type="text"
+            input-mode="decimal"
+            input-rule="decimal"
+            :max-length="6"
+            :error="localErrors.porcentaje_adelanto"
+            hint="Opcional: 0–100 %, hasta 2 decimales."
           />
-          <TextField v-model="header.plazo_entrega" name="plazo" label="Plazo de entrega" />
+          <TextField v-model="header.plazo_entrega" name="plazo" label="Plazo de entrega" :max-length="QUOTE_LIMITS.plazo_entrega" :error="localErrors.plazo_entrega" hint="Máximo 45 caracteres." />
           <TextField
             v-model="header.validez_oferta"
             name="validez"
             label="Validez de la oferta (días)"
-            type="number"
-            min="1"
+            type="text"
+            input-mode="numeric"
+            input-rule="digits"
+            :max-length="2"
+            :error="localErrors.validez_oferta"
+            hint="Opcional: entre 1 y 99 días."
           />
           <label class="quote-textarea form-grid__full" for="quote-observaciones">
             <span>Observaciones</span>
@@ -1204,8 +1285,12 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               v-model="header.observaciones"
               name="observaciones"
               rows="4"
+              :maxlength="QUOTE_LIMITS.observaciones"
+              :aria-invalid="Boolean(localErrors.observaciones)"
               placeholder="Condiciones adicionales para esta cotización..."
             />
+            <small v-if="localErrors.observaciones" class="condition-error" role="alert">{{ localErrors.observaciones }}</small>
+            <small v-else class="field-count">{{ header.observaciones.length }}/250 caracteres</small>
           </label>
         </div>
       </section>
@@ -1271,9 +1356,20 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           <p v-if="header.validez_oferta">
             <strong>Validez:</strong> {{ header.validez_oferta }} días
           </p>
-          <Button type="button" variant="secondary" @click="copyCommercialSummary"
-            >Copiar resumen para compartir manualmente</Button
-          ></Card
+          <div class="whatsapp-share" @input.stop @change.stop>
+            <label for="whatsapp-message"><MessageCircle :size="18" aria-hidden="true" /> Mensaje para WhatsApp</label>
+            <p>Personaliza el saludo y copia el texto para enviarlo junto con el PDF.</p>
+            <textarea
+              id="whatsapp-message"
+              :value="whatsappDraft"
+              rows="5"
+              @input="editWhatsapp(($event.target as HTMLTextAreaElement).value)"
+            />
+            <div class="actions">
+              <Button type="button" variant="secondary" @click="copyCommercialSummary">Copiar mensaje para WhatsApp</Button>
+              <Button v-if="whatsappEdited" type="button" variant="secondary" @click="resetWhatsapp">Restaurar mensaje sugerido</Button>
+            </div>
+          </div></Card
         >
         <div class="totals">
           <template v-if="persisted && !dirty">
@@ -1292,10 +1388,14 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             </small>
           </template>
         </div>
-        <div v-if="!canEmit" class="warning" role="status">
-          <strong>Antes de emitir:</strong>
+        <div v-if="!canEmit" class="emission-checklist" role="status">
+          <div class="emission-checklist__header"><CircleAlert :size="19" aria-hidden="true" /><strong>Requisitos para emitir</strong></div>
+          <p>Completa los siguientes datos para habilitar la emisión.</p>
           <ul>
-            <li v-for="pending in emissionPending" :key="pending">{{ pending }}.</li>
+            <li v-for="pending in emissionPending" :key="pending">
+              <span>{{ pending }}.</span>
+              <button type="button" @click="currentStep = pendingStep(pending)">Corregir</button>
+            </li>
           </ul>
         </div>
       </section>
@@ -2020,7 +2120,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-5);
-  max-width: 68rem;
 }
 .form-grid__full {
   grid-column: 1 / -1;
@@ -2149,14 +2248,14 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 .commercial-preview :deep(.button) {
   justify-self: start;
 }
-.totals {
+ .totals {
   display: grid;
   justify-items: end;
   gap: var(--space-2);
   padding: var(--space-6);
-  border: 1px solid color-mix(in srgb, var(--color-primary) 20%, var(--color-border));
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
-  background: var(--color-primary-soft);
+  background: var(--color-surface-muted);
   text-align: right;
 }
 .totals span {
@@ -2386,4 +2485,33 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     transform: none;
   }
 }
+
+.currency-choice { min-width: 0; margin: 0; padding: 0; border: 0; }
+.currency-choice legend { margin-bottom: var(--space-2); color: var(--color-text); font-weight: 600; }
+.currency-choice__options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.currency-choice__option { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface); cursor: pointer; }
+.currency-choice__option--selected { border-color: var(--color-primary); background: var(--color-primary-soft); }
+.currency-choice__option:hover { border-color: var(--color-border-strong); }
+.currency-choice__option:focus-within { box-shadow: var(--focus-ring); }
+.currency-choice__option input { accent-color: var(--color-primary); }
+.currency-choice__option span { display: grid; gap: var(--space-1); }
+.currency-choice__option small { color: var(--color-text-secondary); }
+.condition-error { color: var(--color-danger); }
+.field-count { color: var(--color-text-secondary); justify-self: end; font-weight: 400; }
+.whatsapp-share { display: grid; gap: var(--space-3); margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--color-border); }
+.whatsapp-share label { display: flex; align-items: center; gap: var(--space-2); color: var(--color-text); font-weight: 700; }
+.whatsapp-share label svg { color: var(--color-primary-accent); }
+.whatsapp-share p { margin: 0; color: var(--color-text-secondary); }
+.whatsapp-share textarea { width: 100%; min-height: 10rem; padding: var(--space-3); border: 1px solid var(--color-border-strong); border-radius: var(--radius-control); background: var(--color-surface); color: var(--color-text); font: inherit; line-height: 1.65; resize: vertical; }
+.whatsapp-share textarea:focus-visible { box-shadow: var(--focus-ring); }
+.emission-checklist { display: grid; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface-muted); }
+.emission-checklist__header { display: flex; align-items: center; gap: var(--space-2); }
+.emission-checklist__header svg { color: var(--color-warning); }
+.emission-checklist p { margin: 0; color: var(--color-text-secondary); }
+.emission-checklist ul { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.emission-checklist li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) 0; border-top: 1px solid var(--color-border); }
+.emission-checklist li button { flex-shrink: 0; padding: var(--space-2); border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-primary-accent); cursor: pointer; font-weight: 650; }
+.emission-checklist li button:hover { background: var(--color-primary-soft); }
+@media (max-width: 36rem) { .currency-choice__options { grid-template-columns: 1fr; } }
+
 </style>
