@@ -38,7 +38,7 @@ test('PRF-04 voz real hasta guardado integral sin escrituras prematuras', async 
   // El guardado no debe omitir la confirmación comercial explícita.
   await page.getByRole('navigation', { name: 'Apartados del mueble a pedido' })
     .getByRole('button', { name: /Revisar/ }).click()
-  await page.getByRole('button', { name: 'Guardar especificación' }).click()
+  await page.getByRole('button', { name: 'Agregar mueble a la proforma' }).click()
   await expect(page.getByRole('heading', { name: /Configurar|Nuevo mueble|escritorio/i }).first()).toBeVisible()
   await expect(
     page.getByRole('alert').filter({ hasText: 'Confirma la diferencia entre el total dictado' }),
@@ -52,7 +52,7 @@ test('PRF-04 voz real hasta guardado integral sin escrituras prematuras', async 
     .check()
   await page.getByRole('navigation', { name: 'Apartados del mueble a pedido' })
     .getByRole('button', { name: /Revisar/ }).click()
-  await page.getByRole('button', { name: 'Guardar especificación' }).click()
+  await page.getByRole('button', { name: 'Agregar mueble a la proforma' }).click()
   await expect(page.getByRole('heading', { name: 'Nueva proforma' })).toBeVisible()
   expect(comerciales).toEqual([])
   await page.getByRole('button', { name: 'Guardar borrador' }).click()
