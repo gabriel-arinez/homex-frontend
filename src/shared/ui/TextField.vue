@@ -21,7 +21,7 @@ const props = defineProps<{
 const emit = defineEmits<{ 'update:modelValue': [value: string]; blur: [] }>()
 function update(event: Event) {
   const input = event.target as HTMLInputElement
-  if (input.isComposing) return
+  if (event instanceof InputEvent && event.isComposing) return
   const raw = input.value
   const cleaned = cleanInput(raw, props.inputRule, props.maxLength)
   if (raw !== cleaned) input.value = cleaned
