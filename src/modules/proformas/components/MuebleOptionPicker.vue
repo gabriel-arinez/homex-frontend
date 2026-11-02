@@ -73,7 +73,7 @@ function close(event: FocusEvent) {
         aria-autocomplete="list"
         :aria-expanded="open"
         :aria-controls="open ? listId : undefined"
-        :aria-activedescendant="open && active >= 0 && active < matching.length ? listId + '-' + active : undefined"
+        :aria-activedescendant="open && active >= 0 ? listId + '-' + active : undefined"
         :placeholder="selected && !open ? selected.label : placeholder"
         @focus="open = true"
         @input="open = true; active = -1"
@@ -90,7 +90,7 @@ function close(event: FocusEvent) {
         v-for="(option, i) in matching" :id="listId + '-' + i" :key="option.value" type="button" role="option"
         :aria-selected="option.value === modelValue" :class="{ 'is-active': active === i }" @click="choose(option)"
       >{{ option.label }} <Check v-if="option.value === modelValue" :size="15" aria-hidden="true" /></button>
-      <button v-if="canCreate" type="button" class="mueble-picker__create" :disabled="busy" @click="create">
+      <button v-if="canCreate" :id="listId + '-' + matching.length" type="button" role="option" :aria-selected="false" :class="{ 'is-active': active === matching.length }" class="mueble-picker__create" :disabled="busy" @click="create">
         <Plus :size="17" aria-hidden="true" /> {{ createLabel }} “{{ search.trim() }}”
       </button>
       <p v-if="!matching.length && !canCreate">No se encontraron coincidencias.</p>
