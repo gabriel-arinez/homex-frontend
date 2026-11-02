@@ -313,7 +313,8 @@ function retroceder() {
         <Button type="button" @click="confirmarCaptura">Aplicar propuesta al mueble</Button>
       </div>
     </section>
-    <fieldset class="studio-content" :disabled="processing || Boolean(propuestaPorConfirmar)">
+    <!-- La ficha anterior no debe mostrar validaciones mientras se revisa una propuesta sin aplicar. -->
+    <fieldset v-if="!propuestaPorConfirmar" class="studio-content" :disabled="processing">
       <EspecificacionForm
         :key="formVersion"
         :tipos="tipos"
