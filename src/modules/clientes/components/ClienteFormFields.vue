@@ -8,6 +8,7 @@ import {
   type ClientData,
 } from '@/shared/validation/commercialFields'
 import TextField from '@/shared/ui/TextField.vue'
+import TextAreaField from '@/shared/ui/TextAreaField.vue'
 
 export type ClienteFormModel = ClientData & { tipo_cliente: string }
 
@@ -142,13 +143,16 @@ function changeType(value: string) {
       @blur="touched.direccion = true"
       @update:model-value="emit('change', 'direccion', $event)"
     />
-    <TextField
+    <TextAreaField
+      class="client-fields__full"
       :model-value="model.observaciones"
       :name="prefix + 'observaciones'"
       label="Observaciones"
+      placeholder="Añade información adicional que pueda ser útil en futuras cotizaciones..."
+      :rows="4"
       :max-length="CLIENT_LIMITS.observaciones"
       :error="errorFor('observaciones')"
-      hint="Máximo 250 caracteres."
+      hint="Campo opcional."
       @blur="touched.observaciones = true"
       @update:model-value="emit('change', 'observaciones', $event)"
     />
