@@ -23,6 +23,7 @@ type DatosComerciales = {
 }
 const props = defineProps<{
   nueva: boolean
+  formVersion: number
   dirty: boolean
   sesion: string
   moneda: 'BOB' | 'USD'
@@ -145,6 +146,7 @@ function retroceder() {
     </div>
     <fieldset class="studio-content" :disabled="processing">
       <EspecificacionForm
+        :key="formVersion"
         :tipos="tipos"
         :especificacion="especificacion"
         :detalle="detalle"
@@ -158,6 +160,7 @@ function retroceder() {
         @save="(body, comercial) => emit('save', body, comercial)"
         @changed="emit('changed')"
         @cancel="emit('cancel')"
+        @request-section="seccion = $event"
         @type-created="emit('typeCreated', $event)"
       />
     </fieldset>
