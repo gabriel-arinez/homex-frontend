@@ -92,7 +92,7 @@ const titulo = computed(() => props.detalle?.nombre?.trim() || 'Nuevo mueble a p
 watch(seccion, async () => {
   await nextTick()
   tituloSeccion.value?.focus({ preventScroll: true })
-  tituloSeccion.value?.scrollIntoView({ behavior: 'auto', block: 'start' })
+  tituloSeccion.value?.scrollIntoView?.({ behavior: 'auto', block: 'start' })
 })
 function avanzar() {
   if (volverARevision.value) { seccion.value = 'revision'; volverARevision.value = false; return }
