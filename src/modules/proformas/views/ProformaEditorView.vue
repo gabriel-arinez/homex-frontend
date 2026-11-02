@@ -1426,7 +1426,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             type="text"
             input-mode="numeric"
             input-rule="digits"
-            :max-length="2"
+            :max-length="3"
             :error="conditionError('validez_oferta')"
             @blur="conditionsTouched.validez_oferta = true"
             hint="Opcional: entre 1 y 99 días."
