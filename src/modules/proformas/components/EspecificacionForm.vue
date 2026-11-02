@@ -12,6 +12,7 @@ import Button from '@/shared/ui/Button.vue'
 import Select from '@/shared/ui/Select.vue'
 import TextField from '@/shared/ui/TextField.vue'
 import TextAreaField from '@/shared/ui/TextAreaField.vue'
+import Toast from '@/shared/ui/Toast.vue'
 import MuebleOptionPicker from './MuebleOptionPicker.vue'
 import { Pencil, AlertCircle, CheckCircle2, Layers3, Plus } from '@lucide/vue'
 import { asignarEspesorPendiente, pendienteResuelto } from '../services/pendientesAsistencia'
@@ -76,6 +77,7 @@ const catalogo = ref<AtributoMueble[]>([])
 const limites = reactive({ max_conjuntos: 10, max_componentes: 40 })
 const catalogError = ref('')
 const error = ref('')
+const aviso = ref('')
 const search = ref('')
 const componentSearch = reactive<Record<string, string>>({})
 const nuevoTipo = ref('')
@@ -442,7 +444,8 @@ function uid() {
   return crypto.randomUUID()
 }
 function addConjunto() {
-  if (conjuntos.some((g) => !componentes.some((c) => c.conjunto_uid === g.uid))) return
+  if (conjuntos.length >= limites.max_conjuntos) { aviso.value = 'Has alcanzado el máximo de conjuntos permitidos.'; return }
+  if (conjuntos.some((g) => !componentes.some((c) => c.conjunto_uid === g.uid))) { aviso.value = 'Completa el conjunto existente con una pieza antes de crear otro.'; return }
   conjuntos.push({ uid: uid(), nombre: '' })
   changed()
 }
@@ -475,8 +478,8 @@ function confirmarDestinoDelConjunto(id: string) {
   changed()
 }
 function addComponente(conjunto_uid?: string) {
-  if (componentes.some((c) => !c.nombre.trim()) || componentes.length >= limites.max_componentes)
-    return
+  if (componentes.length >= limites.max_componentes) { aviso.value = 'Has alcanzado el máximo de componentes permitidos.'; return }
+  if (componentes.some((c) => !c.nombre.trim())) { aviso.value = 'Asigna un nombre al componente sin completar antes de agregar otro.'; return }
   const nuevoUid = uid()
   componentes.push({
     uid: nuevoUid,
@@ -514,7 +517,7 @@ function deshacerComponente() {
   changed()
 }
 function addAccesorio() {
-  if (accesorios.some((item) => !item.trim())) return
+  if (accesorios.some((item) => !item.trim())) { aviso.value = 'Completa o elimina el accesorio sin descripción antes de agregar otro.'; return }
   accesorios.push('')
   accesorioEnEdicion.value = accesorios.length - 1
   changed()
@@ -534,8 +537,8 @@ function deshacerAccesorio() {
   changed()
 }
 function duplicateComponente(index: number) {
-  if (componentes.length >= limites.max_componentes || componentes.some((c) => !c.nombre.trim()))
-    return
+  if (componentes.length >= limites.max_componentes) { aviso.value = 'No puedes duplicar: se alcanzó el máximo de componentes.'; return }
+  if (componentes.some((c) => !c.nombre.trim())) { aviso.value = 'Completa primero los componentes sin nombre.'; return }
   const copy = clonarTecnica(componentes[index]!)
   copy.uid = uid()
   componentes.splice(index + 1, 0, copy)
@@ -887,6 +890,7 @@ onMounted(loadCatalog)
     @change="changed"
     @submit.prevent="submit"
   >
+    <Toast :visible="Boolean(aviso)" :message="aviso" tone="info" @close="aviso = ''" />
     <header v-if="!studio" class="config-header">
       <div>
         <p class="eyebrow">Mueble a pedido · Sin guardar</p>
