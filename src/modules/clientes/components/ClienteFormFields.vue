@@ -18,6 +18,7 @@ const props = defineProps<{
   typeReadonly?: boolean
   prefix?: string
   validate?: boolean
+  original?: Partial<Record<keyof ClientData, string | null | undefined>>
 }>()
 const emit = defineEmits<{ change: [field: keyof ClienteFormModel, value: string] }>()
 
@@ -31,7 +32,7 @@ function errorFor(field: keyof ClientData) {
   return (
     props.errors?.[field]?.[0] ||
     ((touched[field] || props.validate)
-      ? validateClientField(field, props.model[field], isCompany.value)
+      ? validateClientField(field, props.model[field], isCompany.value, props.original?.[field])
       : '')
   )
 }
