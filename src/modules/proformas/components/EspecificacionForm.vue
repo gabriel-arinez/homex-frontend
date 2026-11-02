@@ -1263,7 +1263,8 @@ onMounted(loadCatalog)
             <TextField
               v-model="comercial.cantidad"
               name="mueble-cantidad"
-              label="Cantidad cotizada"
+              label="Cantidad cotizada *"
+              input-mode="numeric" :error="errorCampo('comercial', 0, touched.cantidad)" @blur="touched.cantidad = true"
             />
             <Select
               v-model="comercial.unidad"
@@ -1278,19 +1279,22 @@ onMounted(loadCatalog)
             <TextField
               v-model="comercial.precio_unitario"
               name="mueble-precio"
-              :label="'Precio unitario negociado (' + (moneda ?? 'BOB') + ')'"
+              :label="'Precio unitario negociado (' + (moneda ?? 'BOB') + ') *'"
+              input-mode="decimal" :error="errorCampo('comercial', 2, touched.precio)" @blur="touched.precio = true"
             />
             <TextField
               v-model="comercial.descuento"
               name="mueble-descuento"
-              label="Descuento monetario total de línea"
+              label="Descuento monetario total de línea *"
+              input-mode="decimal" :error="errorCampo('comercial', 3, touched.descuento)" @blur="touched.descuento = true"
             />
           </div>
-          <p role="status">
-            Total estimado en {{ moneda ?? 'BOB' }}:
-            {{ totalEstimado === null ? 'Pendiente' : totalEstimado.toFixed(2) }}. El importe
-            definitivo se calcula en PostgreSQL.
-          </p>
+          <div class="commercial-total" role="status">
+            <div><span>Subtotal</span><strong>{{ comercial.cantidad.trim() && comercial.precio_unitario.trim() && Number(comercial.precio_unitario) > 0 ? (Number(comercial.cantidad) * Number(comercial.precio_unitario)).toFixed(2) + ' ' + (moneda ?? 'BOB') : 'Pendiente' }}</strong></div>
+            <div><span>Descuento</span><strong>{{ comercial.descuento.trim() ? comercial.descuento + ' ' + (moneda ?? 'BOB') : 'Pendiente' }}</strong></div>
+            <div class="commercial-total-main"><span>Total estimado del mueble</span><strong>{{ totalEstimado === null ? 'Importe pendiente' : totalEstimado.toFixed(2) + ' ' + (moneda ?? 'BOB') }}</strong></div>
+            <p>El total definitivo se confirmará al guardar la proforma.</p>
+          </div>
         </section>
         <section id="revision" v-show="!studio || activeSection === 'revision'" class="furniture-review" aria-labelledby="revision-title">
           <header class="review-hero">
@@ -1300,7 +1304,8 @@ onMounted(loadCatalog)
               <h4>{{ comercial.nombre || 'Mueble pendiente de nombre' }}</h4>
               <p>{{ tiposLocales.find((x) => String(x.id) === form.tipo_mueble)?.nombre || 'Tipo de mueble no especificado' }}</p>
             </div>
-            <span class="review-check"><CheckCircle2 :size="24" aria-hidden="true" /></span>
+            <span v-if="!Object.values(erroresSecciones).some((lista) => lista.length) && !pendientesVisibles.length" class="review-check"><CheckCircle2 :size="24" aria-label="Sin datos obligatorios pendientes" /></span>
+            <span v-else class="review-check review-check--pending"><AlertCircle :size="24" aria-label="Hay información que revisar" /></span>
           </header>
           <div v-if="Object.values(erroresSecciones).some((lista) => lista.length)" class="review-alert" aria-label="Datos que debes revisar">
             <h4><AlertCircle :size="19" aria-hidden="true" /> Información por completar</h4>
