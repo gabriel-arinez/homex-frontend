@@ -112,6 +112,33 @@ describe('AP4 clientes consolidados', () => {
     await clientesService.update(41, { activo: true }, 'b'.repeat(64))
     expect(methods).toEqual(['DELETE', 'PATCH:{"activo":true}'])
   })
+  it('permite observaciones multilinea con contador y sin perder saltos de línea', async () => {
+    const wrapper = mount(ClienteFormFields, {
+      props: {
+        model: {
+          tipo_cliente: '2',
+          nombres: 'María',
+          apellidos: 'Flores',
+          empresa: 'HOMEX',
+          celular: '',
+          direccion: '',
+          observaciones: '',
+        },
+        prefix: 'prueba',
+        tipos: [typeInfo],
+      },
+    })
+    const observations = wrapper.get('textarea[name="prueba-observaciones"]')
+    expect(observations.attributes('maxlength')).toBe('250')
+    await observations.setValue('Atender por la mañana.\nConfirmar dirección.')
+    expect(wrapper.emitted('change')).toContainEqual([
+      'observaciones',
+      'Atender por la mañana.\nConfirmar dirección.',
+    ])
+    expect(wrapper.text()).toContain('250 caracteres')
+    wrapper.unmount()
+  })
+
   it('conserva los datos locales al alternar entre EMPRESA y PERSONA', async () => {
     const wrapper = mount(ClienteFormFields, {
       props: {
