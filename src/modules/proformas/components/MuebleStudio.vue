@@ -72,6 +72,7 @@ const secciones = [
 const seccion = ref<Seccion>('general')
 const estadoApartados = ref<Record<Seccion, 'pending' | 'complete' | 'issues'>>({ general: 'pending', estructura: 'pending', accesorios: 'pending', comercial: 'pending', revision: 'pending' })
 const volverARevision = ref(false)
+const propuestaPorConfirmar = ref<ResultadoAsistida | null>(null)
 const indice = computed(() => secciones.findIndex((item) => item.id === seccion.value))
 const titulo = computed(() => props.detalle?.nombre?.trim() || 'Nuevo mueble a pedido')
 function avanzar() {
@@ -79,7 +80,16 @@ function avanzar() {
   if (indice.value < secciones.length - 1) seccion.value = secciones[indice.value + 1]!.id
 }
 function editarDesdeRevision(section: Seccion) { volverARevision.value = true; seccion.value = section }
-function recibirCaptura(result: ResultadoAsistida) { emit('applied', result); volverARevision.value = false; seccion.value = 'revision' }
+function recibirCaptura(result: ResultadoAsistida) {
+  propuestaPorConfirmar.value = result
+  volverARevision.value = false
+  seccion.value = 'revision'
+}
+function confirmarCaptura() {
+  if (!propuestaPorConfirmar.value) return
+  emit('applied', propuestaPorConfirmar.value)
+  propuestaPorConfirmar.value = null
+}
 function retroceder() {
   if (indice.value > 0) seccion.value = secciones[indice.value - 1]!.id
 }
@@ -96,7 +106,7 @@ function retroceder() {
     </header>
     <CapturaAsistida
       v-if="nueva" :dirty="dirty" :sesion="sesion" :moneda="moneda" :proforma="proforma"
-      @applied="recibirCaptura" @processing="emit('processing', $event)"
+      review-before-apply @proposed="recibirCaptura" @processing="emit('processing', $event)"
     />
     <nav class="studio-steps" aria-label="Apartados del mueble a pedido">
       <button
@@ -118,7 +128,34 @@ function retroceder() {
       </div>
       <p v-if="seccion === 'revision'">Comprueba los detalles antes de añadir el mueble a la proforma.</p>
     </div>
-    <fieldset class="studio-content" :disabled="processing">
+    <section v-if="propuestaPorConfirmar && seccion === 'revision'" class="studio-proposal" aria-label="Propuesta de voz por confirmar">
+      <div class="studio-proposal-heading">
+        <div>
+          <h3>Propuesta obtenida por voz</h3>
+          <p>Comprueba estos datos antes de reemplazar la información que hayas introducido.</p>
+        </div>
+        <span class="studio-proposal-pill">Pendiente de aceptación</span>
+      </div>
+      <div class="studio-proposal-facts">
+        <div><span>Nombre reconocido</span><strong>{{ propuestaPorConfirmar.propuesta_configurador?.comercial?.nombre || 'No especificado' }}</strong></div>
+        <div><span>Cantidad reconocida</span><strong>{{ propuestaPorConfirmar.propuesta_configurador?.comercial?.cantidad ?? 'Sin confirmar' }}</strong></div>
+        <div><span>Precio unitario propuesto</span><strong>{{ propuestaPorConfirmar.propuesta_configurador?.comercial?.precio_unitario ?? 'Pendiente' }} {{ moneda }}</strong></div>
+      </div>
+      <details v-if="propuestaPorConfirmar.texto_transcrito_original" class="studio-proposal-transcript">
+        <summary>Ver texto reconocido</summary>
+        <p>{{ propuestaPorConfirmar.texto_transcrito_original }}</p>
+      </details>
+      <div v-if="propuestaPorConfirmar.pendientes.length" class="studio-proposal-pending">
+        <h4>{{ propuestaPorConfirmar.pendientes.length }} datos que requieren revisión</h4>
+        <ul><li v-for="p in propuestaPorConfirmar.pendientes" :key="p.indice">{{ p.mensaje }}</li></ul>
+      </div>
+      <p class="studio-proposal-disclaimer">La ficha que aparece debajo todavía contiene los datos anteriores. Al aplicar la propuesta se reemplazarán los datos de este mueble, pero no los demás ítems de la proforma.</p>
+      <div class="studio-proposal-actions">
+        <Button type="button" variant="secondary" @click="propuestaPorConfirmar = null">Descartar propuesta</Button>
+        <Button type="button" @click="confirmarCaptura">Aplicar propuesta al mueble</Button>
+      </div>
+    </section>
+    <fieldset class="studio-content" :disabled="processing || Boolean(propuestaPorConfirmar)">
       <EspecificacionForm
         :key="formVersion" :tipos="tipos" :especificacion="especificacion" :detalle="detalle"
         :unidades="unidades" :pendientes-asistencia="pendientesAsistencia" :moneda="moneda"
@@ -130,7 +167,7 @@ function retroceder() {
         @type-created="emit('typeCreated', $event)"
       />
     </fieldset>
-    <footer class="studio-page-footer">
+    <footer v-if="!propuestaPorConfirmar" class="studio-page-footer">
       <Button type="button" variant="secondary" :disabled="indice === 0" @click="retroceder">Anterior</Button>
       <span v-if="seccion === 'revision'">Revisa cada apartado antes de incorporar el mueble.</span>
       <span v-else>Los cambios se conservan mientras configuras el mueble.</span>
@@ -167,4 +204,21 @@ function retroceder() {
 .studio-page-footer span { color:var(--color-text-secondary); font-size:.75rem; }
 @media(max-width:65rem) { .studio-step-icon { display:none; } }
 @media(max-width:48rem) { .studio-steps { display:flex; overflow-x:auto; padding-bottom:.4rem; } .studio-steps button { flex:0 0 auto; min-height:3.2rem; } .studio-section-heading { display:grid; } .studio-section-heading>p { text-align:left; } .studio-page-footer span { order:3; flex-basis:100%; } }
+.studio-proposal { display:grid; gap:1rem; border:1px solid var(--color-border-strong); padding:clamp(1rem,2vw,1.5rem); background:var(--color-surface); border-radius:var(--radius-card); }
+.studio-proposal-heading { display:flex; justify-content:space-between; flex-wrap:wrap; gap:.8rem; align-items:start; }
+.studio-proposal-heading h3 { margin:0 0 .35rem; font-size:1.1rem; }
+.studio-proposal-heading p,.studio-proposal-disclaimer { margin:0; font-size:.83rem; line-height:1.55; color:var(--color-text-secondary); }
+.studio-proposal-pill { border-radius:999px; padding:.4rem .7rem; color:var(--color-text); background:var(--color-surface-muted); border:1px solid var(--color-border); font-size:.71rem; font-weight:700; }
+.studio-proposal-facts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.6rem; }
+.studio-proposal-facts div { display:grid; gap:.4rem; padding:1rem; border:1px solid var(--color-border); border-radius:var(--radius-control); }
+.studio-proposal-facts span { color:var(--color-text-secondary); font-size:.74rem; }
+.studio-proposal-facts strong { font-size:.88rem; overflow-wrap:anywhere; }
+.studio-proposal-transcript { padding:.8rem; border:1px solid var(--color-border); border-radius:var(--radius-control); }
+.studio-proposal-transcript summary { cursor:pointer; font-size:.85rem; font-weight:700; }
+.studio-proposal-transcript p { font-size:.82rem; overflow-wrap:anywhere; line-height:1.6; }
+.studio-proposal-pending { padding:.9rem; border:1px solid var(--color-border-strong); border-radius:var(--radius-control); }
+.studio-proposal-pending h4 { font-size:.86rem; margin:0; }
+.studio-proposal-pending li { font-size:.78rem; line-height:1.5; margin-top:.3rem; }
+.studio-proposal-actions { display:flex; gap:.7rem; flex-wrap:wrap; justify-content:end; }
+@media(max-width:38rem) { .studio-proposal-facts { grid-template-columns:1fr; } }
 </style>
