@@ -54,8 +54,7 @@ import ClienteFormFields from '@/modules/clientes/components/ClienteFormFields.v
 import DetalleForm from '../components/DetalleForm.vue'
 import CatalogoContextual from '../components/CatalogoContextual.vue'
 import type { CatalogoContextState } from '../services/catalogoContext'
-import EspecificacionForm from '../components/EspecificacionForm.vue'
-import CapturaAsistida from '../components/CapturaAsistida.vue'
+import MuebleStudio from '../components/MuebleStudio.vue'
 import { mapearCapturaAsistida } from '../services/capturaAsistidaMapper'
 import { leerDatosTecnicos, tecnicaIgual } from '../services/muebleTecnico'
 import { proformasService } from '../services/proformasService'
@@ -119,6 +118,7 @@ const readMaster = ref<Producto | null>(null)
 let readRequestId = 0
 const specLine = ref<number | null>(null)
 const draftingFurniture = ref<LineaLocal | null>(null)
+const furnitureOpen = computed(() => specLine.value !== null || draftingFurniture.value !== null)
 const sesionBorrador = ref(crypto.randomUUID())
 const specRenderVersion = ref(0)
 const voiceProcessing = ref(false)
@@ -1121,6 +1121,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       @close="answerConfirmation(false)"
       @confirm="answerConfirmation(true)"
     />
+    <div v-if="!furnitureOpen" class="quote-main">
     <div class="quote-topline" aria-label="Ubicación en el proceso">
       <span>COMERCIAL <span class="quote-divider">/</span> PROFORMAS</span>
       <div class="quote-topline__right">
@@ -1861,37 +1862,29 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         @cancel="closeLineModal"
       />
     </Modal>
-    <Modal
-      :open="specLine !== null || draftingFurniture !== null"
-      title="Configurador integral de mueble a pedido"
-      fullscreen
-      @close="closeSpec"
-    >
-      <CapturaAsistida
-        v-if="draftingFurniture"
-        :dirty="specModalDirty"
-        :sesion="sesionBorrador"
-        :moneda="header.moneda_codigo === 'USD' ? 'USD' : 'BOB'"
-        :proforma="proformaId"
-        @applied="aplicarCaptura"
-        @processing="voiceProcessing = $event"
-      />
-      <fieldset :disabled="voiceProcessing" style="border: 0; padding: 0; min-width: 0">
-        <EspecificacionForm
-          :key="`${specLine ?? -1}:${specRenderVersion}`"
-          :tipos="tiposMueble"
-          :especificacion="editableSpec"
-          :detalle="editableSpecDetail"
-          :unidades="unidades"
-          :pendientes-asistencia="draftingFurniture ? pendientesAsistencia : []"
-          :moneda="header.moneda_codigo === 'USD' ? 'USD' : 'BOB'"
-          @save="saveSpec"
-          @type-created="registrarTipoMueble"
-          @changed="specModalDirty = true"
-          @cancel="closeSpec"
-        />
-      </fieldset>
-    </Modal>
+    </div>
+    <MuebleStudio
+      v-if="furnitureOpen"
+      :key="specRenderVersion + ':' + (specLine ?? -1)"
+      :nueva="Boolean(draftingFurniture)"
+      :dirty="specModalDirty"
+      :sesion="sesionBorrador"
+      :moneda="header.moneda_codigo === 'USD' ? 'USD' : 'BOB'"
+      :proforma="proformaId"
+      :tipos="tiposMueble"
+      :especificacion="editableSpec"
+      :detalle="editableSpecDetail"
+      :unidades="unidades"
+      :pendientes-asistencia="draftingFurniture ? pendientesAsistencia : []"
+      :processing="voiceProcessing"
+      :external-error="error"
+      @save="saveSpec"
+      @type-created="registrarTipoMueble"
+      @changed="specModalDirty = true"
+      @cancel="closeSpec"
+      @applied="aplicarCaptura"
+      @processing="voiceProcessing = $event"
+    />
   </div>
 </template>
 
