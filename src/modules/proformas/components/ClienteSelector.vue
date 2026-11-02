@@ -278,3 +278,4 @@ void ensureSelected()
 .selected-client button { display: grid; flex-shrink: 0; place-items: center; width: 2rem; height: 2rem; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-text); cursor: pointer; }
 .selected-client button:hover { background: var(--color-surface-hover); }
 @media (max-width: 35rem) { .client-picker__option { padding: var(--space-3); } }
+</style>
