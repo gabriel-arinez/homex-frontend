@@ -23,35 +23,49 @@ test('PRF-04 voz real hasta guardado integral sin escrituras prematuras', async 
   // Reproducir el fixture completo a través de MediaRecorder real de Chromium.
   await page.waitForTimeout(12000)
   await page.getByRole('button', { name: 'Detener', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Propuesta obtenida por voz' })).toBeVisible({ timeout: 120000 })
+  await expect(page.getByRole('heading', { name: 'Propuesta obtenida por voz' })).toBeVisible({
+    timeout: 120000,
+  })
   await page.getByRole('button', { name: 'Aplicar propuesta al mueble' }).click()
-  await page.getByRole('navigation', { name: 'Apartados del mueble a pedido' })
-    .getByRole('button', { name: /General/ }).click()
+  await page
+    .getByRole('navigation', { name: 'Apartados del mueble a pedido' })
+    .getByRole('button', { name: /General/ })
+    .click()
   await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue(/escritorio/i)
   expect(comerciales).toEqual([])
-  await page.getByRole('navigation', { name: 'Apartados del mueble a pedido' })
-    .getByRole('button', { name: /Precio/ }).click()
+  await page
+    .getByRole('navigation', { name: 'Apartados del mueble a pedido' })
+    .getByRole('button', { name: /Precio/ })
+    .click()
   await page.getByLabel('Cantidad cotizada').fill('3')
   await page.getByLabel('Precio unitario negociado (BOB)').fill('100')
   await page.locator('input[name="mueble-descuento"]').fill('0.00')
   // El dictado comunica 100 BOB de total, mientras que 3 × 100 BOB = 300 BOB.
   // El guardado no debe omitir la confirmación comercial explícita.
-  await page.getByRole('navigation', { name: 'Apartados del mueble a pedido' })
-    .getByRole('button', { name: /Revisar/ }).click()
+  await page
+    .getByRole('navigation', { name: 'Apartados del mueble a pedido' })
+    .getByRole('button', { name: /Revisar/ })
+    .click()
   await page.getByRole('button', { name: 'Agregar mueble a la proforma' }).click()
-  await expect(page.getByRole('heading', { name: /Configurar|Nuevo mueble|escritorio/i }).first()).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: /Configurar|Nuevo mueble|escritorio/i }).first(),
+  ).toBeVisible()
   await expect(
     page.getByRole('alert').filter({ hasText: 'Confirma la diferencia entre el total dictado' }),
   ).toBeVisible()
-  await page.getByRole('navigation', { name: 'Apartados del mueble a pedido' })
-    .getByRole('button', { name: /Precio/ }).click()
+  await page
+    .getByRole('navigation', { name: 'Apartados del mueble a pedido' })
+    .getByRole('button', { name: /Precio/ })
+    .click()
   await page
     .getByRole('checkbox', {
       name: /Confirmo que el importe comercial difiere del total dictado/,
     })
     .check()
-  await page.getByRole('navigation', { name: 'Apartados del mueble a pedido' })
-    .getByRole('button', { name: /Revisar/ }).click()
+  await page
+    .getByRole('navigation', { name: 'Apartados del mueble a pedido' })
+    .getByRole('button', { name: /Revisar/ })
+    .click()
   await page.getByRole('button', { name: 'Agregar mueble a la proforma' }).click()
   await expect(page.getByRole('heading', { name: 'Nueva proforma' })).toBeVisible()
   expect(comerciales).toEqual([])

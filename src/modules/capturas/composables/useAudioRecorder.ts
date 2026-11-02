@@ -76,7 +76,9 @@ export function useAudioRecorder() {
           }
           animationFrame = requestAnimationFrame(draw)
         }
-      } catch { /* Visualización opcional; nunca interrumpir el dictado. */ }
+      } catch {
+        /* Visualización opcional; nunca interrumpir el dictado. */
+      }
       const preferred = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/webm'].find(
         (x) => MediaRecorder.isTypeSupported(x),
       )

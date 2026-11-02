@@ -11,7 +11,13 @@ const opciones = [
 describe('Furniture Studio: buscadores accesibles', () => {
   it('filtra sin distinguir mayúsculas ni acentos y selecciona un valor existente', async () => {
     const wrapper = mount(MuebleOptionPicker, {
-      props: { modelValue: '', name: 'tipo', label: 'Tipo de mueble', options: opciones, allowCreate: true },
+      props: {
+        modelValue: '',
+        name: 'tipo',
+        label: 'Tipo de mueble',
+        options: opciones,
+        allowCreate: true,
+      },
       attachTo: document.body,
     })
     const input = wrapper.get('input[role="combobox"]')
@@ -25,7 +31,13 @@ describe('Furniture Studio: buscadores accesibles', () => {
 
   it('crea solo una opción inexistente y evita duplicados equivalentes', async () => {
     const wrapper = mount(MuebleOptionPicker, {
-      props: { modelValue: '', name: 'medida', label: 'Agregar medida', options: opciones, allowCreate: true },
+      props: {
+        modelValue: '',
+        name: 'medida',
+        label: 'Agregar medida',
+        options: opciones,
+        allowCreate: true,
+      },
       attachTo: document.body,
     })
     await wrapper.get('input').trigger('focus')

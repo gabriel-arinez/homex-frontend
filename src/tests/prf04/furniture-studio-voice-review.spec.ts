@@ -9,7 +9,11 @@ afterEach(() => vi.restoreAllMocks())
 describe('Furniture Studio: consentimiento antes de aplicar propuesta PRF04', () => {
   it('deja la interpretación como propuesta pendiente sin reemplazar directamente el mueble', async () => {
     const crear = vi.spyOn(asistidasService, 'create').mockResolvedValue({
-      id: 24, estado: 'PENDIENTE', intento_id: 24, numero_intento: 1, reutilizada: false,
+      id: 24,
+      estado: 'PENDIENTE',
+      intento_id: 24,
+      numero_intento: 1,
+      reutilizada: false,
     })
     vi.spyOn(asistidasService, 'get').mockResolvedValue(captura24)
     const wrapper = mount(CapturaAsistida, {
@@ -17,7 +21,9 @@ describe('Furniture Studio: consentimiento antes de aplicar propuesta PRF04', ()
       global: { stubs: { AudioRecorder: true, Teleport: true } },
     })
     try {
-      const upload = wrapper.findAll('button').find((button) => button.text().includes('Subir audio'))
+      const upload = wrapper
+        .findAll('button')
+        .find((button) => button.text().includes('Subir audio'))
       expect(upload).toBeDefined()
       await upload!.trigger('click')
       expect(wrapper.text()).not.toContain('reemplazará toda la información')

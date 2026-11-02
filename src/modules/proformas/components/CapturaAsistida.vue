@@ -14,7 +14,11 @@ const props = defineProps<{
   proforma?: number | null
   reviewBeforeApply?: boolean
 }>()
-const emit = defineEmits<{ applied: [result: ResultadoAsistida]; proposed: [result: ResultadoAsistida]; processing: [value: boolean] }>()
+const emit = defineEmits<{
+  applied: [result: ResultadoAsistida]
+  proposed: [result: ResultadoAsistida]
+  processing: [value: boolean]
+}>()
 const voice = useCapturaAsistida()
 const confirm = ref(false)
 const recording = ref(false)
@@ -49,7 +53,10 @@ watch(
   },
 )
 async function activate() {
-  if (pendingText.value) { void send(undefined, pendingText.value); return }
+  if (pendingText.value) {
+    void send(undefined, pendingText.value)
+    return
+  }
   if (pendingMode.value === 'upload') {
     puedeSeleccionarAudio.value = true
     fileInput.value?.click()
@@ -155,16 +162,29 @@ function cancel() {
 <template>
   <section class="voice-workflow" aria-label="Asistencia por voz">
     <div class="voice-shortcuts">
-      <button type="button" class="voice-record" :disabled="voice.processing.value || recording" @click="start('record')">
+      <button
+        type="button"
+        class="voice-record"
+        :disabled="voice.processing.value || recording"
+        @click="start('record')"
+      >
         <Mic :size="19" aria-hidden="true" /> Grabar descripción
       </button>
-      <button type="button" class="voice-upload" :disabled="voice.processing.value || recording" @click="start('upload')">
+      <button
+        type="button"
+        class="voice-upload"
+        :disabled="voice.processing.value || recording"
+        @click="start('upload')"
+      >
         <Upload :size="19" aria-hidden="true" /> Subir audio
       </button>
       <p>Describe las características del mueble o sube un audio para completar la ficha.</p>
     </div>
     <input
-      ref="fileInput" class="visually-hidden-audio" type="file" tabindex="-1"
+      ref="fileInput"
+      class="visually-hidden-audio"
+      type="file"
+      tabindex="-1"
       :disabled="!puedeSeleccionarAudio || voice.processing.value"
       accept=".wav,.mp3,.m4a,.ogg,.webm"
       aria-label="Seleccionar archivo de audio"
@@ -172,11 +192,16 @@ function cancel() {
     />
     <div v-if="recording" class="voice-live">
       <AudioRecorder ref="recorder" @ready="(audio) => audio && send(audio)" />
-      <button type="button" class="voice-cancel" @click="cancel"><X :size="16" aria-hidden="true" /> Cancelar dictado</button>
+      <button type="button" class="voice-cancel" @click="cancel">
+        <X :size="16" aria-hidden="true" /> Cancelar dictado
+      </button>
     </div>
     <div v-if="voice.processing.value" class="voice-processing" role="status" aria-live="polite">
       <FileAudio :size="20" aria-hidden="true" />
-      <div><strong>Analizando descripción</strong><span>La información de tu mueble se mantiene mientras procesamos el audio.</span></div>
+      <div>
+        <strong>Analizando descripción</strong
+        ><span>La información de tu mueble se mantiene mientras procesamos el audio.</span>
+      </div>
       <Button variant="secondary" @click="cancel">Cancelar</Button>
     </div>
     <p v-if="fileError" role="alert" class="voice-error">{{ fileError }}</p>
@@ -184,16 +209,36 @@ function cancel() {
     <details v-if="original" class="voice-transcript">
       <summary>Ver transcripción original</summary>
       <blockquote>{{ original }}</blockquote>
-      <p v-if="lastInterpretation && lastInterpretation !== original">Última interpretación: {{ lastInterpretation }}</p>
+      <p v-if="lastInterpretation && lastInterpretation !== original">
+        Última interpretación: {{ lastInterpretation }}
+      </p>
       <label for="transcripcion-corregida">Corregir texto para una nueva interpretación</label>
-      <textarea id="transcripcion-corregida" v-model="corrected" :disabled="voice.processing.value" rows="4" />
-      <Button :disabled="voice.processing.value || !corrected.trim() || corrected === lastInterpretation" @click="reinterpret">
+      <textarea
+        id="transcripcion-corregida"
+        v-model="corrected"
+        :disabled="voice.processing.value"
+        rows="4"
+      />
+      <Button
+        :disabled="voice.processing.value || !corrected.trim() || corrected === lastInterpretation"
+        @click="reinterpret"
+      >
         Interpretar texto corregido
       </Button>
     </details>
-    <p v-else-if="hasResult" role="status">La interpretación se ha procesado. Revisa la ficha antes de incorporarla.</p>
-    <Modal :open="confirm" title="Reemplazar información del mueble" title-id="prf04-replace-title" @close="confirm = false">
-      <p>La captura por voz reemplazará toda la información de este mueble. No afectará los demás ítems de la proforma.</p>
+    <p v-else-if="hasResult" role="status">
+      La interpretación se ha procesado. Revisa la ficha antes de incorporarla.
+    </p>
+    <Modal
+      :open="confirm"
+      title="Reemplazar información del mueble"
+      title-id="prf04-replace-title"
+      @close="confirm = false"
+    >
+      <p>
+        La captura por voz reemplazará toda la información de este mueble. No afectará los demás
+        ítems de la proforma.
+      </p>
       <Button variant="secondary" @click="confirm = false">Cancelar</Button>
       <Button @click="proceed">Continuar con voz</Button>
     </Modal>
@@ -201,26 +246,146 @@ function cancel() {
 </template>
 
 <style scoped>
-.voice-workflow { display:grid; gap:1rem; }
-.voice-shortcuts { display:flex; flex-wrap:wrap; align-items:center; gap:.65rem; }
-.voice-shortcuts button { display:inline-flex; justify-content:center; align-items:center; gap:.65rem; min-height:3rem; padding:.7rem 1rem; border-radius:var(--radius-control); font:inherit; font-size:.87rem; font-weight:700; cursor:pointer; }
-.voice-shortcuts button:focus-visible,.voice-cancel:focus-visible { outline:2px solid var(--color-primary-accent); outline-offset:2px; }
-.voice-shortcuts button:disabled { opacity:.6; cursor:wait; }
-.voice-record { background:var(--color-primary); border:1px solid var(--color-primary); color:#fff; }
-.voice-upload { background:var(--color-surface); color:var(--color-text); border:1px solid var(--color-border-strong); }
-.voice-shortcuts p { width:100%; order:3; margin:0; font-size:.78rem; color:var(--color-text-secondary); }
-.visually-hidden-audio { position:absolute; width:1px; height:1px; clip-path:inset(50%); overflow:hidden; white-space:nowrap; }
-.voice-live { display:grid; gap:.65rem; max-width:47rem; border:1px solid var(--color-border); border-radius:var(--radius-card); padding:var(--space-3); background:var(--color-surface-soft); }
-.voice-cancel { display:flex; align-items:center; gap:.4rem; justify-self:start; border:0; background:transparent; color:var(--color-text-secondary); font:inherit; font-size:.8rem; cursor:pointer; }
-.voice-processing { display:flex; align-items:center; gap:1rem; flex-wrap:wrap; background:var(--color-surface-muted); border-radius:var(--radius-card); padding:var(--space-3); }
-.voice-processing div { flex:1; display:grid; gap:.3rem; }
-.voice-processing strong { font-size:.9rem; }
-.voice-processing span { font-size:.8rem; color:var(--color-text-secondary); }
-.voice-error { color:var(--color-danger-text); }
-.voice-transcript { background:var(--color-surface); border:1px solid var(--color-border); padding:var(--space-4); border-radius:var(--radius-card); max-width:58rem; }
-.voice-transcript summary { font-weight:650; cursor:pointer; }
-.voice-transcript blockquote { border-left:2px solid var(--color-primary); padding-left:1rem; margin:1rem 0; color:var(--color-text-secondary); overflow-wrap:anywhere; }
-.voice-transcript label { display:block; margin:1rem 0 .4rem; font-weight:600; }
-.voice-transcript textarea { width:100%; display:block; padding:var(--space-3); border:1px solid var(--color-border-strong); border-radius:var(--radius-control); background:var(--color-surface); color:var(--color-text); font:inherit; resize:vertical; margin-bottom:.7rem; }
-@media(max-width:36rem) { .voice-shortcuts button { flex:1; } }
+.voice-workflow {
+  display: grid;
+  gap: 1rem;
+}
+.voice-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+.voice-shortcuts button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 3rem;
+  padding: 0.7rem 1rem;
+  border-radius: var(--radius-control);
+  font: inherit;
+  font-size: 0.87rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.voice-shortcuts button:focus-visible,
+.voice-cancel:focus-visible {
+  outline: 2px solid var(--color-primary-accent);
+  outline-offset: 2px;
+}
+.voice-shortcuts button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.voice-record {
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  color: #fff;
+}
+.voice-upload {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-strong);
+}
+.voice-shortcuts p {
+  width: 100%;
+  order: 3;
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+.visually-hidden-audio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.voice-live {
+  display: grid;
+  gap: 0.65rem;
+  max-width: 47rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: var(--space-3);
+  background: var(--color-surface-soft);
+}
+.voice-cancel {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  justify-self: start;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.voice-processing {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-card);
+  padding: var(--space-3);
+}
+.voice-processing div {
+  flex: 1;
+  display: grid;
+  gap: 0.3rem;
+}
+.voice-processing strong {
+  font-size: 0.9rem;
+}
+.voice-processing span {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+.voice-error {
+  color: var(--color-danger-text);
+}
+.voice-transcript {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  max-width: 58rem;
+}
+.voice-transcript summary {
+  font-weight: 650;
+  cursor: pointer;
+}
+.voice-transcript blockquote {
+  border-left: 2px solid var(--color-primary);
+  padding-left: 1rem;
+  margin: 1rem 0;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+.voice-transcript label {
+  display: block;
+  margin: 1rem 0 0.4rem;
+  font-weight: 600;
+}
+.voice-transcript textarea {
+  width: 100%;
+  display: block;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  resize: vertical;
+  margin-bottom: 0.7rem;
+}
+@media (max-width: 36rem) {
+  .voice-shortcuts button {
+    flex: 1;
+  }
+}
 </style>

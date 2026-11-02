@@ -1,9 +1,11 @@
 # Furniture Studio — Configurador de muebles a pedido
 
 ## Estado
+
 Implementación frontend en rama de revisión. El resultado visual debe ser aceptado por el usuario antes de cerrar el apartado.
 
 ## Diseño y navegación
+
 El configurador deja de vivir dentro de un `Modal fullscreen` y ocupa toda el área principal del shell HOMEX. El `ProformaEditorView` conserva el estado del borrador en memoria al alternar entre la proforma y el estudio técnico.
 
 `MuebleStudio.vue` aporta encabezado independiente, botón «Volver a proforma», grabación o carga directa de audio y cinco apartados de navegación: general, estructura, accesorios, precio y revisión.
@@ -11,6 +13,7 @@ El configurador deja de vivir dentro de un `Modal fullscreen` y ocupa toda el á
 `EspecificacionForm.vue` mantiene la edición y serialización de `datos_tecnicos`, pero en modo `studio` muestra solamente el apartado elegido, un explorador jerárquico de componentes y una ficha final técnico-comercial. Se eliminó el resumen lateral redundante. El modo no-studio preserva las APIs del formulario usadas por pruebas y consumidores preexistentes.
 
 ## Invariantes funcionales
+
 - La ficha **se incorpora localmente** a la proforma; el servidor únicamente recibe el guardado integral explícito de la proforma o su emisión.
 - Registros, extensiones y claves desconocidas de `datos_tecnicos` se preservan al editar una sección.
 - Los conjuntos y componentes conservan identificadores estables. Máximos: 10 conjuntos y 40 componentes, con la excepción de lectura histórica ya prevista por backend.
@@ -24,6 +27,7 @@ El configurador deja de vivir dentro de un `Modal fullscreen` y ocupa toda el á
 - La nueva interfaz utiliza tokens HOMEX y debe verificarse en claro/oscuro, portátil, tableta y móvil.
 
 ## Archivos principales
+
 - `src/modules/proformas/components/MuebleStudio.vue`
 - `src/modules/proformas/components/EspecificacionForm.vue`
 - `src/modules/proformas/views/ProformaEditorView.vue`
@@ -33,6 +37,7 @@ El configurador deja de vivir dentro de un `Modal fullscreen` y ocupa toda el á
 - `src/modules/capturas/composables/useAudioRecorder.ts`
 
 ## Verificaciones requeridas
+
 ```bash
 npm ci
 npm run type-check

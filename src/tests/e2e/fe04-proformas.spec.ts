@@ -398,7 +398,10 @@ test('FE04 crea con unitario y descuento, revisa y aprueba', async ({ page }) =>
   await page.getByRole('button', { name: 'Acciones de Tres escritorios ejecutivos' }).click()
   await page.getByRole('menuitem', { name: 'Ficha técnica' }).click()
   await page.getByRole('combobox', { name: 'Tipo de mueble (opcional)' }).fill('Escritorio')
-  await page.getByRole('option', { name: /Escritorio/ }).first().click()
+  await page
+    .getByRole('option', { name: /Escritorio/ })
+    .first()
+    .click()
   await studioStep(page, 'Estructura')
   await page.locator('#componente-dimensiones-0').fill('ancho 1.2 m')
   await studioStep(page, 'Revisar')
@@ -973,7 +976,9 @@ for (const width of [360, 390, 768, 1024, 1440])
     }
   })
 
-test('@a11y PRF04 acciones directas de voz accesibles y sin reemplazo prematuro', async ({ page }) => {
+test('@a11y PRF04 acciones directas de voz accesibles y sin reemplazo prematuro', async ({
+  page,
+}) => {
   await mockBackend(page)
   await page.goto('/proformas/nueva')
   await page.getByRole('button', { name: 'Añadir ítem' }).click()
