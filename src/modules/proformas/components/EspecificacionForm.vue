@@ -1570,9 +1570,8 @@ onMounted(loadCatalog)
             <div>
               <span>Subtotal</span
               ><strong>{{
-                comercial.cantidad.trim() &&
-                comercial.precio_unitario.trim() &&
-                Number(comercial.precio_unitario) > 0
+                cantidadValida &&
+                precioValido
                   ? (Number(comercial.cantidad) * Number(comercial.precio_unitario)).toFixed(2) +
                     ' ' +
                     (moneda ?? 'BOB')
@@ -1582,7 +1581,7 @@ onMounted(loadCatalog)
             <div>
               <span>Descuento</span
               ><strong>{{
-                comercial.descuento.trim()
+                descuentoValido
                   ? comercial.descuento + ' ' + (moneda ?? 'BOB')
                   : 'Pendiente'
               }}</strong>
