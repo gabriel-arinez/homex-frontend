@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, watch } from 'vue'
+import { onBeforeUnmount, ref, watch } from 'vue'
 import { CheckCircle2, CircleAlert, Info, X } from '@lucide/vue'
 
 const props = withDefaults(
@@ -13,11 +13,17 @@ const props = withDefaults(
 )
 const emit = defineEmits<{ close: [] }>()
 let timer: ReturnType<typeof setTimeout> | undefined
+const shown = ref(props.visible)
+function dismiss() {
+  shown.value = false
+  emit('close')
+}
 watch(
   () => [props.visible, props.message] as const,
   () => {
     if (timer) clearTimeout(timer)
-    if (props.visible && props.duration > 0) timer = setTimeout(() => emit('close'), props.duration)
+    shown.value = props.visible
+    if (props.visible && props.duration > 0) timer = setTimeout(dismiss, props.duration)
   },
   { immediate: true },
 )
@@ -26,7 +32,7 @@ onBeforeUnmount(() => { if (timer) clearTimeout(timer) })
 <template>
   <Teleport to="body">
     <div
-      v-if="visible"
+      v-if="shown"
       class="toast"
       :class="'toast--' + tone"
       :role="tone === 'danger' ? 'alert' : 'status'"
@@ -36,7 +42,7 @@ onBeforeUnmount(() => { if (timer) clearTimeout(timer) })
       <CircleAlert v-else-if="tone === 'danger'" :size="20" aria-hidden="true" />
       <Info v-else :size="20" aria-hidden="true" />
       <span>{{ message }}</span>
-      <button type="button" aria-label="Cerrar notificación" @click="emit('close')"><X :size="17" aria-hidden="true" /></button>
+      <button type="button" aria-label="Cerrar notificación" @click="dismiss"><X :size="17" aria-hidden="true" /></button>
     </div>
   </Teleport>
 </template>
