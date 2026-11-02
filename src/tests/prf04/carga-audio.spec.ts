@@ -94,6 +94,8 @@ describe('PRF-04 carga de grabaciones', () => {
       await seleccionar(wrapper, new File(['audio'], 'escritorio.aac', { type: 'audio/aac' }))
       expect(wrapper.text()).toContain('Formato no admitido')
 
+      // Cada nuevo archivo requiere una acción expresa del vendedor.
+      await wrapper.get('button').trigger('click')
       await seleccionar(wrapper, new File([], 'vacio.m4a', { type: 'audio/mp4' }))
       expect(wrapper.text()).toContain('archivo de audio está vacío')
       expect(crear).not.toHaveBeenCalled()
