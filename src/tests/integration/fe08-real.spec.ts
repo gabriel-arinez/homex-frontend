@@ -298,6 +298,7 @@ test.describe.serial('FE08 backend real', () => {
         await studio.getByRole('button', { name: 'Añadir accesorio' }).click()
         await studio.locator('input[name="accesorio-0"]').fill(caso.accesorio)
       }
+      await navigation.getByRole('button', { name: /Revisar/ }).click()
       await studio.getByRole('button', { name: 'Guardar especificación' }).click()
       await expect(page.locator('.line-card').getByText(caso.nombre, { exact: true })).toBeVisible()
 
