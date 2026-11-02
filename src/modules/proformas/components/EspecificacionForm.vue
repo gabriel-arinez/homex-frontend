@@ -77,6 +77,8 @@ const nuevoTipo = ref('')
 const creatingType = ref(false)
 const submitAttempted = ref(false)
 const touched = reactive({ nombre: false, precio: false, cantidad: false, descuento: false })
+const touchedMedidas = reactive<Record<string, boolean>>({})
+const touchedPiezas = reactive<Record<string, boolean>>({})
 const tiposLocales = ref([...props.tipos])
 const tiposParecidos = computed(() => {
   const buscar = normalized(nuevoTipo.value)
@@ -626,6 +628,17 @@ const estadoSecciones = computed<Record<SeccionStudio, 'pending' | 'issues' | 'c
   revision: 'pending',
 }))
 watch(estadoSecciones, (value) => emit('sectionStatus', value), { immediate: true })
+function errorMedida(medida: Medida): string {
+  if (!touchedMedidas[medida.clave] && !submitAttempted.value) return ''
+  if (!medida.valor.trim()) return ''
+  if (!Number.isFinite(Number(medida.valor)) || Number(medida.valor) <= 0) return 'Introduce una medida numérica mayor que cero.'
+  if (!medida.unidad) return 'Confirma la unidad de la medida.'
+  return ''
+}
+function errorPieza(pieza: ComponenteTecnico): string {
+  if (!touchedPiezas[pieza.uid ?? pieza.nombre] && !submitAttempted.value) return ''
+  return pieza.nombre.trim() ? '' : 'Introduce el nombre de este componente.'
+}
 function errorCampo(seccion: SeccionStudio, index: number, touchedField = false): string {
   if (!submitAttempted.value && !touchedField) return ''
   if (seccion === 'general' && index === 0) return !comercial.nombre.trim() ? 'Indica el nombre comercial del mueble.' : ''
@@ -869,6 +882,7 @@ onMounted(loadCatalog)
               v-model="medida.valor"
               :name="medida.clave"
               :label="medida.clave.replace(/_/g, ' ')"
+              input-mode="decimal" :error="errorMedida(medida)" @blur="touchedMedidas[medida.clave] = true"
             />
             <label
               >Unidad
@@ -1083,7 +1097,7 @@ onMounted(loadCatalog)
                   <TextField
                     v-model="c.nombre"
                     :name="`componente-nombre-${i}`"
-                    label="Nombre"
+                    label="Nombre *" :error="errorPieza(c)" @blur="touchedPiezas[c.uid ?? c.nombre] = true"
                   /><label class="number-field"
                     >Cantidad por mueble<input
                       :value="c.cantidad_interna ?? ''"
