@@ -73,7 +73,7 @@ function retroceder() {
 </script>
 
 <template>
-  <main class="furniture-studio" aria-labelledby="furniture-studio-title">
+  <section class="furniture-studio" aria-labelledby="furniture-studio-title">
     <div class="studio-breadcrumb">COMERCIAL <span>/</span> PROFORMAS <span>/</span> MUEBLE A PEDIDO</div>
     <header class="studio-header">
       <div>
@@ -170,7 +170,7 @@ function retroceder() {
       <Button v-if="indice < secciones.length - 1" type="button" @click="avanzar">Continuar</Button>
       <Button v-else type="button" variant="secondary" @click="seccion = 'general'">Volver al inicio</Button>
     </footer>
-  </main>
+  </section>
 </template>
 
 <style scoped>
