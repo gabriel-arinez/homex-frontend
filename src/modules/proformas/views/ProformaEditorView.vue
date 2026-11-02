@@ -980,6 +980,9 @@ async function persist(emitir: boolean) {
   validationAttempted.value = true
   localErrors.value = validateQuoteConditions(header)
   if (clienteMode.value === 'nuevo') {
+    if (!nuevoCliente.tipo_cliente) {
+      localErrors.value['cliente_nuevo.tipo_cliente'] = 'Selecciona el tipo de cliente.'
+    }
     const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
     const errors = validateClient(nuevoCliente, tipo?.codigo === 'EMPRESA')
     for (const [field, message] of Object.entries(errors))
