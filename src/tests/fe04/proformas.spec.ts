@@ -388,13 +388,14 @@ describe('FE04 proformas manuales', () => {
     )
 
     const clients = mount(ClienteSelector)
+    await clients.get('input[role="combobox"]').trigger('focus')
     await flushPromises()
     await clients
       .findAll('button')
       .find((button) => button.text() === 'Cargar más clientes')!
       .trigger('click')
     await flushPromises()
-    expect(clients.find('option[value="200"]').exists()).toBe(true)
+    expect(clients.find('[role="option"]').text()).toContain('Cliente Página dos')
 
     const products = mount(ProductoSelector)
     await flushPromises()
