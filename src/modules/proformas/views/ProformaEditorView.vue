@@ -166,6 +166,7 @@ const nuevoCliente = reactive({
   observaciones: '',
 })
 function updateNuevoCliente(field: keyof typeof nuevoCliente, value: string) {
+  if (nuevoCliente[field] !== value) markDirty()
   nuevoCliente[field] = value
   const backendField = 'cliente_nuevo.' + field
   if (fields.value[backendField]) {
@@ -416,6 +417,12 @@ watch(
   },
   { deep: true },
 )
+function setExistingClient(value: string) {
+  if (header.cliente !== value) {
+    header.cliente = value
+    markDirty()
+  }
+}
 function nombreClienteVisible() {
   const cliente = clienteSeleccionado.value
   if (!cliente) return 'Cliente pendiente'
@@ -1310,8 +1317,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         </div>
         <ClienteSelector
           v-if="clienteMode === 'existente'"
-          v-model="header.cliente"
+          :model-value="header.cliente"
           label="Cliente existente"
+          @update:model-value="setExistingClient"
           @select="clienteSeleccionado = $event"
           @input.stop
           @change.stop
