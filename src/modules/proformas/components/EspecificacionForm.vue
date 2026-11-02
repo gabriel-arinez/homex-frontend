@@ -1426,7 +1426,7 @@ onMounted(loadCatalog)
     </div>
     <p v-if="error || externalError" role="alert">{{ error || externalError }}</p>
     <div v-if="!studio || activeSection === 'revision'" class="actions review-actions">
-      <Button type="submit" :disabled="processing" aria-label="Guardar especificación">Agregar mueble a la proforma</Button>
+      <Button type="submit" :disabled="processing">{{ studio ? 'Agregar mueble a la proforma' : 'Guardar especificación' }}</Button>
       <Button v-if="!studio" variant="secondary" @click="emit('cancel')">Cancelar</Button>
     </div>
   </form>
