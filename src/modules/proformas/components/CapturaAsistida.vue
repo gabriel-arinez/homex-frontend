@@ -21,6 +21,7 @@ const recording = ref(false)
 const recorder = ref<InstanceType<typeof AudioRecorder> | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const pendingMode = ref<'record' | 'upload'>('record')
+const puedeSeleccionarAudio = ref(false)
 const hasResult = ref(false)
 const fileError = ref('')
 const MAX_AUDIO_BYTES = 25_000_000
@@ -44,20 +45,24 @@ watch(
     captureId.value = null
     pendingText.value = ''
     hasResult.value = false
+    puedeSeleccionarAudio.value = false
   },
 )
 async function activate() {
   if (pendingText.value) { void send(undefined, pendingText.value); return }
   if (pendingMode.value === 'upload') {
+    puedeSeleccionarAudio.value = true
     fileInput.value?.click()
     return
   }
   recording.value = true
+  puedeSeleccionarAudio.value = true
   await nextTick()
   await recorder.value?.startRecording?.()
 }
 function start(mode: 'record' | 'upload' = 'record') {
   pendingMode.value = mode
+  puedeSeleccionarAudio.value = false
   pendingText.value = ''
   fileError.value = ''
   if (voice.processing.value) return
@@ -79,7 +84,8 @@ function seleccionarAudio(event: Event) {
   input.value = ''
   fileError.value = ''
 
-  if (!archivo || voice.processing.value) return
+  if (!archivo || !puedeSeleccionarAudio.value || voice.processing.value) return
+  puedeSeleccionarAudio.value = false
 
   const extension = archivo.name.slice(archivo.name.lastIndexOf('.')).toLowerCase()
 
@@ -103,6 +109,7 @@ function seleccionarAudio(event: Event) {
 
 async function send(audio?: Blob, texto?: string) {
   recording.value = false
+  puedeSeleccionarAudio.value = false
   const context = JSON.stringify([props.sesion, props.moneda, props.proforma])
   const result = await voice.capture({
     clave_idempotencia: crypto.randomUUID(),
@@ -141,6 +148,7 @@ async function send(audio?: Blob, texto?: string) {
 function cancel() {
   voice.cancel()
   recording.value = false
+  puedeSeleccionarAudio.value = false
   fileError.value = ''
 }
 </script>
@@ -157,6 +165,7 @@ function cancel() {
     </div>
     <input
       ref="fileInput" class="visually-hidden-audio" type="file"
+      :disabled="!puedeSeleccionarAudio || voice.processing.value"
       accept=".wav,.mp3,.m4a,.ogg,.webm"
       aria-label="Seleccionar archivo de audio"
       @change="seleccionarAudio"
