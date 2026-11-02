@@ -342,6 +342,23 @@ const canEmit = computed(() => {
 function markDirty() {
   dirty.value = true
 }
+watch(header, () => {
+  if (!validationAttempted.value) return
+  const condition = validateQuoteConditions(header)
+  localErrors.value = {
+    ...Object.fromEntries(Object.entries(localErrors.value).filter(([field]) => field.startsWith('cliente_nuevo.'))),
+    ...condition,
+  }
+}, { deep: true })
+watch(nuevoCliente, () => {
+  if (!validationAttempted.value || clienteMode.value !== 'nuevo') return
+  const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
+  const client = validateClient(nuevoCliente, tipo?.codigo === 'EMPRESA')
+  localErrors.value = {
+    ...Object.fromEntries(Object.entries(localErrors.value).filter(([field]) => !field.startsWith('cliente_nuevo.'))),
+    ...Object.fromEntries(Object.entries(client).map(([field, message]) => ['cliente_nuevo.' + field, message])),
+  }
+}, { deep: true })
 function nombreClienteVisible() {
   const cliente = clienteSeleccionado.value
   if (!cliente) return 'Cliente pendiente'
