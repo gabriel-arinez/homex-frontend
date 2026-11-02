@@ -679,7 +679,7 @@ onMounted(loadCatalog)
     <div class="configurator-layout">
       <div class="configurator-fields">
     <aside
-      v-if="pendientesVisibles.length && (!studio || activeSection === 'revision')"
+      v-if="pendientesVisibles.length"
       class="pending-summary"
       aria-label="Información pendiente"
       aria-live="polite"
