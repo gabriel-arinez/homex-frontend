@@ -244,7 +244,7 @@ test('AP4 registra una empresa desde móvil y llega a su ficha', async ({ page }
     }),
   )
   await page.goto('/clientes/nuevo')
-  await page.getByLabel('Tipo de cliente').selectOption('2')
+  await page.getByRole('radio', { name: /Empresa/ }).check()
   await page.getByLabel('Nombres del contacto').fill('María')
   await page.getByLabel('Apellidos del contacto').fill('Flores')
   await page.getByLabel('Razón social o empresa').fill('Muebles Flores')
