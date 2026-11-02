@@ -19,8 +19,9 @@ async function login(page: Page) {
 async function createDraft(page: Page, title: string) {
   await page.goto('/proformas/nueva')
   await page.getByRole('button', { name: /Cliente$/ }).click()
-  await expect(page.locator('#cliente-proforma option')).toContainText(['Cliente Integración FE08'])
-  await page.locator('#cliente-proforma').selectOption({ label: 'Cliente Integración FE08' })
+  await page.getByRole('radio', { name: /Existente/ }).check()
+  await page.getByRole('combobox', { name: 'Cliente existente' }).focus()
+  await page.getByRole('option', { name: /Cliente Integración FE08/ }).click()
   await page.getByRole('button', { name: /Condiciones$/ }).click()
   await page.getByLabel('Título').fill(title)
   await page.getByRole('button', { name: 'Guardar borrador' }).click()
@@ -47,7 +48,7 @@ async function addCatalogLine(page: Page) {
 
 async function approveCurrentQuote(page: Page) {
   await page.getByRole('button', { name: 'Emitir proforma' }).click()
-  await expect(page.getByText('En revisión', { exact: true })).toBeVisible()
+  await expect(page.locator('.quote-save-reference')).toContainText('En revisión')
   const segments = new URL(page.url()).pathname.split('/').filter(Boolean)
   const proformaId = Number(segments[segments.length - 2])
   await page.goto(`/proformas/${proformaId}`)
