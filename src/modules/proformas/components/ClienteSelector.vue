@@ -187,7 +187,7 @@ void ensureSelected()
       </div>
       <button type="button" aria-label="Quitar cliente seleccionado" @click="clearSelected"><X :size="17" aria-hidden="true" /></button>
     </div>
-    <div v-if="isOpen" :id="listId" class="client-picker__results" role="listbox" :aria-label="label">
+    <div v-if="isOpen" :id="listId" class="client-picker__results" :role="options.length ? 'listbox' : undefined" :aria-label="options.length ? label : undefined">
       <p v-if="loading && !options.length" role="status">Buscando clientes...</p>
       <p v-else-if="error" role="alert">
         {{ error }}
