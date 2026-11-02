@@ -309,17 +309,27 @@ async function noOverflow(page: Page) {
   ).toBe(true)
 }
 
-async function studioStep(page: Page, name: 'General' | 'Estructura' | 'Accesorios' | 'Precio' | 'Revisar') {
-  await page.getByRole('navigation', { name: 'Apartados del mueble a pedido' })
-    .getByRole('button', { name: new RegExp(name) }).click()
+async function studioStep(
+  page: Page,
+  name: 'General' | 'Estructura' | 'Accesorios' | 'Precio' | 'Revisar',
+) {
+  await page
+    .getByRole('navigation', { name: 'Apartados del mueble a pedido' })
+    .getByRole('button', { name: new RegExp(name) })
+    .click()
 }
 
-test('FURNITURE STUDIO abre una pagina propia, conserva cambios entre apartados y no persiste al incorporar', async ({ page }) => {
+test('FURNITURE STUDIO abre una pagina propia, conserva cambios entre apartados y no persiste al incorporar', async ({
+  page,
+}) => {
   await mockBackend(page)
   const writes: string[] = []
   page.on('request', (request) => {
-    if (/\/proformas\/(?:integral\/)?$/.test(new URL(request.url()).pathname) &&
-        ['POST', 'PUT', 'PATCH'].includes(request.method())) writes.push(request.url())
+    if (
+      /\/proformas\/(?:integral\/)?$/.test(new URL(request.url()).pathname) &&
+      ['POST', 'PUT', 'PATCH'].includes(request.method())
+    )
+      writes.push(request.url())
   })
   await page.goto('/proformas/nueva')
   await page.getByRole('button', { name: 'Añadir ítem' }).click()
@@ -334,13 +344,19 @@ test('FURNITURE STUDIO abre una pagina propia, conserva cambios entre apartados 
   await page.locator('#componente-nombre-0').fill('Tablero superior')
   await page.locator('#componente-espesor-0').fill('18 mm')
   await studioStep(page, 'General')
-  await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Escritorio personalizado')
+  await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue(
+    'Escritorio personalizado',
+  )
 
   await page.getByRole('button', { name: 'Volver a proforma' }).click()
   await expect(page.getByRole('dialog', { name: 'Descartar ficha técnica' })).toBeVisible()
-  await page.getByRole('dialog', { name: 'Descartar ficha técnica' })
-    .getByRole('button', { name: 'Cancelar' }).click()
-  await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Escritorio personalizado')
+  await page
+    .getByRole('dialog', { name: 'Descartar ficha técnica' })
+    .getByRole('button', { name: 'Cancelar' })
+    .click()
+  await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue(
+    'Escritorio personalizado',
+  )
   await studioStep(page, 'Precio')
   await page.getByLabel('Precio unitario negociado (BOB)').fill('350.00')
   await studioStep(page, 'Revisar')
