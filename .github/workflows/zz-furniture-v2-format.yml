@@ -6,7 +6,7 @@ permissions:
   contents: write
 jobs:
   format-once:
-    if: github.event.head_commit.message == 'chore(ci): lanzar formato automatico de Furniture Studio 2.0'
+    if: "github.event.head_commit.message == 'chore(ci): lanzar formato automatico de Furniture Studio 2.0'"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
