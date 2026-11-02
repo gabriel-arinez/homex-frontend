@@ -112,6 +112,10 @@ function changeSearch(event: Event) {
   search.value = value
   isOpen.value = true
   ++requestId
+  clients.value = []
+  focusedIndex.value = -1
+  hasMore.value = false
+  error.value = ''
   if (debounce) clearTimeout(debounce)
   loading.value = true
   debounce = setTimeout(() => void load(true), 280)
@@ -167,7 +171,7 @@ void ensureSelected()
         autocomplete="off"
         aria-autocomplete="list"
         :aria-expanded="isOpen"
-        :aria-controls="listId"
+        :aria-controls="isOpen && options.length ? listId : undefined"
         :aria-activedescendant="isOpen && focusedIndex >= 0 ? listId + '-' + focusedIndex : undefined"
         placeholder="Buscar por nombre, apellido o empresa..."
         @focus="openList"
