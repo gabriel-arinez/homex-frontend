@@ -587,6 +587,7 @@ async function createType() {
   }
 }
 type SeccionStudio = 'general' | 'estructura' | 'accesorios' | 'comercial' | 'revision'
+const pasosValidacion: SeccionStudio[] = ['general', 'estructura', 'accesorios', 'comercial']
 const erroresSecciones = computed<Record<SeccionStudio, string[]>>(() => {
   const problemas: Record<SeccionStudio, string[]> = { general: [], estructura: [], accesorios: [], comercial: [], revision: [] }
   if (!comercial.nombre.trim()) problemas.general.push('Indica el nombre comercial del mueble.')
@@ -626,7 +627,17 @@ const estadoSecciones = computed<Record<SeccionStudio, 'pending' | 'issues' | 'c
 }))
 watch(estadoSecciones, (value) => emit('sectionStatus', value), { immediate: true })
 function errorCampo(seccion: SeccionStudio, index: number, touchedField = false): string {
-  return submitAttempted.value || touchedField ? erroresSecciones.value[seccion][index] ?? '' : ''
+  if (!submitAttempted.value && !touchedField) return ''
+  if (seccion === 'general' && index === 0) return !comercial.nombre.trim() ? 'Indica el nombre comercial del mueble.' : ''
+  if (seccion !== 'comercial') return ''
+  if (index === 0) return !comercial.cantidad.trim() || !Number.isInteger(Number(comercial.cantidad)) || Number(comercial.cantidad) <= 0
+    ? 'Introduce una cantidad entera mayor que cero.' : ''
+  if (index === 2) return !comercial.precio_unitario.trim() || !Number.isFinite(Number(comercial.precio_unitario)) || Number(comercial.precio_unitario) <= 0
+    ? 'Introduce un precio unitario mayor que cero.' : ''
+  if (index === 3) return !comercial.descuento.trim() || !Number.isFinite(Number(comercial.descuento)) || Number(comercial.descuento) < 0 ||
+    Number(comercial.descuento) > Number(comercial.cantidad) * Number(comercial.precio_unitario)
+    ? 'El descuento debe ser válido y no superar el subtotal.' : ''
+  return ''
 }
 function irASeccion(seccion: SeccionStudio) {
   emit('requestSection', seccion)
@@ -755,7 +766,7 @@ onMounted(loadCatalog)
     <div class="configurator-layout">
       <div class="configurator-fields">
         <aside
-          v-if="pendientesVisibles.length && (!studio || activeSection === 'revision')"
+          v-if="pendientesVisibles.length && !studio"
           class="pending-summary"
           aria-label="Información pendiente"
           aria-live="polite"
@@ -1291,7 +1302,7 @@ onMounted(loadCatalog)
           <div v-if="Object.values(erroresSecciones).some((lista) => lista.length)" class="review-alert" aria-label="Datos que debes revisar">
             <h4><AlertCircle :size="19" aria-hidden="true" /> Información por completar</h4>
             <p>Revisa estos datos antes de incorporar el mueble a la proforma.</p>
-            <div v-for="section in (['general','estructura','accesorios','comercial'] as const)" :key="section">
+            <div v-for="section in pasosValidacion" :key="section">
               <button v-for="(issue, index) in erroresSecciones[section]" :key="index" type="button" @click="irASeccion(section)">
                 <AlertCircle :size="15" aria-hidden="true" /> {{ issue }} <Pencil :size="14" aria-hidden="true" />
               </button>
