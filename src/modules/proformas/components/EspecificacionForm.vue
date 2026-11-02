@@ -1168,8 +1168,8 @@ onMounted(loadCatalog)
             <Button
               variant="secondary"
               :disabled="
-                conjuntos.length >= limites.max_conjuntos ||
-                conjuntos.some((g) => !componentes.some((c) => c.conjunto_uid === g.uid))
+                !studio && (conjuntos.length >= limites.max_conjuntos ||
+                conjuntos.some((g) => !componentes.some((c) => c.conjunto_uid === g.uid)))
               "
               @click="addConjunto"
               >Añadir conjunto</Button
@@ -1221,8 +1221,8 @@ onMounted(loadCatalog)
             <Button
               variant="secondary"
               :disabled="
-                componentes.length >= limites.max_componentes ||
-                componentes.some((c) => !c.nombre.trim())
+                !studio && (componentes.length >= limites.max_componentes ||
+                componentes.some((c) => !c.nombre.trim()))
               "
               @click="addComponente()"
               >Agregar componente</Button
@@ -1456,7 +1456,7 @@ onMounted(loadCatalog)
           </div>
           <Button
             variant="secondary"
-            :disabled="accesorios.some((a) => !a.trim())"
+            :disabled="!studio && accesorios.some((a) => !a.trim())"
             @click="addAccesorio"
             ><Plus :size="16" aria-hidden="true" /> Añadir accesorio</Button
           >
