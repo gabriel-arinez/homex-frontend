@@ -1,0 +1,32 @@
+name: Temporary HOMEX UI formatter
+on:
+  push:
+    branches:
+      - feat/ux-proformas-20261101
+jobs:
+  formatter:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/ux-proformas-20261101
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Format changed frontend files only
+        run: |
+          npx prettier --write src/shared/validation/commercialFields.ts src/shared/ui/TextField.vue src/shared/ui/Toast.vue src/modules/clientes/components/ClienteFormFields.vue src/modules/clientes/views/ClienteCreateView.vue src/modules/clientes/views/ClienteDetailView.vue src/modules/clientes/services/clientesService.ts src/modules/proformas/components/ClienteSelector.vue src/modules/proformas/views/ProformaEditorView.vue src/tests/fe04/commercialFields.spec.ts src/tests/e2e/fe04-proformas.spec.ts src/tests/e2e/fe03-clientes-productos.spec.ts
+      - name: Commit formatting only
+        run: |
+          git config user.name "homex-ui-formatter"
+          git config user.email "homex-ui-formatter@users.noreply.github.com"
+          git add src
+          if ! git diff --cached --quiet; then
+            git commit -m "style(frontend): formatear mejoras del editor comercial"
+            git push origin HEAD:feat/ux-proformas-20261101
+          fi
