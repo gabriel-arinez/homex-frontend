@@ -1,0 +1,34 @@
+name: HOMEX Temporary Final Formatter
+on:
+  push:
+    branches:
+      - feat/ux-proformas-20261101
+    paths:
+      - .github/workflows/homex-final-format.yml
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/ux-proformas-20261101
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.12.0'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Normalize changed files
+        run: |
+          npx prettier --write src/shared/ui/TextAreaField.vue src/modules/clientes/components/ClienteFormFields.vue src/modules/proformas/views/ProformaEditorView.vue src/tests/e2e/fe04-proformas.spec.ts src/tests/ap5/catalogo-proformas.spec.ts src/shared/ui/Modal.vue src/shared/ui/ConfirmDialog.vue
+      - name: Commit formatting updates
+        run: |
+          git config user.name "homex-format-action"
+          git config user.email "homex-format-action@users.noreply.github.com"
+          git add src
+          if ! git diff --cached --quiet; then
+            git commit -m "style(frontend): normalizar pulido final del formulario"
+            git push origin HEAD:feat/ux-proformas-20261101
+          fi
