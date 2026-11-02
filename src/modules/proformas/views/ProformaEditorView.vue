@@ -1616,7 +1616,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <p v-if="!canShareWhatsApp" class="whatsapp-share__hint">
               Selecciona un cliente o completa los datos del nuevo cliente para copiar el mensaje.
             </p>
-            <div v-if="whatsappExpanded" id="whatsapp-message-content" class="whatsapp-share__content">
+            <div v-show="whatsappExpanded" id="whatsapp-message-content" class="whatsapp-share__content">
               <label for="whatsapp-message">Contenido del mensaje</label>
               <textarea
                 id="whatsapp-message"
@@ -1889,9 +1889,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   gap: 0;
   padding-bottom: var(--space-8);
 }
-.quote-topline {
+ .quote-topline {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-3);
   margin-bottom: var(--space-3);
@@ -1912,6 +1912,42 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   background: var(--color-primary-soft);
   letter-spacing: 0.02em;
   white-space: nowrap;
+}
+.quote-topline__right {
+  display: grid;
+  justify-items: end;
+  flex-shrink: 0;
+  gap: var(--space-2);
+  max-width: min(100%, 26rem);
+  text-align: right;
+  letter-spacing: normal;
+}
+.quote-save-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  max-width: 100%;
+  color: var(--color-text-secondary);
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.quote-save-status svg {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+.quote-save-status--saved svg {
+  color: var(--color-success);
+}
+.quote-save-status--warning,
+.quote-save-status--warning svg {
+  color: var(--color-danger);
+}
+.quote-save-reference {
+  color: var(--color-text-secondary);
+  font-size: 0.68rem;
+  font-weight: 500;
 }
 .quote-workspace :deep(.page-header) {
   margin-bottom: var(--space-6);
@@ -1993,40 +2029,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 }
 .steps button.active .step-marker {
   background: var(--color-primary);
-}
-.editor-status {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: var(--space-2) var(--space-5);
-  margin-bottom: var(--space-5);
-  padding: 0.8rem var(--space-4);
-  border: 1px solid var(--quote-border);
-  border-radius: var(--radius-card);
-  background: var(--quote-muted);
-  color: var(--color-text-secondary);
-  font-size: 0.81rem;
-}
-.editor-status__main {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  font-weight: 650;
-  color: var(--color-text);
-}
-.status-icon {
-  display: grid;
-  width: 1.9rem;
-  height: 1.9rem;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 0.55rem;
-  color: var(--color-primary-accent);
-  background: var(--color-primary-soft);
-}
-.editor-status__reference strong {
-  color: var(--color-text);
 }
 .quote-panel {
   display: grid;
@@ -2830,21 +2832,80 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   padding-top: var(--space-4);
   border-top: 1px solid var(--color-border);
 }
-.whatsapp-share label {
+.whatsapp-share__summary {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
+  min-width: 0;
+}
+.whatsapp-share__icon {
+  display: grid;
+  flex: 0 0 auto;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+  color: var(--color-success);
+}
+.whatsapp-share__heading {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: var(--space-1);
+}
+.whatsapp-share__heading strong {
   color: var(--color-text);
-  font-weight: 700;
+  font-size: 0.9rem;
 }
-.whatsapp-share label svg {
-  color: var(--color-primary-accent);
-}
-.whatsapp-share p {
-  margin: 0;
+.whatsapp-share__heading small,
+.whatsapp-share__hint {
   color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.5;
 }
-.whatsapp-share textarea {
+.whatsapp-share__controls {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: var(--space-2);
+}
+.whatsapp-share__toggle {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.whatsapp-share__toggle:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+.whatsapp-share__toggle:focus-visible {
+  outline: 2px solid var(--color-primary-accent);
+  outline-offset: 2px;
+}
+.whatsapp-share__hint {
+  margin: 0;
+  padding-left: 3.25rem;
+}
+.whatsapp-share__content {
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+.whatsapp-share__content label {
+  color: var(--color-text);
+  font-weight: 600;
+}
+.whatsapp-share__content textarea {
   width: 100%;
   min-height: 10rem;
   padding: var(--space-3);
@@ -2856,32 +2917,74 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   line-height: 1.65;
   resize: vertical;
 }
-.whatsapp-share textarea:focus-visible {
-  box-shadow: var(--focus-ring);
+.whatsapp-share__content textarea:focus-visible {
+  outline: 2px solid var(--color-primary-accent);
+  outline-offset: 1px;
 }
-.emission-checklist {
-  display: grid;
+.whatsapp-share__edit-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   gap: var(--space-3);
-  padding: var(--space-4);
+  flex-wrap: wrap;
+}
+.whatsapp-share__edit-actions small {
+  color: var(--color-text-secondary);
+}
+.emission-checklist,
+.emission-ready {
+  padding: var(--space-5);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface-raised);
 }
+.emission-checklist {
+  display: grid;
+  gap: var(--space-4);
+}
 .emission-checklist__header {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
-.emission-checklist__header svg {
-  color: var(--color-warning);
-}
-.emission-checklist p {
-  margin: 0;
+.emission-checklist__icon {
+  display: grid;
+  width: 2.7rem;
+  height: 2.7rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
   color: var(--color-text-secondary);
+}
+.emission-checklist__heading {
+  flex: 1;
+  min-width: 0;
+}
+.emission-checklist__heading h3 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1rem;
+}
+.emission-checklist__heading p {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+}
+.emission-checklist__count {
+  flex-shrink: 0;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  font-size: 0.75rem;
+  font-weight: 650;
+  white-space: nowrap;
 }
 .emission-checklist ul {
   display: grid;
-  gap: var(--space-2);
+  gap: 0;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -2889,13 +2992,35 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 .emission-checklist li {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-2) 0;
+  padding: var(--space-4) 0;
   border-top: 1px solid var(--color-border);
 }
+.emission-checklist li > svg {
+  flex: 0 0 auto;
+  color: var(--color-warning);
+}
+.emission-checklist__detail {
+  display: grid;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+}
+.emission-checklist__detail strong {
+  color: var(--color-text);
+  font-size: 0.86rem;
+}
+.emission-checklist__detail p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
 .emission-checklist li button {
+  display: inline-flex;
+  align-items: center;
   flex-shrink: 0;
+  gap: var(--space-1);
   padding: var(--space-2);
   border: 0;
   border-radius: var(--radius-control);
@@ -2903,13 +3028,53 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   color: var(--color-primary-accent);
   cursor: pointer;
   font-weight: 650;
+  font-size: 0.81rem;
 }
-.emission-checklist li button:hover {
+.emission-checklist li button:hover,
+.emission-checklist li button:focus-visible {
   background: var(--color-primary-soft);
+}
+.emission-ready {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-text);
+}
+.emission-ready svg {
+  flex-shrink: 0;
+  color: var(--color-success);
 }
 @media (max-width: 36rem) {
   .currency-choice__options {
     grid-template-columns: 1fr;
+  }
+  .quote-topline {
+    flex-wrap: wrap;
+  }
+  .quote-topline__right {
+    margin-left: auto;
+  }
+  .whatsapp-share__summary {
+    flex-wrap: wrap;
+  }
+  .whatsapp-share__controls {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .whatsapp-share__hint {
+    padding-left: 0;
+  }
+  .emission-checklist__header {
+    flex-wrap: wrap;
+  }
+  .emission-checklist__count {
+    margin-left: auto;
+  }
+  .emission-checklist li {
+    flex-wrap: wrap;
+  }
+  .emission-checklist li button {
+    margin-left: auto;
   }
 }
 </style>
