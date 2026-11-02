@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import {
   ArrowLeft,
   AlertCircle,
@@ -71,6 +71,7 @@ const secciones = [
   { id: 'revision', titulo: 'Revisar', icono: ClipboardCheck },
 ] as const
 const seccion = ref<Seccion>('general')
+const tituloSeccion = ref<HTMLElement | null>(null)
 const estadoApartados = ref<Record<Seccion, 'pending' | 'complete' | 'issues'>>({ general: 'pending', estructura: 'pending', accesorios: 'pending', comercial: 'pending', revision: 'pending' })
 const volverARevision = ref(false)
 const propuestaPorConfirmar = ref<ResultadoAsistida | null>(null)
@@ -88,6 +89,11 @@ const medidasPropuestas = computed(() => {
 })
 const indice = computed(() => secciones.findIndex((item) => item.id === seccion.value))
 const titulo = computed(() => props.detalle?.nombre?.trim() || 'Nuevo mueble a pedido')
+watch(seccion, async () => {
+  await nextTick()
+  tituloSeccion.value?.focus({ preventScroll: true })
+  tituloSeccion.value?.scrollIntoView({ behavior: 'auto', block: 'start' })
+})
 function avanzar() {
   if (volverARevision.value) { seccion.value = 'revision'; volverARevision.value = false; return }
   if (indice.value < secciones.length - 1) seccion.value = secciones[indice.value + 1]!.id
@@ -137,7 +143,7 @@ function retroceder() {
     <div class="studio-section-heading">
       <div>
         <p class="studio-index">PASO {{ String(indice + 1).padStart(2, '0') }} DE 05</p>
-        <h2>{{ { general: 'Información general', estructura: 'Estructura y componentes', accesorios: 'Accesorios y observaciones', comercial: 'Datos comerciales', revision: 'Revisión del mueble' }[seccion] }}</h2>
+        <h2 ref="tituloSeccion" tabindex="-1">{{ { general: 'Información general', estructura: 'Estructura y componentes', accesorios: 'Accesorios y observaciones', comercial: 'Datos comerciales', revision: 'Revisión del mueble' }[seccion] }}</h2>
       </div>
       <p v-if="seccion === 'revision'">Comprueba los detalles antes de añadir el mueble a la proforma.</p>
     </div>
@@ -237,6 +243,7 @@ function retroceder() {
 .studio-issue { color:var(--color-danger); }
 .studio-section-heading { display:flex; align-items:end; justify-content:space-between; gap:1rem; }
 .studio-index { font-size:.7rem; font-weight:750; letter-spacing:.08em; color:var(--color-primary-accent); margin:0 0 .4rem; }
+.studio-section-heading h2:focus { outline: none; }
 .studio-section-heading h2 { font-size:clamp(1.15rem,1.5vw,1.5rem); margin:0; }
 .studio-section-heading > p { color:var(--color-text-secondary); max-width:23rem; text-align:right; font-size:.82rem; }
 .studio-content { min-width:0; margin:0; border:0; padding:0; }
