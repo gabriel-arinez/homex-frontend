@@ -45,7 +45,7 @@ describe('AP4 clientes consolidados', () => {
     await router.push('/clientes/nuevo')
     const wrapper = mount(ClienteCreateView, { global: { plugins: [createPinia(), router] } })
     await flushPromises()
-    await wrapper.get('input[type="radio"][value="2"]').setValue()
+    await wrapper.get('input[type="radio"][value="2"]').setValue(true)
     await wrapper.get('input[name="nuevo-cliente-nombres"]').setValue('María')
     await wrapper.get('input[name="nuevo-cliente-apellidos"]').setValue('Flores')
     await wrapper.get('input[name="nuevo-cliente-empresa"]').setValue('Muebles Flores')
@@ -130,7 +130,7 @@ describe('AP4 clientes consolidados', () => {
         ],
       },
     })
-    await wrapper.get('input[type="radio"][value="1"]').setValue()
+    await wrapper.get('input[type="radio"][value="1"]').setValue(true)
     expect(wrapper.emitted('change')).toEqual([['tipo_cliente', '1']])
   })
 
