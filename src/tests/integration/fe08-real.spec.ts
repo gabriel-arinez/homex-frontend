@@ -278,8 +278,8 @@ test.describe.serial('FE08 backend real', () => {
       await navigation.getByRole('button', { name: /General/ }).click()
       for (const medida of caso.medidas) {
         if (!['ancho', 'alto', 'profundidad'].includes(medida.clave)) {
-          await studio.getByLabel('Nueva medida').fill(medida.clave)
-          await studio.getByRole('button', { name: 'Añadir medida' }).click()
+          await studio.getByRole('combobox', { name: 'Agregar medida' }).fill(medida.clave)
+          await studio.getByRole('combobox', { name: 'Agregar medida' }).press('Enter')
         }
         await studio.locator(`input[name="${medida.clave}"]`).fill(medida.valor)
       }
