@@ -5,11 +5,14 @@ export function useAudioRecorder() {
     >('IDLE'),
     elapsed = ref(0),
     blob = ref<Blob | null>(null),
-    error = ref('')
+    error = ref(''),
+    levels = ref<number[]>(Array(28).fill(0))
   let recorder: MediaRecorder | null = null,
     stream: MediaStream | null = null,
     timer: number | undefined,
     chunks: Blob[] = []
+  let audioContext: AudioContext | null = null
+  let animationFrame: number | null = null
   let generation = 0
   let unmounted = false
   const supported = computed(
@@ -19,6 +22,11 @@ export function useAudioRecorder() {
       typeof MediaRecorder !== 'undefined',
   )
   function cleanup() {
+    if (animationFrame !== null) cancelAnimationFrame(animationFrame)
+    animationFrame = null
+    if (audioContext) void audioContext.close().catch(() => undefined)
+    audioContext = null
+    levels.value = Array(28).fill(0)
     if (timer) window.clearInterval(timer)
     timer = undefined
     stream?.getTracks().forEach((t) => t.stop())
@@ -43,6 +51,32 @@ export function useAudioRecorder() {
         return
       }
       stream = acquired
+      // Las barras reflejan la señal real del micrófono; si Web Audio no está
+      // disponible, se conserva el indicador y el temporizador de grabación.
+      try {
+        const AudioContextType = window.AudioContext
+        if (AudioContextType) {
+          audioContext = new AudioContextType()
+          const source = audioContext.createMediaStreamSource(acquired)
+          const analyser = audioContext.createAnalyser()
+          analyser.fftSize = 1024
+          source.connect(analyser)
+          const samples = new Uint8Array(analyser.fftSize)
+          const draw = () => {
+            if (state.value !== 'RECORDING') return
+            analyser.getByteTimeDomainData(samples)
+            const groupSize = Math.floor(samples.length / 28)
+            levels.value = Array.from({ length: 28 }, (_, i) => {
+              let total = 0
+              for (let j = i * groupSize; j < (i + 1) * groupSize; j++)
+                total += Math.abs(samples[j]! - 128) / 128
+              return Math.min(1, (total / groupSize) * 5)
+            })
+            animationFrame = requestAnimationFrame(draw)
+          }
+          animationFrame = requestAnimationFrame(draw)
+        }
+      } catch { /* Visualización opcional; nunca interrumpir el dictado. */ }
       const preferred = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/webm'].find(
         (x) => MediaRecorder.isTypeSupported(x),
       )
@@ -93,5 +127,5 @@ export function useAudioRecorder() {
     unmounted = true
     cancel()
   })
-  return { state, elapsed, blob, error, supported, start, stop, cancel }
+  return { state, elapsed, blob, error, levels, supported, start, stop, cancel }
 }
