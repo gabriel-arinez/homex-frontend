@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import type { ClienteWritable, ValorCatalogoPublico } from '@/generated/api'
 import { ApiError } from '@/shared/api'
+import { validateClient } from '@/shared/validation/commercialFields'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import ClienteFormFields, { type ClienteFormModel } from '../components/ClienteFormFields.vue'
 import { clientesService } from '../services/clientesService'
@@ -20,6 +21,7 @@ const loading = ref(true)
 const saving = ref(false)
 const error = ref('')
 const fields = ref<Record<string, string[]>>({})
+const validationAttempted = ref(false)
 const dirty = ref(false)
 const allowLeave = ref(false)
 const confirmLeave = ref(false)
@@ -71,6 +73,14 @@ async function loadTypes() {
 }
 async function save() {
   if (saving.value || !form.tipo_cliente) return
+  validationAttempted.value = true
+  const company = tipos.value.find((item) => String(item.id) === form.tipo_cliente)?.codigo === 'EMPRESA'
+  const validation = validateClient(form, company)
+  if (Object.keys(validation).length) {
+    fields.value = Object.fromEntries(Object.entries(validation).map(([field, message]) => [field, [message]]))
+    error.value = 'Revisa los campos señalados antes de registrar el cliente.'
+    return
+  }
   saving.value = true
   error.value = ''
   fields.value = {}
@@ -78,7 +88,7 @@ async function save() {
     tipo_cliente: Number(form.tipo_cliente),
     nombres: form.nombres || null,
     apellidos: form.apellidos || null,
-    empresa: form.empresa || null,
+    empresa: company ? form.empresa || null : null,
     celular: form.celular || null,
     direccion: form.direccion || null,
     observaciones: form.observaciones || null,
@@ -123,6 +133,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           :model="form"
           :tipos="tipos"
           :errors="fields"
+          :validate="validationAttempted"
           prefix="nuevo-cliente"
           @change="updateForm"
         />
