@@ -107,7 +107,7 @@ describe('PRF-04 carga de grabaciones', () => {
 
     try {
       await wrapper.get('button').trigger('click')
-      expect(wrapper.find('input[type="file"]').exists()).toBe(false)
+      expect(wrapper.get('input[type="file"]').attributes('disabled')).toBeDefined()
       expect(wrapper.text()).toContain('reemplazará toda la información')
 
       const continuar = wrapper
@@ -115,7 +115,7 @@ describe('PRF-04 carga de grabaciones', () => {
         .find((button) => button.text() === 'Continuar con voz')
       expect(continuar).toBeDefined()
       await continuar!.trigger('click')
-      expect(wrapper.find('input[type="file"]').exists()).toBe(true)
+      expect(wrapper.get('input[type="file"]').attributes('disabled')).toBeUndefined()
     } finally {
       wrapper.unmount()
     }
