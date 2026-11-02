@@ -82,8 +82,7 @@ export type QuoteConditions = {
 
 export function validateQuoteConditions(data: QuoteConditions): Record<string, string> {
   const errors: Record<string, string> = {}
-  if (Array.from(data.titulo).length > QUOTE_LIMITS.titulo)
-    errors.titulo = 'Máximo 250 caracteres.'
+  if (Array.from(data.titulo).length > QUOTE_LIMITS.titulo) errors.titulo = 'Máximo 250 caracteres.'
   if (Array.from(data.plazo_entrega).length > QUOTE_LIMITS.plazo_entrega)
     errors.plazo_entrega = 'Máximo 45 caracteres.'
   if (Array.from(data.observaciones).length > QUOTE_LIMITS.observaciones)

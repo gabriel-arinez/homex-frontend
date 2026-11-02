@@ -18,7 +18,11 @@ import type {
   ResultadoAsistida,
 } from '@/generated/api'
 import { ApiError } from '@/shared/api'
-import { QUOTE_LIMITS, validateClient, validateQuoteConditions } from '@/shared/validation/commercialFields'
+import {
+  QUOTE_LIMITS,
+  validateClient,
+  validateQuoteConditions,
+} from '@/shared/validation/commercialFields'
 import {
   ArrowLeft,
   ArrowRight,
@@ -82,10 +86,12 @@ const validationAttempted = ref(false)
 const localErrors = ref<Record<string, string>>({})
 const conditionsTouched = ref<Record<string, boolean>>({})
 function conditionError(field: keyof ReturnType<typeof validateQuoteConditions>): string {
-  return localErrors.value[field] ||
-    ((conditionsTouched.value[field] || validationAttempted.value)
+  return (
+    localErrors.value[field] ||
+    (conditionsTouched.value[field] || validationAttempted.value
       ? validateQuoteConditions(header)[field] || ''
       : '')
+  )
 }
 const dirty = ref(false)
 const conflicted = ref(false)
@@ -173,10 +179,16 @@ function updateNuevoCliente(field: keyof typeof nuevoCliente, value: string) {
 const lineas = ref<LineaLocal[]>([])
 const confirmation = ref<{ title: string; description: string; confirmLabel: string } | null>(null)
 let confirmResolver: ((answer: boolean) => void) | null = null
-function askConfirmation(description: string, title = 'Confirmar acción', confirmLabel = 'Continuar') {
+function askConfirmation(
+  description: string,
+  title = 'Confirmar acción',
+  confirmLabel = 'Continuar',
+) {
   if (confirmResolver) confirmResolver(false)
   confirmation.value = { title, description, confirmLabel }
-  return new Promise<boolean>((resolve) => { confirmResolver = resolve })
+  return new Promise<boolean>((resolve) => {
+    confirmResolver = resolve
+  })
 }
 function answerConfirmation(answer: boolean) {
   confirmation.value = null
@@ -187,25 +199,34 @@ function answerConfirmation(answer: boolean) {
 const whatsappEdited = ref(false)
 const whatsappDraft = ref('')
 const whatsappSuggested = computed(() => {
-  const firstName = clienteMode.value === 'nuevo'
-    ? nuevoCliente.nombres.trim().split(/\s+/)[0]
-    : clienteMode.value === 'existente' && clienteSeleccionado.value
-      ? ('nombres' in clienteSeleccionado.value
+  const firstName =
+    clienteMode.value === 'nuevo'
+      ? nuevoCliente.nombres.trim().split(/\s+/)[0]
+      : clienteMode.value === 'existente' && clienteSeleccionado.value
+        ? 'nombres' in clienteSeleccionado.value
           ? (clienteSeleccionado.value.nombres || '').trim().split(/\s+/)[0]
           : clienteSeleccionado.value.empresa
             ? ''
-            : (clienteSeleccionado.value.nombre || '').trim().split(/\s+/)[0])
-      : ''
+            : (clienteSeleccionado.value.nombre || '').trim().split(/\s+/)[0]
+        : ''
   const greeting = firstName ? 'Hola, ' + firstName + '.' : 'Hola.'
   const title = header.titulo.trim()
   return [
     greeting,
     'Te saluda el equipo de HOMEX.',
-    'Te compartimos nuestra proforma' + (title ? ' "' + title + '"' : '') + ' para que puedas revisar los productos, precios y condiciones.',
+    'Te compartimos nuestra proforma' +
+      (title ? ' "' + title + '"' : '') +
+      ' para que puedas revisar los productos, precios y condiciones.',
     'Quedamos atentos a tus consultas. ¡Gracias por confiar en HOMEX!',
   ].join('\n\n')
 })
-watch(whatsappSuggested, (value) => { if (!whatsappEdited.value) whatsappDraft.value = value }, { immediate: true })
+watch(
+  whatsappSuggested,
+  (value) => {
+    if (!whatsappEdited.value) whatsappDraft.value = value
+  },
+  { immediate: true },
+)
 function editWhatsapp(value: string) {
   whatsappEdited.value = true
   whatsappDraft.value = value
@@ -237,10 +258,15 @@ const emissionPending = computed(() => {
       pendientes.push('completar la razón social')
     }
   }
-  if (Object.keys(validateQuoteConditions(header)).length) pendientes.push('revisar los valores de condiciones')
+  if (Object.keys(validateQuoteConditions(header)).length)
+    pendientes.push('revisar los valores de condiciones')
   if (clienteMode.value === 'nuevo') {
     const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
-    if (Object.keys(validateClient(nuevoCliente, tipo?.codigo === 'EMPRESA')).length && nuevoCliente.nombres && nuevoCliente.apellidos)
+    if (
+      Object.keys(validateClient(nuevoCliente, tipo?.codigo === 'EMPRESA')).length &&
+      nuevoCliente.nombres &&
+      nuevoCliente.apellidos
+    )
       pendientes.push('corregir los datos del cliente')
   }
   return pendientes
@@ -360,23 +386,37 @@ const canEmit = computed(() => {
 function markDirty() {
   dirty.value = true
 }
-watch(header, () => {
-  if (!validationAttempted.value) return
-  const condition = validateQuoteConditions(header)
-  localErrors.value = {
-    ...Object.fromEntries(Object.entries(localErrors.value).filter(([field]) => field.startsWith('cliente_nuevo.'))),
-    ...condition,
-  }
-}, { deep: true })
-watch(nuevoCliente, () => {
-  if (!validationAttempted.value || clienteMode.value !== 'nuevo') return
-  const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
-  const client = validateClient(nuevoCliente, tipo?.codigo === 'EMPRESA')
-  localErrors.value = {
-    ...Object.fromEntries(Object.entries(localErrors.value).filter(([field]) => !field.startsWith('cliente_nuevo.'))),
-    ...Object.fromEntries(Object.entries(client).map(([field, message]) => ['cliente_nuevo.' + field, message])),
-  }
-}, { deep: true })
+watch(
+  header,
+  () => {
+    if (!validationAttempted.value) return
+    const condition = validateQuoteConditions(header)
+    localErrors.value = {
+      ...Object.fromEntries(
+        Object.entries(localErrors.value).filter(([field]) => field.startsWith('cliente_nuevo.')),
+      ),
+      ...condition,
+    }
+  },
+  { deep: true },
+)
+watch(
+  nuevoCliente,
+  () => {
+    if (!validationAttempted.value || clienteMode.value !== 'nuevo') return
+    const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
+    const client = validateClient(nuevoCliente, tipo?.codigo === 'EMPRESA')
+    localErrors.value = {
+      ...Object.fromEntries(
+        Object.entries(localErrors.value).filter(([field]) => !field.startsWith('cliente_nuevo.')),
+      ),
+      ...Object.fromEntries(
+        Object.entries(client).map(([field, message]) => ['cliente_nuevo.' + field, message]),
+      ),
+    }
+  },
+  { deep: true },
+)
 function nombreClienteVisible() {
   const cliente = clienteSeleccionado.value
   if (!cliente) return 'Cliente pendiente'
@@ -557,7 +597,13 @@ async function saveSpec(
         (existingSpec?.observaciones ?? null) === (body.observaciones ?? null) &&
         tecnicaIgual(existingSpec?.datos_tecnicos ?? {}, body.datos_tecnicos ?? {})
       if (sameCommercial && sameSpec) {
-        if (!(await askConfirmation('La copia es idéntica. ¿Aumentar la cantidad de la línea original?', 'Mueble duplicado', 'Sumar cantidad')))
+        if (
+          !(await askConfirmation(
+            'La copia es idéntica. ¿Aumentar la cantidad de la línea original?',
+            'Mueble duplicado',
+            'Sumar cantidad',
+          ))
+        )
           return
         original.cantidad = String(Number(original.cantidad) + Number(candidate.cantidad))
       } else lineas.value.push(candidate)
@@ -598,7 +644,13 @@ async function saveSpec(
       commercialKeys.every((key) => String(original[key] ?? '') === String(line[key] ?? '')) &&
       tecnicaIgual(original.especificacion ?? null, body)
     if (identical) {
-      if (!(await askConfirmation('La copia completa es idéntica. ¿Sumar su cantidad a la línea original?', 'Mueble duplicado', 'Sumar cantidad')))
+      if (
+        !(await askConfirmation(
+          'La copia completa es idéntica. ¿Sumar su cantidad a la línea original?',
+          'Mueble duplicado',
+          'Sumar cantidad',
+        ))
+      )
         return
       original.cantidad = String(Number(original.cantidad) + Number(line.cantidad))
       lineas.value.splice(index, 1)
@@ -623,7 +675,11 @@ function openSpec(index: number) {
 async function closeSpec() {
   if (
     specModalDirty.value &&
-    !(await askConfirmation('Hay cambios sin guardar en la ficha técnica. ¿Deseas descartarlos?', 'Descartar ficha técnica', 'Descartar cambios'))
+    !(await askConfirmation(
+      'Hay cambios sin guardar en la ficha técnica. ¿Deseas descartarlos?',
+      'Descartar ficha técnica',
+      'Descartar cambios',
+    ))
   )
     return
   specLine.value = null
@@ -789,7 +845,11 @@ async function copyCommercialSummary() {
 async function closeLineModal() {
   if (
     lineModalDirty.value &&
-    !(await askConfirmation('Hay cambios sin agregar en esta línea. ¿Deseas descartarlos?', 'Descartar línea', 'Descartar cambios'))
+    !(await askConfirmation(
+      'Hay cambios sin agregar en esta línea. ¿Deseas descartarlos?',
+      'Descartar línea',
+      'Descartar cambios',
+    ))
   )
     return
   lineModal.value = false
@@ -892,7 +952,11 @@ function body(emitir: boolean): ProformaIntegralWritable {
       clienteMode.value === 'nuevo'
         ? ({
             ...nuevoCliente,
-            empresa: tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)?.codigo === 'EMPRESA' ? nuevoCliente.empresa : '',
+            empresa:
+              tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
+                ?.codigo === 'EMPRESA'
+                ? nuevoCliente.empresa
+                : '',
             tipo_cliente: Number(nuevoCliente.tipo_cliente),
           } satisfies ClienteNuevoProforma)
         : null,
@@ -912,11 +976,16 @@ async function persist(emitir: boolean) {
   if (clienteMode.value === 'nuevo') {
     const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
     const errors = validateClient(nuevoCliente, tipo?.codigo === 'EMPRESA')
-    for (const [field, message] of Object.entries(errors)) localErrors.value['cliente_nuevo.' + field] = message
+    for (const [field, message] of Object.entries(errors))
+      localErrors.value['cliente_nuevo.' + field] = message
   }
   if (Object.keys(localErrors.value).length) {
     error.value = 'Revisa los campos señalados antes de guardar.'
-    currentStep.value = Object.keys(localErrors.value).some((field) => field.startsWith('cliente_nuevo.')) ? 1 : 2
+    currentStep.value = Object.keys(localErrors.value).some((field) =>
+      field.startsWith('cliente_nuevo.'),
+    )
+      ? 1
+      : 2
     return
   }
   saving.value = true
@@ -949,8 +1018,16 @@ function beforeUnload(event: BeforeUnloadEvent) {
   event.preventDefault()
 }
 onBeforeRouteLeave(async () => {
-  if (contextualNavigation.value || (!dirty.value && !lineModalDirty.value && !specModalDirty.value)) return true
-  return askConfirmation('Hay cambios sin guardar. Si sales, podrías perder los datos introducidos.', 'Salir sin guardar', 'Salir sin guardar')
+  if (
+    contextualNavigation.value ||
+    (!dirty.value && !lineModalDirty.value && !specModalDirty.value)
+  )
+    return true
+  return askConfirmation(
+    'Hay cambios sin guardar. Si sales, podrías perder los datos introducidos.',
+    'Salir sin guardar',
+    'Salir sin guardar',
+  )
 })
 onMounted(async () => {
   window.addEventListener('beforeunload', beforeUnload)
@@ -1273,7 +1350,14 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         </div>
         <div class="form-grid">
           <div class="form-grid__full">
-            <TextField v-model="header.titulo" name="titulo" label="Título" :max-length="QUOTE_LIMITS.titulo" :error="conditionError('titulo')" @blur="conditionsTouched.titulo = true" />
+            <TextField
+              v-model="header.titulo"
+              name="titulo"
+              label="Título"
+              :max-length="QUOTE_LIMITS.titulo"
+              :error="conditionError('titulo')"
+              @blur="conditionsTouched.titulo = true"
+            />
             <small>Un título breve que identifique esta cotización.</small>
           </div>
           <fieldset class="currency-choice form-grid__full">
@@ -1283,10 +1367,24 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 v-for="moneda in monedas.filter((item) => ['BOB', 'USD'].includes(item.codigo))"
                 :key="moneda.id"
                 class="currency-choice__option"
-                :class="{ 'currency-choice__option--selected': header.moneda_codigo === moneda.codigo }"
+                :class="{
+                  'currency-choice__option--selected': header.moneda_codigo === moneda.codigo,
+                }"
               >
-                <input v-model="header.moneda_codigo" type="radio" name="moneda" :value="moneda.codigo" />
-                <span><strong>{{ moneda.codigo === 'BOB' ? 'Bolivianos (BOB)' : 'Dólares (USD)' }}</strong><small>{{ moneda.codigo === 'BOB' ? 'Moneda nacional' : 'Cotización en dólares' }}</small></span>
+                <input
+                  v-model="header.moneda_codigo"
+                  type="radio"
+                  name="moneda"
+                  :value="moneda.codigo"
+                />
+                <span
+                  ><strong>{{
+                    moneda.codigo === 'BOB' ? 'Bolivianos (BOB)' : 'Dólares (USD)'
+                  }}</strong
+                  ><small>{{
+                    moneda.codigo === 'BOB' ? 'Moneda nacional' : 'Cotización en dólares'
+                  }}</small></span
+                >
               </label>
             </div>
           </fieldset>
@@ -1298,10 +1396,19 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             input-mode="decimal"
             input-rule="decimal"
             :max-length="6"
-            :error="conditionError('porcentaje_adelanto')" @blur="conditionsTouched.porcentaje_adelanto = true"
+            :error="conditionError('porcentaje_adelanto')"
+            @blur="conditionsTouched.porcentaje_adelanto = true"
             hint="Opcional: 0–100 %, hasta 2 decimales."
           />
-          <TextField v-model="header.plazo_entrega" name="plazo" label="Plazo de entrega" :max-length="QUOTE_LIMITS.plazo_entrega" :error="conditionError('plazo_entrega')" @blur="conditionsTouched.plazo_entrega = true" hint="Máximo 45 caracteres." />
+          <TextField
+            v-model="header.plazo_entrega"
+            name="plazo"
+            label="Plazo de entrega"
+            :max-length="QUOTE_LIMITS.plazo_entrega"
+            :error="conditionError('plazo_entrega')"
+            @blur="conditionsTouched.plazo_entrega = true"
+            hint="Máximo 45 caracteres."
+          />
           <TextField
             v-model="header.validez_oferta"
             name="validez"
@@ -1310,7 +1417,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             input-mode="numeric"
             input-rule="digits"
             :max-length="2"
-            :error="conditionError('validez_oferta')" @blur="conditionsTouched.validez_oferta = true"
+            :error="conditionError('validez_oferta')"
+            @blur="conditionsTouched.validez_oferta = true"
             hint="Opcional: entre 1 y 99 días."
           />
           <label class="quote-textarea form-grid__full" for="quote-observaciones">
@@ -1325,8 +1433,12 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               :aria-invalid="Boolean(conditionError('observaciones'))"
               placeholder="Condiciones adicionales para esta cotización..."
             />
-            <small v-if="conditionError('observaciones')" class="condition-error" role="alert">{{ conditionError('observaciones') }}</small>
-            <small v-else class="field-count">{{ header.observaciones.length }}/250 caracteres</small>
+            <small v-if="conditionError('observaciones')" class="condition-error" role="alert">{{
+              conditionError('observaciones')
+            }}</small>
+            <small v-else class="field-count"
+              >{{ header.observaciones.length }}/250 caracteres</small
+            >
           </label>
         </div>
       </section>
@@ -1393,7 +1505,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <strong>Validez:</strong> {{ header.validez_oferta }} días
           </p>
           <div class="whatsapp-share" @input.stop @change.stop>
-            <label for="whatsapp-message"><MessageCircle :size="18" aria-hidden="true" /> Mensaje para WhatsApp</label>
+            <label for="whatsapp-message"
+              ><MessageCircle :size="18" aria-hidden="true" /> Mensaje para WhatsApp</label
+            >
             <p>Personaliza el saludo y copia el texto para enviarlo junto con el PDF.</p>
             <textarea
               id="whatsapp-message"
@@ -1402,8 +1516,12 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               @input="editWhatsapp(($event.target as HTMLTextAreaElement).value)"
             />
             <div class="actions">
-              <Button type="button" variant="secondary" @click="copyCommercialSummary">Copiar mensaje para WhatsApp</Button>
-              <Button v-if="whatsappEdited" type="button" variant="secondary" @click="resetWhatsapp">Restaurar mensaje sugerido</Button>
+              <Button type="button" variant="secondary" @click="copyCommercialSummary"
+                >Copiar mensaje para WhatsApp</Button
+              >
+              <Button v-if="whatsappEdited" type="button" variant="secondary" @click="resetWhatsapp"
+                >Restaurar mensaje sugerido</Button
+              >
             </div>
           </div></Card
         >
@@ -1425,7 +1543,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           </template>
         </div>
         <div v-if="!canEmit" class="emission-checklist" role="status">
-          <div class="emission-checklist__header"><CircleAlert :size="19" aria-hidden="true" /><strong>Requisitos para emitir</strong></div>
+          <div class="emission-checklist__header">
+            <CircleAlert :size="19" aria-hidden="true" /><strong>Requisitos para emitir</strong>
+          </div>
           <p>Completa los siguientes datos para habilitar la emisión.</p>
           <ul>
             <li v-for="pending in emissionPending" :key="pending">
@@ -2284,7 +2404,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 .commercial-preview :deep(.button) {
   justify-self: start;
 }
- .totals {
+.totals {
   display: grid;
   justify-items: end;
   gap: var(--space-2);
@@ -2522,32 +2642,147 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   }
 }
 
-.currency-choice { min-width: 0; margin: 0; padding: 0; border: 0; }
-.currency-choice legend { margin-bottom: var(--space-2); color: var(--color-text); font-weight: 600; }
-.currency-choice__options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
-.currency-choice__option { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface); cursor: pointer; }
-.currency-choice__option--selected { border-color: var(--color-primary); background: var(--color-primary-soft); }
-.currency-choice__option:hover { border-color: var(--color-border-strong); }
-.currency-choice__option:focus-within { box-shadow: var(--focus-ring); }
-.currency-choice__option input { accent-color: var(--color-primary); }
-.currency-choice__option span { display: grid; gap: var(--space-1); }
-.currency-choice__option small { color: var(--color-text-secondary); }
-.condition-error { color: var(--color-danger); }
-.field-count { color: var(--color-text-secondary); justify-self: end; font-weight: 400; }
-.whatsapp-share { display: grid; gap: var(--space-3); margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--color-border); }
-.whatsapp-share label { display: flex; align-items: center; gap: var(--space-2); color: var(--color-text); font-weight: 700; }
-.whatsapp-share label svg { color: var(--color-primary-accent); }
-.whatsapp-share p { margin: 0; color: var(--color-text-secondary); }
-.whatsapp-share textarea { width: 100%; min-height: 10rem; padding: var(--space-3); border: 1px solid var(--color-border-strong); border-radius: var(--radius-control); background: var(--color-surface); color: var(--color-text); font: inherit; line-height: 1.65; resize: vertical; }
-.whatsapp-share textarea:focus-visible { box-shadow: var(--focus-ring); }
-.emission-checklist { display: grid; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface-muted); }
-.emission-checklist__header { display: flex; align-items: center; gap: var(--space-2); }
-.emission-checklist__header svg { color: var(--color-warning); }
-.emission-checklist p { margin: 0; color: var(--color-text-secondary); }
-.emission-checklist ul { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
-.emission-checklist li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) 0; border-top: 1px solid var(--color-border); }
-.emission-checklist li button { flex-shrink: 0; padding: var(--space-2); border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-primary-accent); cursor: pointer; font-weight: 650; }
-.emission-checklist li button:hover { background: var(--color-primary-soft); }
-@media (max-width: 36rem) { .currency-choice__options { grid-template-columns: 1fr; } }
-
+.currency-choice {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.currency-choice legend {
+  margin-bottom: var(--space-2);
+  color: var(--color-text);
+  font-weight: 600;
+}
+.currency-choice__options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.currency-choice__option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+.currency-choice__option--selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+.currency-choice__option:hover {
+  border-color: var(--color-border-strong);
+}
+.currency-choice__option:focus-within {
+  box-shadow: var(--focus-ring);
+}
+.currency-choice__option input {
+  accent-color: var(--color-primary);
+}
+.currency-choice__option span {
+  display: grid;
+  gap: var(--space-1);
+}
+.currency-choice__option small {
+  color: var(--color-text-secondary);
+}
+.condition-error {
+  color: var(--color-danger);
+}
+.field-count {
+  color: var(--color-text-secondary);
+  justify-self: end;
+  font-weight: 400;
+}
+.whatsapp-share {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+.whatsapp-share label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text);
+  font-weight: 700;
+}
+.whatsapp-share label svg {
+  color: var(--color-primary-accent);
+}
+.whatsapp-share p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+.whatsapp-share textarea {
+  width: 100%;
+  min-height: 10rem;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  line-height: 1.65;
+  resize: vertical;
+}
+.whatsapp-share textarea:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+.emission-checklist {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-muted);
+}
+.emission-checklist__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.emission-checklist__header svg {
+  color: var(--color-warning);
+}
+.emission-checklist p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+.emission-checklist ul {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.emission-checklist li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--color-border);
+}
+.emission-checklist li button {
+  flex-shrink: 0;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-primary-accent);
+  cursor: pointer;
+  font-weight: 650;
+}
+.emission-checklist li button:hover {
+  background: var(--color-primary-soft);
+}
+@media (max-width: 36rem) {
+  .currency-choice__options {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

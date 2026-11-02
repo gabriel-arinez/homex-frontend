@@ -74,10 +74,13 @@ async function loadTypes() {
 async function save() {
   if (saving.value || !form.tipo_cliente) return
   validationAttempted.value = true
-  const company = tipos.value.find((item) => String(item.id) === form.tipo_cliente)?.codigo === 'EMPRESA'
+  const company =
+    tipos.value.find((item) => String(item.id) === form.tipo_cliente)?.codigo === 'EMPRESA'
   const validation = validateClient(form, company)
   if (Object.keys(validation).length) {
-    fields.value = Object.fromEntries(Object.entries(validation).map(([field, message]) => [field, [message]]))
+    fields.value = Object.fromEntries(
+      Object.entries(validation).map(([field, message]) => [field, [message]]),
+    )
     error.value = 'Revisa los campos señalados antes de registrar el cliente.'
     return
   }

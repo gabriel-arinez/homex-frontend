@@ -27,7 +27,9 @@ watch(
   },
   { immediate: true },
 )
-onBeforeUnmount(() => { if (timer) clearTimeout(timer) })
+onBeforeUnmount(() => {
+  if (timer) clearTimeout(timer)
+})
 </script>
 <template>
   <Teleport to="body">
@@ -42,7 +44,9 @@ onBeforeUnmount(() => { if (timer) clearTimeout(timer) })
       <CircleAlert v-else-if="tone === 'danger'" :size="20" aria-hidden="true" />
       <Info v-else :size="20" aria-hidden="true" />
       <span>{{ message }}</span>
-      <button type="button" aria-label="Cerrar notificación" @click="dismiss"><X :size="17" aria-hidden="true" /></button>
+      <button type="button" aria-label="Cerrar notificación" @click="dismiss">
+        <X :size="17" aria-hidden="true" />
+      </button>
     </div>
   </Teleport>
 </template>
@@ -64,8 +68,15 @@ onBeforeUnmount(() => { if (timer) clearTimeout(timer) })
   color: var(--color-text);
   box-shadow: 0 8px 24px var(--color-overlay);
 }
-.toast span { flex: 1; line-height: 1.5; overflow-wrap: anywhere; }
-.toast > svg { flex: 0 0 auto; color: var(--color-success); }
+.toast span {
+  flex: 1;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.toast > svg {
+  flex: 0 0 auto;
+  color: var(--color-success);
+}
 .toast button {
   display: grid;
   flex: 0 0 auto;
@@ -78,10 +89,27 @@ onBeforeUnmount(() => { if (timer) clearTimeout(timer) })
   color: var(--color-text-secondary);
   cursor: pointer;
 }
-.toast button:hover { background: var(--color-surface-hover); }
-.toast--danger { border-left-color: var(--color-danger); }
-.toast--danger > svg { color: var(--color-danger); }
-.toast--info { border-left-color: var(--color-info); }
-.toast--info > svg { color: var(--color-info); }
-@media (max-width: 35rem) { .toast { top: var(--space-3); right: var(--space-3); left: var(--space-3); max-width: none; } }
+.toast button:hover {
+  background: var(--color-surface-hover);
+}
+.toast--danger {
+  border-left-color: var(--color-danger);
+}
+.toast--danger > svg {
+  color: var(--color-danger);
+}
+.toast--info {
+  border-left-color: var(--color-info);
+}
+.toast--info > svg {
+  color: var(--color-info);
+}
+@media (max-width: 35rem) {
+  .toast {
+    top: var(--space-3);
+    right: var(--space-3);
+    left: var(--space-3);
+    max-width: none;
+  }
+}
 </style>

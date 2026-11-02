@@ -31,7 +31,7 @@ const touched = reactive<Record<string, boolean>>({})
 function errorFor(field: keyof ClientData) {
   return (
     props.errors?.[field]?.[0] ||
-    ((touched[field] || props.validate)
+    (touched[field] || props.validate
       ? validateClientField(field, props.model[field], isCompany.value, props.original?.[field])
       : '')
   )
@@ -68,7 +68,9 @@ function changeType(value: string) {
           <Building2 v-else :size="20" aria-hidden="true" />
           <span>
             <strong>{{ type.codigo === 'PERSONA' ? 'Persona natural' : 'Empresa' }}</strong>
-            <small>{{ type.codigo === 'PERSONA' ? 'Datos personales' : 'Razón social y contacto' }}</small>
+            <small>{{
+              type.codigo === 'PERSONA' ? 'Datos personales' : 'Razón social y contacto'
+            }}</small>
           </span>
         </label>
       </div>
@@ -153,10 +155,24 @@ function changeType(value: string) {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-5);
 }
-.client-fields__full { grid-column: 1 / -1; }
-.client-type { min-width: 0; margin: 0; padding: 0; border: 0; }
-.client-type legend { margin-bottom: var(--space-2); font-weight: 600; }
-.client-type__options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.client-fields__full {
+  grid-column: 1 / -1;
+}
+.client-type {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.client-type legend {
+  margin-bottom: var(--space-2);
+  font-weight: 600;
+}
+.client-type__options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
 .client-type__option {
   display: flex;
   align-items: center;
@@ -168,17 +184,49 @@ function changeType(value: string) {
   background: var(--color-surface);
   cursor: pointer;
 }
-.client-type__option:hover { border-color: var(--color-border-strong); background: var(--color-surface-hover); }
-.client-type__option:focus-within { box-shadow: var(--focus-ring); }
-.client-type__option--active { border-color: var(--color-primary); background: var(--color-primary-soft); }
-.client-type__option svg { flex-shrink: 0; color: var(--color-primary-accent); }
-.client-type__option input { flex-shrink: 0; accent-color: var(--color-primary); }
-.client-type__option span { display: grid; min-width: 0; gap: var(--space-1); }
-.client-type__option small { color: var(--color-text-secondary); font-weight: 400; }
-.readonly-field { display: grid; align-content: start; gap: var(--space-2); }
-.readonly-field > span { font-weight: 600; }
-.readonly-field small { color: var(--color-text-secondary); }
+.client-type__option:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-hover);
+}
+.client-type__option:focus-within {
+  box-shadow: var(--focus-ring);
+}
+.client-type__option--active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+.client-type__option svg {
+  flex-shrink: 0;
+  color: var(--color-primary-accent);
+}
+.client-type__option input {
+  flex-shrink: 0;
+  accent-color: var(--color-primary);
+}
+.client-type__option span {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-1);
+}
+.client-type__option small {
+  color: var(--color-text-secondary);
+  font-weight: 400;
+}
+.readonly-field {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+}
+.readonly-field > span {
+  font-weight: 600;
+}
+.readonly-field small {
+  color: var(--color-text-secondary);
+}
 @media (max-width: 47.99rem) {
-  .client-fields, .client-type__options { grid-template-columns: 1fr; }
+  .client-fields,
+  .client-type__options {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -135,7 +135,8 @@ function handleKey(event: KeyboardEvent) {
     if (!isOpen.value) openList()
     if (!options.value.length) return
     const direction = event.key === 'ArrowDown' ? 1 : -1
-    focusedIndex.value = (focusedIndex.value + direction + options.value.length) % options.value.length
+    focusedIndex.value =
+      (focusedIndex.value + direction + options.value.length) % options.value.length
   }
   if (event.key === 'Enter' && isOpen.value && focusedIndex.value >= 0) {
     event.preventDefault()
@@ -149,7 +150,10 @@ function closeOnBlur(event: FocusEvent) {
   isOpen.value = false
   focusedIndex.value = -1
 }
-watch(() => props.modelValue, (value) => void ensureSelected(value))
+watch(
+  () => props.modelValue,
+  (value) => void ensureSelected(value),
+)
 onBeforeUnmount(() => {
   ++requestId
   if (debounce) clearTimeout(debounce)
@@ -172,7 +176,9 @@ void ensureSelected()
         aria-autocomplete="list"
         :aria-expanded="isOpen"
         :aria-controls="isOpen && options.length ? listId : undefined"
-        :aria-activedescendant="isOpen && focusedIndex >= 0 ? listId + '-' + focusedIndex : undefined"
+        :aria-activedescendant="
+          isOpen && focusedIndex >= 0 ? listId + '-' + focusedIndex : undefined
+        "
         placeholder="Buscar por nombre, apellido o empresa..."
         @focus="openList"
         @input="changeSearch"
@@ -183,21 +189,37 @@ void ensureSelected()
     <div v-if="selected" class="selected-client">
       <div class="selected-client__identity">
         <Check :size="17" aria-hidden="true" />
-        <span>Seleccionado: <strong>{{ labelFor(selected) }}</strong></span>
+        <span
+          >Seleccionado: <strong>{{ labelFor(selected) }}</strong></span
+        >
       </div>
-      <button type="button" aria-label="Quitar cliente seleccionado" @click="clearSelected"><X :size="17" aria-hidden="true" /></button>
+      <button type="button" aria-label="Quitar cliente seleccionado" @click="clearSelected">
+        <X :size="17" aria-hidden="true" />
+      </button>
     </div>
-    <div v-if="isOpen" :id="listId" class="client-picker__results" :role="options.length ? 'listbox' : undefined" :aria-label="options.length ? label : undefined">
+    <div
+      v-if="isOpen"
+      :id="listId"
+      class="client-picker__results"
+      :role="options.length ? 'listbox' : undefined"
+      :aria-label="options.length ? label : undefined"
+    >
       <p v-if="loading && !options.length" role="status">Buscando clientes...</p>
       <p v-else-if="error" role="alert">
         {{ error }}
         <button type="button" @click="load(true)">Reintentar</button>
       </p>
       <p v-else-if="!options.length" role="status">
-        {{ search ? 'No encontramos clientes que coincidan con tu búsqueda.' : 'No hay clientes disponibles.' }}
+        {{
+          search
+            ? 'No encontramos clientes que coincidan con tu búsqueda.'
+            : 'No hay clientes disponibles.'
+        }}
       </p>
       <template v-else>
-        <p class="client-picker__intro">{{ search ? 'Coincidencias encontradas' : 'Clientes disponibles · orden alfabético' }}</p>
+        <p class="client-picker__intro">
+          {{ search ? 'Coincidencias encontradas' : 'Clientes disponibles · orden alfabético' }}
+        </p>
         <button
           v-for="(cliente, index) in options"
           :id="listId + '-' + index"
@@ -210,24 +232,48 @@ void ensureSelected()
           @mousedown.prevent
           @click="selectValue(cliente)"
         >
-          <Building2 v-if="cliente.tipo_cliente_info?.codigo === 'EMPRESA'" :size="20" aria-hidden="true" />
+          <Building2
+            v-if="cliente.tipo_cliente_info?.codigo === 'EMPRESA'"
+            :size="20"
+            aria-hidden="true"
+          />
           <UserRound v-else :size="20" aria-hidden="true" />
-          <span><strong>{{ labelFor(cliente) }}</strong><small>{{ cliente.tipo_cliente_info?.nombre || 'Cliente registrado' }}</small></span>
+          <span
+            ><strong>{{ labelFor(cliente) }}</strong
+            ><small>{{ cliente.tipo_cliente_info?.nombre || 'Cliente registrado' }}</small></span
+          >
           <Check v-if="String(cliente.id) === modelValue" :size="18" aria-hidden="true" />
         </button>
         <div class="client-picker__footer">
           <span v-if="loading" role="status">Cargando...</span>
-          <Button v-if="hasMore" type="button" variant="secondary" :processing="loading" @click="load(false)">Cargar más clientes</Button>
+          <Button
+            v-if="hasMore"
+            type="button"
+            variant="secondary"
+            :processing="loading"
+            @click="load(false)"
+            >Cargar más clientes</Button
+          >
         </div>
       </template>
     </div>
-    <p class="client-picker__hint">Puedes buscar por nombres, apellidos o empresa. Solo se muestran clientes activos que puedes utilizar.</p>
+    <p class="client-picker__hint">
+      Puedes buscar por nombres, apellidos o empresa. Solo se muestran clientes activos que puedes
+      utilizar.
+    </p>
   </div>
 </template>
 
 <style scoped>
-.client-picker { position: relative; display: grid; gap: var(--space-2); min-width: 0; }
-.client-picker__label { font-weight: 600; }
+.client-picker {
+  position: relative;
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.client-picker__label {
+  font-weight: 600;
+}
 .client-picker__search {
   display: flex;
   align-items: center;
@@ -239,9 +285,21 @@ void ensureSelected()
   background: var(--color-surface);
   color: var(--color-text-secondary);
 }
-.client-picker__search:focus-within { box-shadow: var(--focus-ring); }
-.client-picker__search input { flex: 1; min-width: 0; padding: 0.7rem 0; border: 0; outline: 0; color: var(--color-text); background: transparent; }
-.client-picker__search svg { flex: 0 0 auto; }
+.client-picker__search:focus-within {
+  box-shadow: var(--focus-ring);
+}
+.client-picker__search input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.7rem 0;
+  border: 0;
+  outline: 0;
+  color: var(--color-text);
+  background: transparent;
+}
+.client-picker__search svg {
+  flex: 0 0 auto;
+}
 .client-picker__results {
   position: relative;
   display: grid;
@@ -252,8 +310,18 @@ void ensureSelected()
   background: var(--color-surface-raised);
   box-shadow: 0 8px 24px var(--color-overlay);
 }
-.client-picker__intro { margin: 0; padding: var(--space-3); color: var(--color-text-secondary); font-size: 0.75rem; font-weight: 600; }
-.client-picker__results > p[role] { margin: 0; padding: var(--space-4); color: var(--color-text-secondary); }
+.client-picker__intro {
+  margin: 0;
+  padding: var(--space-3);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.client-picker__results > p[role] {
+  margin: 0;
+  padding: var(--space-4);
+  color: var(--color-text-secondary);
+}
 .client-picker__option {
   display: flex;
   align-items: center;
@@ -267,19 +335,80 @@ void ensureSelected()
   cursor: pointer;
   text-align: left;
 }
-.client-picker__option:hover, .client-picker__option--active { background: var(--color-primary-soft); }
-.client-picker__option[aria-selected='true'] { color: var(--color-primary-accent); }
-.client-picker__option > svg { flex: 0 0 auto; }
-.client-picker__option span { display: grid; gap: 0.25rem; min-width: 0; }
-.client-picker__option small { color: var(--color-text-secondary); }
-.client-picker__option:focus-visible { box-shadow: inset var(--focus-ring); }
-.client-picker__footer { display: flex; align-items: center; justify-content: flex-end; padding: var(--space-2); }
-.client-picker__hint { margin: 0; color: var(--color-text-secondary); font-size: 0.75rem; }
-.selected-client { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--color-primary); border-radius: var(--radius-control); background: var(--color-primary-soft); }
-.selected-client__identity { display: flex; align-items: center; gap: var(--space-2); min-width: 0; color: var(--color-text); }
-.selected-client__identity > svg { color: var(--color-primary-accent); flex: 0 0 auto; }
-.selected-client__identity span { overflow-wrap: anywhere; }
-.selected-client button { display: grid; flex-shrink: 0; place-items: center; width: 2rem; height: 2rem; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-text); cursor: pointer; }
-.selected-client button:hover { background: var(--color-surface-hover); }
-@media (max-width: 35rem) { .client-picker__option { padding: var(--space-3); } }
+.client-picker__option:hover,
+.client-picker__option--active {
+  background: var(--color-primary-soft);
+}
+.client-picker__option[aria-selected='true'] {
+  color: var(--color-primary-accent);
+}
+.client-picker__option > svg {
+  flex: 0 0 auto;
+}
+.client-picker__option span {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.client-picker__option small {
+  color: var(--color-text-secondary);
+}
+.client-picker__option:focus-visible {
+  box-shadow: inset var(--focus-ring);
+}
+.client-picker__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: var(--space-2);
+}
+.client-picker__hint {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
+.selected-client {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-control);
+  background: var(--color-primary-soft);
+}
+.selected-client__identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--color-text);
+}
+.selected-client__identity > svg {
+  color: var(--color-primary-accent);
+  flex: 0 0 auto;
+}
+.selected-client__identity span {
+  overflow-wrap: anywhere;
+}
+.selected-client button {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+}
+.selected-client button:hover {
+  background: var(--color-surface-hover);
+}
+@media (max-width: 35rem) {
+  .client-picker__option {
+    padding: var(--space-3);
+  }
+}
 </style>

@@ -133,7 +133,9 @@ async function save() {
   validationAttempted.value = true
   const validation = validateClient(form, isCompany.value, client.value ?? undefined)
   if (Object.keys(validation).length) {
-    fields.value = Object.fromEntries(Object.entries(validation).map(([field, message]) => [field, [message]]))
+    fields.value = Object.fromEntries(
+      Object.entries(validation).map(([field, message]) => [field, [message]]),
+    )
     error.value = 'Revisa los campos señalados antes de guardar.'
     return
   }

@@ -655,11 +655,17 @@ test('PRF-01 previene líneas inválidas y conserva edición al cerrar', async (
 
   await page.getByRole('button', { name: 'Cerrar', exact: true }).click()
   await expect(page.getByRole('dialog', { name: 'Descartar ficha técnica' })).toBeVisible()
-  await page.getByRole('dialog', { name: 'Descartar ficha técnica' }).getByRole('button', { name: 'Cancelar' }).click()
+  await page
+    .getByRole('dialog', { name: 'Descartar ficha técnica' })
+    .getByRole('button', { name: 'Cancelar' })
+    .click()
   await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Escritorio comercial')
 
   await page.getByRole('button', { name: 'Cerrar', exact: true }).click()
-  await page.getByRole('dialog', { name: 'Descartar ficha técnica' }).getByRole('button', { name: 'Descartar cambios' }).click()
+  await page
+    .getByRole('dialog', { name: 'Descartar ficha técnica' })
+    .getByRole('button', { name: 'Descartar cambios' })
+    .click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
 })
 
@@ -690,11 +696,17 @@ test('PRF-01 protege cambios pendientes de la ficha técnica', async ({ page }) 
 
   await page.getByRole('button', { name: 'Cerrar', exact: true }).click()
   await expect(page.getByRole('dialog', { name: 'Descartar ficha técnica' })).toBeVisible()
-  await page.getByRole('dialog', { name: 'Descartar ficha técnica' }).getByRole('button', { name: 'Cancelar' }).click()
+  await page
+    .getByRole('dialog', { name: 'Descartar ficha técnica' })
+    .getByRole('button', { name: 'Cancelar' })
+    .click()
   await expect(page.locator('#componente-nombre-0')).toHaveValue('Mesón')
 
   await page.getByRole('dialog').getByRole('button', { name: 'Cancelar', exact: true }).click()
-  await page.getByRole('dialog', { name: 'Descartar ficha técnica' }).getByRole('button', { name: 'Descartar cambios' }).click()
+  await page
+    .getByRole('dialog', { name: 'Descartar ficha técnica' })
+    .getByRole('button', { name: 'Descartar cambios' })
+    .click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
 })
 
@@ -753,11 +765,17 @@ test('PRF-01 restaura cliente y no descarta la línea al volver del producto con
 
   await page.getByRole('button', { name: 'Cerrar', exact: true }).click()
   await expect(page.getByRole('dialog', { name: 'Descartar línea' })).toBeVisible()
-  await page.getByRole('dialog', { name: 'Descartar línea' }).getByRole('button', { name: 'Cancelar' }).click()
+  await page
+    .getByRole('dialog', { name: 'Descartar línea' })
+    .getByRole('button', { name: 'Cancelar' })
+    .click()
   await expect(page.getByLabel('Nombre comercial')).toHaveValue('Mesa pendiente')
 
   await page.getByRole('button', { name: 'Cerrar', exact: true }).click()
-  await page.getByRole('dialog', { name: 'Descartar línea' }).getByRole('button', { name: 'Descartar cambios' }).click()
+  await page
+    .getByRole('dialog', { name: 'Descartar línea' })
+    .getByRole('button', { name: 'Descartar cambios' })
+    .click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(page.getByRole('region').getByText('Ana Pérez', { exact: true })).toBeVisible()
 })
@@ -989,7 +1007,9 @@ for (const width of [360, 768, 1440]) {
   })
 }
 
-test('PRF-UX inicia con cliente pendiente y permite guardar borrador sin cliente', async ({ page }) => {
+test('PRF-UX inicia con cliente pendiente y permite guardar borrador sin cliente', async ({
+  page,
+}) => {
   const state = await mockBackend(page)
   let saveBody: Record<string, unknown> | null = null
   await page.route('**/api/v1/proformas/integral/', async (route) => {
@@ -1027,7 +1047,9 @@ test('PRF-UX busca clientes al enfocar y filtra automáticamente sin Buscar', as
   await input.focus()
   await expect(page.getByRole('option', { name: /Ana Pérez/ })).toBeVisible()
   await input.fill('zzz')
-  await expect(page.getByText('No encontramos clientes que coincidan con tu búsqueda.')).toBeVisible()
+  await expect(
+    page.getByText('No encontramos clientes que coincidan con tu búsqueda.'),
+  ).toBeVisible()
   await input.fill('Ana')
   await expect(page.getByRole('option', { name: /Ana Pérez/ })).toBeVisible()
   await page.getByRole('option', { name: /Ana Pérez/ }).click()
