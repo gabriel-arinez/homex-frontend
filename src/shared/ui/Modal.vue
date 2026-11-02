@@ -9,6 +9,7 @@ const props = defineProps<{
   description?: string
   wide?: boolean
   fullscreen?: boolean
+  priority?: boolean
 }>()
 const emit = defineEmits<{ close: [] }>()
 const panel = ref<HTMLElement | null>(null)
@@ -19,7 +20,7 @@ useFocusTrap(
 </script>
 <template>
   <Teleport to="body"
-    ><div v-if="open" class="backdrop" @mousedown.self="emit('close')">
+    ><div v-if="open" class="backdrop" :class="{ 'backdrop--priority': priority }" @mousedown.self="emit('close')">
       <section
         ref="panel"
         class="modal"
@@ -50,6 +51,9 @@ useFocusTrap(
   padding: var(--space-4);
   place-items: center;
   background: var(--color-overlay);
+}
+.backdrop--priority {
+  z-index: 140;
 }
 .modal {
   width: min(36rem, 100%);
