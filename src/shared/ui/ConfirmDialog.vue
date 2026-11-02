@@ -7,7 +7,7 @@ const emit = defineEmits<{ close: []; confirm: [] }>()
 const titleId = useId()
 </script>
 <template>
-  <Modal :open :title :title-id="titleId" :description @close="emit('close')"
+  <Modal :open :title :title-id="titleId" priority :description @close="emit('close')"
     ><template #footer
       ><Button variant="secondary" @click="emit('close')">Cancelar</Button
       ><Button variant="danger" @click="emit('confirm')">{{
