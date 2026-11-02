@@ -79,6 +79,8 @@ const submitAttempted = ref(false)
 const touched = reactive({ nombre: false, precio: false, cantidad: false, descuento: false })
 const touchedMedidas = reactive<Record<string, boolean>>({})
 const touchedPiezas = reactive<Record<string, boolean>>({})
+const touchedGrupos = reactive<Record<string, boolean>>({})
+const touchedAccesorios = reactive<Record<number, boolean>>({})
 const tiposLocales = ref([...props.tipos])
 const tiposParecidos = computed(() => {
   const buscar = normalized(nuevoTipo.value)
@@ -647,6 +649,14 @@ function errorMedida(medida: Medida): string {
   if (!medida.unidad) return 'Confirma la unidad de la medida.'
   return ''
 }
+function errorGrupo(grupo: ConjuntoTecnico): string {
+  return (submitAttempted.value || touchedGrupos[grupo.uid]) && !grupo.nombre.trim()
+    ? 'Pon un nombre a este conjunto.' : ''
+}
+function errorAccesorio(index: number): string {
+  return (submitAttempted.value || touchedAccesorios[index]) && !accesorios[index]?.trim()
+    ? 'Describe el accesorio o quítalo.' : ''
+}
 function errorPieza(pieza: ComponenteTecnico): string {
   if (!touchedPiezas[pieza.uid ?? pieza.nombre] && !submitAttempted.value) return ''
   return pieza.nombre.trim() ? '' : 'Introduce el nombre de este componente.'
@@ -1025,7 +1035,8 @@ onMounted(loadCatalog)
               <TextField
                 v-model="g.nombre"
                 :name="`grupo-${gi}`"
-                label="Nombre del conjunto"
+                label="Nombre del conjunto *"
+                :error="errorGrupo(g)" @blur="touchedGrupos[g.uid] = true"
               /><Button variant="secondary" @click="addComponente(g.uid)">Añadir componente</Button
               ><Button variant="secondary" @click="removeConjunto(gi)">Quitar conjunto</Button>
             </div>
@@ -1239,7 +1250,7 @@ onMounted(loadCatalog)
               <div class="accessory-item-label"><CheckCircle2 :size="18" aria-hidden="true" /><strong>{{ accesorios[i] }}</strong></div>
               <Button variant="secondary" @click="accesorioEnEdicion = i"><Pencil :size="15" aria-hidden="true" /> Editar</Button>
             </template>
-            <TextField v-else v-model="accesorios[i]" :name="`accesorio-${i}`" label="Descripción del accesorio" />
+            <TextField v-else v-model="accesorios[i]" :name="`accesorio-${i}`" label="Descripción del accesorio *" :error="errorAccesorio(i)" @blur="touchedAccesorios[i] = true" />
             <Button variant="secondary" @click="removeAccesorio(i)">Quitar</Button>
             <Button v-if="studio && accesorioEnEdicion === i && accesorios[i]?.trim()" variant="secondary" @click="accesorioEnEdicion = null">Listo</Button>
           </div>
@@ -1302,7 +1313,7 @@ onMounted(loadCatalog)
             <Select
               v-model="comercial.unidad"
               name="mueble-unidad"
-              label="Unidad comercial"
+              label="Unidad comercial *"
               :options="
                 (unidades ?? [])
                   .filter((u) => ['PIEZA', 'JUEGO'].includes(u.codigo))
