@@ -12,6 +12,8 @@ import Button from '@/shared/ui/Button.vue'
 import Select from '@/shared/ui/Select.vue'
 import TextField from '@/shared/ui/TextField.vue'
 import TextAreaField from '@/shared/ui/TextAreaField.vue'
+import MuebleOptionPicker from './MuebleOptionPicker.vue'
+import { Pencil, AlertCircle, CheckCircle2, Layers3, Plus } from '@lucide/vue'
 import { asignarEspesorPendiente, pendienteResuelto } from '../services/pendientesAsistencia'
 import { proformasService } from '../services/proformasService'
 import {
@@ -61,7 +63,8 @@ const emit = defineEmits<{
   cancel: []
   changed: []
   typeCreated: [tipo: ValorCatalogoPublico]
-  requestSection: [section: 'revision']
+  requestSection: [section: 'general' | 'estructura' | 'accesorios' | 'comercial' | 'revision']
+  sectionStatus: [statuses: Record<'general' | 'estructura' | 'accesorios' | 'comercial' | 'revision', 'pending' | 'issues' | 'complete'>]
 }>()
 const base = leerDatosTecnicos(props.especificacion?.datos_tecnicos)
 const catalogo = ref<AtributoMueble[]>([])
@@ -72,6 +75,8 @@ const search = ref('')
 const componentSearch = reactive<Record<string, string>>({})
 const nuevoTipo = ref('')
 const creatingType = ref(false)
+const submitAttempted = ref(false)
+const touched = reactive({ nombre: false, precio: false, cantidad: false, descuento: false })
 const tiposLocales = ref([...props.tipos])
 const tiposParecidos = computed(() => {
   const buscar = normalized(nuevoTipo.value)
@@ -202,7 +207,10 @@ const totalEstimado = computed(() => {
   const cantidad = Number(comercial.cantidad)
   const precio = Number(comercial.precio_unitario)
   const descuento = Number(comercial.descuento)
-  return [cantidad, precio, descuento].every(Number.isFinite) ? cantidad * precio - descuento : null
+  return comercial.precio_unitario.trim() && comercial.cantidad.trim() && comercial.descuento.trim() &&
+    Number.isFinite(cantidad) && Number.isFinite(precio) && Number.isFinite(descuento) &&
+    cantidad > 0 && precio > 0 && descuento >= 0 && descuento <= cantidad * precio
+    ? cantidad * precio - descuento : null
 })
 type Medida = { clave: string; valor: string; unidad: string; original?: unknown }
 const clavesIniciales = ['ancho', 'alto', 'profundidad']
@@ -253,6 +261,18 @@ function enfocarDimension(clave: string) {
 
 const nuevaMedida = ref('')
 const opcionesMedidas = ['largo', 'diámetro', 'lado_1', 'lado_2', 'altura_total', 'ancho_mesón']
+function agregarMedidaElegida(value: string) {
+  nuevaMedida.value = value
+  agregarMedida()
+}
+function crearTipoDesdeBuscador(nombre: string) {
+  nuevoTipo.value = nombre
+  void createType()
+}
+function elegirAtributoGeneral(value: string) {
+  const item = catalogo.value.find((x) => String(x.id) === value)
+  if (item) addAttribute(atributosGenerales, item)
+}
 function agregarMedida() {
   const clave = nuevaMedida.value.trim().toLowerCase().replace(/\s+/g, '_')
   if (!clave || medidas.some((x) => x.clave === clave)) return
@@ -337,6 +357,16 @@ const componentesOrganizados = computed(() => {
     return (ga < 0 ? conjuntos.length : ga) - (gb < 0 ? conjuntos.length : gb) || a.index - b.index
   })
 })
+const gruposArbol = computed(() => [
+  ...conjuntos.map((grupo) => ({
+    id: grupo.uid, nombre: grupo.nombre.trim() || 'Conjunto pendiente de nombre',
+    piezas: componentes.map((pieza, index) => ({ pieza, index })).filter((x) => x.pieza.conjunto_uid === grupo.uid),
+  })),
+  {
+    id: 'independientes', nombre: 'Piezas independientes',
+    piezas: componentes.map((pieza, index) => ({ pieza, index })).filter((x) => !x.pieza.conjunto_uid),
+  },
+].filter((grupo) => grupo.piezas.length > 0))
 const medidaResumen = computed(() =>
   medidas
     .filter((m) => m.valor.trim())
@@ -572,7 +602,54 @@ async function createType() {
     creatingType.value = false
   }
 }
+type SeccionStudio = 'general' | 'estructura' | 'accesorios' | 'comercial' | 'revision'
+const erroresSecciones = computed<Record<SeccionStudio, string[]>>(() => {
+  const problemas: Record<SeccionStudio, string[]> = { general: [], estructura: [], accesorios: [], comercial: [], revision: [] }
+  if (!comercial.nombre.trim()) problemas.general.push('Indica el nombre comercial del mueble.')
+  for (const medida of medidas) {
+    if (!medida.valor.trim()) continue
+    const numero = Number(medida.valor)
+    if (!Number.isFinite(numero) || numero <= 0) problemas.general.push('Introduce una medida válida y positiva para ' + medida.clave.replace(/_/g, ' ') + '.')
+    if (!medida.unidad) problemas.general.push('Confirma la unidad de ' + medida.clave.replace(/_/g, ' ') + '.')
+  }
+  if (conjuntos.some((g) => !g.nombre.trim())) problemas.estructura.push('Pon un nombre a cada conjunto.')
+  if (componentes.some((c) => !c.nombre.trim())) problemas.estructura.push('Pon un nombre a cada componente.')
+  if (componentes.some((c) => c.cantidad_interna !== undefined && (!Number.isInteger(c.cantidad_interna) || c.cantidad_interna <= 0)))
+    problemas.estructura.push('La cantidad de cada componente debe ser un número entero positivo.')
+  if (conjuntos.some((g) => !componentes.some((c) => c.conjunto_uid === g.uid)))
+    problemas.estructura.push('Cada conjunto necesita al menos un componente.')
+  if (accesorios.some((a) => !a.trim())) problemas.accesorios.push('Completa o quita los accesorios sin descripción.')
+  if (!comercial.cantidad.trim() || !Number.isInteger(Number(comercial.cantidad)) || Number(comercial.cantidad) <= 0)
+    problemas.comercial.push('La cantidad cotizada debe ser un número entero mayor que cero.')
+  if (!props.unidades?.some((u) => ['PIEZA', 'JUEGO'].includes(u.codigo) && String(u.id) === comercial.unidad))
+    problemas.comercial.push('Elige una unidad comercial válida.')
+  if (!comercial.precio_unitario.trim() || !Number.isFinite(Number(comercial.precio_unitario)) || Number(comercial.precio_unitario) <= 0)
+    problemas.comercial.push('Introduce un precio unitario mayor que cero.')
+  if (!comercial.descuento.trim() || !Number.isFinite(Number(comercial.descuento)) || Number(comercial.descuento) < 0)
+    problemas.comercial.push('Indica un descuento válido; escribe cero si no hay descuento.')
+  else if (Number(comercial.descuento) > Number(comercial.cantidad) * Number(comercial.precio_unitario))
+    problemas.comercial.push('El descuento no puede superar el subtotal.')
+  if (diferenciaComercial.value && !diferenciaConfirmada.value)
+    problemas.comercial.push('Confirma la diferencia entre el precio dictado y el importe indicado.')
+  return problemas
+})
+const estadoSecciones = computed<Record<SeccionStudio, 'pending' | 'issues' | 'complete'>>(() => ({
+  general: erroresSecciones.value.general.length ? (comercial.nombre.trim() || submitAttempted.value ? 'issues' : 'pending') : 'complete',
+  estructura: erroresSecciones.value.estructura.length ? 'issues' : componentes.length ? 'complete' : 'pending',
+  accesorios: erroresSecciones.value.accesorios.length ? 'issues' : accesorios.length || form.observaciones.trim() ? 'complete' : 'pending',
+  comercial: erroresSecciones.value.comercial.length ? (comercial.precio_unitario.trim() || submitAttempted.value ? 'issues' : 'pending') : 'complete',
+  revision: 'pending',
+}))
+watch(estadoSecciones, (value) => emit('sectionStatus', value), { immediate: true })
+function errorCampo(seccion: SeccionStudio, index: number, touchedField = false): string {
+  return submitAttempted.value || touchedField ? erroresSecciones.value[seccion][index] ?? '' : ''
+}
+function irASeccion(seccion: SeccionStudio) {
+  emit('requestSection', seccion)
+}
+
 function submit() {
+  submitAttempted.value = true
   const dim = serializarDimensiones()
   const generalesActuales: Record<string, unknown> = { ...generales }
   const dimensionesPresentes =
