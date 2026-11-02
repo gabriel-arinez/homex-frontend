@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import {
   ArrowLeft,
-  AudioLines,
+  AlertCircle,
   CheckCircle2,
   ClipboardCheck,
   Layers3,
