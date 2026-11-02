@@ -379,6 +379,7 @@ const medidaResumen = computed(() =>
     ),
 )
 const accesorios = reactive<string[]>(structuredClone(base.accesorios ?? []))
+const accesorioEnEdicion = ref<number | null>(null)
 const componentesRetirados = ref<Array<{ item: ComponenteTecnico; index: number }>>([])
 const accesoriosRetirados = ref<Array<{ item: string; index: number }>>([])
 const conjuntoPorEliminar = ref<string | null>(null)
@@ -509,6 +510,7 @@ function deshacerComponente() {
 function addAccesorio() {
   if (accesorios.some((item) => !item.trim())) return
   accesorios.push('')
+  accesorioEnEdicion.value = accesorios.length - 1
   changed()
 }
 function removeAccesorio(index: number) {
@@ -516,6 +518,7 @@ function removeAccesorio(index: number) {
   if (item === undefined) return
   accesoriosRetirados.value.push({ item, index })
   accesorios.splice(index, 1)
+  accesorioEnEdicion.value = null
   changed()
 }
 function deshacerAccesorio() {
@@ -771,7 +774,7 @@ onMounted(loadCatalog)
     <div class="configurator-layout">
       <div class="configurator-fields">
         <aside
-          v-if="pendientesVisibles.length"
+          v-if="pendientesVisibles.length && (!studio || activeSection === 'revision')"
           class="pending-summary"
           aria-label="Información pendiente"
           aria-live="polite"
@@ -816,47 +819,60 @@ onMounted(loadCatalog)
           <TextField
             v-model="comercial.nombre"
             name="mueble-nombre-comercial"
-            label="Nombre comercial del mueble"
+            label="Nombre comercial del mueble *"
+            :max-length="200"
+            :error="errorCampo('general', 0, touched.nombre)"
+            @blur="touched.nombre = true"
           />
-          <Select
-            v-model="form.tipo_mueble"
-            name="tipo-mueble"
-            label="Tipo de mueble"
-            :options="[
-              { label: 'Sin especificar', value: '' },
-              ...tiposLocales.map((x) => ({ label: x.nombre, value: String(x.id) })),
-            ]"
+          <MuebleOptionPicker
+            v-if="studio" v-model="form.tipo_mueble" name="tipo-mueble-buscador"
+            label="Tipo de mueble (opcional)"
+            :options="tiposLocales.map((x) => ({ label: x.nombre, value: String(x.id) }))"
+            placeholder="Buscar un tipo existente..." allow-create create-label="Crear nuevo tipo"
+            :busy="creatingType" @create="crearTipoDesdeBuscador"
           />
-          <div class="inline">
-            <TextField
-              v-model="nuevoTipo"
-              name="nuevo-tipo"
-              label="Buscar o crear tipo de mueble"
-            /><Button variant="secondary" :processing="creatingType" @click="createType"
-              >Crear tipo</Button
+          <template v-else>
+            <Select
+              v-model="form.tipo_mueble"
+              name="tipo-mueble"
+              label="Tipo de mueble"
+              :options="[
+                { label: 'Sin especificar', value: '' },
+                ...tiposLocales.map((x) => ({ label: x.nombre, value: String(x.id) })),
+              ]"
+            />
+            <div class="inline">
+              <TextField
+                v-model="nuevoTipo"
+                name="nuevo-tipo"
+                label="Buscar o crear tipo de mueble"
+              /><Button variant="secondary" :processing="creatingType" @click="createType"
+                >Crear tipo</Button
+              >
+            </div>
+            <div
+              v-if="tiposParecidos.length"
+              class="suggestions"
+              role="group"
+              aria-label="Tipos de mueble similares existentes"
             >
-          </div>
-          <div
-            v-if="tiposParecidos.length"
-            class="suggestions"
-            role="group"
-            aria-label="Tipos de mueble similares existentes"
-          >
-            <p>Tipos existentes similares; selecciónalos para evitar duplicados:</p>
-            <button
-              v-for="tipo in tiposParecidos"
-              :key="tipo.id"
-              type="button"
-              @click="elegirTipoSimilar(tipo.id)"
-            >
-              {{ tipo.nombre }}
-            </button>
-          </div>
+              <p>Tipos existentes similares; selecciónalos para evitar duplicados:</p>
+              <button
+                v-for="tipo in tiposParecidos"
+                :key="tipo.id"
+                type="button"
+                @click="elegirTipoSimilar(tipo.id)"
+              >
+                {{ tipo.nombre }}
+              </button>
+            </div>
+          </template>
         </section>
-        <section id="dimensiones" v-show="!studio || activeSection === 'general'">
+        <section id="dimensiones" class="dimensions-section" v-show="!studio || activeSection === 'general'">
           <h3>Dimensiones generales opcionales</h3>
           <p>Cada medida conserva su unidad y los datos técnicos originales.</p>
-          <div v-for="medida in medidas" :key="medida.clave" class="inline">
+          <div class="measure-grid">
+          <div v-for="medida in medidas" :key="medida.clave" class="inline measure-row">
             <TextField
               v-model="medida.valor"
               :name="medida.clave"
@@ -898,7 +914,8 @@ onMounted(loadCatalog)
               >Quitar medida</Button
             >
           </div>
-          <div class="inline">
+          </div>
+          <div v-if="!studio" class="inline">
             <label
               >Nueva medida
               <input v-model="nuevaMedida" list="medidas-sugeridas" aria-label="Nueva medida" />
@@ -910,12 +927,27 @@ onMounted(loadCatalog)
               >Añadir medida</Button
             >
           </div>
+          <MuebleOptionPicker
+            v-else :model-value="''" name="agregar-medida" label="Agregar medida"
+            placeholder="Buscar una medida, por ejemplo: diámetro"
+            :options="opcionesMedidas.filter((x) => !medidas.some((m) => m.clave === x)).map((x) => ({ value: x, label: x.replace(/_/g, ' ') }))"
+            allow-create create-label="Agregar medida personalizada"
+            @update:model-value="agregarMedidaElegida" @create="agregarMedidaElegida"
+          />
         </section>
         <section v-show="!studio || activeSection === 'general'">
           <h3>Características generales</h3>
           <div class="attribute-search">
-            <TextField v-model="search" name="buscar-atributo" label="Buscar característica" />
-            <div v-if="search" class="suggestions">
+            <MuebleOptionPicker
+              v-if="studio" :model-value="''" name="buscar-atributo-estudio" label="Agregar característica"
+              placeholder="Buscar característica existente..."
+              :options="matchingAttributes('', 'mueble').map((x) => ({ value: String(x.id), label: x.nombre }))"
+              allow-create create-label="Agregar característica personalizada"
+              @update:model-value="elegirAtributoGeneral"
+              @create="addAttribute(atributosGenerales, undefined, $event)"
+            />
+            <TextField v-else v-model="search" name="buscar-atributo" label="Buscar característica" />
+            <div v-if="search && !studio" class="suggestions">
               <button
                 v-for="item in resultados"
                 :key="item.id"
