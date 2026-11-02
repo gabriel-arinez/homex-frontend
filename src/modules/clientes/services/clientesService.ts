@@ -7,7 +7,7 @@ import type {
 } from '@/generated/api'
 import { apiRequest } from '@/shared/api'
 
-type ClienteListQuery = NonNullable<V1ClientesListData['query']> & { orden?: 'nombre' }
+type ClienteListQuery = NonNullable<V1ClientesListData['query']>
 
 function queryString(query: ClienteListQuery) {
   const params = new URLSearchParams()
