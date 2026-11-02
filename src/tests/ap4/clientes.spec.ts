@@ -45,7 +45,7 @@ describe('AP4 clientes consolidados', () => {
     await router.push('/clientes/nuevo')
     const wrapper = mount(ClienteCreateView, { global: { plugins: [createPinia(), router] } })
     await flushPromises()
-    await wrapper.get('select').setValue('2')
+    await wrapper.get('input[type="radio"][value="2"]').setValue()
     await wrapper.get('input[name="nuevo-cliente-nombres"]').setValue('María')
     await wrapper.get('input[name="nuevo-cliente-apellidos"]').setValue('Flores')
     await wrapper.get('input[name="nuevo-cliente-empresa"]').setValue('Muebles Flores')
@@ -112,7 +112,7 @@ describe('AP4 clientes consolidados', () => {
     await clientesService.update(41, { activo: true }, 'b'.repeat(64))
     expect(methods).toEqual(['DELETE', 'PATCH:{"activo":true}'])
   })
-  it('limpia la razon social oculta al pasar de EMPRESA a PERSONA', async () => {
+  it('conserva los datos locales al alternar entre EMPRESA y PERSONA', async () => {
     const wrapper = mount(ClienteFormFields, {
       props: {
         model: {
@@ -130,11 +130,8 @@ describe('AP4 clientes consolidados', () => {
         ],
       },
     })
-    await wrapper.get('select').setValue('1')
-    expect(wrapper.emitted('change')).toEqual([
-      ['tipo_cliente', '1'],
-      ['empresa', ''],
-    ])
+    await wrapper.get('input[type="radio"][value="1"]').setValue()
+    expect(wrapper.emitted('change')).toEqual([['tipo_cliente', '1']])
   })
 
   it('actualiza la ficha al cambiar de identificador sin mostrar el cliente anterior', async () => {
