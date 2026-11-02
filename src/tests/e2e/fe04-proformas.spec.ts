@@ -988,3 +988,69 @@ for (const width of [360, 768, 1440]) {
     expect(writes).toEqual([])
   })
 }
+
+test('PRF-UX inicia con cliente pendiente y permite guardar borrador sin cliente', async ({ page }) => {
+  const state = await mockBackend(page)
+  let saveBody: Record<string, unknown> | null = null
+  await page.route('**/api/v1/proformas/integral/', async (route) => {
+    saveBody = route.request().postDataJSON()
+    return route.fallback()
+  })
+  await page.goto('/proformas/nueva')
+  await page.getByRole('button', { name: /Cliente$/ }).click()
+  await expect(page.getByRole('radio', { name: /Pendiente/ })).toBeChecked()
+  await page.getByRole('button', { name: 'Guardar borrador' }).click()
+  await expect(page.getByText('Borrador guardado')).toBeVisible()
+  expect(saveBody).toMatchObject({ cliente: null, cliente_nuevo: null, emitir: false })
+  expect(state.quote().cliente).toBeNull()
+  await page.getByRole('button', { name: /Cliente$/ }).click()
+  await expect(page.getByRole('radio', { name: /Pendiente/ })).toBeChecked()
+})
+
+test('PRF-UX busca clientes al enfocar y filtra automáticamente sin Buscar', async ({ page }) => {
+  await mockBackend(page)
+  await page.route(/\/api\/v1\/clientes\/(?:\?.*)?$/, (route) => {
+    const q = new URL(route.request().url()).searchParams
+    return route.fulfill({
+      json: {
+        count: q.get('search') === 'zzz' ? 0 : 1,
+        next: null,
+        previous: null,
+        results: q.get('search') === 'zzz' ? [] : [client],
+      },
+    })
+  })
+  await page.goto('/proformas/nueva')
+  await page.getByRole('button', { name: /Cliente$/ }).click()
+  await page.getByRole('radio', { name: /Existente/ }).check()
+  const input = page.getByRole('combobox', { name: 'Cliente existente' })
+  await input.focus()
+  await expect(page.getByRole('option', { name: /Ana Pérez/ })).toBeVisible()
+  await input.fill('zzz')
+  await expect(page.getByText('No encontramos clientes que coincidan con tu búsqueda.')).toBeVisible()
+  await input.fill('Ana')
+  await expect(page.getByRole('option', { name: /Ana Pérez/ })).toBeVisible()
+  await page.getByRole('option', { name: /Ana Pérez/ }).click()
+  await expect(page.getByText(/Seleccionado:/)).toContainText('Ana Pérez')
+})
+
+test('PRF-UX valida condiciones y mantiene mensaje de WhatsApp editable', async ({ page }) => {
+  await mockBackend(page)
+  await page.goto('/proformas/nueva')
+  await page.getByRole('button', { name: /Condiciones$/ }).click()
+  await expect(page.getByRole('radio', { name: /Bolivianos/ })).toBeChecked()
+  await page.getByLabel('Adelanto (%)').fill('101')
+  await page.getByLabel('Validez de la oferta (días)').fill('0')
+  await page.getByRole('button', { name: 'Guardar borrador' }).click()
+  await expect(page.getByText(/Ingresa un porcentaje de 0 a 100/)).toBeVisible()
+  await expect(page.getByText('Ingresa entre 1 y 99 días.')).toBeVisible()
+  await page.getByLabel('Adelanto (%)').fill('0')
+  await page.getByLabel('Validez de la oferta (días)').fill('99')
+  await page.getByRole('button', { name: /Revisar$/ }).click()
+  const message = page.getByLabel('Mensaje para WhatsApp')
+  await expect(message).toContainText('Te saluda el equipo de HOMEX.')
+  await message.fill('Saludos, enviamos la proforma de HOMEX.')
+  await page.getByRole('button', { name: 'Restaurar mensaje sugerido' }).click()
+  await expect(message).toContainText('Te saluda el equipo de HOMEX.')
+  await expect(page.getByText('Requisitos para emitir')).toBeVisible()
+})
