@@ -28,6 +28,8 @@ import { calcularUnitarioExacto, totalComercialCoincide } from '../services/prec
 
 const props = defineProps<{
   tipos: ValorCatalogoPublico[]
+  studio?: boolean
+  activeSection?: 'general' | 'estructura' | 'accesorios' | 'comercial' | 'revision'
   especificacion?: EspecificacionMueble | null
   pendientesAsistencia?: PendienteAsistida[]
   processing?: boolean
@@ -58,6 +60,7 @@ const emit = defineEmits<{
   cancel: []
   changed: []
   typeCreated: [tipo: ValorCatalogoPublico]
+  requestSection: [section: 'revision']
 }>()
 const base = leerDatosTecnicos(props.especificacion?.datos_tecnicos)
 const catalogo = ref<AtributoMueble[]>([])
@@ -324,6 +327,18 @@ function serializarDimensiones(): unknown {
 }
 const conjuntos = reactive<ConjuntoTecnico[]>(structuredClone(base.conjuntos ?? []))
 const componentes = reactive<ComponenteTecnico[]>(structuredClone(base.componentes ?? []))
+const activeComponentUid = ref(componentes[0]?.uid ?? (componentes.length ? '0' : ''))
+const componentesOrganizados = computed(() => {
+  const withIndex = componentes.map((parte, index) => ({ parte, index }))
+  return withIndex.sort((a, b) => {
+    const ga = conjuntos.findIndex((g) => g.uid === a.parte.conjunto_uid)
+    const gb = conjuntos.findIndex((g) => g.uid === b.parte.conjunto_uid)
+    return (ga < 0 ? conjuntos.length : ga) - (gb < 0 ? conjuntos.length : gb) || a.index - b.index
+  })
+})
+const medidaResumen = computed(() =>
+  medidas.filter((m) => m.valor.trim()).map((m) => m.clave.replace(/_/g, ' ') + ': ' + m.valor + (m.unidad ? ' ' + m.unidad : ' · unidad pendiente')),
+)
 const accesorios = reactive<string[]>(structuredClone(base.accesorios ?? []))
 const componentesRetirados = ref<Array<{ item: ComponenteTecnico; index: number }>>([])
 const accesoriosRetirados = ref<Array<{ item: string; index: number }>>([])
@@ -416,13 +431,15 @@ function confirmarDestinoDelConjunto(id: string) {
 function addComponente(conjunto_uid?: string) {
   if (componentes.some((c) => !c.nombre.trim()) || componentes.length >= limites.max_componentes)
     return
+  const nuevoUid = uid()
   componentes.push({
-    uid: uid(),
+    uid: nuevoUid,
     conjunto_uid: conjunto_uid || undefined,
     nombre: '',
     cantidad_interna: 1,
     atributos: [],
   })
+  activeComponentUid.value = nuevoUid
   changed()
 }
 function setCantidadInterna(componente: ComponenteTecnico, event: Event) {
@@ -439,12 +456,15 @@ function removeComponente(index: number) {
     index,
   })
   componentes.splice(index, 1)
+  if (activeComponentUid.value === (item.uid || String(index)))
+    activeComponentUid.value = componentes[0]?.uid ?? (componentes.length ? '0' : '')
   changed()
 }
 function deshacerComponente() {
   const removed = componentesRetirados.value.pop()
   if (!removed) return
   componentes.splice(Math.min(removed.index, componentes.length), 0, removed.item)
+  activeComponentUid.value = removed.item.uid ?? String(removed.index)
   changed()
 }
 function addAccesorio() {
@@ -471,6 +491,7 @@ function duplicateComponente(index: number) {
   const copy = clonarTecnica(componentes[index]!)
   copy.uid = uid()
   componentes.splice(index + 1, 0, copy)
+  activeComponentUid.value = copy.uid
   changed()
 }
 function move(index: number, delta: number) {
@@ -643,8 +664,8 @@ onMounted(loadCatalog)
 </script>
 
 <template>
-  <form class="configurator" @input="changed" @change="changed" @submit.prevent="submit">
-    <header class="config-header">
+  <form class="configurator" :class="{ 'configurator--studio': studio }" @input="changed" @change="changed" @submit.prevent="submit">
+    <header v-if="!studio" class="config-header">
       <div>
         <p class="eyebrow">Mueble a pedido · Sin guardar</p>
         <h2>{{ detalle?.nombre || 'Nuevo mueble a pedido' }}</h2>
@@ -655,8 +676,10 @@ onMounted(loadCatalog)
         ><a href="#comercial">Datos comerciales</a><a href="#revision">Revisar</a>
       </nav>
     </header>
+    <div class="configurator-layout">
+      <div class="configurator-fields">
     <aside
-      v-if="pendientesVisibles.length"
+      v-if="pendientesVisibles.length && (!studio || activeSection === 'revision')"
       class="pending-summary"
       aria-label="Información pendiente"
       aria-live="polite"
@@ -696,7 +719,7 @@ onMounted(loadCatalog)
         </li>
       </ul>
     </aside>
-    <section id="identificacion">
+    <section id="identificacion" v-show="!studio || activeSection === 'general'">
       <h3>Identificación</h3>
       <TextField
         v-model="comercial.nombre"
@@ -738,7 +761,7 @@ onMounted(loadCatalog)
         </button>
       </div>
     </section>
-    <section id="dimensiones">
+    <section id="dimensiones" v-show="!studio || activeSection === 'general'">
       <h3>Dimensiones generales opcionales</h3>
       <p>Cada medida conserva su unidad y los datos técnicos originales.</p>
       <div v-for="medida in medidas" :key="medida.clave" class="inline">
@@ -796,7 +819,7 @@ onMounted(loadCatalog)
         >
       </div>
     </section>
-    <section>
+    <section v-show="!studio || activeSection === 'general'">
       <h3>Características generales</h3>
       <div class="attribute-search">
         <TextField v-model="search" name="buscar-atributo" label="Buscar característica" />
@@ -836,7 +859,7 @@ onMounted(loadCatalog)
         <Button variant="secondary" @click="atributosGenerales.splice(i, 1)">Quitar</Button>
       </div>
     </section>
-    <section>
+    <section v-show="!studio || activeSection === 'estructura'">
       <div class="heading">
         <h3>Conjuntos ({{ conjuntos.length }}/{{ limites.max_conjuntos }})</h3>
         <Button
@@ -884,7 +907,7 @@ onMounted(loadCatalog)
         </div>
       </article>
     </section>
-    <section id="componentes">
+    <section id="componentes" v-show="!studio || activeSection === 'estructura'">
       <div class="heading">
         <h3>Componentes ({{ componentes.length }}/{{ limites.max_componentes }})</h3>
         <Button
@@ -897,7 +920,25 @@ onMounted(loadCatalog)
           >Agregar componente</Button
         >
       </div>
-      <details v-for="(c, i) in componentes" :key="c.uid || i" class="card" open>
+      <div class="studio-component-layout">
+        <aside v-if="studio" class="studio-component-tree" aria-label="Explorador de componentes">
+          <p class="tree-heading">PIEZAS DEL MUEBLE</p>
+          <p v-if="!componentes.length" class="tree-empty">Todavía no agregaste componentes. Utiliza «Agregar componente» para comenzar.</p>
+          <button
+            v-for="item in componentesOrganizados"
+            :key="item.parte.uid || item.index"
+            type="button"
+            class="tree-item"
+            :class="{ 'tree-item--active': activeComponentUid === (item.parte.uid || String(item.index)) }"
+            :aria-pressed="activeComponentUid === (item.parte.uid || String(item.index))"
+            @click="activeComponentUid = item.parte.uid || String(item.index)"
+          >
+            <strong>{{ item.parte.nombre || 'Componente sin nombre' }}</strong>
+            <small>{{ conjuntos.find((g) => g.uid === item.parte.conjunto_uid)?.nombre || 'Sin conjunto' }} · {{ item.parte.cantidad_interna ?? '—' }} por mueble</small>
+          </button>
+        </aside>
+        <div class="studio-component-detail">
+      <details v-for="(c, i) in componentes" v-show="!studio || activeComponentUid === (c.uid || String(i))" :key="c.uid || i" class="card" open>
         <summary>Componente {{ i + 1 }}: {{ c.nombre || 'Sin nombre' }}</summary>
         <div class="heading">
           <strong>Componente {{ i + 1 }}</strong>
@@ -992,11 +1033,17 @@ onMounted(loadCatalog)
           ><Button variant="secondary" @click="removeComponente(i)">Quitar</Button>
         </div>
       </details>
+        <div v-if="studio && !componentes.length" class="empty-editor">
+          <h4>Empieza por una pieza</h4>
+          <p>Agrega un componente y podrás completar sus materiales, dimensiones y características.</p>
+        </div>
+        </div>
+      </div>
       <Button v-if="componentesRetirados.length" variant="secondary" @click="deshacerComponente">
         Deshacer eliminación de componente
       </Button>
     </section>
-    <section id="accesorios">
+    <section id="accesorios" v-show="!studio || activeSection === 'accesorios'">
       <h3>Accesorios incluidos</h3>
       <div v-for="(_, i) in accesorios" :key="i" class="inline">
         <TextField v-model="accesorios[i]" :name="`accesorio-${i}`" label="Descripción" /><Button
@@ -1015,7 +1062,7 @@ onMounted(loadCatalog)
         Deshacer eliminación de accesorio
       </Button>
     </section>
-    <section>
+    <section v-show="!studio || activeSection === 'accesorios'">
       <TextField
         v-model="form.observaciones"
         name="observaciones-especificacion"
@@ -1028,7 +1075,7 @@ onMounted(loadCatalog)
         </ul>
       </div>
     </section>
-    <section id="comercial">
+    <section id="comercial" v-show="!studio || activeSection === 'comercial'">
       <h3>Datos comerciales de este mueble</h3>
       <aside v-if="totalDictado" aria-label="Revisión de precio total dictado">
         <p>
@@ -1085,7 +1132,7 @@ onMounted(loadCatalog)
         se calcula en PostgreSQL.
       </p>
     </section>
-    <section id="revision" aria-labelledby="revision-title">
+    <section id="revision" v-show="!studio || activeSection === 'revision'" aria-labelledby="revision-title">
       <h3 id="revision-title">Revisar mueble</h3>
       <dl class="review-grid">
         <div>
@@ -1195,6 +1242,35 @@ onMounted(loadCatalog)
         borrador o emitirla.
       </p>
     </section>
+      </div>
+      <aside v-if="studio" class="studio-summary" aria-label="Resumen del mueble">
+        <div class="summary-heading">
+          <p>RESUMEN DE CONFIGURACIÓN</p>
+          <h3>{{ comercial.nombre || 'Mueble sin nombre' }}</h3>
+          <span>{{ tiposLocales.find((t) => String(t.id) === form.tipo_mueble)?.nombre || 'Tipo sin especificar' }}</span>
+        </div>
+        <div class="summary-measures">
+          <p>Dimensiones generales</p>
+          <ul v-if="medidaResumen.length">
+            <li v-for="medida in medidaResumen" :key="medida">{{ medida }}</li>
+          </ul>
+          <span v-else>Aún no se indicaron medidas.</span>
+        </div>
+        <div class="summary-counts">
+          <div><span>Conjuntos</span><strong>{{ conjuntos.length }} / {{ limites.max_conjuntos }}</strong></div>
+          <div><span>Componentes</span><strong>{{ componentes.length }} / {{ limites.max_componentes }}</strong></div>
+          <div><span>Accesorios</span><strong>{{ accesorios.filter((a) => a.trim()).length }}</strong></div>
+        </div>
+        <button v-if="pendientesVisibles.length" type="button" class="summary-pending" @click="emit('requestSection', 'revision')">
+          {{ pendientesVisibles.length }} {{ pendientesVisibles.length === 1 ? 'dato requiere' : 'datos requieren' }} revisión. Ver en el último apartado.
+        </button>
+        <div class="summary-total">
+          <span>Total estimado de línea</span>
+          <strong>{{ totalEstimado === null ? 'Pendiente' : totalEstimado.toFixed(2) + ' ' + (moneda ?? 'BOB') }}</strong>
+          <small>El importe definitivo se calcula al guardar la proforma.</small>
+        </div>
+      </aside>
+    </div>
     <p v-if="error || externalError" role="alert">{{ error || externalError }}</p>
     <div class="actions">
       <Button type="submit" :disabled="processing" aria-label="Guardar especificación"
@@ -1343,4 +1419,75 @@ details.card[open] > summary {
     position: static;
   }
 }
+
+/* Espacio de trabajo del mueble: la ficha técnica se conserva, la presentación se divide por etapas. */
+.configurator--studio { display: grid; gap: var(--space-4); }
+.configurator--studio .configurator-layout { display: grid; grid-template-columns: minmax(0,1fr) minmax(15rem,19rem); align-items: start; gap: var(--space-5); }
+.configurator--studio .configurator-fields { min-width: 0; display: grid; align-content: start; gap: var(--space-4); }
+.configurator--studio .configurator-fields > section { min-width: 0; padding: var(--space-5); border-radius: var(--radius-card); background: var(--color-surface); }
+.configurator--studio section h3 { font-size: 1rem; letter-spacing: -.01em; }
+.configurator--studio .configurator-fields > section > p { color: var(--color-text-secondary); font-size: .85rem; }
+.configurator--studio :deep(input:not([type='checkbox'])), .configurator--studio :deep(select), .configurator--studio :deep(textarea) { min-height: 2.55rem; max-width: 100%; }
+.configurator--studio .inline { align-items: end; gap: var(--space-3); }
+.configurator--studio .inline > * { min-width: 0; }
+.configurator--studio #dimensiones .inline { display: grid; grid-template-columns: minmax(0,1fr) minmax(8rem, 11rem) auto; align-items: end; }
+.configurator--studio #dimensiones .inline > p { grid-column: 1 / -1; }
+.configurator--studio #dimensiones .inline > label { min-width: 0; }
+.configurator--studio #identificacion > .inline { display: flex; }
+.configurator--studio .studio-component-layout { display: grid; grid-template-columns: minmax(12rem, .85fr) minmax(0,1.6fr); gap: var(--space-3); align-items: start; }
+.configurator--studio .studio-component-tree { display: grid; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-surface-muted); }
+.configurator--studio .tree-heading { margin: 0 0 .2rem; color: var(--color-text-secondary); font-size: .7rem; font-weight: 750; letter-spacing: .08em; }
+.configurator--studio .tree-item { display: grid; gap: .2rem; width: 100%; min-width: 0; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-control); color: var(--color-text); background: var(--color-surface); font: inherit; text-align: left; cursor: pointer; }
+.configurator--studio .tree-item--active { border-color: var(--color-primary); background: var(--color-primary-soft); }
+.configurator--studio .tree-item:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 2px; }
+.configurator--studio .tree-item strong { font-size: .8rem; overflow-wrap: anywhere; }
+.configurator--studio .tree-item small, .configurator--studio .tree-empty { color: var(--color-text-secondary); font-size: .72rem; line-height: 1.5; overflow-wrap: anywhere; }
+.configurator--studio .studio-component-detail { min-width: 0; display: grid; gap: var(--space-3); }
+.configurator--studio .studio-component-detail details { margin: 0; background: var(--color-surface-muted); }
+.configurator--studio .studio-component-detail .grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.configurator--studio .studio-component-detail .attribute-search, .configurator--studio .attribute-search { position: static; }
+.configurator--studio .empty-editor { border: 1px dashed var(--color-border-strong); border-radius: var(--radius-card); padding: var(--space-6); text-align: center; }
+.configurator--studio .empty-editor h4 { margin: 0; }
+.configurator--studio .empty-editor p { color: var(--color-text-secondary); font-size: .82rem; }
+.configurator--studio .studio-summary { display: grid; gap: var(--space-4); position: sticky; top: var(--space-4); min-width: 0; padding: var(--space-5); border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface); box-shadow: 0 8px 30px rgb(0 0 0 / 3%); }
+.configurator--studio .summary-heading p, .configurator--studio .summary-measures > p { margin: 0 0 .45rem; color: var(--color-text-secondary); font-size: .7rem; font-weight: 700; letter-spacing: .06em; }
+.configurator--studio .summary-heading h3 { font-size: 1.04rem; margin-bottom: .25rem; overflow-wrap: anywhere; }
+.configurator--studio .summary-heading span, .configurator--studio .summary-measures span { color: var(--color-text-secondary); font-size: .77rem; }
+.configurator--studio .summary-measures, .configurator--studio .summary-counts, .configurator--studio .summary-total { padding-top: var(--space-3); border-top: 1px solid var(--color-border); }
+.configurator--studio .summary-measures ul { list-style: none; padding: 0; margin: 0; display: grid; gap: .35rem; font-size: .77rem; }
+.configurator--studio .summary-counts { display: grid; gap: .65rem; }
+.configurator--studio .summary-counts div { display: flex; justify-content: space-between; gap: var(--space-2); font-size: .8rem; }
+.configurator--studio .summary-counts span { color: var(--color-text-secondary); }
+.configurator--studio .summary-pending { background: var(--color-danger-soft, var(--color-surface-muted)); color: var(--color-text); padding: var(--space-3); border: 1px solid var(--color-danger); border-radius: var(--radius-control); text-align: left; cursor: pointer; font-size: .75rem; }
+.configurator--studio .summary-total { display: grid; gap: .35rem; }
+.configurator--studio .summary-total span { color: var(--color-text-secondary); font-size: .75rem; }
+.configurator--studio .summary-total strong { font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+.configurator--studio .summary-total small { color: var(--color-text-secondary); font-size: .7rem; line-height: 1.4; }
+.configurator--studio .actions { justify-content: end; background: var(--color-surface); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-card); }
+.configurator--studio #revision .review-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--space-2); }
+.configurator--studio #revision .review-grid div { border: 1px solid var(--color-border); border-radius: var(--radius-control); }
+.configurator--studio #revision .review-grid dt { color: var(--color-text-secondary); font-size: .72rem; font-weight: 650; }
+.configurator--studio #revision .review-grid dd { margin: .4rem 0 0; font-size: .88rem; overflow-wrap: anywhere; }
+.configurator--studio #revision .review-detail { display: grid; gap: var(--space-2); }
+.configurator--studio #revision .review-detail h4 { margin: var(--space-2) 0 0; font-size: .86rem; }
+.configurator--studio #revision .review-detail p, .configurator--studio #revision .review-detail li { font-size: .78rem; }
+@media (max-width: 85rem) {
+  .configurator--studio .configurator-layout { grid-template-columns: minmax(0,1fr) 15rem; }
+  .configurator--studio .studio-component-layout { grid-template-columns: 1fr; }
+  .configurator--studio .studio-component-tree { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .configurator--studio .tree-heading, .configurator--studio .tree-empty { grid-column: 1 / -1; }
+}
+@media (max-width: 65rem) {
+  .configurator--studio .configurator-layout { grid-template-columns: 1fr; }
+  .configurator--studio .studio-summary { position: static; grid-row: 1; }
+  .configurator--studio .summary-counts { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .configurator--studio .summary-counts div { display: grid; }
+}
+@media (max-width: 36rem) {
+  .configurator--studio #dimensiones .inline { grid-template-columns: minmax(0,1fr) minmax(6rem,.65fr); }
+  .configurator--studio .studio-component-tree, .configurator--studio .studio-component-detail .grid, .configurator--studio #revision .review-grid { grid-template-columns: 1fr; }
+  .configurator--studio .actions, .configurator--studio #identificacion > .inline { align-items: stretch; flex-direction: column; }
+  .configurator--studio .configurator-fields > section { padding: var(--space-3); }
+}
+
 </style>
