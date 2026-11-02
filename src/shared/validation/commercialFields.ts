@@ -41,7 +41,9 @@ export function validateClientField(
   field: ClientFields,
   value: string,
   company: boolean,
+  previous?: string | null,
 ): string {
+  if (previous != null && previous === value) return ''
   const text = value.trim()
   const limit = CLIENT_LIMITS[field]
   if (Array.from(value).length > limit) return 'Máximo ' + limit + ' caracteres.'
@@ -56,12 +58,16 @@ export function validateClientField(
   return ''
 }
 
-export function validateClient(data: ClientData, company: boolean): Record<string, string> {
+export function validateClient(
+  data: ClientData,
+  company: boolean,
+  previous?: Partial<Record<ClientFields, string | null | undefined>>,
+): Record<string, string> {
   return Object.fromEntries(
     (Object.keys(CLIENT_LIMITS) as Array<keyof typeof CLIENT_LIMITS>)
       .filter((field): field is ClientFields => field !== 'search')
       .filter((field) => company || field !== 'empresa')
-      .map((field) => [field, validateClientField(field, data[field], company)])
+      .map((field) => [field, validateClientField(field, data[field], company, previous?.[field])])
       .filter(([, error]) => Boolean(error)),
   )
 }
