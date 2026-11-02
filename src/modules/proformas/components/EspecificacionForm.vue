@@ -297,7 +297,11 @@ function elegirAtributoGeneral(value: string) {
 }
 function agregarMedida() {
   const clave = nuevaMedida.value.trim().toLowerCase().replace(/\s+/g, '_')
-  if (!clave || medidas.some((x) => x.clave === clave)) return
+  if (!clave) { aviso.value = 'Escribe el nombre de la medida.'; return }
+  if (medidas.some((x) => normalized(x.clave) === normalized(clave))) {
+    aviso.value = 'Esta medida ya está agregada al mueble.'
+    return
+  }
   medidas.push({ clave, valor: '', unidad: 'cm' })
   nuevaMedida.value = ''
   changed()
@@ -557,7 +561,11 @@ function move(index: number, delta: number) {
 }
 function addAttribute(target: AtributoTecnico[], option?: AtributoMueble, localName?: string) {
   const nombre = option?.nombre ?? localName?.trim() ?? search.value.trim()
-  if (!nombre || target.some((a) => (a.codigo || a.nombre) === (option?.codigo || nombre))) return
+  if (!nombre.trim()) { aviso.value = 'Escribe el nombre de la característica.'; return }
+  if (target.some((a) => normalized(a.codigo || a.nombre) === normalized(option?.codigo || nombre))) {
+    aviso.value = 'Esta característica ya está agregada.'
+    return
+  }
   target.push({
     ...(option ? { codigo: option.codigo, tipo_entrada: option.tipo_entrada } : {}),
     nombre,
