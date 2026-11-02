@@ -943,6 +943,7 @@ onMounted(loadCatalog)
         </aside>
         <section id="identificacion" v-show="!studio || activeSection === 'general'">
           <h3>Identificación</h3>
+          <div class="studio-identification-fields">
           <TextField
             v-model="comercial.nombre"
             name="mueble-nombre-comercial"
@@ -999,6 +1000,7 @@ onMounted(loadCatalog)
               </button>
             </div>
           </template>
+          </div>
         </section>
         <section
           id="dimensiones"
@@ -1129,7 +1131,8 @@ onMounted(loadCatalog)
             </div>
           </div>
           <p v-if="catalogError" role="status">{{ catalogError }}</p>
-          <div v-for="(a, i) in atributosGenerales" :key="a.codigo || a.nombre" class="inline">
+          <div class="studio-attributes-grid">
+          <div v-for="(a, i) in atributosGenerales" :key="a.codigo || a.nombre" class="inline studio-attribute-row">
             <label v-if="a.tipo_entrada === 'entero'">
               {{ a.nombre }}
               <input v-model="a.valor" :name="`general-${i}`" type="number" step="1" />
@@ -1149,6 +1152,7 @@ onMounted(loadCatalog)
               </select>
             </label>
             <Button variant="secondary" @click="atributosGenerales.splice(i, 1)">Quitar</Button>
+          </div>
           </div>
         </section>
         <section
@@ -2574,4 +2578,13 @@ details.card[open] > summary {
     padding: var(--space-3);
   }
 }
+.configurator--studio .studio-identification-fields { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:1.1rem; align-items:start; }
+.configurator--studio .studio-identification-fields > * { min-width:0; max-width:none; }
+.configurator--studio .studio-attributes-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; margin-top:1rem; }
+.configurator--studio .studio-attribute-row { display:grid; grid-template-columns:minmax(0,1fr); align-items:end; gap:.45rem; padding:.8rem; background:var(--color-surface-muted); border:1px solid var(--color-border); border-radius:var(--radius-control); min-width:0; }
+.configurator--studio .studio-attribute-row > label, .configurator--studio .studio-attribute-row > .field { min-width:0; width:100%; display:grid; gap:.35rem; }
+.configurator--studio .studio-attribute-row input,.configurator--studio .studio-attribute-row select { width:100%; min-width:0; min-height:2.75rem; border:1px solid var(--color-border-strong); border-radius:var(--radius-control); padding:.6rem; color:var(--color-text); background:var(--color-surface); font:inherit; }
+.configurator--studio .studio-attribute-row > button { justify-self:start; }
+@media(max-width:72rem) { .configurator--studio .studio-attributes-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:48rem) { .configurator--studio .studio-identification-fields,.configurator--studio .studio-attributes-grid { grid-template-columns:1fr; } }
 </style>
