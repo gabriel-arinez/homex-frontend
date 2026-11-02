@@ -731,6 +731,17 @@ function errorMedida(medida: Medida): string {
   if (!medida.unidad) return 'Confirma la unidad de la medida.'
   return ''
 }
+function errorAtributo(a: AtributoTecnico): string {
+  if (!submitAttempted.value) return ''
+  if (!a.nombre.trim() || !a.valor.trim()) return 'Completa esta característica o quítala.'
+  if (a.tipo_entrada === 'entero' && (!Number.isInteger(Number(a.valor)) || Number(a.valor) < 0))
+    return 'Introduce un número entero válido.'
+  if (a.tipo_entrada === 'numero_unidad') {
+    if (!Number.isFinite(Number(a.valor))) return 'Introduce un número válido.'
+    if (!a.unidad?.trim()) return 'Selecciona una unidad.'
+  }
+  return ''
+}
 function errorGrupo(grupo: ConjuntoTecnico): string {
   return (submitAttempted.value || touchedGrupos[grupo.uid]) && !grupo.nombre.trim()
     ? 'Pon un nombre a este conjunto.'
@@ -1137,6 +1148,7 @@ onMounted(loadCatalog)
           <p v-if="catalogError" role="status">{{ catalogError }}</p>
           <div class="studio-attributes-grid">
           <div v-for="(a, i) in atributosGenerales" :key="a.codigo || a.nombre" class="inline studio-attribute-row">
+            <p v-if="errorAtributo(a)" class="studio-attribute-error" role="alert">{{ errorAtributo(a) }}</p>
             <label v-if="a.tipo_entrada === 'entero'">
               {{ a.nombre }}
               <input v-model="a.valor" :name="`general-${i}`" type="number" step="1" />
@@ -1351,6 +1363,7 @@ onMounted(loadCatalog)
                   </div>
                 </div>
                 <div v-for="(a, ai) in c.atributos" :key="a.codigo || a.nombre" class="inline">
+                  <p v-if="errorAtributo(a)" class="studio-attribute-error" role="alert">{{ errorAtributo(a) }}</p>
                   <label v-if="a.tipo_entrada === 'entero'">
                     {{ a.nombre }}
                     <input v-model="a.valor" :name="`atributo-${i}-${ai}`" type="number" step="1" />
@@ -2591,4 +2604,5 @@ details.card[open] > summary {
 .configurator--studio .studio-attribute-row > button { justify-self:start; }
 @media(max-width:72rem) { .configurator--studio .studio-attributes-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media(max-width:48rem) { .configurator--studio .studio-identification-fields,.configurator--studio .studio-attributes-grid { grid-template-columns:1fr; } }
+.configurator--studio .studio-attribute-error { color:var(--color-danger); margin:0; font-size:.78rem; }
 </style>
