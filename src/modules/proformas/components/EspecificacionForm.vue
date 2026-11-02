@@ -1187,9 +1187,16 @@ onMounted(loadCatalog)
                   </label>
                   <Button variant="secondary" @click="c.atributos?.splice(ai, 1)">Quitar</Button>
                 </div>
-                <div class="inline">
-                  <Button variant="secondary" @click="duplicateComponente(i)">Duplicar</Button
-                  ><Button variant="secondary" @click="removeComponente(i)">Quitar</Button>
+                <details v-if="studio" class="component-actions-menu">
+                  <summary>Acciones de esta pieza</summary>
+                  <div>
+                    <Button variant="secondary" @click="duplicateComponente(i)">Duplicar componente</Button>
+                    <Button variant="secondary" @click="removeComponente(i)">Quitar componente</Button>
+                  </div>
+                </details>
+                <div v-else class="inline">
+                  <Button variant="secondary" @click="duplicateComponente(i)">Duplicar</Button>
+                  <Button variant="secondary" @click="removeComponente(i)">Quitar</Button>
                 </div>
               </details>
               <div v-if="studio && !componentes.length" class="empty-editor">
@@ -1583,6 +1590,9 @@ details.card[open] > summary {
 .configurator--studio .studio-component-detail .heading { gap:.5rem; align-items:center; }
 .configurator--studio .studio-component-detail .grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
 .configurator--studio .studio-component-detail button { cursor:pointer; }
+.configurator--studio .component-actions-menu { border-top:1px solid var(--color-border); padding-top:.65rem; }
+.configurator--studio .component-actions-menu summary { font-size:.82rem; font-weight:700; cursor:pointer; color:var(--color-text-secondary); }
+.configurator--studio .component-actions-menu > div { display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.75rem; }
 .configurator--studio .studio-component-detail button:focus-visible { outline:2px solid var(--color-primary); }
 .configurator--studio .studio-component-detail .attribute-search { margin-top:1rem; }
 .configurator--studio .empty-editor { padding:2.5rem; border:1px dashed var(--color-border-strong); border-radius:var(--radius-card); text-align:center; }
