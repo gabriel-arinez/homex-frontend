@@ -18,24 +18,27 @@ test('PRF-04 voz real hasta guardado integral sin escrituras prematuras', async 
   await page.goto('/proformas/nueva')
   await page.getByRole('button', { name: 'Añadir ítem' }).click()
   await page.getByRole('button', { name: 'Mueble a pedido' }).click()
-  await page.getByRole('button', { name: 'Asistencia por voz' }).click()
-  await page.getByRole('button', { name: 'Dictar especificaciones' }).click()
+  await page.getByRole('button', { name: 'Grabar descripción' }).click()
   await page.getByRole('button', { name: 'Grabar', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Grabando' })).toBeVisible()
   // Reproducir el fixture completo a través de MediaRecorder real de Chromium.
   await page.waitForTimeout(12000)
   await page.getByRole('button', { name: 'Detener', exact: true }).click()
+  await page.getByRole('navigation', { name: 'Apartados del mueble a pedido' }).getByRole('button', { name: /General/ }).click()
   await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue(/escritorio/i, {
     timeout: 120000,
   })
   expect(comerciales).toEqual([])
   await page.getByRole('navigation', { name: 'Apartados del mueble a pedido' })
     .getByRole('button', { name: /Precio/ }).click()
+  await page.getByRole('navigation', { name: 'Apartados del mueble a pedido' }).getByRole('button', { name: /Precio/ }).click()
   await page.getByLabel('Cantidad cotizada').fill('3')
   await page.getByLabel('Precio unitario negociado (BOB)').fill('100')
   await page.locator('input[name="mueble-descuento"]').fill('0.00')
   // El dictado comunica 100 BOB de total, mientras que 3 × 100 BOB = 300 BOB.
   // El guardado no debe omitir la confirmación comercial explícita.
+  await page.getByRole('navigation', { name: 'Apartados del mueble a pedido' })
+    .getByRole('button', { name: /Revisar/ }).click()
   await page.getByRole('button', { name: 'Guardar especificación' }).click()
   await expect(page.getByRole('heading', { name: /Configurar|Nuevo mueble|escritorio/i }).first()).toBeVisible()
   await expect(
