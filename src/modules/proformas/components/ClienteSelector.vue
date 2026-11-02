@@ -209,7 +209,7 @@ void ensureSelected()
         {{ error }}
         <button type="button" @click="load(true)">Reintentar</button>
       </p>
-      <p v-else-if="!options.length" role="status">
+      <p v-else-if="!options.length && !hasMore" role="status">
         {{
           search
             ? 'No encontramos clientes que coincidan con tu búsqueda.'
@@ -244,19 +244,19 @@ void ensureSelected()
           >
           <Check v-if="String(cliente.id) === modelValue" :size="18" aria-hidden="true" />
         </button>
-        <div class="client-picker__footer">
-          <span v-if="loading" role="status">Cargando...</span>
-          <Button
-            v-if="hasMore"
-            type="button"
-            variant="secondary"
-            :processing="loading"
-            @mousedown.prevent
-            @click="load(false)"
-            >Cargar más clientes</Button
-          >
-        </div>
       </template>
+      <div v-if="hasMore || loading" class="client-picker__footer">
+        <span v-if="loading && options.length" role="status">Cargando...</span>
+        <Button
+          v-if="hasMore"
+          type="button"
+          variant="secondary"
+          :processing="loading"
+          @mousedown.prevent
+          @click="load(false)"
+          >Cargar más clientes</Button
+        >
+      </div>
     </div>
     <p class="client-picker__hint">
       Puedes buscar por nombres, apellidos o empresa. Solo se muestran clientes activos que puedes
