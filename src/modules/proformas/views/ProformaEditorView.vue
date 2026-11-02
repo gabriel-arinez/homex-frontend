@@ -1840,7 +1840,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   flex: 0 0 auto;
   place-items: center;
   border-radius: 0.6rem;
-  background: var(--color-surface-muted);
+  background: var(--color-surface-raised);
   color: var(--color-text-secondary);
   font-size: 0.75rem;
   font-weight: 750;
@@ -1962,7 +1962,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   padding: 0.4rem 0.7rem;
   border: 1px solid var(--color-border);
   border-radius: 999px;
-  background: var(--color-surface-muted);
+  background: var(--color-surface-raised);
   color: var(--color-text-secondary);
   font-size: 0.78rem;
   font-weight: 650;
@@ -2109,7 +2109,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   flex: 0 0 auto;
   place-items: center;
   border-radius: 0.6rem;
-  background: var(--color-surface-muted);
+  background: var(--color-surface-raised);
   color: var(--color-text-secondary);
   font-size: 0.74rem;
   font-weight: 700;
@@ -2410,7 +2410,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   padding: var(--space-6);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
-  background: var(--color-surface-muted);
+  background: var(--color-surface-raised);
   text-align: right;
 }
 .totals span {
@@ -2737,7 +2737,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   padding: var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
-  background: var(--color-surface-muted);
+  background: var(--color-surface-raised);
 }
 .emission-checklist__header {
   display: flex;
