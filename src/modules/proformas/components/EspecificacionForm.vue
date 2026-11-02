@@ -11,6 +11,7 @@ import { ApiError } from '@/shared/api/errors'
 import Button from '@/shared/ui/Button.vue'
 import Select from '@/shared/ui/Select.vue'
 import TextField from '@/shared/ui/TextField.vue'
+import TextAreaField from '@/shared/ui/TextAreaField.vue'
 import { asignarEspesorPendiente, pendienteResuelto } from '../services/pendientesAsistencia'
 import { proformasService } from '../services/proformasService'
 import {
@@ -1121,10 +1122,12 @@ onMounted(loadCatalog)
           </Button>
         </section>
         <section v-show="!studio || activeSection === 'accesorios'">
-          <TextField
+          <TextAreaField
             v-model="form.observaciones"
             name="observaciones-especificacion"
-            label="Observaciones"
+            label="Observaciones y detalles adicionales"
+            :rows="5"
+            hint="Incluye indicaciones de fabricación, instalación o acuerdos especiales."
           />
           <div v-if="base.advertencias?.length">
             <h4>Información pendiente histórica</h4>
