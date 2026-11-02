@@ -155,16 +155,16 @@ function cancel() {
 <template>
   <section class="voice-workflow" aria-label="Asistencia por voz">
     <div class="voice-shortcuts">
-      <button type="button" class="voice-record" :disabled="voice.processing.value" @click="start('record')">
+      <button type="button" class="voice-record" :disabled="voice.processing.value || recording" @click="start('record')">
         <Mic :size="19" aria-hidden="true" /> Grabar descripción
       </button>
-      <button type="button" class="voice-upload" :disabled="voice.processing.value" @click="start('upload')">
+      <button type="button" class="voice-upload" :disabled="voice.processing.value || recording" @click="start('upload')">
         <Upload :size="19" aria-hidden="true" /> Subir audio
       </button>
       <p>Describe las características del mueble o sube un audio para completar la ficha.</p>
     </div>
     <input
-      ref="fileInput" class="visually-hidden-audio" type="file"
+      ref="fileInput" class="visually-hidden-audio" type="file" tabindex="-1"
       :disabled="!puedeSeleccionarAudio || voice.processing.value"
       accept=".wav,.mp3,.m4a,.ogg,.webm"
       aria-label="Seleccionar archivo de audio"
