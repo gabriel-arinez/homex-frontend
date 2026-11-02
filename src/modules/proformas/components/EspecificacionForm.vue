@@ -1201,10 +1201,11 @@ onMounted(loadCatalog)
               </div>
             </div>
           </div>
-          <div v-if="componentesRetirados.length" class="undo-notice" role="status">
+          <div v-if="studio && componentesRetirados.length" class="undo-notice" role="status">
             Se quitó un componente.
             <button type="button" @click="deshacerComponente">Deshacer</button>
           </div>
+          <Button v-else-if="componentesRetirados.length" variant="secondary" @click="deshacerComponente">Deshacer eliminación de componente</Button>
         </section>
         <section id="accesorios" v-show="!studio || activeSection === 'accesorios'">
           <div class="heading"><h3>Accesorios incluidos</h3><span v-if="studio" class="accessory-count">{{ accesorios.filter((a) => a.trim()).length }} registrados</span></div>
@@ -1218,9 +1219,10 @@ onMounted(loadCatalog)
             <Button v-if="studio && accesorioEnEdicion === i && accesorios[i]?.trim()" variant="secondary" @click="accesorioEnEdicion = null">Listo</Button>
           </div>
           <Button variant="secondary" :disabled="accesorios.some((a) => !a.trim())" @click="addAccesorio"><Plus :size="16" aria-hidden="true" /> Añadir accesorio</Button>
-          <div v-if="accesoriosRetirados.length" class="undo-notice" role="status">
+          <div v-if="studio && accesoriosRetirados.length" class="undo-notice" role="status">
             Se quitó un accesorio. <button type="button" @click="deshacerAccesorio">Deshacer</button>
           </div>
+          <Button v-else-if="accesoriosRetirados.length" variant="secondary" @click="deshacerAccesorio">Deshacer eliminación de accesorio</Button>
         </section>
         <section v-show="!studio || activeSection === 'accesorios'">
           <TextAreaField
