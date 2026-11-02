@@ -131,7 +131,7 @@ async function load() {
 async function save() {
   if (!client.value || saving.value) return
   validationAttempted.value = true
-  const validation = validateClient(form, isCompany.value)
+  const validation = validateClient(form, isCompany.value, client.value ?? undefined)
   if (Object.keys(validation).length) {
     fields.value = Object.fromEntries(Object.entries(validation).map(([field, message]) => [field, [message]]))
     error.value = 'Revisa los campos señalados antes de guardar.'
@@ -239,6 +239,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           :tipos="[typeInfo]"
           :errors="fields"
           :validate="validationAttempted"
+          :original="client || undefined"
           type-readonly
           @change="updateForm"
         />
