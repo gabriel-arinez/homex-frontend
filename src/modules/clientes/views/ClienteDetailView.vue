@@ -4,6 +4,7 @@ import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router'
 import type { Cliente, PatchedClienteWritable } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { ApiError } from '@/shared/api'
+import { validateClient } from '@/shared/validation/commercialFields'
 import ClienteFormFields, { type ClienteFormModel } from '../components/ClienteFormFields.vue'
 import { clientesService, nombreCliente } from '../services/clientesService'
 import Button from '@/shared/ui/Button.vue'
@@ -25,6 +26,7 @@ const success = ref('')
 const confirmDiscard = ref(false)
 const confirmStatus = ref(false)
 const fields = ref<Record<string, string[]>>({})
+const validationAttempted = ref(false)
 const dirty = ref(false)
 const conflicted = ref(false)
 let requestId = 0
@@ -60,6 +62,7 @@ function fill(value: Cliente) {
   form.direccion = value.direccion ?? ''
   form.observaciones = value.observaciones ?? ''
   dirty.value = false
+  validationAttempted.value = false
 }
 watch(
   form,
@@ -127,6 +130,13 @@ async function load() {
 }
 async function save() {
   if (!client.value || saving.value) return
+  validationAttempted.value = true
+  const validation = validateClient(form, isCompany.value)
+  if (Object.keys(validation).length) {
+    fields.value = Object.fromEntries(Object.entries(validation).map(([field, message]) => [field, [message]]))
+    error.value = 'Revisa los campos señalados antes de guardar.'
+    return
+  }
   saving.value = true
   fields.value = {}
   success.value = ''
@@ -228,6 +238,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           :model="form"
           :tipos="[typeInfo]"
           :errors="fields"
+          :validate="validationAttempted"
           type-readonly
           @change="updateForm"
         />
