@@ -209,9 +209,9 @@ const whatsappSuggested = computed(() => {
       : clienteMode.value === 'existente' && clienteSeleccionado.value
         ? 'nombres' in clienteSeleccionado.value
           ? (clienteSeleccionado.value.nombres || '').trim().split(/\s+/)[0]
-          : clienteSeleccionado.value.empresa
-            ? ''
-            : (clienteSeleccionado.value.nombre || '').trim().split(/\s+/)[0]
+          : 'nombre' in clienteSeleccionado.value && !clienteSeleccionado.value.empresa
+            ? (clienteSeleccionado.value.nombre || '').trim().split(/\s+/)[0]
+            : ''
         : ''
   const greeting = firstName ? '¡Hola, ' + firstName + '! 👋' : '¡Hola! 👋'
   const title = header.titulo.trim()
