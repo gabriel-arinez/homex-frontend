@@ -167,6 +167,12 @@ async function save() {
 }
 function updateForm(field: keyof ClienteFormModel, value: string) {
   form[field] = value
+  if (fields.value[field]) {
+    const remaining = { ...fields.value }
+    delete remaining[field]
+    fields.value = remaining
+  }
+  if (error.value.startsWith('Revisa los campos señalados')) error.value = ''
 }
 function cancelEdit() {
   if (dirty.value) confirmDiscard.value = true
