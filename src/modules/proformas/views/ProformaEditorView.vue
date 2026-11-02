@@ -1865,7 +1865,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     </div>
     <MuebleStudio
       v-if="furnitureOpen"
-      :key="specRenderVersion + ':' + (specLine ?? -1)"
+      :form-version="specRenderVersion"
       :nueva="Boolean(draftingFurniture)"
       :dirty="specModalDirty"
       :sesion="sesionBorrador"
