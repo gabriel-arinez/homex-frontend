@@ -1,0 +1,37 @@
+name: Temporary Furniture Studio Formatter
+on:
+  push:
+    branches:
+      - feat/furniture-studio-20261102
+permissions:
+  contents: read
+jobs:
+  format-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx prettier --write src/modules/proformas/components/MuebleStudio.vue src/modules/proformas/components/EspecificacionForm.vue src/modules/proformas/views/ProformaEditorView.vue src/tests/e2e/fe04-proformas.spec.ts
+      - name: Export formatted text for review
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs')
+          const names = [
+            'src/modules/proformas/components/MuebleStudio.vue',
+            'src/modules/proformas/components/EspecificacionForm.vue',
+            'src/modules/proformas/views/ProformaEditorView.vue',
+            'src/tests/e2e/fe04-proformas.spec.ts',
+          ]
+          for (const path of names) {
+            process.stdout.write('FMT_START|' + path + '\n')
+            const encoded = fs.readFileSync(path).toString('base64')
+            for (let i = 0; i < encoded.length; i += 1800) {
+              process.stdout.write('FMT_DATA|' + encoded.slice(i, i + 1800) + '\n')
+            }
+            process.stdout.write('FMT_END|' + path + '\n')
+          }
+          NODE
