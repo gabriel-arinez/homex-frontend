@@ -29,7 +29,7 @@ export function cleanInput(value: string, rule?: InputRule, maxLength?: number):
     const dot = text.indexOf('.')
     if (dot >= 0) text = text.slice(0, dot + 1) + text.slice(dot + 1).replace(/\./g, '')
   }
-  if (rule === 'search') text = text.replace(/[\u0000-\u001f\u007f]/g, '')
+  if (rule === 'search') text = text.replace(/[\p{Cc}]/gu, '')
   return maxLength === undefined ? text : Array.from(text).slice(0, maxLength).join('')
 }
 
