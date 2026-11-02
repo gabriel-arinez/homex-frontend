@@ -78,7 +78,8 @@ function changeType(value: string) {
         v-if="errors?.tipo_cliente?.[0] || (validate && !model.tipo_cliente)"
         class="client-type__error"
         role="alert"
-      >{{ errors?.tipo_cliente?.[0] || 'Selecciona el tipo de cliente.' }}</small>
+        >{{ errors?.tipo_cliente?.[0] || 'Selecciona el tipo de cliente.' }}</small
+      >
     </fieldset>
     <TextField
       :model-value="model.nombres"
