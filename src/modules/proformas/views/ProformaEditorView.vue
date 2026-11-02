@@ -280,7 +280,8 @@ const emissionIssues = computed<EmissionIssue[]>(() => {
     const company = tipo?.codigo === 'EMPRESA'
     const invalid = validateClient(nuevoCliente, company)
     let description = ''
-    if (!nuevoCliente.tipo_cliente) description = 'Indica si el cliente es persona natural o empresa.'
+    if (!nuevoCliente.tipo_cliente)
+      description = 'Indica si el cliente es persona natural o empresa.'
     else if (!nuevoCliente.nombres.trim() || !nuevoCliente.apellidos.trim())
       description = 'Completa los nombres y apellidos del contacto.'
     else if (company && !nuevoCliente.empresa.trim())
@@ -1588,7 +1589,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           </p>
           <div class="whatsapp-share" @input.stop @change.stop>
             <div class="whatsapp-share__summary">
-              <span class="whatsapp-share__icon"><MessageCircle :size="20" aria-hidden="true" /></span>
+              <span class="whatsapp-share__icon"
+                ><MessageCircle :size="20" aria-hidden="true"
+              /></span>
               <div class="whatsapp-share__heading">
                 <strong>Mensaje para WhatsApp</strong>
                 <small>Personaliza el saludo para acompañar el PDF.</small>
@@ -1599,13 +1602,16 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   variant="secondary"
                   :disabled="!canShareWhatsApp || !whatsappDraft.trim()"
                   @click="copyCommercialSummary"
-                >Copiar mensaje</Button>
+                  >Copiar mensaje</Button
+                >
                 <button
                   type="button"
                   class="whatsapp-share__toggle"
                   :aria-expanded="whatsappExpanded"
                   aria-controls="whatsapp-message-content"
-                  :aria-label="whatsappExpanded ? 'Ocultar mensaje de WhatsApp' : 'Mostrar mensaje de WhatsApp'"
+                  :aria-label="
+                    whatsappExpanded ? 'Ocultar mensaje de WhatsApp' : 'Mostrar mensaje de WhatsApp'
+                  "
                   @click="whatsappExpanded = !whatsappExpanded"
                 >
                   <ChevronUp v-if="whatsappExpanded" :size="20" aria-hidden="true" />
@@ -1616,7 +1622,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <p v-if="!canShareWhatsApp" class="whatsapp-share__hint">
               Selecciona un cliente o completa los datos del nuevo cliente para copiar el mensaje.
             </p>
-            <div v-show="whatsappExpanded" id="whatsapp-message-content" class="whatsapp-share__content">
+            <div
+              v-show="whatsappExpanded"
+              id="whatsapp-message-content"
+              class="whatsapp-share__content"
+            >
               <label for="whatsapp-message">Contenido del mensaje</label>
               <textarea
                 id="whatsapp-message"
@@ -1625,13 +1635,16 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 @input="editWhatsapp(($event.target as HTMLTextAreaElement).value)"
               />
               <div class="whatsapp-share__edit-actions">
-                <small>Al copiar se incluye únicamente el texto. Adjunta el PDF por separado.</small>
+                <small
+                  >Al copiar se incluye únicamente el texto. Adjunta el PDF por separado.</small
+                >
                 <Button
                   v-if="whatsappEdited"
                   type="button"
                   variant="secondary"
                   @click="resetWhatsapp"
-                >Restaurar mensaje sugerido</Button>
+                  >Restaurar mensaje sugerido</Button
+                >
               </div>
             </div>
           </div></Card
@@ -1655,13 +1668,16 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         </div>
         <div v-if="!canEmit" class="emission-checklist">
           <div class="emission-checklist__header">
-            <span class="emission-checklist__icon"><ClipboardCheck :size="22" aria-hidden="true" /></span>
+            <span class="emission-checklist__icon"
+              ><ClipboardCheck :size="22" aria-hidden="true"
+            /></span>
             <div class="emission-checklist__heading">
               <h3>Verificación de la proforma</h3>
               <p>Completa la información necesaria antes de emitir.</p>
             </div>
             <span class="emission-checklist__count" aria-live="polite">
-              {{ emissionIssues.length }} {{ emissionIssues.length === 1 ? 'pendiente' : 'pendientes' }}
+              {{ emissionIssues.length }}
+              {{ emissionIssues.length === 1 ? 'pendiente' : 'pendientes' }}
             </span>
           </div>
           <ul>
@@ -1889,7 +1905,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   gap: 0;
   padding-bottom: var(--space-8);
 }
- .quote-topline {
+.quote-topline {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;

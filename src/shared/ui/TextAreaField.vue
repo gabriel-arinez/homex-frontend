@@ -98,7 +98,8 @@ function update(event: Event) {
   color: var(--color-text-secondary);
   font-size: 0.75rem;
 }
-.textarea-field__hint, .textarea-field__counter {
+.textarea-field__hint,
+.textarea-field__counter {
   color: var(--color-text-secondary);
 }
 .textarea-field__counter {

@@ -20,7 +20,12 @@ useFocusTrap(
 </script>
 <template>
   <Teleport to="body"
-    ><div v-if="open" class="backdrop" :class="{ 'backdrop--priority': priority }" @mousedown.self="emit('close')">
+    ><div
+      v-if="open"
+      class="backdrop"
+      :class="{ 'backdrop--priority': priority }"
+      @mousedown.self="emit('close')"
+    >
       <section
         ref="panel"
         class="modal"
