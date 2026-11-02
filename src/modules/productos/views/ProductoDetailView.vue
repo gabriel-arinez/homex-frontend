@@ -89,10 +89,22 @@ function discardEdit() {
   dirty.value = false
   error.value = ''
 }
-function confirmNavigation() {
+const confirmLeave = ref(false)
+let resolveLeave: ((answer: boolean) => void) | null = null
+function answerLeave(answer: boolean) {
+  confirmLeave.value = false
+  const resolver = resolveLeave
+  resolveLeave = null
+  resolver?.(answer)
+}
+function confirmNavigation(): boolean | Promise<boolean> {
   if (saving.value) return false
   if (!editing.value || !dirty.value) return true
-  return window.confirm('Hay cambios sin guardar. ¿Deseas descartarlos?')
+  return new Promise<boolean>((resolve) => {
+    if (resolveLeave) resolveLeave(false)
+    resolveLeave = resolve
+    confirmLeave.value = true
+  })
 }
 function beforeUnload(event: BeforeUnloadEvent) {
   if (editing.value && dirty.value) event.preventDefault()
@@ -222,6 +234,14 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       confirm-label="Descartar"
       @close="confirmCancel = false"
       @confirm="discardEdit"
+    />
+    <ConfirmDialog
+      :open="confirmLeave"
+      title="Salir sin guardar"
+      description="Hay cambios sin guardar en este producto. Si sales, se descartarán."
+      confirm-label="Salir sin guardar"
+      @close="answerLeave(false)"
+      @confirm="answerLeave(true)"
     />
   </div>
 </template>
