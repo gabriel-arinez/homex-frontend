@@ -174,3 +174,82 @@ test('FE01 no bloquea las acciones del contenido en tablet', async ({ page }) =>
 
   await assertNoHorizontalOverflow(page)
 })
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`FE01 ancho fluido 2880px ${theme}`, async ({ page }) => {
+    await page.addInitScript((selected) => localStorage.setItem('homex.theme', selected), theme)
+    await page.setViewportSize({ width: 2880, height: 900 })
+    await page.goto('/resumen')
+
+    await expect(page.getByRole('heading', { name: 'Resumen', level: 1 })).toBeVisible()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme)
+
+    async function checkFluidWidth() {
+      const widths = await page.evaluate(() => {
+        const main = document.querySelector<HTMLElement>('#main-content')
+        const content = main?.firstElementChild as HTMLElement | null
+        if (!main || !content) throw new Error('No se encontró el contenido del layout')
+        const styles = getComputedStyle(main)
+        return {
+          available:
+            main.clientWidth -
+            Number.parseFloat(styles.paddingLeft) -
+            Number.parseFloat(styles.paddingRight),
+          content: content.getBoundingClientRect().width,
+        }
+      })
+
+      expect(widths.available).toBeGreaterThan(2000)
+      expect(widths.content).toBeGreaterThanOrEqual(widths.available - 2)
+      expect(widths.content).toBeLessThanOrEqual(widths.available + 2)
+    }
+
+    await checkFluidWidth()
+    await page.getByRole('button', { name: 'Compactar navegación' }).click()
+    await checkFluidWidth()
+    await assertNoHorizontalOverflow(page)
+  })
+}
+
+test('FE01 oculta las barras globales sin desactivar el scroll', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 480 })
+  await page.goto('/resumen')
+  await expect(page.getByRole('heading', { name: 'Resumen', level: 1 })).toBeVisible()
+
+  const scrollState = await page.evaluate(() => {
+    const sidebarNav = document.querySelector<HTMLElement>(
+      '.sidebar nav[aria-label="Navegación principal"]',
+    )
+    if (!sidebarNav) throw new Error('No se encontró la navegación lateral')
+    const panel = document.createElement('div')
+    panel.style.cssText = 'overflow:auto;width:180px;height:48px;position:fixed;left:0;top:0'
+    panel.innerHTML = '<div style="width:400px;height:300px"></div>'
+    document.body.appendChild(panel)
+
+    panel.scrollTop = 70
+    panel.scrollLeft = 80
+    sidebarNav.scrollTop = 70
+    const result = {
+      documentScrollbar: getComputedStyle(document.documentElement).scrollbarWidth,
+      sidebarScrollbar: getComputedStyle(sidebarNav).scrollbarWidth,
+      nestedScrollbar: getComputedStyle(panel).scrollbarWidth,
+      sidebarScrollable: sidebarNav.scrollHeight > sidebarNav.clientHeight,
+      sidebarScrolled: sidebarNav.scrollTop > 0,
+      nestedScrolledVertically: panel.scrollTop > 0,
+      nestedScrolledHorizontally: panel.scrollLeft > 0,
+    }
+    panel.remove()
+    return result
+  })
+
+  expect(scrollState).toEqual({
+    documentScrollbar: 'none',
+    sidebarScrollbar: 'none',
+    nestedScrollbar: 'none',
+    sidebarScrollable: true,
+    sidebarScrolled: true,
+    nestedScrolledVertically: true,
+    nestedScrolledHorizontally: true,
+  })
+  await assertNoHorizontalOverflow(page)
+})

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import type {
   Cliente,
@@ -18,13 +18,36 @@ import type {
   ResultadoAsistida,
 } from '@/generated/api'
 import { ApiError } from '@/shared/api'
+import {
+  QUOTE_LIMITS,
+  validateClient,
+  validateQuoteConditions,
+} from '@/shared/validation/commercialFields'
+import {
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  MessageCircle,
+  CircleAlert,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  ClipboardCheck,
+  Info,
+  PackageOpen,
+  Plus,
+  SlidersHorizontal,
+  Sofa,
+  UserRound,
+} from '@lucide/vue'
 import Button from '@/shared/ui/Button.vue'
 import Card from '@/shared/ui/Card.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
 import Modal from '@/shared/ui/Modal.vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
-import Select from '@/shared/ui/Select.vue'
+import Toast from '@/shared/ui/Toast.vue'
+import ConfirmDialog from '@/shared/ui/ConfirmDialog.vue'
 import TextField from '@/shared/ui/TextField.vue'
 import ClienteSelector from '../components/ClienteSelector.vue'
 import ClienteFormFields from '@/modules/clientes/components/ClienteFormFields.vue'
@@ -61,6 +84,17 @@ const referenceLoading = ref(true)
 const error = ref('')
 const success = ref('')
 const fields = ref<Record<string, string[]>>({})
+const validationAttempted = ref(false)
+const localErrors = ref<Record<string, string>>({})
+const conditionsTouched = ref<Record<string, boolean>>({})
+function conditionError(field: keyof ReturnType<typeof validateQuoteConditions>): string {
+  return (
+    localErrors.value[field] ||
+    (conditionsTouched.value[field] || validationAttempted.value
+      ? validateQuoteConditions(header)[field] || ''
+      : '')
+  )
+}
 const dirty = ref(false)
 const conflicted = ref(false)
 const persisted = ref<Proforma | null>(null)
@@ -113,7 +147,7 @@ const preferredProductId = ref<number | null>(null)
 const pendingLineDraft = ref<Record<string, string> | null>(null)
 const duplicateOrigin = ref<string | null>(null)
 const duplicateSpec = ref<EspecificacionMuebleWritable | null>(null)
-const clienteMode = ref<'existente' | 'nuevo' | 'pendiente'>('existente')
+const clienteMode = ref<'existente' | 'nuevo' | 'pendiente'>('pendiente')
 const clienteSeleccionado = ref<Cliente | ClienteResumenProforma | null>(null)
 const key = ref(crypto.randomUUID())
 const header = reactive({
@@ -135,28 +169,163 @@ const nuevoCliente = reactive({
   observaciones: '',
 })
 function updateNuevoCliente(field: keyof typeof nuevoCliente, value: string) {
+  if (nuevoCliente[field] !== value) markDirty()
   nuevoCliente[field] = value
+  const backendField = 'cliente_nuevo.' + field
+  if (fields.value[backendField]) {
+    const remaining = { ...fields.value }
+    delete remaining[backendField]
+    fields.value = remaining
+  }
+  if (error.value.startsWith('Revisa los campos señalados')) error.value = ''
 }
 const lineas = ref<LineaLocal[]>([])
+const confirmation = ref<{ title: string; description: string; confirmLabel: string } | null>(null)
+let confirmResolver: ((answer: boolean) => void) | null = null
+function askConfirmation(
+  description: string,
+  title = 'Confirmar acción',
+  confirmLabel = 'Continuar',
+) {
+  if (confirmResolver) confirmResolver(false)
+  confirmation.value = { title, description, confirmLabel }
+  return new Promise<boolean>((resolve) => {
+    confirmResolver = resolve
+  })
+}
+function answerConfirmation(answer: boolean) {
+  confirmation.value = null
+  const resolver = confirmResolver
+  confirmResolver = null
+  resolver?.(answer)
+}
+const whatsappExpanded = ref(false)
+const whatsappEdited = ref(false)
+const whatsappDraft = ref('')
+const whatsappSuggested = computed(() => {
+  const firstName =
+    clienteMode.value === 'nuevo'
+      ? nuevoCliente.nombres.trim().split(/\s+/)[0]
+      : clienteMode.value === 'existente' && clienteSeleccionado.value
+        ? 'nombres' in clienteSeleccionado.value
+          ? (clienteSeleccionado.value.nombres || '').trim().split(/\s+/)[0]
+          : 'nombre' in clienteSeleccionado.value && !clienteSeleccionado.value.empresa
+            ? (clienteSeleccionado.value.nombre || '').trim().split(/\s+/)[0]
+            : ''
+        : ''
+  const greeting = firstName ? '¡Hola, ' + firstName + '! 👋' : '¡Hola! 👋'
+  const title = header.titulo.trim()
+  return [
+    greeting,
+    'Te saluda el equipo de HOMEX. 🏡',
+    'Te compartimos nuestra proforma' +
+      (title ? ' "' + title + '"' : '') +
+      ' para que puedas revisar los productos, precios y condiciones en el PDF adjunto.',
+    'Quedamos atentos a tus consultas. ¡Gracias por confiar en nosotros!',
+  ].join('\n\n')
+})
+watch(
+  whatsappSuggested,
+  (value) => {
+    if (!whatsappEdited.value) whatsappDraft.value = value
+  },
+  { immediate: true },
+)
+function editWhatsapp(value: string) {
+  whatsappEdited.value = true
+  whatsappDraft.value = value
+}
+function resetWhatsapp() {
+  whatsappEdited.value = false
+  whatsappDraft.value = whatsappSuggested.value
+}
+const canShareWhatsApp = computed(() => {
+  if (clienteMode.value === 'existente') return Boolean(header.cliente)
+  if (clienteMode.value !== 'nuevo' || !nuevoCliente.tipo_cliente) return false
+  const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
+  return Object.keys(validateClient(nuevoCliente, tipo?.codigo === 'EMPRESA')).length === 0
+})
 const existingProductIds = computed(() =>
   lineas.value.flatMap((line) => (line.producto ? [line.producto] : [])),
 )
 const totalPreview = computed(() => totalEstimadoCompleto(lineas.value))
-const emissionPending = computed(() => {
-  const pendientes: string[] = []
-  if (!lineas.value.length) pendientes.push('agregar al menos una línea')
-  if (clienteMode.value === 'pendiente') pendientes.push('elegir o registrar un cliente')
-  if (clienteMode.value === 'existente' && !header.cliente) pendientes.push('elegir un cliente')
-  if (clienteMode.value === 'nuevo') {
-    if (!nuevoCliente.tipo_cliente) pendientes.push('indicar el tipo de cliente')
-    const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
-    const contacto = Boolean(nuevoCliente.nombres.trim() && nuevoCliente.apellidos.trim())
-    if (!contacto) pendientes.push('completar nombre y apellidos del contacto')
-    if (/EMPRESA|JURID/.test(tipo?.codigo ?? '') && !nuevoCliente.empresa.trim()) {
-      pendientes.push('completar la razón social')
-    }
+type EmissionIssue = {
+  id: string
+  step: number
+  title: string
+  description: string
+  action: string
+}
+const emissionIssues = computed<EmissionIssue[]>(() => {
+  const issues: EmissionIssue[] = []
+  if (!lineas.value.length) {
+    issues.push({
+      id: 'productos',
+      step: 0,
+      title: 'Productos',
+      description: 'Agrega al menos un producto o mueble a pedido.',
+      action: 'Ir a productos',
+    })
   }
-  return pendientes
+  if (clienteMode.value === 'pendiente' || (clienteMode.value === 'existente' && !header.cliente)) {
+    issues.push({
+      id: 'cliente',
+      step: 1,
+      title: 'Cliente',
+      description: 'Selecciona un cliente existente o registra uno nuevo.',
+      action: 'Ir a cliente',
+    })
+  } else if (clienteMode.value === 'nuevo') {
+    const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
+    const company = tipo?.codigo === 'EMPRESA'
+    const invalid = validateClient(nuevoCliente, company)
+    let description = ''
+    if (!nuevoCliente.tipo_cliente)
+      description = 'Indica si el cliente es persona natural o empresa.'
+    else if (!nuevoCliente.nombres.trim() || !nuevoCliente.apellidos.trim())
+      description = 'Completa los nombres y apellidos del contacto.'
+    else if (company && !nuevoCliente.empresa.trim())
+      description = 'Completa la razón social o empresa.'
+    else {
+      const fieldNames: Record<string, string> = {
+        nombres: 'nombres',
+        apellidos: 'apellidos',
+        empresa: 'razón social',
+        celular: 'celular',
+        direccion: 'dirección',
+        observaciones: 'observaciones',
+      }
+      const firstError = Object.entries(invalid)[0]
+      if (firstError) description = 'Revisa ' + fieldNames[firstError[0]] + ': ' + firstError[1]
+    }
+    if (description)
+      issues.push({
+        id: 'cliente-nuevo',
+        step: 1,
+        title: 'Cliente',
+        description,
+        action: 'Ir a cliente',
+      })
+  }
+  const errors = validateQuoteConditions(header)
+  const firstError = Object.entries(errors)[0]
+  if (firstError) {
+    const fields: Record<string, string> = {
+      titulo: 'título',
+      porcentaje_adelanto: 'adelanto',
+      plazo_entrega: 'plazo de entrega',
+      validez_oferta: 'validez',
+      observaciones: 'observaciones',
+    }
+    issues.push({
+      id: 'condiciones',
+      step: 2,
+      title: 'Condiciones',
+      description: 'Revisa ' + fields[firstError[0]] + ': ' + firstError[1],
+      action: 'Ir a condiciones',
+    })
+  }
+  return issues
 })
 const editingStatus = computed(() => {
   if (saving.value) return 'Guardando en HOMEX…'
@@ -259,17 +428,56 @@ const editableSpec = computed(() => {
   return (lineas.value[specLine.value]?.especificacion ?? null) as EspecificacionMueble | null
 })
 const canEmit = computed(() => {
+  if (Object.keys(validateQuoteConditions(header)).length) return false
   if (!lineas.value.length) return false
   if (clienteMode.value === 'existente') return Boolean(header.cliente)
   if (clienteMode.value !== 'nuevo' || !nuevoCliente.tipo_cliente) return false
   const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
   const esEmpresa = /EMPRESA|JURID/.test(tipo?.codigo ?? '')
   const contacto = Boolean(nuevoCliente.nombres.trim() && nuevoCliente.apellidos.trim())
+  if (Object.keys(validateClient(nuevoCliente, esEmpresa)).length) return false
   return esEmpresa ? contacto && Boolean(nuevoCliente.empresa.trim()) : contacto
 })
 
 function markDirty() {
   dirty.value = true
+}
+watch(
+  header,
+  () => {
+    if (!validationAttempted.value) return
+    const condition = validateQuoteConditions(header)
+    localErrors.value = {
+      ...Object.fromEntries(
+        Object.entries(localErrors.value).filter(([field]) => field.startsWith('cliente_nuevo.')),
+      ),
+      ...condition,
+    }
+  },
+  { deep: true },
+)
+watch(
+  nuevoCliente,
+  () => {
+    if (!validationAttempted.value || clienteMode.value !== 'nuevo') return
+    const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
+    const client = validateClient(nuevoCliente, tipo?.codigo === 'EMPRESA')
+    localErrors.value = {
+      ...Object.fromEntries(
+        Object.entries(localErrors.value).filter(([field]) => !field.startsWith('cliente_nuevo.')),
+      ),
+      ...Object.fromEntries(
+        Object.entries(client).map(([field, message]) => ['cliente_nuevo.' + field, message]),
+      ),
+    }
+  },
+  { deep: true },
+)
+function setExistingClient(value: string) {
+  if (header.cliente !== value) {
+    header.cliente = value
+    markDirty()
+  }
 }
 function nombreClienteVisible() {
   const cliente = clienteSeleccionado.value
@@ -413,7 +621,7 @@ function registrarTipoMueble(tipo: ValorCatalogoPublico) {
     a.nombre.localeCompare(b.nombre, 'es'),
   )
 }
-function saveSpec(
+async function saveSpec(
   body: EspecificacionMuebleWritable,
   comercial: {
     nombre: string
@@ -451,7 +659,13 @@ function saveSpec(
         (existingSpec?.observaciones ?? null) === (body.observaciones ?? null) &&
         tecnicaIgual(existingSpec?.datos_tecnicos ?? {}, body.datos_tecnicos ?? {})
       if (sameCommercial && sameSpec) {
-        if (!window.confirm('La copia es idéntica. ¿Aumentar la cantidad de la línea original?'))
+        if (
+          !(await askConfirmation(
+            'La copia es idéntica. ¿Aumentar la cantidad de la línea original?',
+            'Mueble duplicado',
+            'Sumar cantidad',
+          ))
+        )
           return
         original.cantidad = String(Number(original.cantidad) + Number(candidate.cantidad))
       } else lineas.value.push(candidate)
@@ -492,7 +706,13 @@ function saveSpec(
       commercialKeys.every((key) => String(original[key] ?? '') === String(line[key] ?? '')) &&
       tecnicaIgual(original.especificacion ?? null, body)
     if (identical) {
-      if (!window.confirm('La copia completa es idéntica. ¿Sumar su cantidad a la línea original?'))
+      if (
+        !(await askConfirmation(
+          'La copia completa es idéntica. ¿Sumar su cantidad a la línea original?',
+          'Mueble duplicado',
+          'Sumar cantidad',
+        ))
+      )
         return
       original.cantidad = String(Number(original.cantidad) + Number(line.cantidad))
       lineas.value.splice(index, 1)
@@ -514,10 +734,14 @@ function openSpec(index: number) {
   specModalDirty.value = false
   specLine.value = index
 }
-function closeSpec() {
+async function closeSpec() {
   if (
     specModalDirty.value &&
-    !window.confirm('Hay cambios sin guardar en la ficha técnica. ¿Deseas descartarlos?')
+    !(await askConfirmation(
+      'Hay cambios sin guardar en la ficha técnica. ¿Deseas descartarlos?',
+      'Descartar ficha técnica',
+      'Descartar cambios',
+    ))
   )
     return
   specLine.value = null
@@ -672,35 +896,30 @@ function restoreContextualDraft() {
   }
 }
 async function copyCommercialSummary() {
-  const client =
-    clienteMode.value === 'nuevo'
-      ? nuevoCliente.empresa || `${nuevoCliente.nombres} ${nuevoCliente.apellidos}`.trim()
-      : nombreClienteVisible()
-  const lines = lineas.value
-    .map((line) =>
-      line.modo_calculo === 'TOTAL_NEGOCIADO'
-        ? `• ${line.nombre}: importe negociado ${money(Number(line.importe_negociado || 0))}`
-        : totalEstimadoLinea(line) === null
-          ? `• ${line.nombre}: precio pendiente`
-          : `• ${line.nombre}: ${line.cantidad} × ${money(Number(line.precio_unitario))}`,
-    )
-    .join('\n')
-  const conditions = [
-    header.plazo_entrega && `Plazo: ${header.plazo_entrega}`,
-    header.validez_oferta && `Validez: ${header.validez_oferta} días`,
-  ]
-    .filter(Boolean)
-    .join('\n')
-  await navigator.clipboard.writeText(
-    `HOMEX — Cotización\n${client}\n${lines}\n${totalPreview.value === null ? 'Total estimado pendiente' : `Total estimado: ${money(totalPreview.value)}`}${conditions ? `\n${conditions}` : ''}`,
-  )
-  success.value = 'Resumen copiado. Puedes pegarlo manualmente en WhatsApp.'
+  if (!canShareWhatsApp.value) {
+    error.value = 'Selecciona un cliente válido antes de copiar el mensaje de WhatsApp.'
+    return
+  }
+  if (!whatsappDraft.value.trim()) {
+    error.value = 'El mensaje está vacío. Escribe uno o restaura el texto sugerido.'
+    return
+  }
+  try {
+    await navigator.clipboard.writeText(whatsappDraft.value)
+    success.value = 'Mensaje copiado. Puedes pegarlo en WhatsApp y adjuntar el PDF.'
+  } catch {
+    error.value = 'No fue posible copiar el mensaje. Selecciónalo manualmente para copiarlo.'
+  }
 }
 
-function closeLineModal() {
+async function closeLineModal() {
   if (
     lineModalDirty.value &&
-    !window.confirm('Hay cambios sin agregar en esta línea. ¿Deseas descartarlos?')
+    !(await askConfirmation(
+      'Hay cambios sin agregar en esta línea. ¿Deseas descartarlos?',
+      'Descartar línea',
+      'Descartar cambios',
+    ))
   )
     return
   lineModal.value = false
@@ -767,9 +986,11 @@ async function focusDuplicateProduct(productId: number) {
   if (index < 0) return
   if (
     lineModalDirty.value &&
-    !window.confirm(
+    !(await askConfirmation(
       'La variante ya está incluida. ¿Deseas descartar esta edición y ver la línea existente?',
-    )
+      'Variante duplicada',
+      'Ver línea existente',
+    ))
   )
     return
   lineModal.value = false
@@ -801,6 +1022,11 @@ function body(emitir: boolean): ProformaIntegralWritable {
       clienteMode.value === 'nuevo'
         ? ({
             ...nuevoCliente,
+            empresa:
+              tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
+                ?.codigo === 'EMPRESA'
+                ? nuevoCliente.empresa
+                : '',
             tipo_cliente: Number(nuevoCliente.tipo_cliente),
           } satisfies ClienteNuevoProforma)
         : null,
@@ -815,6 +1041,26 @@ function body(emitir: boolean): ProformaIntegralWritable {
 }
 async function persist(emitir: boolean) {
   if (saving.value) return
+  validationAttempted.value = true
+  localErrors.value = validateQuoteConditions(header)
+  if (clienteMode.value === 'nuevo') {
+    if (!nuevoCliente.tipo_cliente) {
+      localErrors.value['cliente_nuevo.tipo_cliente'] = 'Selecciona el tipo de cliente.'
+    }
+    const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
+    const errors = validateClient(nuevoCliente, tipo?.codigo === 'EMPRESA')
+    for (const [field, message] of Object.entries(errors))
+      localErrors.value['cliente_nuevo.' + field] = message
+  }
+  if (Object.keys(localErrors.value).length) {
+    error.value = 'Revisa los campos señalados antes de guardar.'
+    currentStep.value = Object.keys(localErrors.value).some((field) =>
+      field.startsWith('cliente_nuevo.'),
+    )
+      ? 1
+      : 2
+    return
+  }
   saving.value = true
   error.value = ''
   success.value = ''
@@ -844,12 +1090,18 @@ function beforeUnload(event: BeforeUnloadEvent) {
   if (!dirty.value && !lineModalDirty.value && !specModalDirty.value) return
   event.preventDefault()
 }
-onBeforeRouteLeave(
-  () =>
+onBeforeRouteLeave(async () => {
+  if (
     contextualNavigation.value ||
-    (!dirty.value && !lineModalDirty.value && !specModalDirty.value) ||
-    window.confirm('Hay cambios sin guardar. ¿Deseas salir?'),
-)
+    (!dirty.value && !lineModalDirty.value && !specModalDirty.value)
+  )
+    return true
+  return askConfirmation(
+    'Hay cambios sin guardar. Si sales, podrías perder los datos introducidos.',
+    'Salir sin guardar',
+    'Salir sin guardar',
+  )
+})
 onMounted(async () => {
   window.addEventListener('beforeunload', beforeUnload)
   await Promise.all([loadReferences(), load()])
@@ -859,7 +1111,43 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 </script>
 
 <template>
-  <div @input="markDirty" @change="markDirty">
+  <div class="quote-workspace" @input="markDirty" @change="markDirty">
+    <Toast :visible="Boolean(success)" :message="success" tone="success" @close="success = ''" />
+    <ConfirmDialog
+      :open="Boolean(confirmation)"
+      :title="confirmation?.title || 'Confirmar'"
+      :description="confirmation?.description || ''"
+      :confirm-label="confirmation?.confirmLabel"
+      @close="answerConfirmation(false)"
+      @confirm="answerConfirmation(true)"
+    />
+    <div class="quote-topline" aria-label="Ubicación en el proceso">
+      <span>COMERCIAL <span class="quote-divider">/</span> PROFORMAS</span>
+      <div class="quote-topline__right">
+        <span class="quote-progress">Paso {{ currentStep + 1 }} de {{ steps.length }}</span>
+        <div
+          class="quote-save-status"
+          :class="{
+            'quote-save-status--saved': persisted && !dirty && !saving && !conflicted,
+            'quote-save-status--warning': conflicted,
+          }"
+          role="status"
+          aria-live="polite"
+        >
+          <CheckCircle2
+            v-if="persisted && !dirty && !saving && !conflicted"
+            :size="14"
+            aria-hidden="true"
+          />
+          <CircleAlert v-else-if="conflicted" :size="14" aria-hidden="true" />
+          <Info v-else :size="14" aria-hidden="true" />
+          <span>{{ editingStatus }}</span>
+        </div>
+        <span v-if="persisted" class="quote-save-reference">
+          {{ persisted.estado_info.nombre }} · Proforma {{ persisted.numero }}
+        </span>
+      </div>
+    </div>
     <PageHeader
       :title="persisted ? `Editar proforma #${persisted.numero}` : 'Nueva proforma'"
       description="Prepara productos, cliente y condiciones antes de guardar."
@@ -875,22 +1163,17 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         <button
           v-for="(step, index) in steps"
           :key="step"
+          type="button"
           :class="{ active: currentStep === index }"
           :aria-current="currentStep === index ? 'step' : undefined"
           @click="currentStep = index"
         >
-          <span>{{ index + 1 }}</span
-          >{{ step }}
+          <span class="step-number">{{ String(index + 1).padStart(2, '0') }}</span>
+          <span class="step-label">{{ step }}</span>
+          <span class="step-marker" aria-hidden="true" />
         </button>
       </nav>
-      <p v-if="success" role="status" class="success">{{ success }}</p>
-      <div class="editor-status" role="status" aria-live="polite">
-        <span>{{ editingStatus }}</span>
-        <span v-if="persisted">
-          Estado comercial: <strong>{{ persisted.estado_info.nombre }}</strong> · Proforma
-          {{ persisted.numero }}
-        </span>
-      </div>
+
       <div v-if="error" role="alert" class="error error-summary">
         <strong>{{ error }}</strong>
         <ul v-if="fieldErrorMessages.length">
@@ -903,20 +1186,55 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         </Button>
       </div>
 
-      <section v-show="currentStep === 0" aria-labelledby="productos-title">
+      <section
+        v-show="currentStep === 0"
+        class="quote-panel products-panel"
+        aria-labelledby="productos-title"
+      >
         <div class="section-title">
-          <div>
-            <h2 id="productos-title">Productos</h2>
-            <p>Agrega productos antes o después de elegir cliente.</p>
+          <div class="section-title__identity">
+            <span class="section-icon"><PackageOpen :size="22" aria-hidden="true" /></span>
+            <div>
+              <p class="section-kicker">01 · COMPOSICIÓN</p>
+              <h2 id="productos-title">Productos</h2>
+              <p>Agrega productos antes o después de elegir cliente.</p>
+            </div>
           </div>
-          <Button @click="additionMode = 'choose'">Añadir ítem</Button>
+          <div class="section-title__tools">
+            <span v-if="lineas.length" class="count-pill"
+              >{{ lineas.length }} {{ lineas.length === 1 ? 'ítem' : 'ítems' }}</span
+            >
+            <Button @click="additionMode = 'choose'"
+              ><Plus :size="17" aria-hidden="true" />Añadir ítem</Button
+            >
+          </div>
         </div>
         <div v-if="additionMode === 'choose'" class="choice-panel">
-          <h3>¿Qué deseas incorporar a la cotización?</h3>
-          <div class="actions">
-            <Button @click="chooseCatalog">Producto de catálogo</Button>
-            <Button variant="secondary" @click="chooseManualFurniture">Mueble a pedido</Button>
+          <div class="choice-panel__heading">
+            <div>
+              <p class="section-kicker">AGREGAR A LA PROFORMA</p>
+              <h3>¿Qué deseas incorporar a la cotización?</h3>
+              <p>Selecciona cómo quieres incorporar el siguiente ítem.</p>
+            </div>
             <Button variant="secondary" @click="additionMode = 'none'">Cancelar</Button>
+          </div>
+          <div class="choice-grid">
+            <button type="button" class="choice-card" @click="chooseCatalog">
+              <span class="choice-card__icon"><PackageOpen :size="24" aria-hidden="true" /></span>
+              <span class="choice-card__copy">
+                <strong>Producto de catálogo</strong>
+                <small>Busca un producto existente y añádelo a la cotización.</small>
+              </span>
+              <ArrowRight :size="20" aria-hidden="true" />
+            </button>
+            <button type="button" class="choice-card" @click="chooseManualFurniture">
+              <span class="choice-card__icon"><Sofa :size="24" aria-hidden="true" /></span>
+              <span class="choice-card__copy">
+                <strong>Mueble a pedido</strong>
+                <small>Define las características y el importe de un mueble a medida.</small>
+              </span>
+              <ArrowRight :size="20" aria-hidden="true" />
+            </button>
           </div>
         </div>
         <div v-if="catalogInitialized" v-show="additionMode === 'catalog'">
@@ -936,6 +1254,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           />
         </div>
         <Card v-for="(line, index) in lineas" :key="line.localId" class="line-card">
+          <span class="line-index" aria-hidden="true">{{
+            String(index + 1).padStart(2, '0')
+          }}</span>
           <div
             :id="`ap3-linea-${line.localId}`"
             class="line-summary"
@@ -1006,80 +1327,228 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           {{ removedLines.length }} eliminación(es) provisional(es) pendiente(s) de guardar.
           <button type="button" @click="undoRemove">Deshacer última eliminación</button>
         </p>
-        <p v-if="!lineas.length" class="empty">Aún no agregaste productos.</p>
+        <div v-if="!lineas.length && additionMode === 'none'" class="empty empty-products">
+          <span class="empty-products__icon"><PackageOpen :size="30" aria-hidden="true" /></span>
+          <h3>Aún no agregaste productos.</h3>
+          <p>
+            Comienza con un producto de catálogo o un mueble a pedido para construir esta proforma.
+          </p>
+          <div class="empty-actions">
+            <Button @click="chooseCatalog"
+              ><PackageOpen :size="17" aria-hidden="true" />Producto de catálogo</Button
+            >
+            <Button variant="secondary" @click="chooseManualFurniture"
+              ><Sofa :size="17" aria-hidden="true" />Mueble a pedido</Button
+            >
+          </div>
+        </div>
         <p v-if="lineas.some((line) => line.modo_calculo === 'TOTAL_NEGOCIADO')" class="warning">
           Las líneas de importe histórico negociado se conservan sin conversión automática.
         </p>
       </section>
 
-      <section v-show="currentStep === 1" aria-labelledby="cliente-title">
-        <h2 id="cliente-title">Cliente</h2>
+      <section
+        v-show="currentStep === 1"
+        class="quote-panel client-panel"
+        aria-labelledby="cliente-title"
+      >
+        <div class="section-title">
+          <div class="section-title__identity">
+            <span class="section-icon"><UserRound :size="22" aria-hidden="true" /></span>
+            <div>
+              <p class="section-kicker">02 · DESTINATARIO</p>
+              <h2 id="cliente-title">Cliente</h2>
+              <p>
+                Indica a quién corresponde la cotización. Puedes dejarlo pendiente para el borrador.
+              </p>
+            </div>
+          </div>
+        </div>
         <div class="mode" role="radiogroup" aria-label="Origen del cliente">
-          <label><input v-model="clienteMode" type="radio" value="pendiente" /> Pendiente</label>
-          <label><input v-model="clienteMode" type="radio" value="existente" /> Existente</label>
-          <label><input v-model="clienteMode" type="radio" value="nuevo" /> Registrar nuevo</label>
+          <label
+            class="client-option"
+            :class="{ 'client-option--active': clienteMode === 'pendiente' }"
+          >
+            <input v-model="clienteMode" type="radio" value="pendiente" />
+            <span><strong>Pendiente</strong><small>Completar el cliente más adelante</small></span>
+          </label>
+          <label
+            class="client-option"
+            :class="{ 'client-option--active': clienteMode === 'existente' }"
+          >
+            <input v-model="clienteMode" type="radio" value="existente" />
+            <span
+              ><strong>Existente</strong><small>Seleccionar desde clientes registrados</small></span
+            >
+          </label>
+          <label
+            class="client-option"
+            :class="{ 'client-option--active': clienteMode === 'nuevo' }"
+          >
+            <input v-model="clienteMode" type="radio" value="nuevo" />
+            <span
+              ><strong>Registrar nuevo</strong><small>Registrar al guardar la proforma</small></span
+            >
+          </label>
         </div>
         <ClienteSelector
           v-if="clienteMode === 'existente'"
-          v-model="header.cliente"
+          :model-value="header.cliente"
           label="Cliente existente"
+          @update:model-value="setExistingClient"
           @select="clienteSeleccionado = $event"
+          @input.stop
+          @change.stop
         />
-        <Card v-if="clienteMode === 'nuevo'">
+        <Card v-if="clienteMode === 'nuevo'" class="client-fields">
           <ClienteFormFields
             :model="nuevoCliente"
             :tipos="tiposCliente"
             :errors="clientErrors"
+            :validate="validationAttempted"
             prefix="proforma-cliente"
             @change="updateNuevoCliente"
           />
         </Card>
-        <p v-if="clienteMode === 'pendiente'">
-          Puedes guardar el borrador sin cliente. Para emitir deberás definirlo.
-        </p>
+        <div v-if="clienteMode === 'pendiente'" class="context-note">
+          <Info :size="19" aria-hidden="true" />
+          <p>Puedes guardar el borrador sin cliente. Para emitir deberás definirlo.</p>
+        </div>
       </section>
 
-      <section v-show="currentStep === 2" aria-labelledby="condiciones-title">
-        <h2 id="condiciones-title">Condiciones</h2>
+      <section
+        v-show="currentStep === 2"
+        class="quote-panel conditions-panel"
+        aria-labelledby="condiciones-title"
+      >
+        <div class="section-title">
+          <div class="section-title__identity">
+            <span class="section-icon"><SlidersHorizontal :size="22" aria-hidden="true" /></span>
+            <div>
+              <p class="section-kicker">03 · ACUERDOS</p>
+              <h2 id="condiciones-title">Condiciones</h2>
+              <p>Especifica los datos comerciales que acompañarán a la proforma.</p>
+            </div>
+          </div>
+        </div>
         <div class="form-grid">
-          <TextField v-model="header.titulo" name="titulo" label="Título" />
-          <Select
-            v-model="header.moneda_codigo"
-            name="moneda"
-            label="Moneda"
-            :options="monedas.map((x) => ({ label: `${x.nombre} (${x.codigo})`, value: x.codigo }))"
-          />
-          <TextField v-model="header.plazo_entrega" name="plazo" label="Plazo de entrega" />
-          <TextField
-            v-model="header.validez_oferta"
-            name="validez"
-            label="Validez de la oferta (días)"
-            type="number"
-            min="1"
-          />
+          <div class="form-grid__full">
+            <TextField
+              v-model="header.titulo"
+              name="titulo"
+              label="Título"
+              :max-length="QUOTE_LIMITS.titulo"
+              :error="conditionError('titulo')"
+              @blur="conditionsTouched.titulo = true"
+            />
+            <small>Un título breve que identifique esta cotización.</small>
+          </div>
+          <fieldset class="currency-choice form-grid__full">
+            <legend>Moneda</legend>
+            <div class="currency-choice__options">
+              <label
+                v-for="moneda in monedas.filter((item) => ['BOB', 'USD'].includes(item.codigo))"
+                :key="moneda.id"
+                class="currency-choice__option"
+                :class="{
+                  'currency-choice__option--selected': header.moneda_codigo === moneda.codigo,
+                }"
+              >
+                <input
+                  v-model="header.moneda_codigo"
+                  type="radio"
+                  name="moneda"
+                  :value="moneda.codigo"
+                />
+                <span
+                  ><strong>{{
+                    moneda.codigo === 'BOB' ? 'Bolivianos (BOB)' : 'Dólares (USD)'
+                  }}</strong
+                  ><small>{{
+                    moneda.codigo === 'BOB' ? 'Moneda nacional' : 'Cotización en dólares'
+                  }}</small></span
+                >
+              </label>
+            </div>
+          </fieldset>
           <TextField
             v-model="header.porcentaje_adelanto"
             name="adelanto"
             label="Adelanto (%)"
-            type="number"
-            min="0"
-            max="100"
-            step="0.01"
+            type="text"
+            input-mode="decimal"
+            input-rule="decimal"
+            :max-length="6"
+            :error="conditionError('porcentaje_adelanto')"
+            @blur="conditionsTouched.porcentaje_adelanto = true"
+            hint="Opcional: 0–100 %, hasta 2 decimales."
           />
-          <TextField v-model="header.observaciones" name="observaciones" label="Observaciones" />
+          <TextField
+            v-model="header.plazo_entrega"
+            name="plazo"
+            label="Plazo de entrega"
+            :max-length="QUOTE_LIMITS.plazo_entrega"
+            :error="conditionError('plazo_entrega')"
+            @blur="conditionsTouched.plazo_entrega = true"
+            hint="Máximo 45 caracteres."
+          />
+          <TextField
+            v-model="header.validez_oferta"
+            name="validez"
+            label="Validez de la oferta (días)"
+            type="text"
+            input-mode="numeric"
+            input-rule="digits"
+            :max-length="3"
+            :error="conditionError('validez_oferta')"
+            @blur="conditionsTouched.validez_oferta = true"
+            hint="Opcional: entre 1 y 99 días."
+          />
+          <label class="quote-textarea form-grid__full" for="quote-observaciones">
+            <span>Observaciones</span>
+            <textarea
+              id="quote-observaciones"
+              v-model="header.observaciones"
+              name="observaciones"
+              rows="4"
+              :maxlength="QUOTE_LIMITS.observaciones"
+              @blur="conditionsTouched.observaciones = true"
+              :aria-invalid="Boolean(conditionError('observaciones'))"
+              placeholder="Condiciones adicionales para esta cotización..."
+            />
+            <small v-if="conditionError('observaciones')" class="condition-error" role="alert">{{
+              conditionError('observaciones')
+            }}</small>
+            <small v-else class="field-count"
+              >{{ header.observaciones.length }}/250 caracteres</small
+            >
+          </label>
         </div>
       </section>
 
-      <section v-if="currentStep === 3" aria-labelledby="revisar-title">
-        <h2 id="revisar-title">Revisar</h2>
+      <section
+        v-if="currentStep === 3"
+        class="quote-panel review-panel"
+        aria-labelledby="revisar-title"
+      >
+        <div class="section-title">
+          <div class="section-title__identity">
+            <span class="section-icon"><ClipboardCheck :size="22" aria-hidden="true" /></span>
+            <div>
+              <p class="section-kicker">04 · COMPROBACIÓN</p>
+              <h2 id="revisar-title">Revisar</h2>
+              <p>Comprueba los datos registrados antes de guardar o emitir.</p>
+            </div>
+          </div>
+        </div>
         <div class="review-grid">
-          <Card
-            ><h3>Productos</h3>
+          <Card class="review-summary-card"
+            ><h3><PackageOpen :size="17" aria-hidden="true" />Productos</h3>
             <p>{{ lineas.length }} línea(s)</p>
             <button @click="currentStep = 0">Corregir productos</button></Card
           >
-          <Card
-            ><h3>Cliente</h3>
+          <Card class="review-summary-card"
+            ><h3><UserRound :size="17" aria-hidden="true" />Cliente</h3>
             <p>
               {{
                 clienteMode === 'pendiente'
@@ -1091,16 +1560,19 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             </p>
             <button @click="currentStep = 1">Corregir cliente</button></Card
           >
-          <Card
-            ><h3>Condiciones</h3>
+          <Card class="review-summary-card"
+            ><h3><SlidersHorizontal :size="17" aria-hidden="true" />Condiciones</h3>
             <p>{{ header.plazo_entrega || 'Plazo pendiente' }} · {{ header.moneda_codigo }}</p>
             <button @click="currentStep = 2">Corregir condiciones</button></Card
           >
         </div>
         <Card class="commercial-preview"
-          ><p class="brand">HOMEX</p>
+          ><div class="preview-brand">
+            <span class="preview-mark">H</span>
+            <p class="brand">HOMEX · VISTA PREVIA</p>
+          </div>
           <h3>{{ header.titulo || 'Cotización comercial' }}</h3>
-          <p v-for="line in lineas" :key="line.localId">
+          <p v-for="line in lineas" :key="line.localId" class="review-line">
             <strong>{{ line.nombre }}</strong> —
             <template v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
               importe negociado {{ money(Number(line.importe_negociado || 0)) }}
@@ -1115,9 +1587,67 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           <p v-if="header.validez_oferta">
             <strong>Validez:</strong> {{ header.validez_oferta }} días
           </p>
-          <Button type="button" variant="secondary" @click="copyCommercialSummary"
-            >Copiar resumen para compartir manualmente</Button
-          ></Card
+          <div class="whatsapp-share" @input.stop @change.stop>
+            <div class="whatsapp-share__summary">
+              <span class="whatsapp-share__icon"
+                ><MessageCircle :size="20" aria-hidden="true"
+              /></span>
+              <div class="whatsapp-share__heading">
+                <strong>Mensaje para WhatsApp</strong>
+                <small>Personaliza el saludo para acompañar el PDF.</small>
+              </div>
+              <div class="whatsapp-share__controls">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  :disabled="!canShareWhatsApp || !whatsappDraft.trim()"
+                  @click="copyCommercialSummary"
+                  >Copiar mensaje</Button
+                >
+                <button
+                  type="button"
+                  class="whatsapp-share__toggle"
+                  :aria-expanded="whatsappExpanded"
+                  aria-controls="whatsapp-message-content"
+                  :aria-label="
+                    whatsappExpanded ? 'Ocultar mensaje de WhatsApp' : 'Mostrar mensaje de WhatsApp'
+                  "
+                  @click="whatsappExpanded = !whatsappExpanded"
+                >
+                  <ChevronUp v-if="whatsappExpanded" :size="20" aria-hidden="true" />
+                  <ChevronDown v-else :size="20" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+            <p v-if="!canShareWhatsApp" class="whatsapp-share__hint">
+              Selecciona un cliente o completa los datos del nuevo cliente para copiar el mensaje.
+            </p>
+            <div
+              v-show="whatsappExpanded"
+              id="whatsapp-message-content"
+              class="whatsapp-share__content"
+            >
+              <label for="whatsapp-message">Contenido del mensaje</label>
+              <textarea
+                id="whatsapp-message"
+                :value="whatsappDraft"
+                rows="5"
+                @input="editWhatsapp(($event.target as HTMLTextAreaElement).value)"
+              />
+              <div class="whatsapp-share__edit-actions">
+                <small
+                  >Al copiar se incluye únicamente el texto. Adjunta el PDF por separado.</small
+                >
+                <Button
+                  v-if="whatsappEdited"
+                  type="button"
+                  variant="secondary"
+                  @click="resetWhatsapp"
+                  >Restaurar mensaje sugerido</Button
+                >
+              </div>
+            </div>
+          </div></Card
         >
         <div class="totals">
           <template v-if="persisted && !dirty">
@@ -1136,32 +1666,64 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             </small>
           </template>
         </div>
-        <div v-if="!canEmit" class="warning" role="status">
-          <strong>Antes de emitir:</strong>
+        <div v-if="!canEmit" class="emission-checklist">
+          <div class="emission-checklist__header">
+            <span class="emission-checklist__icon"
+              ><ClipboardCheck :size="22" aria-hidden="true"
+            /></span>
+            <div class="emission-checklist__heading">
+              <h3>Verificación de la proforma</h3>
+              <p>Completa la información necesaria antes de emitir.</p>
+            </div>
+            <span class="emission-checklist__count" aria-live="polite">
+              {{ emissionIssues.length }}
+              {{ emissionIssues.length === 1 ? 'pendiente' : 'pendientes' }}
+            </span>
+          </div>
           <ul>
-            <li v-for="pending in emissionPending" :key="pending">{{ pending }}.</li>
+            <li v-for="issue in emissionIssues" :key="issue.id">
+              <CircleAlert :size="18" aria-hidden="true" />
+              <div class="emission-checklist__detail">
+                <strong>{{ issue.title }}</strong>
+                <p>{{ issue.description }}</p>
+              </div>
+              <button type="button" @click="currentStep = issue.step">
+                {{ issue.action }} <ChevronRight :size="16" aria-hidden="true" />
+              </button>
+            </li>
           </ul>
+        </div>
+        <div v-else class="emission-ready" role="status">
+          <CheckCircle2 :size="19" aria-hidden="true" />
+          <span>Información completa. La proforma está lista para emitir.</span>
         </div>
       </section>
 
       <footer class="editor-actions">
-        <Button variant="secondary" :disabled="currentStep === 0" @click="currentStep--"
-          >Anterior</Button
-        >
-        <Button v-if="currentStep < 3" @click="currentStep++">Continuar</Button>
-        <Button variant="secondary" :processing="saving" @click="persist(false)"
-          >Guardar borrador</Button
-        >
-        <Button :disabled="!canEmit" :processing="saving" @click="persist(true)"
-          >Emitir proforma</Button
-        >
-        <Button
-          v-if="persisted"
-          variant="secondary"
-          @click="router.push(`/proformas/${persisted.id}`)"
-        >
-          Ver detalle, aprobar y gestionar adjuntos
-        </Button>
+        <div class="editor-actions__inner">
+          <div class="editor-actions__navigation">
+            <Button variant="secondary" :disabled="currentStep === 0" @click="currentStep--"
+              ><ArrowLeft :size="17" aria-hidden="true" />Anterior</Button
+            >
+            <Button v-if="currentStep < 3" @click="currentStep++"
+              >Continuar<ArrowRight :size="17" aria-hidden="true"
+            /></Button>
+          </div>
+          <div class="editor-actions__operations">
+            <Button variant="secondary" :processing="saving" @click="persist(false)"
+              >Guardar borrador</Button
+            >
+            <Button :disabled="!canEmit" :processing="saving" @click="persist(true)"
+              >Emitir proforma</Button
+            >
+            <Button
+              v-if="persisted"
+              variant="secondary"
+              @click="router.push(`/proformas/${persisted.id}`)"
+              >Ver detalle, aprobar y gestionar adjuntos</Button
+            >
+          </div>
+        </div>
       </footer>
     </template>
 
@@ -1334,102 +1896,704 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 </template>
 
 <style scoped>
-.steps {
+.quote-workspace {
+  --quote-shadow: 0 4px 24px rgb(0 0 0 / 4%);
+  --quote-muted: color-mix(in srgb, var(--color-surface) 76%, var(--color-background));
+  --quote-border: color-mix(in srgb, var(--color-border) 80%, transparent);
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  align-content: start;
+  gap: 0;
+  padding-bottom: var(--space-8);
+}
+.quote-topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  color: var(--color-text-secondary);
+  font-size: 0.69rem;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+}
+.quote-divider {
+  padding: 0 var(--space-2);
+  color: var(--color-border-strong);
+}
+.quote-progress {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-primary-accent);
+  background: var(--color-primary-soft);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.quote-topline__right {
+  display: grid;
+  justify-items: end;
+  flex-shrink: 0;
   gap: var(--space-2);
+  max-width: min(100%, 26rem);
+  text-align: right;
+  letter-spacing: normal;
+}
+.quote-save-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  max-width: 100%;
+  color: var(--color-text-secondary);
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.quote-save-status svg {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+.quote-save-status--saved svg {
+  color: var(--color-success);
+}
+.quote-save-status--warning,
+.quote-save-status--warning svg {
+  color: var(--color-danger);
+}
+.quote-save-reference {
+  color: var(--color-text-secondary);
+  font-size: 0.68rem;
+  font-weight: 500;
+}
+.quote-workspace :deep(.page-header) {
   margin-bottom: var(--space-6);
 }
-.steps button {
-  display: flex;
+.quote-workspace :deep(.page-header h1) {
+  font-size: clamp(1.65rem, 2.4vw, 2.25rem);
+  font-weight: 750;
+  letter-spacing: -0.035em;
+}
+.steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+.steps button {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 4.1rem;
   align-items: center;
-  justify-content: center;
-  min-height: 3rem;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-card);
   background: var(--color-surface);
   color: var(--color-text-secondary);
+  cursor: pointer;
+  font-weight: 600;
+  text-align: left;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    color var(--transition-fast),
+    transform var(--transition-fast);
+}
+.steps button:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-hover);
+}
+.steps button:focus-visible {
+  outline: 2px solid var(--color-primary-accent);
+  outline-offset: 2px;
 }
 .steps button.active {
   border-color: var(--color-primary);
-  color: var(--color-primary);
-  font-weight: 700;
+  background: var(--color-primary-soft);
+  color: var(--color-primary-accent);
 }
-.steps span {
+.step-number {
   display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
   place-items: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: 50%;
-  background: var(--color-surface-muted);
+  border-radius: 0.6rem;
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 750;
 }
-section {
+.steps button.active .step-number {
+  color: #fff;
+  background: var(--color-primary);
+}
+.step-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.step-marker {
+  position: absolute;
+  right: var(--space-4);
+  bottom: -1px;
+  left: var(--space-4);
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: transparent;
+}
+.steps button.active .step-marker {
+  background: var(--color-primary);
+}
+.quote-panel {
   display: grid;
-  gap: var(--space-4);
+  min-width: 0;
+  gap: var(--space-5);
+  padding: clamp(1rem, 2.5vw, 2rem);
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  background: var(--color-surface);
+  box-shadow: var(--quote-shadow);
 }
-.section-title,
-.line-card,
-.editor-actions {
+.section-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--quote-border);
+}
+.section-title__identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-4);
+}
+.section-icon {
+  display: grid;
+  width: 3.15rem;
+  height: 3.15rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 12%, transparent);
+  border-radius: 0.85rem;
+  color: var(--color-primary-accent);
+  background: var(--color-primary-soft);
+}
+.section-title h2 {
+  margin: 0.1rem 0 0;
+  color: var(--color-text);
+  font-size: 1.35rem;
+  letter-spacing: -0.025em;
+}
+.section-title p:not(.section-kicker) {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-secondary);
+}
+.section-kicker {
+  margin: 0;
+  color: var(--color-primary-accent);
+  font-size: 0.67rem;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+}
+.section-title__tools {
+  display: flex;
+  align-items: center;
   gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.count-pill {
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 650;
+  white-space: nowrap;
 }
 .choice-panel {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--quote-muted);
+}
+.choice-panel__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.choice-panel h3 {
+  margin: var(--space-1) 0;
+  font-size: 1.05rem;
+}
+.choice-panel__heading p:last-child {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-secondary);
+}
+.choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.choice-card {
+  display: flex;
+  min-width: 0;
+  min-height: 7.75rem;
+  align-items: center;
+  gap: var(--space-4);
   padding: var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    transform var(--transition-fast);
 }
-.choice-panel h3 {
-  margin-top: 0;
+.choice-card:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  transform: translateY(-1px);
+}
+.choice-card:focus-visible {
+  outline: 2px solid var(--color-primary-accent);
+  outline-offset: 2px;
+}
+.choice-card > svg {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--color-text-secondary);
+}
+.choice-card__icon {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: var(--radius-card);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-accent);
+}
+.choice-card__copy {
+  display: grid;
+  min-width: 0;
+  gap: 0.45rem;
+}
+.choice-card__copy strong {
+  font-size: 0.95rem;
+}
+.choice-card__copy small {
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+.empty-products {
+  display: grid;
+  min-height: 16rem;
+  justify-items: center;
+  align-content: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-5);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-card);
+  background: var(--quote-muted);
+  text-align: center;
+}
+.empty-products__icon {
+  display: grid;
+  width: 4rem;
+  height: 4rem;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 1rem;
+  background: var(--color-surface);
+  color: var(--color-primary-accent);
+}
+.empty-products h3 {
+  margin: var(--space-2) 0 0;
+  font-size: 1.12rem;
+}
+.empty-products p {
+  max-width: 32rem;
+  margin: 0;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+.empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+.line-card {
+  display: flex;
+  position: relative;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border-color: var(--quote-border);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 3%);
+}
+.line-card:hover {
+  border-color: var(--color-border-strong);
+}
+.line-index {
+  display: grid;
+  width: 2.4rem;
+  height: 2.4rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.6rem;
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+  font-size: 0.74rem;
+  font-weight: 700;
 }
 .line-summary {
-  cursor: pointer;
   min-width: 0;
   flex: 1;
+  cursor: pointer;
+}
+.line-summary strong {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 0.94rem;
+}
+.line-summary p {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.83rem;
 }
 .line-summary:focus-visible {
   outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+.line-card > strong {
+  flex: 0 0 auto;
+  color: var(--color-text);
+  white-space: nowrap;
 }
 .line-menu {
   position: relative;
-  flex-shrink: 0;
+  z-index: 30;
+  flex: 0 0 auto;
 }
 .menu-trigger {
-  padding: var(--space-2);
-  border-radius: var(--radius-control);
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
   border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
   background: var(--color-surface);
-  color: var(--color-text);
+  color: var(--color-text-secondary);
   font-size: 1.25rem;
   cursor: pointer;
+}
+.menu-trigger:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
 }
 .menu-panel {
   position: absolute;
   z-index: 10;
-  top: 100%;
+  top: calc(100% + 0.3rem);
   right: 0;
-  min-width: 10rem;
   display: grid;
+  min-width: 11rem;
+  gap: 0.15rem;
   padding: var(--space-2);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-card);
   background: var(--color-surface-raised);
-  box-shadow: 0 4px 16px #0002;
+  box-shadow: 0 12px 26px rgb(0 0 0 / 16%);
 }
 .menu-panel button {
-  text-align: left;
-  padding: var(--space-2);
+  padding: 0.65rem 0.8rem;
+  border: 0;
+  border-radius: 0.35rem;
   background: transparent;
   color: var(--color-text);
+  cursor: pointer;
+  text-align: left;
+}
+.menu-panel button:hover:not(:disabled),
+.menu-panel button:focus-visible {
+  background: var(--color-surface-hover);
+}
+.menu-panel button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.undo,
+.context-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--quote-muted);
+  color: var(--color-text-secondary);
+}
+.context-note svg {
+  flex-shrink: 0;
+  color: var(--color-info);
+}
+.context-note p {
+  margin: 0;
+}
+.undo button {
   border: 0;
+  background: transparent;
+  color: var(--color-primary-accent);
+  text-decoration: underline;
   cursor: pointer;
 }
-.menu-panel button:focus-visible {
-  outline: 2px solid var(--color-primary);
+.client-panel {
+  align-content: start;
+}
+.mode {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.client-option {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+}
+.client-option:hover {
+  border-color: var(--color-border-strong);
+  background: var(--quote-muted);
+}
+.client-option--active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+.client-option input {
+  margin-top: 0.2rem;
+  flex: 0 0 auto;
+  accent-color: var(--color-primary);
+}
+.client-option span {
+  display: grid;
+  min-width: 0;
+  gap: 0.35rem;
+}
+.client-option strong {
+  font-size: 0.87rem;
+}
+.client-option small {
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+}
+.client-option:focus-within {
+  outline: 2px solid var(--color-primary-accent);
+  outline-offset: 2px;
+}
+.client-fields {
+  border-color: var(--quote-border);
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+.form-grid__full {
+  grid-column: 1 / -1;
+}
+.form-grid__full > small {
+  display: block;
+  margin-top: var(--space-2);
+  color: var(--color-text-secondary);
+}
+.quote-textarea {
+  display: grid;
+  gap: var(--space-2);
+  color: var(--color-text);
+  font-weight: 600;
+}
+.quote-textarea textarea {
+  display: block;
+  width: 100%;
+  min-height: 7.5rem;
+  resize: vertical;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 400;
+  line-height: 1.6;
+}
+.quote-textarea textarea::placeholder {
+  color: var(--color-text-muted);
+}
+.quote-textarea textarea:hover {
+  border-color: var(--color-text-muted);
+}
+.quote-textarea textarea:focus-visible {
+  outline: 2px solid var(--color-primary-accent);
+  outline-offset: 1px;
+}
+.review-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.review-summary-card {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  background: var(--quote-muted);
+  border-color: var(--quote-border);
+}
+.review-summary-card h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 0.84rem;
+}
+.review-summary-card h3 svg {
+  color: var(--color-primary-accent);
+}
+.review-summary-card p {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-text-secondary);
+}
+.review-summary-card button {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-primary-accent);
+  cursor: pointer;
+  font-weight: 650;
+}
+.review-summary-card button:hover {
+  text-decoration: underline;
+}
+.commercial-preview {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  border-color: var(--quote-border);
+}
+.preview-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--quote-border);
+}
+.preview-mark {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 0.45rem;
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 800;
+}
+.brand {
+  margin: 0;
+  color: var(--color-primary-accent);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+}
+.commercial-preview h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  letter-spacing: -0.02em;
+}
+.review-line {
+  margin: 0;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--quote-border);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.review-line strong {
+  color: var(--color-text);
+}
+.commercial-preview :deep(.button) {
+  justify-self: start;
+}
+.totals {
+  display: grid;
+  justify-items: end;
+  gap: var(--space-2);
+  padding: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+  text-align: right;
+}
+.totals span {
+  color: var(--color-text-secondary);
+  font-weight: 650;
+}
+.totals strong {
+  color: var(--color-text);
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  letter-spacing: -0.04em;
+}
+.totals small {
+  color: var(--color-text-secondary);
+}
+.error,
+.warning {
+  color: var(--color-danger);
+}
+.error-summary,
+.warning {
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 24%, var(--color-border));
+  border-radius: var(--radius-card);
+  background: var(--color-danger-soft);
+}
+.error-summary ul,
+.warning ul {
+  margin-bottom: 0;
+}
+.success {
+  margin: 0 0 var(--space-3);
+  color: var(--color-success);
+  font-weight: 650;
+}
+.pending-value {
+  color: var(--color-warning);
 }
 .read-line {
   display: grid;
@@ -1444,97 +2608,489 @@ section {
   overflow: auto;
   white-space: pre-wrap;
 }
-.line-card {
-  margin-bottom: var(--space-3);
-}
-.actions,
-.mode {
+.actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);
 }
-.form-grid,
-.client-grid,
-.review-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-4);
-}
-.review-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-.totals {
-  display: grid;
-  justify-items: end;
-  padding: var(--space-5);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-}
-.totals strong {
-  font-size: 1.5rem;
-}
 .editor-actions {
   position: sticky;
+  z-index: 5;
   bottom: 0;
-  margin-top: var(--space-6);
-  padding: var(--space-4);
+  margin-top: var(--space-5);
+  padding: var(--space-3) 0;
   border-top: 1px solid var(--color-border);
-  background: var(--color-background);
+  background: color-mix(in srgb, var(--color-background) 96%, transparent);
+  backdrop-filter: blur(12px);
 }
-.error,
-.warning {
-  color: var(--color-danger);
-}
-.success {
-  color: var(--color-success);
-}
-.editor-status {
+.editor-actions__inner {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
-  gap: var(--space-2) var(--space-5);
-  margin-bottom: var(--space-4);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-muted);
-  color: var(--color-text-secondary);
+  gap: var(--space-4);
+  padding: 0 var(--space-2);
 }
-.pending-value {
-  color: var(--color-warning-text, var(--color-text-secondary));
+.editor-actions__navigation,
+.editor-actions__operations {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
-.error-summary ul,
-.warning ul {
-  margin-bottom: 0;
+.editor-actions__operations {
+  justify-content: flex-end;
 }
-.empty {
-  padding: var(--space-6);
+.editor-actions :deep(.button) {
+  white-space: normal;
   text-align: center;
-  border: 1px dashed var(--color-border);
+}
+@media (max-width: 64rem) {
+  .steps button {
+    justify-content: center;
+    padding: var(--space-3);
+    gap: var(--space-2);
+  }
+  .choice-card {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .choice-card > svg {
+    margin-left: auto;
+  }
 }
 @media (max-width: 48rem) {
-  .steps {
-    grid-template-columns: repeat(2, 1fr);
+  .steps button {
+    min-height: 3.7rem;
   }
+  .step-number {
+    width: 1.7rem;
+    height: 1.7rem;
+  }
+  .quote-panel {
+    padding: var(--space-5);
+  }
+  .mode,
   .review-grid {
     grid-template-columns: 1fr;
   }
-  .editor-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+  .editor-actions__inner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .editor-actions__navigation,
+  .editor-actions__operations {
+    justify-content: flex-end;
+  }
+  .editor-actions__navigation {
+    justify-content: space-between;
   }
 }
-@media (max-width: 35rem) {
-  .steps,
-  .form-grid,
-  .client-grid,
-  .editor-actions {
-    grid-template-columns: 1fr;
+@media (max-width: 36rem) {
+  .quote-topline {
+    align-items: flex-start;
   }
-  .line-card,
+  .steps {
+    gap: 0.35rem;
+  }
+  .steps button {
+    min-height: 4.25rem;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.55rem 0.25rem;
+    text-align: center;
+  }
+  .step-label {
+    width: 100%;
+    font-size: 0.69rem;
+  }
+  .step-marker {
+    right: 0.3rem;
+    left: 0.3rem;
+  }
   .section-title {
     align-items: stretch;
     flex-direction: column;
+  }
+  .section-title__identity {
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+  .section-icon {
+    width: 2.6rem;
+    height: 2.6rem;
+  }
+  .section-title__tools :deep(.button) {
+    flex: 1;
+  }
+  .choice-panel__heading {
+    flex-direction: column;
+  }
+  .choice-grid,
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .form-grid__full {
+    grid-column: auto;
+  }
+  .choice-card {
+    min-height: 5.5rem;
+    flex-wrap: nowrap;
+  }
+  .empty-products {
+    padding: var(--space-6) var(--space-3);
+  }
+  .empty-actions {
+    width: 100%;
+  }
+  .empty-actions :deep(.button) {
+    width: 100%;
+  }
+  .line-card {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .line-summary {
+    flex-basis: calc(100% - 4rem);
+  }
+  .line-card > strong {
+    margin-left: 3rem;
+  }
+  .line-menu {
+    margin-left: auto;
+  }
+  .editor-actions {
+    position: static;
+  }
+  .editor-actions__navigation,
+  .editor-actions__operations {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .editor-actions__operations :deep(.button:last-child:nth-child(3)) {
+    grid-column: 1 / -1;
+  }
+  .editor-actions :deep(.button) {
+    min-width: 0;
+    width: 100%;
+  }
+  .commercial-preview,
+  .totals {
+    padding: var(--space-4);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .steps button,
+  .choice-card,
+  .client-option {
+    transition: none;
+    transform: none;
+  }
+}
+
+.currency-choice {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.currency-choice legend {
+  margin-bottom: var(--space-2);
+  color: var(--color-text);
+  font-weight: 600;
+}
+.currency-choice__options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.currency-choice__option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+.currency-choice__option--selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+.currency-choice__option:hover {
+  border-color: var(--color-border-strong);
+}
+.currency-choice__option:focus-within {
+  box-shadow: var(--focus-ring);
+}
+.currency-choice__option input {
+  accent-color: var(--color-primary);
+}
+.currency-choice__option span {
+  display: grid;
+  gap: var(--space-1);
+}
+.currency-choice__option small {
+  color: var(--color-text-secondary);
+}
+.condition-error {
+  color: var(--color-danger);
+}
+.field-count {
+  color: var(--color-text-secondary);
+  justify-self: end;
+  font-weight: 400;
+}
+.whatsapp-share {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+.whatsapp-share__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.whatsapp-share__icon {
+  display: grid;
+  flex: 0 0 auto;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+  color: var(--color-success);
+}
+.whatsapp-share__heading {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: var(--space-1);
+}
+.whatsapp-share__heading strong {
+  color: var(--color-text);
+  font-size: 0.9rem;
+}
+.whatsapp-share__heading small,
+.whatsapp-share__hint {
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+.whatsapp-share__controls {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: var(--space-2);
+}
+.whatsapp-share__toggle {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.whatsapp-share__toggle:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+.whatsapp-share__toggle:focus-visible {
+  outline: 2px solid var(--color-primary-accent);
+  outline-offset: 2px;
+}
+.whatsapp-share__hint {
+  margin: 0;
+  padding-left: 3.25rem;
+}
+.whatsapp-share__content {
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+.whatsapp-share__content label {
+  color: var(--color-text);
+  font-weight: 600;
+}
+.whatsapp-share__content textarea {
+  width: 100%;
+  min-height: 10rem;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  line-height: 1.65;
+  resize: vertical;
+}
+.whatsapp-share__content textarea:focus-visible {
+  outline: 2px solid var(--color-primary-accent);
+  outline-offset: 1px;
+}
+.whatsapp-share__edit-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.whatsapp-share__edit-actions small {
+  color: var(--color-text-secondary);
+}
+.emission-checklist,
+.emission-ready {
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+}
+.emission-checklist {
+  display: grid;
+  gap: var(--space-4);
+}
+.emission-checklist__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.emission-checklist__icon {
+  display: grid;
+  width: 2.7rem;
+  height: 2.7rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+}
+.emission-checklist__heading {
+  flex: 1;
+  min-width: 0;
+}
+.emission-checklist__heading h3 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1rem;
+}
+.emission-checklist__heading p {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+}
+.emission-checklist__count {
+  flex-shrink: 0;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  font-size: 0.75rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.emission-checklist ul {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.emission-checklist li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--color-border);
+}
+.emission-checklist li > svg {
+  flex: 0 0 auto;
+  color: var(--color-warning);
+}
+.emission-checklist__detail {
+  display: grid;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+}
+.emission-checklist__detail strong {
+  color: var(--color-text);
+  font-size: 0.86rem;
+}
+.emission-checklist__detail p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+.emission-checklist li button {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-primary-accent);
+  cursor: pointer;
+  font-weight: 650;
+  font-size: 0.81rem;
+}
+.emission-checklist li button:hover,
+.emission-checklist li button:focus-visible {
+  background: var(--color-primary-soft);
+}
+.emission-ready {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-text);
+}
+.emission-ready svg {
+  flex-shrink: 0;
+  color: var(--color-success);
+}
+@media (max-width: 36rem) {
+  .currency-choice__options {
+    grid-template-columns: 1fr;
+  }
+  .quote-topline {
+    flex-wrap: wrap;
+  }
+  .quote-topline__right {
+    margin-left: auto;
+  }
+  .whatsapp-share__summary {
+    flex-wrap: wrap;
+  }
+  .whatsapp-share__controls {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .whatsapp-share__hint {
+    padding-left: 0;
+  }
+  .emission-checklist__header {
+    flex-wrap: wrap;
+  }
+  .emission-checklist__count {
+    margin-left: auto;
+  }
+  .emission-checklist li {
+    flex-wrap: wrap;
+  }
+  .emission-checklist li button {
+    margin-left: auto;
   }
 }
 </style>

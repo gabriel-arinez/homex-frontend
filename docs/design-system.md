@@ -25,6 +25,21 @@ Preferencias locales permitidas:
 
 No se almacenan tokens, datos personales ni información comercial en esas claves.
 
+## Distribución y desplazamiento
+
+El contenido principal usa el ancho disponible al lado del menú, sin un máximo global de 90 rem.
+Se adapta a zoom reducido y a monitores amplios sin crear márgenes laterales artificiales. El
+espacio de seguridad se controla con el padding responsive del shell; los componentes pueden
+aplicar límites locales solo cuando el contenido (por ejemplo, un texto o un campo) necesite
+conservar una longitud legible, sin limitar la página completa.
+
+Todas las barras de desplazamiento se ocultan **solo visualmente** desde
+`src/shared/styles/base.css`, tanto en el documento como en las regiones anidadas: sidebar,
+categorías, tablas y modales. Se mantiene `overflow` y el desplazamiento por rueda, teclado,
+touchpad y tacto; no introducir `overflow: hidden` para ocultar barras. Esta norma vale para
+ambos temas y todas las rutas. Los controles desplazables deben seguir siendo utilizables y
+accesibles sin depender de arrastrar una barra.
+
 ## Componentes
 
 Los componentes base viven en `src/shared/ui`. Sus APIs usan `modelValue`/`update:modelValue` para

@@ -344,13 +344,14 @@ test('FE04 crea con unitario y descuento, revisa y aprueba', async ({ page }) =>
   await page.locator('#componente-color-0').fill('Nogal')
   await page.getByRole('button', { name: 'Guardar especificación' }).click()
   await page.getByRole('button', { name: /Cliente$/ }).click()
-  await expect(page.locator('#cliente-proforma option[value="1"]')).toHaveCount(1)
-  await page.locator('#cliente-proforma').selectOption('1')
+  await page.getByRole('radio', { name: /Existente/ }).check()
+  await page.getByRole('combobox', { name: 'Cliente existente' }).focus()
+  await page.getByRole('option', { name: /Ana Pérez/ }).click()
   await page.getByRole('button', { name: /Condiciones$/ }).click()
   await page.getByLabel('Título').fill('Oficina nueva')
   await page.getByRole('button', { name: /Revisar$/ }).click()
   await page.getByRole('button', { name: 'Emitir proforma' }).click()
-  await expect(page.getByText('En revisión', { exact: true })).toBeVisible()
+  await expect(page.locator('.quote-save-reference')).toContainText('En revisión')
   await page.getByRole('button', { name: 'Ver detalle, aprobar y gestionar adjuntos' }).click()
   await expect(page).toHaveURL(/\/proformas\/1$/)
   await page.getByRole('button', { name: 'Aprobar' }).click()
@@ -591,9 +592,10 @@ test('FE04 selecciona cliente y producto fuera de la primera página', async ({ 
   await page.goto('/proformas/nueva')
   await expect(page.getByRole('heading', { name: 'Nueva proforma' })).toBeVisible()
   await page.getByRole('button', { name: /Cliente$/ }).click()
+  await page.getByRole('radio', { name: /Existente/ }).check()
+  await page.getByRole('combobox', { name: 'Cliente existente' }).focus()
   await page.getByRole('button', { name: 'Cargar más clientes' }).click()
-  await expect(page.locator('#cliente-proforma option[value="200"]')).toHaveCount(1)
-  await page.locator('#cliente-proforma').selectOption('200')
+  await page.getByRole('option', { name: /Beatriz Segunda página/ }).click()
 
   state.quote().detalles = []
   await page.route(/\/api\/v1\/catalogo\/productos\/(?:\?.*)?$/, (route) => {
@@ -651,13 +653,19 @@ test('PRF-01 previene líneas inválidas y conserva edición al cerrar', async (
   )
   await expect(page.getByRole('dialog')).toBeVisible()
 
-  page.once('dialog', (dialog) => dialog.dismiss())
   await page.getByRole('button', { name: 'Cerrar', exact: true }).click()
-  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByRole('dialog', { name: 'Descartar ficha técnica' })).toBeVisible()
+  await page
+    .getByRole('dialog', { name: 'Descartar ficha técnica' })
+    .getByRole('button', { name: 'Cancelar' })
+    .click()
   await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Escritorio comercial')
 
-  page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('button', { name: 'Cerrar', exact: true }).click()
+  await page
+    .getByRole('dialog', { name: 'Descartar ficha técnica' })
+    .getByRole('button', { name: 'Descartar cambios' })
+    .click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
 })
 
@@ -667,12 +675,13 @@ test('PRF-01 muestra cliente humano y estimación local sin identificadores inte
   await mockBackend(page)
   await page.goto('/proformas/1/editar')
   await page.getByRole('button', { name: /Cliente$/ }).click()
-  await page.getByLabel('Cliente existente').selectOption('1')
+  await page.getByRole('combobox', { name: 'Cliente existente' }).focus()
+  await page.getByRole('option', { name: /Ana Pérez/ }).click()
   await page.getByRole('button', { name: /Revisar$/ }).click()
   await expect(page.getByRole('region').getByText('Ana Pérez', { exact: true })).toBeVisible()
   await expect(page.getByText('Cliente #1')).toHaveCount(0)
-  await expect(page.getByText('Estimación local')).toBeVisible()
-  await expect(page.getByText('Total pendiente')).toBeVisible()
+  await expect(page.getByText('Total confirmado por HOMEX')).toBeVisible()
+  await expect(page.getByText('Total pendiente')).toHaveCount(0)
 })
 
 test('PRF-01 protege cambios pendientes de la ficha técnica', async ({ page }) => {
@@ -685,13 +694,19 @@ test('PRF-01 protege cambios pendientes de la ficha técnica', async ({ page }) 
   await page.getByRole('button', { name: 'Agregar componente' }).click()
   await page.locator('#componente-nombre-0').fill('Mesón')
 
-  page.once('dialog', (dialog) => dialog.dismiss())
   await page.getByRole('button', { name: 'Cerrar', exact: true }).click()
-  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByRole('dialog', { name: 'Descartar ficha técnica' })).toBeVisible()
+  await page
+    .getByRole('dialog', { name: 'Descartar ficha técnica' })
+    .getByRole('button', { name: 'Cancelar' })
+    .click()
   await expect(page.locator('#componente-nombre-0')).toHaveValue('Mesón')
 
-  page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('dialog').getByRole('button', { name: 'Cancelar', exact: true }).click()
+  await page
+    .getByRole('dialog', { name: 'Descartar ficha técnica' })
+    .getByRole('button', { name: 'Descartar cambios' })
+    .click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
 })
 
@@ -748,13 +763,19 @@ test('PRF-01 restaura cliente y no descarta la línea al volver del producto con
   await expect(page.getByRole('dialog')).toBeVisible()
   await expect(page.getByLabel('Nombre comercial')).toHaveValue('Mesa pendiente')
 
-  page.once('dialog', (dialog) => dialog.dismiss())
   await page.getByRole('button', { name: 'Cerrar', exact: true }).click()
-  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByRole('dialog', { name: 'Descartar línea' })).toBeVisible()
+  await page
+    .getByRole('dialog', { name: 'Descartar línea' })
+    .getByRole('button', { name: 'Cancelar' })
+    .click()
   await expect(page.getByLabel('Nombre comercial')).toHaveValue('Mesa pendiente')
 
-  page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('button', { name: 'Cerrar', exact: true }).click()
+  await page
+    .getByRole('dialog', { name: 'Descartar línea' })
+    .getByRole('button', { name: 'Descartar cambios' })
+    .click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(page.getByRole('region').getByText('Ana Pérez', { exact: true })).toBeVisible()
 })
@@ -985,3 +1006,158 @@ for (const width of [360, 768, 1440]) {
     expect(writes).toEqual([])
   })
 }
+
+test('PRF-UX inicia con cliente pendiente y permite guardar borrador sin cliente', async ({
+  page,
+}) => {
+  const state = await mockBackend(page)
+  let saveBody: Record<string, unknown> | null = null
+  await page.route('**/api/v1/proformas/integral/', async (route) => {
+    saveBody = route.request().postDataJSON()
+    return route.fallback()
+  })
+  await page.goto('/proformas/nueva')
+  await page.getByRole('button', { name: /Cliente$/ }).click()
+  await expect(page.getByRole('radio', { name: /Pendiente/ })).toBeChecked()
+  await page.getByRole('button', { name: 'Guardar borrador' }).click()
+  await expect(page.locator('.quote-topline .quote-save-status')).toContainText('Borrador guardado')
+  await expect(page.locator('.editor-status')).toHaveCount(0)
+  expect(saveBody).toMatchObject({ cliente: null, cliente_nuevo: null, emitir: false })
+  expect(state.quote().cliente).toBeNull()
+  await page.getByRole('button', { name: /Cliente$/ }).click()
+  await expect(page.getByRole('radio', { name: /Pendiente/ })).toBeChecked()
+})
+
+test('PRF-UX busca clientes al enfocar y filtra automáticamente sin Buscar', async ({ page }) => {
+  await mockBackend(page)
+  await page.route(/\/api\/v1\/clientes\/(?:\?.*)?$/, (route) => {
+    const q = new URL(route.request().url()).searchParams
+    return route.fulfill({
+      json: {
+        count: q.get('search') === 'zzz' ? 0 : 1,
+        next: null,
+        previous: null,
+        results: q.get('search') === 'zzz' ? [] : [client],
+      },
+    })
+  })
+  await page.goto('/proformas/nueva')
+  await page.getByRole('button', { name: /Cliente$/ }).click()
+  await page.getByRole('radio', { name: /Existente/ }).check()
+  const input = page.getByRole('combobox', { name: 'Cliente existente' })
+  await input.focus()
+  await expect(page.getByRole('option', { name: /Ana Pérez/ })).toBeVisible()
+  await input.fill('zzz')
+  await expect(
+    page.getByText('No encontramos clientes que coincidan con tu búsqueda.'),
+  ).toBeVisible()
+  await input.fill('Ana')
+  await expect(page.getByRole('option', { name: /Ana Pérez/ })).toBeVisible()
+  await page.getByRole('option', { name: /Ana Pérez/ }).click()
+  await expect(page.getByText(/Seleccionado:/)).toContainText('Ana Pérez')
+})
+
+test('PRF-UX valida condiciones y mantiene mensaje de WhatsApp editable', async ({ page }) => {
+  await mockBackend(page)
+  await page.goto('/proformas/nueva')
+  await page.getByRole('button', { name: /Condiciones$/ }).click()
+  await expect(page.getByRole('radio', { name: /Bolivianos/ })).toBeChecked()
+  await page.getByLabel('Adelanto (%)').fill('101')
+  await page.getByLabel('Validez de la oferta (días)').fill('0')
+  await page.getByRole('button', { name: 'Guardar borrador' }).click()
+  await expect(page.getByText(/Ingresa un porcentaje de 0 a 100/)).toBeVisible()
+  await expect(page.getByText('Ingresa entre 1 y 99 días.')).toBeVisible()
+  await page.getByLabel('Adelanto (%)').fill('0')
+  await page.getByLabel('Validez de la oferta (días)').fill('99')
+  await page.getByRole('button', { name: /Revisar$/ }).click()
+  const toggle = page.getByRole('button', { name: 'Mostrar mensaje de WhatsApp' })
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  await expect(page.getByRole('button', { name: 'Copiar mensaje' })).toBeDisabled()
+  await toggle.click()
+  const message = page.getByLabel('Contenido del mensaje')
+  await expect(message).toBeVisible()
+  await expect(message).toHaveValue(/Te saluda el equipo de HOMEX\./)
+  await message.fill('Saludos, enviamos la proforma de HOMEX.')
+  await page.getByRole('button', { name: 'Ocultar mensaje de WhatsApp' }).click()
+  await expect(message).toBeHidden()
+  await page.getByRole('button', { name: 'Mostrar mensaje de WhatsApp' }).click()
+  await expect(message).toHaveValue('Saludos, enviamos la proforma de HOMEX.')
+  await page.getByRole('button', { name: 'Restaurar mensaje sugerido' }).click()
+  await expect(message).toHaveValue(/Te saluda el equipo de HOMEX\./)
+  await expect(page.getByRole('heading', { name: 'Verificación de la proforma' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Ir a productos' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Ir a cliente' })).toBeVisible()
+})
+
+test('PRF-UX protege navegación SPA sin usar window.confirm', async ({ page }) => {
+  await mockBackend(page)
+  await page.goto('/proformas/nueva')
+  await page.getByRole('button', { name: /Condiciones$/ }).click()
+  await page.getByLabel('Título').fill('Cotización pendiente')
+  await page.getByRole('link', { name: 'Resumen' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Salir sin guardar' })
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name: 'Cancelar' }).click()
+  await expect(page).toHaveURL(/\/proformas\/nueva$/)
+  await expect(page.getByLabel('Título')).toHaveValue('Cotización pendiente')
+  await page.getByRole('link', { name: 'Resumen' }).click()
+  await dialog.getByRole('button', { name: 'Salir sin guardar' }).click()
+  await expect(page).toHaveURL(/\/resumen$/)
+})
+
+test('PRF-FINAL muestra estado compacto en encabezado y no marca cambios por abrir etapas', async ({
+  page,
+}) => {
+  await mockBackend(page)
+  await page.goto('/proformas/nueva')
+  const state = page.locator('.quote-topline .quote-save-status')
+  await expect(state).toContainText('Nueva cotización sin guardar')
+  await page.getByRole('button', { name: /Cliente$/ }).click()
+  await page.getByRole('button', { name: /Revisar$/ }).click()
+  await expect(state).toContainText('Nueva cotización sin guardar')
+  await expect(page.locator('.editor-status')).toHaveCount(0)
+})
+
+test('PRF-FINAL convierte observaciones del cliente en área multilínea compartida', async ({
+  page,
+}) => {
+  await mockBackend(page)
+  await page.goto('/proformas/nueva')
+  await page.getByRole('button', { name: /Cliente$/ }).click()
+  await page.getByRole('radio', { name: /Registrar nuevo/ }).check()
+  const comments = page.locator('#proforma-cliente-observaciones')
+  await expect(comments).toHaveJSProperty('tagName', 'TEXTAREA')
+  await expect(comments).toHaveAttribute('maxlength', '250')
+  await comments.fill('Recibir en la mañana.\nConfirmar dirección al llamar.')
+  await expect(comments).toHaveValue('Recibir en la mañana.\nConfirmar dirección al llamar.')
+  await expect(page.getByText(/\d+ \/ 250 caracteres/)).toBeVisible()
+})
+
+test('PRF-FINAL copia WhatsApp con cliente seleccionado sin requerir emisión', async ({ page }) => {
+  await mockBackend(page)
+  await page.goto('/proformas/nueva')
+  await page.getByRole('button', { name: /Cliente$/ }).click()
+  await page.getByRole('radio', { name: /Existente/ }).check()
+  const input = page.getByRole('combobox', { name: 'Cliente existente' })
+  await input.focus()
+  await page.getByRole('option', { name: /Ana Pérez/ }).click()
+  await page.getByRole('button', { name: /Revisar$/ }).click()
+  await expect(page.getByRole('button', { name: 'Copiar mensaje' })).toBeEnabled()
+  await page.getByRole('button', { name: 'Mostrar mensaje de WhatsApp' }).click()
+  await expect(page.getByLabel('Contenido del mensaje')).toHaveValue(/¡Hola, Ana! 👋/)
+  await expect(page.getByRole('heading', { name: 'Verificación de la proforma' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Ir a productos' })).toBeVisible()
+  await page.getByRole('button', { name: 'Ir a productos' }).click()
+  await expect(page.getByRole('heading', { name: 'Productos', level: 2 })).toBeVisible()
+})
+
+test('PRF-FINAL editar mensaje no altera el estado local del formulario', async ({ page }) => {
+  await mockBackend(page)
+  await page.goto('/proformas/nueva')
+  await page.getByRole('button', { name: /Revisar$/ }).click()
+  const status = page.locator('.quote-save-status')
+  await expect(status).toContainText('Nueva cotización sin guardar')
+  await page.getByRole('button', { name: 'Mostrar mensaje de WhatsApp' }).click()
+  await page.getByLabel('Contenido del mensaje').fill('Mensaje de prueba independiente')
+  await expect(status).toContainText('Nueva cotización sin guardar')
+})

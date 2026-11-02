@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { reactive } from 'vue'
 import { createPinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
+import ConfirmDialog from '@/shared/ui/ConfirmDialog.vue'
 import {
   cloneEditorData,
   consumeEditorDraft,
@@ -293,14 +294,22 @@ describe('AP5 regresiones de interfaces reactivas y comerciales', () => {
     expect(editar).toBeDefined()
     await editar!.trigger('click')
     await wrapper.get('input[name="nombre"]').setValue('Edición pendiente')
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
-    await router.push('/productos/11')
+    const blockedNavigation = router.push('/productos/11')
+    await flushPromises()
+    const cancelDialog = wrapper.findAllComponents(ConfirmDialog).find((x) => x.props('open'))
+    expect(cancelDialog?.props('title')).toBe('Salir sin guardar')
+    cancelDialog!.vm.$emit('close')
+    await blockedNavigation
     expect(router.currentRoute.value.path).toBe('/productos/10')
-    confirm.mockReturnValue(true)
-    await router.push('/productos/11')
+
+    const allowedNavigation = router.push('/productos/11')
+    await flushPromises()
+    const leaveDialog = wrapper.findAllComponents(ConfirmDialog).find((x) => x.props('open'))
+    expect(leaveDialog?.props('title')).toBe('Salir sin guardar')
+    leaveDialog!.vm.$emit('confirm')
+    await allowedNavigation
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/productos/11')
-    confirm.mockRestore()
     wrapper.unmount()
   })
 })

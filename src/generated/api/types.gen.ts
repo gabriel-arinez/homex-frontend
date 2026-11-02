@@ -2082,6 +2082,10 @@ export type V1ClientesListData = {
   query?: {
     activo?: boolean
     /**
+     * * `nombre` - nombre
+     */
+    orden?: 'nombre'
+    /**
      * Un número de página dentro del conjunto de resultados paginado.
      */
     page?: number
