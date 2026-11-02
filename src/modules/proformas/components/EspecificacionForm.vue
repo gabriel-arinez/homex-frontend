@@ -965,7 +965,7 @@ onMounted(loadCatalog)
             <MuebleOptionPicker
               v-if="studio" :model-value="''" name="buscar-atributo-estudio" label="Agregar característica"
               placeholder="Buscar característica existente..."
-              :options="matchingAttributes('', 'mueble').map((x) => ({ value: String(x.id), label: x.nombre }))"
+              :options="catalogo.filter((x) => !Array.isArray(x.ambitos) || !x.ambitos.length || x.ambitos.includes('mueble')).map((x) => ({ value: String(x.id), label: x.nombre }))"
               allow-create create-label="Agregar característica personalizada"
               @update:model-value="elegirAtributoGeneral"
               @create="addAttribute(atributosGenerales, undefined, $event)"
