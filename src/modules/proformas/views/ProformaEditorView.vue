@@ -29,6 +29,9 @@ import {
   CheckCircle2,
   MessageCircle,
   CircleAlert,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
   ClipboardCheck,
   Info,
   PackageOpen,
@@ -196,6 +199,7 @@ function answerConfirmation(answer: boolean) {
   confirmResolver = null
   resolver?.(answer)
 }
+const whatsappExpanded = ref(false)
 const whatsappEdited = ref(false)
 const whatsappDraft = ref('')
 const whatsappSuggested = computed(() => {
@@ -209,15 +213,15 @@ const whatsappSuggested = computed(() => {
             ? ''
             : (clienteSeleccionado.value.nombre || '').trim().split(/\s+/)[0]
         : ''
-  const greeting = firstName ? 'Hola, ' + firstName + '.' : 'Hola.'
+  const greeting = firstName ? '¡Hola, ' + firstName + '! 👋' : '¡Hola! 👋'
   const title = header.titulo.trim()
   return [
     greeting,
-    'Te saluda el equipo de HOMEX.',
+    'Te saluda el equipo de HOMEX. 🏡',
     'Te compartimos nuestra proforma' +
       (title ? ' "' + title + '"' : '') +
-      ' para que puedas revisar los productos, precios y condiciones.',
-    'Quedamos atentos a tus consultas. ¡Gracias por confiar en HOMEX!',
+      ' para que puedas revisar los productos, precios y condiciones en el PDF adjunto.',
+    'Quedamos atentos a tus consultas. ¡Gracias por confiar en nosotros!',
   ].join('\n\n')
 })
 watch(
@@ -235,41 +239,92 @@ function resetWhatsapp() {
   whatsappEdited.value = false
   whatsappDraft.value = whatsappSuggested.value
 }
-function pendingStep(message: string): number {
-  if (/línea|producto/i.test(message)) return 0
-  if (/cliente|contacto|razón social/i.test(message)) return 1
-  return 2
-}
+const canShareWhatsApp = computed(() => {
+  if (clienteMode.value === 'existente') return Boolean(header.cliente)
+  if (clienteMode.value !== 'nuevo' || !nuevoCliente.tipo_cliente) return false
+  const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
+  return Object.keys(validateClient(nuevoCliente, tipo?.codigo === 'EMPRESA')).length === 0
+})
 const existingProductIds = computed(() =>
   lineas.value.flatMap((line) => (line.producto ? [line.producto] : [])),
 )
 const totalPreview = computed(() => totalEstimadoCompleto(lineas.value))
-const emissionPending = computed(() => {
-  const pendientes: string[] = []
-  if (!lineas.value.length) pendientes.push('agregar al menos una línea')
-  if (clienteMode.value === 'pendiente') pendientes.push('elegir o registrar un cliente')
-  if (clienteMode.value === 'existente' && !header.cliente) pendientes.push('elegir un cliente')
-  if (clienteMode.value === 'nuevo') {
-    if (!nuevoCliente.tipo_cliente) pendientes.push('indicar el tipo de cliente')
+type EmissionIssue = {
+  id: string
+  step: number
+  title: string
+  description: string
+  action: string
+}
+const emissionIssues = computed<EmissionIssue[]>(() => {
+  const issues: EmissionIssue[] = []
+  if (!lineas.value.length) {
+    issues.push({
+      id: 'productos',
+      step: 0,
+      title: 'Productos',
+      description: 'Agrega al menos un producto o mueble a pedido.',
+      action: 'Ir a productos',
+    })
+  }
+  if (clienteMode.value === 'pendiente' || (clienteMode.value === 'existente' && !header.cliente)) {
+    issues.push({
+      id: 'cliente',
+      step: 1,
+      title: 'Cliente',
+      description: 'Selecciona un cliente existente o registra uno nuevo.',
+      action: 'Ir a cliente',
+    })
+  } else if (clienteMode.value === 'nuevo') {
     const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
-    const contacto = Boolean(nuevoCliente.nombres.trim() && nuevoCliente.apellidos.trim())
-    if (!contacto) pendientes.push('completar nombre y apellidos del contacto')
-    if (/EMPRESA|JURID/.test(tipo?.codigo ?? '') && !nuevoCliente.empresa.trim()) {
-      pendientes.push('completar la razón social')
+    const company = tipo?.codigo === 'EMPRESA'
+    const invalid = validateClient(nuevoCliente, company)
+    let description = ''
+    if (!nuevoCliente.tipo_cliente) description = 'Indica si el cliente es persona natural o empresa.'
+    else if (!nuevoCliente.nombres.trim() || !nuevoCliente.apellidos.trim())
+      description = 'Completa los nombres y apellidos del contacto.'
+    else if (company && !nuevoCliente.empresa.trim())
+      description = 'Completa la razón social o empresa.'
+    else {
+      const fieldNames: Record<string, string> = {
+        nombres: 'nombres',
+        apellidos: 'apellidos',
+        empresa: 'razón social',
+        celular: 'celular',
+        direccion: 'dirección',
+        observaciones: 'observaciones',
+      }
+      const firstError = Object.entries(invalid)[0]
+      if (firstError) description = 'Revisa ' + fieldNames[firstError[0]] + ': ' + firstError[1]
     }
+    if (description)
+      issues.push({
+        id: 'cliente-nuevo',
+        step: 1,
+        title: 'Cliente',
+        description,
+        action: 'Ir a cliente',
+      })
   }
-  if (Object.keys(validateQuoteConditions(header)).length)
-    pendientes.push('revisar los valores de condiciones')
-  if (clienteMode.value === 'nuevo') {
-    const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
-    if (
-      Object.keys(validateClient(nuevoCliente, tipo?.codigo === 'EMPRESA')).length &&
-      nuevoCliente.nombres &&
-      nuevoCliente.apellidos
-    )
-      pendientes.push('corregir los datos del cliente')
+  const errors = validateQuoteConditions(header)
+  const firstError = Object.entries(errors)[0]
+  if (firstError) {
+    const fields: Record<string, string> = {
+      titulo: 'título',
+      porcentaje_adelanto: 'adelanto',
+      plazo_entrega: 'plazo de entrega',
+      validez_oferta: 'validez',
+      observaciones: 'observaciones',
+    }
+    issues.push({
+      id: 'condiciones',
+      step: 2,
+      title: 'Condiciones',
+      description: 'Revisa ' + fields[firstError[0]] + ': ' + firstError[1],
+      action: 'Ir a condiciones',
+    })
   }
-  return pendientes
+  return issues
 })
 const editingStatus = computed(() => {
   if (saving.value) return 'Guardando en HOMEX…'
@@ -840,6 +895,14 @@ function restoreContextualDraft() {
   }
 }
 async function copyCommercialSummary() {
+  if (!canShareWhatsApp.value) {
+    error.value = 'Selecciona un cliente válido antes de copiar el mensaje de WhatsApp.'
+    return
+  }
+  if (!whatsappDraft.value.trim()) {
+    error.value = 'El mensaje está vacío. Escribe uno o restaura el texto sugerido.'
+    return
+  }
   try {
     await navigator.clipboard.writeText(whatsappDraft.value)
     success.value = 'Mensaje copiado. Puedes pegarlo en WhatsApp y adjuntar el PDF.'
@@ -1059,7 +1122,30 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     />
     <div class="quote-topline" aria-label="Ubicación en el proceso">
       <span>COMERCIAL <span class="quote-divider">/</span> PROFORMAS</span>
-      <span class="quote-progress">Paso {{ currentStep + 1 }} de {{ steps.length }}</span>
+      <div class="quote-topline__right">
+        <span class="quote-progress">Paso {{ currentStep + 1 }} de {{ steps.length }}</span>
+        <div
+          class="quote-save-status"
+          :class="{
+            'quote-save-status--saved': persisted && !dirty && !saving && !conflicted,
+            'quote-save-status--warning': conflicted,
+          }"
+          role="status"
+          aria-live="polite"
+        >
+          <CheckCircle2
+            v-if="persisted && !dirty && !saving && !conflicted"
+            :size="14"
+            aria-hidden="true"
+          />
+          <CircleAlert v-else-if="conflicted" :size="14" aria-hidden="true" />
+          <Info v-else :size="14" aria-hidden="true" />
+          <span>{{ editingStatus }}</span>
+        </div>
+        <span v-if="persisted" class="quote-save-reference">
+          {{ persisted.estado_info.nombre }} · Proforma {{ persisted.numero }}
+        </span>
+      </div>
     </div>
     <PageHeader
       :title="persisted ? `Editar proforma #${persisted.numero}` : 'Nueva proforma'"
@@ -1087,20 +1173,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         </button>
       </nav>
 
-      <div class="editor-status" role="status" aria-live="polite">
-        <div class="editor-status__main">
-          <span class="status-icon" aria-hidden="true"
-            ><CheckCircle2 v-if="persisted && !dirty && !saving && !conflicted" :size="18" /><Info
-              v-else
-              :size="18"
-          /></span>
-          <span>{{ editingStatus }}</span>
-        </div>
-        <span v-if="persisted" class="editor-status__reference">
-          Estado comercial: <strong>{{ persisted.estado_info.nombre }}</strong> · Proforma
-          {{ persisted.numero }}
-        </span>
-      </div>
       <div v-if="error" role="alert" class="error error-summary">
         <strong>{{ error }}</strong>
         <ul v-if="fieldErrorMessages.length">
@@ -1515,23 +1587,52 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <strong>Validez:</strong> {{ header.validez_oferta }} días
           </p>
           <div class="whatsapp-share" @input.stop @change.stop>
-            <label for="whatsapp-message"
-              ><MessageCircle :size="18" aria-hidden="true" /> Mensaje para WhatsApp</label
-            >
-            <p>Personaliza el saludo y copia el texto para enviarlo junto con el PDF.</p>
-            <textarea
-              id="whatsapp-message"
-              :value="whatsappDraft"
-              rows="5"
-              @input="editWhatsapp(($event.target as HTMLTextAreaElement).value)"
-            />
-            <div class="actions">
-              <Button type="button" variant="secondary" @click="copyCommercialSummary"
-                >Copiar mensaje para WhatsApp</Button
-              >
-              <Button v-if="whatsappEdited" type="button" variant="secondary" @click="resetWhatsapp"
-                >Restaurar mensaje sugerido</Button
-              >
+            <div class="whatsapp-share__summary">
+              <span class="whatsapp-share__icon"><MessageCircle :size="20" aria-hidden="true" /></span>
+              <div class="whatsapp-share__heading">
+                <strong>Mensaje para WhatsApp</strong>
+                <small>Personaliza el saludo para acompañar el PDF.</small>
+              </div>
+              <div class="whatsapp-share__controls">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  :disabled="!canShareWhatsApp || !whatsappDraft.trim()"
+                  @click="copyCommercialSummary"
+                >Copiar mensaje</Button>
+                <button
+                  type="button"
+                  class="whatsapp-share__toggle"
+                  :aria-expanded="whatsappExpanded"
+                  aria-controls="whatsapp-message-content"
+                  :aria-label="whatsappExpanded ? 'Ocultar mensaje de WhatsApp' : 'Mostrar mensaje de WhatsApp'"
+                  @click="whatsappExpanded = !whatsappExpanded"
+                >
+                  <ChevronUp v-if="whatsappExpanded" :size="20" aria-hidden="true" />
+                  <ChevronDown v-else :size="20" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+            <p v-if="!canShareWhatsApp" class="whatsapp-share__hint">
+              Selecciona un cliente o completa los datos del nuevo cliente para copiar el mensaje.
+            </p>
+            <div v-if="whatsappExpanded" id="whatsapp-message-content" class="whatsapp-share__content">
+              <label for="whatsapp-message">Contenido del mensaje</label>
+              <textarea
+                id="whatsapp-message"
+                :value="whatsappDraft"
+                rows="5"
+                @input="editWhatsapp(($event.target as HTMLTextAreaElement).value)"
+              />
+              <div class="whatsapp-share__edit-actions">
+                <small>Al copiar se incluye únicamente el texto. Adjunta el PDF por separado.</small>
+                <Button
+                  v-if="whatsappEdited"
+                  type="button"
+                  variant="secondary"
+                  @click="resetWhatsapp"
+                >Restaurar mensaje sugerido</Button>
+              </div>
             </div>
           </div></Card
         >
@@ -1552,17 +1653,33 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             </small>
           </template>
         </div>
-        <div v-if="!canEmit" class="emission-checklist" role="status">
+        <div v-if="!canEmit" class="emission-checklist">
           <div class="emission-checklist__header">
-            <CircleAlert :size="19" aria-hidden="true" /><strong>Requisitos para emitir</strong>
+            <span class="emission-checklist__icon"><ClipboardCheck :size="22" aria-hidden="true" /></span>
+            <div class="emission-checklist__heading">
+              <h3>Verificación de la proforma</h3>
+              <p>Completa la información necesaria antes de emitir.</p>
+            </div>
+            <span class="emission-checklist__count" aria-live="polite">
+              {{ emissionIssues.length }} {{ emissionIssues.length === 1 ? 'pendiente' : 'pendientes' }}
+            </span>
           </div>
-          <p>Completa los siguientes datos para habilitar la emisión.</p>
           <ul>
-            <li v-for="pending in emissionPending" :key="pending">
-              <span>{{ pending }}.</span>
-              <button type="button" @click="currentStep = pendingStep(pending)">Corregir</button>
+            <li v-for="issue in emissionIssues" :key="issue.id">
+              <CircleAlert :size="18" aria-hidden="true" />
+              <div class="emission-checklist__detail">
+                <strong>{{ issue.title }}</strong>
+                <p>{{ issue.description }}</p>
+              </div>
+              <button type="button" @click="currentStep = issue.step">
+                {{ issue.action }} <ChevronRight :size="16" aria-hidden="true" />
+              </button>
             </li>
           </ul>
+        </div>
+        <div v-else class="emission-ready" role="status">
+          <CheckCircle2 :size="19" aria-hidden="true" />
+          <span>Información completa. La proforma está lista para emitir.</span>
         </div>
       </section>
 
