@@ -302,6 +302,17 @@ async function mockBackend(page: Page) {
   return { quote: () => quote }
 }
 async function noOverflow(page: Page) {
+  // El sidebar anima margin-left al cambiar de viewport. Medir al
+  // terminar el reflujo evita reportar el desbordamiento transitorio.
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        ),
+      { timeout: 4000 },
+    )
+    .toBeLessThanOrEqual(1)
   const result = await page.evaluate(() => {
     const width = document.documentElement.clientWidth
     const scrollWidth = document.documentElement.scrollWidth
