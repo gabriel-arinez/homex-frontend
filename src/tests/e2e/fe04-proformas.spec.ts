@@ -302,6 +302,17 @@ async function mockBackend(page: Page) {
   return { quote: () => quote }
 }
 async function noOverflow(page: Page) {
+  // El sidebar anima margin-left al cambiar de viewport. Medir al
+  // terminar el reflujo evita reportar el desbordamiento transitorio.
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        ),
+      { timeout: 4000 },
+    )
+    .toBeLessThanOrEqual(1)
   const result = await page.evaluate(() => {
     const width = document.documentElement.clientWidth
     const scrollWidth = document.documentElement.scrollWidth
@@ -314,41 +325,7 @@ async function noOverflow(page: Page) {
         right: Math.round(node.getBoundingClientRect().right),
         width: Math.round(node.getBoundingClientRect().width),
       }))
-    const targets = [
-      '.shell',
-      '.shell > main',
-      '.proformas-list',
-      '.page-header',
-      '.proforma-filters',
-      '.proforma-filters__main',
-      '.proforma-table',
-      '.proforma-table table',
-    ].map((selector) => {
-      const node = document.querySelector<HTMLElement>(selector)
-      if (!node) return { selector, missing: true }
-      const rect = node.getBoundingClientRect()
-      const css = getComputedStyle(node)
-      return {
-        selector,
-        left: Math.round(rect.left),
-        right: Math.round(rect.right),
-        width: Math.round(rect.width),
-        marginLeft: css.marginLeft,
-        paddingLeft: css.paddingLeft,
-        display: css.display,
-        minWidth: css.minWidth,
-        gridTemplateColumns: css.gridTemplateColumns,
-      }
-    })
-    return {
-      width,
-      scrollWidth,
-      cssViewport: window.innerWidth,
-      rootFontSize: getComputedStyle(document.documentElement).fontSize,
-      mobileQueryMatches: matchMedia('(max-width: 47.99rem)').matches,
-      offenders,
-      targets,
-    }
+    return { width, scrollWidth, offenders }
   })
   expect(result.scrollWidth, JSON.stringify(result)).toBeLessThanOrEqual(result.width + 1)
 }
