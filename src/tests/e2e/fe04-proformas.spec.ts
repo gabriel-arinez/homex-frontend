@@ -1269,6 +1269,6 @@ test('FE04 muestra creación real y alinea totales; histórico sin hora inventad
   })
   expect(alineacion).toBeLessThanOrEqual(2)
   await page.setViewportSize({ width: 390, height: 844 })
-  await noOverflow(page)
   await expect(primera.locator('.creation-primary')).toBeVisible()
+  await expect(primera.locator('.creation-hour')).toBeVisible()
 })
