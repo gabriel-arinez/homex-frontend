@@ -105,7 +105,7 @@ onBeforeUnmount(() => {
         <RouterLink
           role="menuitem"
           :to="`/proformas/${id}/editar`"
-          @click="close"
+          @click="close(false)"
         >
           <Pencil :size="17" aria-hidden="true" />
           Continuar edición
@@ -113,7 +113,7 @@ onBeforeUnmount(() => {
         <RouterLink
           role="menuitem"
           :to="`/proformas/${id}`"
-          @click="close"
+          @click="close(false)"
         >
           <ClipboardList :size="17" aria-hidden="true" />
           Ver detalle y acciones
