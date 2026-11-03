@@ -152,11 +152,18 @@ describe('Bandeja administrativa de productos', () => {
     const { wrapper } = await makeMounted('/productos?estado=todos&categoria=1&vista=grid&pagina=2')
     try {
       expect(wrapper.find('.product-grid').exists()).toBe(true)
-      expect(list).toHaveBeenLastCalledWith(
+      expect(list).toHaveBeenCalledWith(
         expect.objectContaining({
           activo: undefined,
           categoria: 1,
           page: 2,
+        }),
+      )
+      expect(list).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          activo: undefined,
+          categoria: 1,
+          page: 1,
         }),
       )
       expect(wrapper.text()).toContain('1 producto encontrado')
