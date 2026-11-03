@@ -97,7 +97,9 @@ for (const [category, file] of samples) {
           await page.getByRole('button', { name: 'Completar por voz' }).click()
           const assistant = page.getByRole('dialog', { name: 'Completar por voz' })
           await expect(assistant).toBeVisible()
-          await expect(assistant.getByRole('heading', { name: 'Descripción por voz' })).toBeVisible()
+          await expect(
+            assistant.getByRole('heading', { name: 'Descripción por voz' }),
+          ).toBeVisible()
           if (mode === 'upload') {
             await page
               .getByLabel('O subir un archivo de audio', { exact: true })
