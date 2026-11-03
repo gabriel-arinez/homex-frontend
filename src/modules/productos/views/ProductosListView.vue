@@ -108,8 +108,8 @@ const hasFilters = computed(
     Boolean(category.value) ||
     extraKeys.some((key) => Boolean(extras[key])),
 )
-const hasSpecificFilters = computed(
-  () => Boolean(search.value.trim() || category.value || extraKeys.some((key) => Boolean(extras[key]))),
+const hasSpecificFilters = computed(() =>
+  Boolean(search.value.trim() || category.value || extraKeys.some((key) => Boolean(extras[key]))),
 )
 const emptyTitle = computed(() => {
   if (hasSpecificFilters.value) return 'Sin resultados'
@@ -130,8 +130,11 @@ const filterError = computed(() => {
   if (availableExtra.value.includes('modelo') && extras.modelo.trim().length > 150)
     return 'El modelo no puede superar 150 caracteres.'
   const thickness = extras.espesor_mm.trim()
-  if (availableExtra.value.includes('espesor_mm') && thickness &&
-    (!/^\d{1,6}(?:\.\d{1,2})?$/.test(thickness) || Number(thickness) <= 0))
+  if (
+    availableExtra.value.includes('espesor_mm') &&
+    thickness &&
+    (!/^\d{1,6}(?:\.\d{1,2})?$/.test(thickness) || Number(thickness) <= 0)
+  )
     return 'Introduce un espesor válido, mayor que cero y con hasta dos decimales.'
   return ''
 })
@@ -665,8 +668,12 @@ onBeforeUnmount(() => {
     </ErrorState>
     <EmptyState v-else-if="!products.length" :title="emptyTitle" :description="emptyDescription">
       <Button v-if="hasFilters" variant="secondary" @click="clearFilters">Limpiar filtros</Button>
-      <Button v-else-if="status === 'activos'" variant="secondary" @click="status = 'todos'">Ver todos los productos</Button>
-      <Button v-else-if="canCreate" variant="secondary" @click="toggleCreate">Nuevo producto</Button>
+      <Button v-else-if="status === 'activos'" variant="secondary" @click="status = 'todos'"
+        >Ver todos los productos</Button
+      >
+      <Button v-else-if="canCreate" variant="secondary" @click="toggleCreate"
+        >Nuevo producto</Button
+      >
     </EmptyState>
     <template v-else>
       <div v-if="view === 'grid'" class="product-grid">
