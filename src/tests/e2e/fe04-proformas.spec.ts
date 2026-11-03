@@ -1196,6 +1196,8 @@ test('@a11y FE04 bandeja de proformas usa menú único y visualización de solo 
   await actions.click()
   await expect(page.getByRole('menuitem', { name: 'Continuar edición' })).toBeVisible()
   await expect(page.getByRole('menuitem', { name: 'Ver detalle y acciones' })).toBeVisible()
+  const accessibility = await new AxeBuilder({ page }).include('.proforma-table').analyze()
+  expect(accessibility.violations).toEqual([])
   await page.keyboard.press('Escape')
   await expect(page.getByRole('menuitem', { name: 'Continuar edición' })).toHaveCount(0)
 
