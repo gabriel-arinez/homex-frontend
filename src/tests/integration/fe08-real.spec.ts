@@ -35,7 +35,11 @@ async function addCatalogLine(page: Page) {
   await page.getByRole('button', { name: 'Añadir ítem' }).click()
   await page.getByRole('button', { name: 'Producto de catálogo' }).click()
   await expect(page.getByText('FE08-SILLA-001')).toBeVisible()
-  await page.getByRole('button', { name: 'Seleccionar para cotizar' }).click()
+  await page
+    .locator('article')
+    .filter({ hasText: 'FE08-SILLA-001' })
+    .getByRole('button', { name: 'Seleccionar para cotizar' })
+    .click()
   await page.getByLabel('Cantidad', { exact: true }).fill('1')
   await expect(page.locator('#unidad-linea')).toBeDisabled()
   await expect(page.locator('#unidad-linea option:checked')).toHaveText('Pieza')
