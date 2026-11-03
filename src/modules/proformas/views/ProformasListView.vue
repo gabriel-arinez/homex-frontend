@@ -263,7 +263,7 @@ onBeforeUnmount(() => {
           type="button"
           class="proforma-more-filters"
           :aria-expanded="showAdvanced"
-          aria-controls="proforma-filtros-avanzados"
+          :aria-controls="showAdvanced ? 'proforma-filtros-avanzados' : undefined"
           @click="showAdvanced = !showAdvanced"
         >
           <SlidersHorizontal :size="18" aria-hidden="true" />
@@ -410,7 +410,7 @@ onBeforeUnmount(() => {
   min-width:0; width:100%; min-height:2.75rem; color:var(--color-text);
   padding:.55rem .7rem; border:1px solid var(--color-border-strong);
   border-radius:var(--radius-control); background:var(--color-surface);
-  font:inherit; color-scheme:dark;
+  font:inherit;
 }
 .proforma-date-error { color:var(--color-danger); font-size:.8rem; margin:0; }
 .proforma-results { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin:1.1rem 0 .8rem; }
