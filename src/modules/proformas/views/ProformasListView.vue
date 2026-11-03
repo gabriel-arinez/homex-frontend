@@ -1,164 +1,484 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
-import type { ProformaListado, ValorCatalogoPublico } from '@/generated/api'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { ChevronDown, ChevronLeft, ChevronRight, Eye, Plus, SlidersHorizontal } from '@lucide/vue'
+import type { Cliente, ProformaListado, ValorCatalogoPublico } from '@/generated/api'
 import { proformasService } from '../services/proformasService'
-import PageHeader from '@/shared/ui/PageHeader.vue'
+import ClienteSelector from '../components/ClienteSelector.vue'
+import ProformaActionsMenu from '../components/ProformaActionsMenu.vue'
+import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
+import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
-import FilterBar from '@/shared/ui/FilterBar.vue'
+import EmptyState from '@/shared/ui/EmptyState.vue'
+import ErrorState from '@/shared/ui/ErrorState.vue'
+import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
+import PageHeader from '@/shared/ui/PageHeader.vue'
 import SearchField from '@/shared/ui/SearchField.vue'
 import Select from '@/shared/ui/Select.vue'
-import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
-import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
-import ErrorState from '@/shared/ui/ErrorState.vue'
-import EmptyState from '@/shared/ui/EmptyState.vue'
-import DataTable from '@/shared/ui/DataTable.vue'
-import Pagination from '@/shared/ui/Pagination.vue'
-const emit = defineEmits<{ openMenu: [] }>(),
-  router = useRouter(),
-  rows = ref<ProformaListado[]>([]),
-  states = ref<ValorCatalogoPublico[]>([]),
-  loading = ref(true),
-  error = ref(''),
-  search = ref(''),
-  state = ref(''),
-  page = ref(1),
-  total = ref(0),
-  size = 10
-let requestId = 0
+
+const emit = defineEmits<{ openMenu: [] }>()
+const route = useRoute()
+const router = useRouter()
+const queryString = (key: string) => typeof route.query[key] === 'string' ? String(route.query[key]) : ''
+const validDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value))
+const routeDate = (key: string) => validDate(queryString(key)) ? queryString(key) : ''
+const routePage = () => {
+  const parsed = Number(queryString('pagina'))
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 1
+}
+const rows = ref<ProformaListado[]>([])
+const states = ref<ValorCatalogoPublico[]>([])
+const currencies = ref<ValorCatalogoPublico[]>([])
+const loading = ref(true)
+const error = ref('')
+const search = ref(queryString('q'))
+const state = ref(queryString('estado'))
+const currency = ref(queryString('moneda'))
+const customer = ref(/^\d+$/.test(queryString('cliente')) && Number(queryString('cliente')) > 0 ? queryString('cliente') : '')
+const customerName = ref('')
+const dateFrom = ref(routeDate('fecha_desde'))
+const dateTo = ref(routeDate('fecha_hasta'))
+const page = ref(routePage())
+const total = ref(0)
+const size = 10
+const showAdvanced = ref(Boolean(currency.value || customer.value || dateFrom.value || dateTo.value))
 const pages = computed(() => Math.max(1, Math.ceil(total.value / size)))
-const displayRows = computed(() =>
-    rows.value.map((row) => ({
-      ...row,
-      clienteNombre: row.cliente_resumen?.nombre || row.cliente_resumen?.empresa || 'Prospecto',
-      estadoNombre: row.estado_info.nombre,
-      monedaCodigo: row.moneda_info.codigo,
-    })),
-  ),
-  filters = computed(() => [
-    ...(search.value ? [{ key: 'q', label: `Búsqueda: ${search.value}` }] : []),
-    ...(state.value
-      ? [
-          {
-            key: 'state',
-            label: `Estado: ${states.value.find((x) => x.codigo === state.value)?.nombre ?? state.value}`,
-          },
-        ]
-      : []),
-  ])
-const money = (v: string, c: string) =>
-  new Intl.NumberFormat('es-BO', { style: 'currency', currency: c }).format(Number(v))
-const editable = (row: unknown) =>
-  ['BORRADOR', 'EN_REVISION'].includes(
-    ((row as ProformaListado).estado_info?.codigo as string | undefined) ?? '',
-  )
+const fromItem = computed(() => (page.value - 1) * size + 1)
+const toItem = computed(() => Math.min(total.value, page.value * size))
+const dateError = computed(() =>
+  dateFrom.value && dateTo.value && dateFrom.value > dateTo.value
+    ? 'La fecha inicial no puede ser posterior a la fecha final.'
+    : '',
+)
+const hasFilters = computed(() => Boolean(search.value.trim() || state.value || currency.value || customer.value || dateFrom.value || dateTo.value))
+const filters = computed(() => [
+  ...(search.value.trim() ? [{ key: 'q', label: `Búsqueda: ${search.value.trim()}` }] : []),
+  ...(state.value ? [{ key: 'state', label: `Estado: ${states.value.find((x) => x.codigo === state.value)?.nombre ?? state.value}` }] : []),
+  ...(currency.value ? [{ key: 'currency', label: `Moneda: ${currencies.value.find((x) => x.codigo === currency.value)?.nombre ?? currency.value}` }] : []),
+  ...(customer.value ? [{ key: 'customer', label: `Cliente: ${customerName.value || '#' + customer.value}` }] : []),
+  ...(dateFrom.value ? [{ key: 'from', label: `Desde: ${dateFrom.value}` }] : []),
+  ...(dateTo.value ? [{ key: 'to', label: `Hasta: ${dateTo.value}` }] : []),
+])
+
+let requestId = 0
+let debounce: ReturnType<typeof setTimeout> | undefined
+let restoringRoute = false
+let synchronizing = false
+let mounted = false
+
+function formatDate(value: string) {
+  if (!validDate(value)) return 'Sin fecha'
+  return new Intl.DateTimeFormat('es-BO', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })
+    .format(new Date(`${value}T12:00:00Z`))
+}
+function money(value: string, code: string) {
+  const amount = Number(value)
+  if (!Number.isFinite(amount)) return 'Importe pendiente'
+  try {
+    return new Intl.NumberFormat('es-BO', { style: 'currency', currency: code }).format(amount)
+  } catch {
+    return `${code} ${amount.toFixed(2)}`
+  }
+}
+function tone(code: string): 'neutral' | 'success' | 'warning' | 'danger' | 'info' {
+  if (code === 'APROBADA') return 'success'
+  if (code === 'EN_REVISION') return 'warning'
+  if (code === 'ENVIADA') return 'info'
+  if (code === 'NO_CONCRETADA' || code === 'CANCELADA') return 'danger'
+  return 'neutral'
+}
+function editable(row: ProformaListado) {
+  return ['BORRADOR', 'EN_REVISION'].includes(row.estado_info.codigo)
+}
+function customerLabel(row: ProformaListado) {
+  return row.cliente_resumen?.empresa?.trim() || row.cliente_resumen?.nombre?.trim() || 'Prospecto'
+}
+function selectCustomer(value: Cliente | null) {
+  customerName.value = value?.empresa?.trim() || (value ? [value.nombres, value.apellidos].filter(Boolean).join(' ').trim() : '') || ''
+}
+
+function currentQuery() {
+  return {
+    q: search.value.trim() || undefined,
+    estado: state.value || undefined,
+    moneda: currency.value || undefined,
+    cliente: customer.value || undefined,
+    fecha_desde: dateFrom.value || undefined,
+    fecha_hasta: dateTo.value || undefined,
+    pagina: page.value > 1 ? String(page.value) : undefined,
+  }
+}
+function syncRoute() {
+  const query = currentQuery()
+  const keys = Object.keys(query) as Array<keyof typeof query>
+  if (keys.every((key) => (query[key] ?? '') === queryString(key))) return
+  synchronizing = true
+  void router.replace({ query }).finally(() => { synchronizing = false })
+}
 async function load() {
-  const currentRequest = ++requestId
+  const id = ++requestId
+  if (dateError.value) {
+    rows.value = []
+    total.value = 0
+    error.value = ''
+    loading.value = false
+    return
+  }
   loading.value = true
   error.value = ''
   try {
-    const r = await proformasService.list({
-      search: search.value || undefined,
+    const response = await proformasService.list({
+      search: search.value.trim() || undefined,
       estado: state.value || undefined,
+      moneda: currency.value || undefined,
+      cliente: customer.value ? Number(customer.value) : undefined,
+      fecha_desde: dateFrom.value || undefined,
+      fecha_hasta: dateTo.value || undefined,
       page: page.value,
       page_size: size,
     })
-    if (currentRequest !== requestId) return
-    rows.value = r.results
-    total.value = r.count
-  } catch (e) {
-    if (currentRequest !== requestId) return
-    error.value = e instanceof Error ? e.message : 'No se pudieron cargar las proformas.'
+    if (id !== requestId) return
+    rows.value = response.results
+    total.value = response.count
+    if (page.value > pages.value) {
+      page.value = pages.value
+      return
+    }
+  } catch (cause) {
+    if (id !== requestId) return
+    rows.value = []
+    total.value = 0
+    error.value = cause instanceof Error ? cause.message : 'No se pudieron cargar las proformas.'
   } finally {
-    if (currentRequest === requestId) loading.value = false
+    if (id === requestId) loading.value = false
   }
 }
-function remove(k: string) {
-  if (k === 'q') search.value = ''
-  else state.value = ''
+function scheduleLoad(delay = 0) {
+  ++requestId // Una búsqueda nueva invalida respuestas anteriores incluso durante el debounce.
+  if (debounce) clearTimeout(debounce)
+  debounce = setTimeout(() => {
+    syncRoute()
+    void load()
+  }, delay)
 }
-function clear() {
-  search.value = ''
-  state.value = ''
-}
-watch([search, state], () => {
-  page.value = 1
+watch([search, state, currency, customer, dateFrom, dateTo], (_newValues, oldValues) => {
+  if (restoringRoute || !mounted) return
+  if (page.value !== 1) page.value = 1
+  const onlySearchChanged = oldValues &&
+    state.value === oldValues[1] && currency.value === oldValues[2] &&
+    customer.value === oldValues[3] && dateFrom.value === oldValues[4] && dateTo.value === oldValues[5]
+  scheduleLoad(onlySearchChanged ? 300 : 0)
+})
+watch(page, () => {
+  if (restoringRoute || !mounted) return
+  scheduleLoad(0)
+})
+watch(() => route.fullPath, async () => {
+  if (synchronizing || !mounted) return
+  const incoming = {
+    search: queryString('q'), state: queryString('estado'), currency: queryString('moneda'),
+    customer: /^\d+$/.test(queryString('cliente')) ? queryString('cliente') : '',
+    dateFrom: routeDate('fecha_desde'), dateTo: routeDate('fecha_hasta'), page: routePage(),
+  }
+  if (search.value === incoming.search && state.value === incoming.state &&
+    currency.value === incoming.currency && customer.value === incoming.customer &&
+    dateFrom.value === incoming.dateFrom && dateTo.value === incoming.dateTo && page.value === incoming.page) return
+  restoringRoute = true
+  search.value = incoming.search
+  state.value = incoming.state
+  currency.value = incoming.currency
+  customer.value = incoming.customer
+  dateFrom.value = incoming.dateFrom
+  dateTo.value = incoming.dateTo
+  page.value = incoming.page
+  if (incoming.currency || incoming.customer || incoming.dateFrom || incoming.dateTo) showAdvanced.value = true
+  if (debounce) clearTimeout(debounce)
+  await nextTick()
+  restoringRoute = false
   void load()
 })
-watch(page, load)
-onMounted(async () => {
-  try {
-    states.value = await proformasService.options('ESTADO_PROFORMA')
-  } finally {
-    await load()
-  }
+function removeFilter(key: string) {
+  if (key === 'q') search.value = ''
+  if (key === 'state') state.value = ''
+  if (key === 'currency') currency.value = ''
+  if (key === 'customer') { customer.value = ''; customerName.value = '' }
+  if (key === 'from') dateFrom.value = ''
+  if (key === 'to') dateTo.value = ''
+}
+function clearFilters() {
+  search.value = ''
+  state.value = ''
+  currency.value = ''
+  customer.value = ''
+  customerName.value = ''
+  dateFrom.value = ''
+  dateTo.value = ''
+}
+onMounted(() => {
+  mounted = true
+  void load()
+  void proformasService.options('ESTADO_PROFORMA').then((value) => { states.value = value }).catch(() => { states.value = [] })
+  void proformasService.options('MONEDA').then((value) => { currencies.value = value }).catch(() => { currencies.value = [] })
 })
-const columns = [
-  { key: 'numero', label: 'Número' },
-  { key: 'cliente', label: 'Cliente' },
-  { key: 'estado', label: 'Estado' },
-  { key: 'total', label: 'Total' },
-  { key: 'acciones', label: 'Acciones' },
-]
+onBeforeUnmount(() => {
+  mounted = false
+  ++requestId
+  if (debounce) clearTimeout(debounce)
+})
 </script>
+
 <template>
-  <div>
+  <main class="proformas-list">
     <PageHeader
       title="Proformas"
-      description="Cotizaciones comerciales de HOMEX."
+      description="Gestiona tus cotizaciones comerciales."
       show-menu
       @menu="emit('openMenu')"
-      ><template #actions
-        ><Button @click="router.push('/proformas/nueva')">Nueva proforma</Button></template
-      ></PageHeader
-    ><FilterBar
-      ><SearchField v-model="search" label="Buscar por número, título o cliente" /><Select
-        v-model="state"
-        name="estado-proforma"
-        label="Estado"
-        :options="[
-          { label: 'Todos', value: '' },
-          ...states.map((x) => ({ label: x.nombre, value: x.codigo })),
-        ]" /></FilterBar
-    ><ActiveFilters :filters @remove="remove" @clear="clear" /><LoadingSkeleton
-      v-if="loading"
-      :lines="6"
-    /><ErrorState v-else-if="error" :description="error"
-      ><button @click="load">Reintentar</button></ErrorState
-    ><EmptyState
+    >
+      <template #actions>
+        <Button @click="router.push('/proformas/nueva')">
+          <Plus :size="18" aria-hidden="true" /> Nueva proforma
+        </Button>
+      </template>
+    </PageHeader>
+
+    <section class="proforma-filters" aria-label="Buscar y filtrar proformas">
+      <div class="proforma-filters__main">
+        <div class="proforma-search">
+          <SearchField v-model="search" label="Buscar por número, título o cliente" />
+        </div>
+        <div class="proforma-state-filter">
+          <Select
+            v-model="state"
+            name="estado-proforma"
+            label="Estado"
+            :options="[
+              { label: 'Todos los estados', value: '' },
+              ...states.map((x) => ({ label: x.nombre, value: x.codigo })),
+              ...(state && !states.some((x) => x.codigo === state) ? [{ label: state, value: state }] : []),
+            ]"
+          />
+        </div>
+        <button
+          type="button"
+          class="proforma-more-filters"
+          :aria-expanded="showAdvanced"
+          aria-controls="proforma-filtros-avanzados"
+          @click="showAdvanced = !showAdvanced"
+        >
+          <SlidersHorizontal :size="18" aria-hidden="true" />
+          Más filtros
+          <ChevronDown :size="16" aria-hidden="true" :class="{ 'rotated': showAdvanced }" />
+        </button>
+      </div>
+      <div v-if="showAdvanced" id="proforma-filtros-avanzados" class="proforma-filters__advanced">
+        <div class="proforma-customer">
+          <ClienteSelector v-model="customer" label="Cliente" @select="selectCustomer" />
+        </div>
+        <Select
+          v-model="currency"
+          name="moneda-proforma-filtro"
+          label="Moneda"
+          :options="[
+            { label: 'Todas las monedas', value: '' },
+            ...currencies.map((x) => ({ label: x.nombre, value: x.codigo })),
+            ...(currency && !currencies.some((x) => x.codigo === currency) ? [{ label: currency, value: currency }] : []),
+          ]"
+        />
+        <label class="proforma-date">Desde <input v-model="dateFrom" type="date" name="fecha-desde-proforma" :max="dateTo || undefined" /></label>
+        <label class="proforma-date">Hasta <input v-model="dateTo" type="date" name="fecha-hasta-proforma" :min="dateFrom || undefined" /></label>
+      </div>
+      <p v-if="dateError" class="proforma-date-error" role="alert">{{ dateError }}</p>
+    </section>
+
+    <ActiveFilters :filters="filters" @remove="removeFilter" @clear="clearFilters" />
+
+    <LoadingSkeleton v-if="loading" :lines="6" />
+    <ErrorState v-else-if="error" :description="error">
+      <button type="button" @click="load">Reintentar</button>
+    </ErrorState>
+    <div v-else-if="dateError" class="proforma-no-results" role="status">Corrige el rango de fechas para ver las proformas.</div>
+    <EmptyState
       v-else-if="!rows.length"
-      :title="filters.length ? 'Sin resultados' : 'Sin proformas'"
-      description="No hay proformas para mostrar."
-    /><template v-else
-      ><p>{{ total }} proforma{{ total === 1 ? '' : 's' }}</p>
-      <DataTable caption="Listado de proformas" :columns :rows="displayRows"
-        ><template #cell-numero="{ row }">#{{ row.numero }}</template
-        ><template #cell-cliente="{ row }">{{ row.clienteNombre }}</template
-        ><template #cell-estado="{ row }">{{ row.estadoNombre }}</template
-        ><template #cell-total="{ row }">{{
-          money(String(row.total), String(row.monedaCodigo))
-        }}</template
-        ><template #cell-acciones="{ row }"
-          ><RouterLink
-            :to="editable(row) ? `/proformas/${row.id}/editar` : `/proformas/${row.id}`"
-            >{{ editable(row) ? 'Continuar edición' : 'Ver detalle' }}</RouterLink
-          ><RouterLink v-if="editable(row)" :to="`/proformas/${row.id}`"
-            >Ver detalle y acciones</RouterLink
-          ></template
-        ></DataTable
-      ><Pagination :page :total-pages="pages" @change="page = $event"
-    /></template>
-  </div>
+      :title="hasFilters ? 'Sin resultados' : 'Sin proformas'"
+      :description="hasFilters ? 'No hay proformas que coincidan con los filtros seleccionados.' : 'Todavía no hay proformas registradas.'"
+    />
+    <template v-else>
+      <div class="proforma-results">
+        <p>{{ total }} proforma{{ total === 1 ? '' : 's' }} encontrada{{ total === 1 ? '' : 's' }}</p>
+        <span>Más recientes primero</span>
+      </div>
+      <div class="proforma-table">
+        <table>
+          <caption class="sr-only">Bandeja de proformas comerciales</caption>
+          <colgroup>
+            <col class="col-quote" /><col class="col-client" /><col class="col-date" />
+            <col class="col-status" /><col class="col-total" /><col class="col-actions" />
+          </colgroup>
+          <thead>
+            <tr>
+              <th scope="col">Proforma</th>
+              <th scope="col">Cliente</th>
+              <th scope="col">Fecha</th>
+              <th scope="col">Estado</th>
+              <th scope="col" class="numeric">Total</th>
+              <th scope="col" class="actions-heading">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in rows" :key="row.id">
+              <td class="quote-cell">
+                <strong>#{{ row.numero }}</strong>
+                <span :title="row.titulo || 'Sin título'">{{ row.titulo?.trim() || 'Sin título' }}</span>
+              </td>
+              <td class="client-cell">
+                <strong :title="customerLabel(row)">{{ customerLabel(row) }}</strong>
+                <span>{{ row.cliente_resumen ? 'Cliente registrado' : 'Prospecto' }}</span>
+              </td>
+              <td class="date-cell" data-label="Fecha">{{ formatDate(row.fecha) }}</td>
+              <td class="status-cell" data-label="Estado">
+                <Badge :tone="tone(row.estado_info.codigo)">{{ row.estado_info.nombre }}</Badge>
+              </td>
+              <td class="total-cell" data-label="Total">
+                <strong>{{ money(row.total, row.moneda_info.codigo) }}</strong>
+              </td>
+              <td class="actions-cell">
+                <ProformaActionsMenu v-if="editable(row)" :id="row.id" :numero="row.numero" />
+                <RouterLink
+                  v-else
+                  :to="`/proformas/${row.id}`"
+                  class="proforma-view-link"
+                  :aria-label="`Ver proforma #${row.numero}`"
+                  :title="`Ver proforma #${row.numero}`"
+                ><Eye :size="19" aria-hidden="true" /></RouterLink>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <nav class="proforma-pagination" aria-label="Paginación de proformas">
+        <p>Mostrando {{ fromItem }}–{{ toItem }} de {{ total }} proformas</p>
+        <div v-if="pages > 1" class="proforma-pagination__buttons">
+          <button type="button" :disabled="page <= 1" @click="page--">
+            <ChevronLeft :size="17" aria-hidden="true" /> Anterior
+          </button>
+          <span>Página {{ page }} de {{ pages }}</span>
+          <button type="button" :disabled="page >= pages" @click="page++">
+            Siguiente <ChevronRight :size="17" aria-hidden="true" />
+          </button>
+        </div>
+      </nav>
+    </template>
+  </main>
 </template>
+
 <style scoped>
-.filter-bar {
-  margin-bottom: var(--space-4);
+.proformas-list { min-width:0; }
+.proformas-list :deep(.page-header) { margin-bottom:var(--space-6); }
+.proformas-list :deep(.page-header__actions button) { display:inline-flex; align-items:center; gap:.5rem; }
+.proforma-filters {
+  display:grid; gap:1rem; padding:1.1rem 1.25rem;
+  border:1px solid var(--color-border); border-radius:var(--radius-card);
+  background:var(--color-surface); margin-bottom:1rem;
 }
-a {
-  color: var(--color-primary-accent);
-  font-weight: 700;
+.proforma-filters__main { display:grid; grid-template-columns:minmax(18rem,1fr) minmax(11rem,14rem) auto; align-items:end; gap:.85rem; }
+.proforma-search { min-width:0; }
+.proforma-search :deep(.search) { width:100%; }
+.proforma-search :deep(.search input) { min-width:0; width:100%; min-height:2.6rem; font-size:.89rem; }
+.proforma-state-filter { min-width:0; }
+.proforma-state-filter :deep(.select select) { width:100%; }
+.proforma-more-filters, .proforma-pagination button {
+  display:inline-flex; align-items:center; justify-content:center; gap:.55rem;
+  padding:.65rem .85rem; min-height:2.75rem; border:1px solid var(--color-border-strong);
+  border-radius:var(--radius-control); background:var(--color-surface);
+  color:var(--color-text); font:inherit; font-size:.84rem; font-weight:650; cursor:pointer;
 }
-.pagination {
-  margin-top: var(--space-5);
+.proforma-more-filters:hover, .proforma-pagination button:not(:disabled):hover { background:var(--color-surface-hover); }
+.proforma-more-filters .rotated { transform:rotate(180deg); }
+.proforma-more-filters:focus-visible, .proforma-pagination button:focus-visible, .proforma-view-link:focus-visible {
+  outline:2px solid var(--color-primary-accent); outline-offset:2px;
+}
+.proforma-filters__advanced {
+  display:grid; grid-template-columns:minmax(13rem,1.4fr) minmax(10rem,1fr) minmax(9rem,.85fr) minmax(9rem,.85fr);
+  gap:1rem; align-items:start; border-top:1px solid var(--color-border); padding-top:1rem;
+}
+.proforma-customer { min-width:0; }
+.proforma-customer :deep(.client-picker) { min-width:0; }
+.proforma-customer :deep(.client-picker__hint) { display:none; }
+.proforma-date { display:grid; gap:.5rem; font-size:.87rem; font-weight:650; }
+.proforma-date input {
+  min-width:0; width:100%; min-height:2.75rem; color:var(--color-text);
+  padding:.55rem .7rem; border:1px solid var(--color-border-strong);
+  border-radius:var(--radius-control); background:var(--color-surface);
+  font:inherit; color-scheme:dark;
+}
+.proforma-date-error { color:var(--color-danger); font-size:.8rem; margin:0; }
+.proforma-results { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin:1.1rem 0 .8rem; }
+.proforma-results p { margin:0; font-size:.88rem; font-weight:650; }
+.proforma-results > span { color:var(--color-text-secondary); font-size:.76rem; }
+.proforma-table { min-width:0; border:1px solid var(--color-border); border-radius:var(--radius-card); background:var(--color-surface); }
+.proforma-table table { width:100%; border-collapse:collapse; table-layout:fixed; }
+.col-quote { width:24%; } .col-client { width:23%; } .col-date { width:13%; }
+.col-status { width:15%; } .col-total { width:17%; } .col-actions { width:8%; }
+.proforma-table th, .proforma-table td { text-align:left; padding:.8rem 1rem; border-bottom:1px solid var(--color-border); vertical-align:middle; }
+.proforma-table th { color:var(--color-text-secondary); font-size:.76rem; font-weight:650; }
+.proforma-table tbody tr:last-child td { border-bottom:0; }
+.proforma-table tbody tr:hover { background:var(--color-surface-hover); }
+.quote-cell, .client-cell { min-width:0; }
+.quote-cell strong, .client-cell strong { display:block; font-weight:700; font-size:.89rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.quote-cell span, .client-cell span { display:block; color:var(--color-text-secondary); font-size:.75rem; margin-top:.25rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.date-cell { font-size:.84rem; color:var(--color-text-secondary); white-space:nowrap; }
+.total-cell, .proforma-table th.numeric { text-align:right; }
+.total-cell strong { font-size:.87rem; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.actions-cell, .proforma-table th.actions-heading { text-align:right; }
+.proforma-view-link {
+  display:inline-grid; place-items:center; width:2.75rem; height:2.75rem;
+  border:1px solid var(--color-border); border-radius:var(--radius-control);
+  color:var(--color-text); background:var(--color-surface); text-decoration:none;
+}
+.proforma-view-link:hover { background:var(--color-surface-hover); color:var(--color-primary-accent); }
+.proforma-pagination { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.75rem; margin-top:1rem; }
+.proforma-pagination p { font-size:.8rem; color:var(--color-text-secondary); margin:0; }
+.proforma-pagination__buttons { display:flex; gap:.8rem; align-items:center; }
+.proforma-pagination__buttons span { font-size:.8rem; color:var(--color-text-secondary); }
+.proforma-pagination button:disabled { opacity:.45; cursor:not-allowed; }
+.proforma-no-results { color:var(--color-text-secondary); padding:1rem; border:1px solid var(--color-border); border-radius:var(--radius-card); }
+@media(max-width:72rem) {
+  .proforma-filters__advanced { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .col-quote { width:22%; } .col-client { width:21%; } .col-date { width:14%; }
+  .col-status { width:17%; } .col-total { width:17%; } .col-actions { width:9%; }
+  .proforma-table th,.proforma-table td { padding:.75rem .65rem; }
+}
+@media(max-width:53rem) {
+  .proforma-filters__main { grid-template-columns:minmax(0,1fr) auto; }
+  .proforma-search { grid-column:1/-1; }
+  .proforma-table { background:transparent; border:0; }
+  .proforma-table colgroup,.proforma-table thead { display:none; }
+  .proforma-table tbody { display:grid; gap:.75rem; }
+  .proforma-table tbody tr {
+    display:grid; grid-template-columns:1fr 1fr; gap:.6rem 1rem;
+    padding:1rem; border:1px solid var(--color-border);
+    border-radius:var(--radius-card); background:var(--color-surface);
+  }
+  .proforma-table tbody td { display:block; padding:0; border:0; min-width:0; }
+  .quote-cell { grid-column:1/-1; }
+  .quote-cell strong { font-size:1rem; }
+  .quote-cell span { font-size:.81rem; }
+  .client-cell { grid-column:1/-1; }
+  .date-cell { grid-column:1; }
+  .status-cell { grid-column:2; text-align:right; }
+  .total-cell { grid-column:1; display:flex !important; flex-direction:column; align-items:start; gap:.3rem; text-align:left; }
+  .total-cell::before { content:attr(data-label); font-size:.75rem; color:var(--color-text-secondary); }
+  .total-cell strong { font-size:1rem; }
+  .actions-cell { grid-column:2; align-self:end; }
+}
+@media(max-width:36rem) {
+  .proforma-filters__main,.proforma-filters__advanced { grid-template-columns:1fr; }
+  .proforma-search { grid-column:auto; }
+  .proforma-more-filters { justify-self:start; }
+  .proforma-results > span { display:none; }
+  .proforma-pagination { align-items:flex-start; flex-direction:column; }
+  .proforma-pagination__buttons { width:100%; justify-content:space-between; gap:.4rem; }
+  .proforma-pagination button { padding:.55rem .6rem; }
 }
 </style>
