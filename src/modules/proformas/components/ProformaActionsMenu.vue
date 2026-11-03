@@ -35,7 +35,7 @@ async function toggle() {
   }
   open.value = true
   await nextTick()
-  menu.value?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
+  menu.value?.querySelector<HTMLElement>('[role="menuitem"]')?.focus({ preventScroll: true })
 }
 
 function outside(event: Event) {
@@ -66,7 +66,7 @@ onMounted(() => {
   document.addEventListener('pointerdown', outside)
   document.addEventListener('focusin', onFocus)
   document.addEventListener('keydown', onKey)
-  window.addEventListener('scroll', onScroll, true)
+  window.addEventListener('scroll', onScroll)
   window.addEventListener('resize', onScroll)
 })
 function onScroll() {
@@ -76,7 +76,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', outside)
   document.removeEventListener('focusin', onFocus)
   document.removeEventListener('keydown', onKey)
-  window.removeEventListener('scroll', onScroll, true)
+  window.removeEventListener('scroll', onScroll)
   window.removeEventListener('resize', onScroll)
 })
 </script>
