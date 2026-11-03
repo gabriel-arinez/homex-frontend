@@ -77,7 +77,7 @@ describe('Bandeja administrativa de productos', () => {
     const { wrapper } = await makeMounted()
     try {
       expect(wrapper.get('table').attributes('class')).toContain('product-table')
-      expect(wrapper.text()).toContain('1 productos encontrados'.replace('1 productos', '1 producto'))
+      expect(wrapper.text()).toContain('1 producto encontrado')
       expect(wrapper.text()).toContain('27 piezas')
       expect(wrapper.text()).toContain('Pendiente: 1')
       expect(wrapper.findAll('[aria-label="Ver producto Silla de visita azul"]')).toHaveLength(1)
@@ -141,7 +141,7 @@ describe('Bandeja administrativa de productos', () => {
       expect(list).toHaveBeenLastCalledWith(expect.objectContaining({
         activo: undefined, categoria: 1, page: 2,
       }))
-      expect(wrapper.text()).toContain('1 productos encontrados'.replace('1 productos', '1 producto'))
+      expect(wrapper.text()).toContain('1 producto encontrado')
     } finally {
       wrapper.unmount()
     }
