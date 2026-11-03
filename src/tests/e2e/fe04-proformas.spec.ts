@@ -1010,6 +1010,7 @@ for (const width of [360, 768, 1440]) {
     await page.route('**/api/v1/capturas/asistidas/24/', (r) => r.fulfill({ json: result }))
     await page.setViewportSize({ width, height: 900 })
     await page.goto('/proformas/nueva')
+    if (width === 768) await page.getByRole('button', { name: 'Compactar navegación' }).click()
     await page.getByRole('button', { name: 'Añadir ítem' }).click()
     await page.getByRole('button', { name: 'Mueble a pedido' }).click()
     await page.getByLabel('Nombre comercial del mueble').fill('Mueble previo')

@@ -13,11 +13,7 @@ function initialTheme(): Theme {
 
 export const usePreferencesStore = defineStore('preferences', () => {
   const theme = ref<Theme>(initialTheme())
-  const savedSidebar = localStorage.getItem(SIDEBAR_KEY)
-  const sidebarCompact = ref(
-    savedSidebar === 'true' ||
-      (savedSidebar === null && matchMedia('(min-width: 48rem) and (max-width: 63.99rem)').matches),
-  )
+  const sidebarCompact = ref(localStorage.getItem(SIDEBAR_KEY) === 'true')
   const isDark = computed(() => theme.value === 'dark')
 
   function applyTheme() {
