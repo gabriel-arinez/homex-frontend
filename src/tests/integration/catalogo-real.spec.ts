@@ -82,12 +82,27 @@ for (const [category, file] of samples) {
             return { count, stocks: stocks.sort((a, b) => a[0] - b[0]) }
           }
           const before = await readInventory()
-          await page.getByRole('combobox', { name: 'Categoría para crear' }).selectOption(category)
+          // El selector de categoría se abrió desde la bandeja; ya no es un combobox.
           await page.getByRole('button', { name: 'Nuevo producto', exact: true }).click()
-          await expect(page.getByRole('heading', { name: 'Descripción por voz' })).toBeVisible()
+          const labels = {
+            SILLA: 'Silla',
+            PISO_FLOTANTE: 'Piso flotante',
+            OTRO: 'Otro producto',
+          }
+          await page
+            .getByRole('group', { name: 'Elegir categoría del nuevo producto' })
+            .getByRole('button', { name: labels[category], exact: true })
+            .click()
+          await expect(page).toHaveURL(new RegExp(`/productos/nuevo\\?categoria=${category}`))
+          await page.getByRole('button', { name: 'Completar por voz' }).click()
+          const assistant = page.getByRole('dialog', { name: 'Completar por voz' })
+          await expect(assistant).toBeVisible()
+          await expect(
+            assistant.getByRole('heading', { name: 'Descripción por voz' }),
+          ).toBeVisible()
           if (mode === 'upload') {
             await page
-              .getByLabel('Subir audio', { exact: true })
+              .getByLabel('O subir un archivo de audio', { exact: true })
               .setInputFiles(join(directory!, file + '.wav'))
           } else {
             await page.getByRole('button', { name: 'Grabar descripción', exact: true }).click()
@@ -115,10 +130,10 @@ for (const [category, file] of samples) {
           expect(await readInventory()).toEqual(before)
           const fields = proposal.propuesta!.fields
           const controls = {
-            nombre: 'Nombre comercial',
-            precio_lista: 'Precio de lista (BOB)',
-            unidad_stock: 'Unidad comercial',
-            observaciones: 'Observaciones',
+            nombre: 'Nombre comercial *',
+            precio_lista: 'Precio de lista (BOB) *',
+            unidad_stock: 'Unidad comercial *',
+            observaciones: 'Notas del producto (opcional)',
             modelo: 'Modelo',
             marca: 'Marca',
             color_primario: 'Color primario',
@@ -126,7 +141,7 @@ for (const [category, file] of samples) {
             espesor_mm: 'Espesor (mm)',
             largo_mm: 'Largo descriptivo (mm)',
             ancho_mm: 'Ancho descriptivo (mm)',
-            m2_por_caja: 'm² por caja (informativo)',
+            m2_por_caja: 'm² por caja',
             material: 'Material',
             tipo: 'Tipo',
             diseno: 'Diseño',
@@ -146,24 +161,30 @@ for (const [category, file] of samples) {
           for (const field of Object.keys(controls) as (keyof typeof controls)[]) {
             if (fields[field] != null) {
               const control = selects.has(field)
-                ? page.getByRole('combobox', { name: controls[field] })
-                : page.getByLabel(controls[field], { exact: true })
+                ? page.getByRole('combobox', { name: controls[field], exact: true })
+                : page.getByLabel(controls[field], { exact: false })
               await expect(control).toHaveValue(String(fields[field]))
             }
           }
           expect(fields).not.toHaveProperty('sku')
           expect(fields).not.toHaveProperty('stock')
+          // OTRO no tiene unidad obligatoria fija. El encargado elige la adecuada
+          // cuando el dictado no aporta una unidad reconocida por el catálogo.
+          if (category === 'OTRO') {
+            const unit = page.getByRole('combobox', { name: 'Unidad comercial *' })
+            if (!(await unit.inputValue())) await unit.selectOption({ label: 'Barra' })
+          }
           expect(fields.precio_lista).toBeDefined()
           if (category === 'SILLA') expect(fields.especificaciones).toBeDefined()
           if (category === 'PISO_FLOTANTE') expect(fields.espesor_mm).toBeDefined()
           if (category === 'OTRO') expect(fields.observaciones).toBeDefined()
           // Required SKU remains a deliberate manual choice.
           await page
-            .getByLabel('SKU', { exact: true })
+            .getByLabel('Código SKU *', { exact: false })
             .fill(`VOICE-${category}-${mode}-${Date.now()}`)
-          const name = page.getByLabel('Nombre comercial', { exact: true })
+          const name = page.getByLabel('Nombre comercial *', { exact: true })
           if (!(await name.inputValue())) await name.fill(`Prueba voz ${category}`)
-          await page.getByLabel('Precio de lista (BOB)', { exact: true }).fill('100')
+          await page.getByLabel('Precio de lista (BOB) *', { exact: true }).fill('100')
           const savedResponse = page.waitForResponse(
             (r) =>
               r.request().method() === 'POST' &&

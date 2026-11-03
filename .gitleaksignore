@@ -24,3 +24,5 @@ a05c3515fc2883ccc71ef96ce580d3e33eb18eb3:src/tests/e2e/fe04-proformas.spec.ts:ge
 30eadeca07d234e7cbfed5546c216c38f7020588:src/tests/e2e/fe01-responsive.spec.ts:generic-api-key:10
 # Same unsigned browser mock token on a historical branch.
 5f46b7f924400c84202765cc7ab10518dbaa1b6c:src/tests/e2e/fe07-resumen.spec.ts:generic-api-key:3
+# Unsigned, synthetic browser token for the products tray E2E mock; not a live credential.
+3386290e165e8ed0c9310f9b4c98d36badd8d496:src/tests/e2e/productos-bandeja-ux.spec.ts:generic-api-key:4
