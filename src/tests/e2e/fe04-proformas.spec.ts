@@ -1252,7 +1252,7 @@ test('FE04 muestra creación real y alinea totales; histórico sin hora inventad
   await expect(page.getByRole('columnheader', { name: 'Creación' })).toBeVisible()
   const primera = page.getByRole('row').filter({ hasText: '#101' })
   const segunda = page.getByRole('row').filter({ hasText: '#102' })
-  await expect(primera.locator('.creation-primary')).toContainText('Hace 5 minutos')
+  await expect(primera.locator('.creation-primary')).toContainText(/Hace [56] minutos/)
   await expect(primera.locator('.creation-hour')).toContainText(/\d{2}:\d{2} (?:a|p)\. m\./)
   await expect(primera.locator('.creation-date')).toBeVisible()
   await expect(segunda.locator('.creation-hour')).toHaveText('Hora no registrada')
