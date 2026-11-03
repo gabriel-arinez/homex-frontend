@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { join } from 'node:path'
+import type { ResultadoCatalogo } from '@/generated/api'
 
 const directory = process.env.HOMEX_CATALOGO_AUDIO_DIR
 const password = process.env.HOMEX_CATALOGO_PASSWORD
@@ -27,6 +28,7 @@ for (const [category, file] of samples) {
           permissions: ['microphone'],
         })
         const page = await context.newPage()
+        page.on('dialog', (dialog) => dialog.accept())
         try {
           const writes: string[] = []
           page.on('request', (request) => {
@@ -55,13 +57,36 @@ for (const [category, file] of samples) {
             await page.waitForTimeout(16000)
             await page.getByRole('button', { name: 'Detener', exact: true }).click()
           }
+          const completed = page.waitForResponse(async (response) => {
+            if (
+              !response.url().includes('/capturas/catalogo/') ||
+              response.request().method() !== 'GET' ||
+              response.status() !== 200
+            )
+              return false
+            return (await response.json()).estado === 'COMPLETADA'
+          })
           await page.getByRole('button', { name: 'Procesar audio', exact: true }).click()
+          const proposal = (await (await completed).json()) as ResultadoCatalogo
           await expect(page.getByRole('heading', { name: 'Campos detectados' })).toBeVisible()
           const text = page.getByRole('textbox', { name: 'Transcripción / texto corregido' })
           expect((await text.inputValue()).trim().length).toBeGreaterThan(4)
           expect(writes).toEqual([])
           await page.getByRole('button', { name: 'Aplicar al formulario', exact: true }).click()
           expect(writes).toEqual([])
+          const fields = proposal.propuesta!.fields
+          const controls = {
+            nombre: 'Nombre comercial',
+            precio_lista: 'Precio de lista (BOB)',
+            unidad_stock: 'Unidad comercial',
+          }
+          expect(Object.keys(fields).some((field) => field in controls)).toBe(true)
+          for (const field of ['nombre', 'precio_lista', 'unidad_stock'] as const) {
+            if (fields[field] != null)
+              await expect(page.getByLabel(controls[field], { exact: true })).toHaveValue(
+                String(fields[field]),
+              )
+          }
           // Required SKU remains a deliberate manual choice.
           await page
             .getByLabel('SKU', { exact: true })
