@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import type {
+  CamposCatalogo,
   FamiliaProducto,
   Producto,
   ProductoWritable,
   ValorCatalogoPublico,
 } from '@/generated/api'
 import { proformasService } from '@/modules/proformas/services/proformasService'
+import CapturaCatalogo from './CapturaCatalogo.vue'
 import Button from '@/shared/ui/Button.vue'
 import Select from '@/shared/ui/Select.vue'
 import TextField from '@/shared/ui/TextField.vue'
@@ -137,6 +139,69 @@ const opts = (key: string, empty = 'Sin seleccionar') => [
   { label: empty, value: '' },
   ...(opciones[key] ?? []).map((x) => ({ label: x.nombre, value: String(x.id) })),
 ]
+function applyVoice(fields: CamposCatalogo) {
+  const allowed = new Set([
+    'nombre',
+    'observaciones',
+    'precio_lista',
+    'unidad_stock',
+    ...(categoria.value === 'SILLA'
+      ? ['marca', 'modelo', 'color_primario', 'especificaciones']
+      : []),
+    ...(categoria.value === 'PISO_FLOTANTE'
+      ? [
+          'marca',
+          'modelo',
+          'tipo',
+          'material',
+          'diseno',
+          'acabado',
+          'espesor_mm',
+          'largo_mm',
+          'ancho_mm',
+          'm2_por_caja',
+        ]
+      : []),
+  ])
+  const catalogFields: Record<string, string> = {
+    unidad_stock: 'UNIDAD_MEDIDA',
+    marca: 'MARCA',
+    color_primario: 'COLOR',
+    tipo: 'TIPO_PISO',
+    material: 'MATERIAL_PISO',
+    diseno: 'DISENO_PISO',
+    acabado: 'ACABADO_PISO',
+  }
+  const proposals = Object.entries(fields).filter(
+    ([key, value]) =>
+      allowed.has(key) &&
+      value != null &&
+      (!catalogFields[key] ||
+        opciones[catalogFields[key]]?.some((option) => String(option.id) === String(value))),
+  )
+  const current = form as Record<string, unknown>
+  const conflicts = proposals.filter(([key, value]) => {
+    if (key === 'especificaciones')
+      return camposSilla.value.length > 0 || Boolean(form.especificaciones)
+    return current[key] !== '' && String(current[key]) !== String(value)
+  })
+  if (
+    conflicts.length &&
+    !window.confirm(
+      'Se reemplazarán los campos con valores manuales: ' +
+        conflicts.map(([key]) => key).join(', ') +
+        '. ¿Continuar?',
+    )
+  )
+    return
+  for (const [key, value] of proposals) {
+    if (key === 'especificaciones') {
+      form.especificaciones = JSON.stringify(value)
+      camposSilla.value = camposSimples(value)
+    } else current[key] = String(value)
+  }
+  emit('change')
+}
 async function load() {
   loading.value = true
   try {
@@ -282,6 +347,15 @@ onMounted(load)
         :options="opts('UNIDAD_MEDIDA', 'Seleccionar unidad')"
       /><TextField v-model="form.observaciones" name="observaciones" label="Observaciones" />
     </div>
+    <CapturaCatalogo
+      v-if="
+        !initial && (categoria === 'SILLA' || categoria === 'PISO_FLOTANTE' || categoria === 'OTRO')
+      "
+      :key="categoria"
+      :categoria="categoria"
+      :opciones="opciones"
+      @apply="applyVoice"
+    />
     <fieldset v-if="categoria === 'SILLA' || categoria === 'PISO_FLOTANTE'">
       <legend>Ficha {{ categoria === 'SILLA' ? 'de silla' : 'de piso' }}</legend>
       <div class="grid">

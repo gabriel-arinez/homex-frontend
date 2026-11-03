@@ -1,5 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it } from 'vitest'
+import { http, HttpResponse } from 'msw'
+import { server } from '@/tests/msw/server'
 import router from '@/app/router'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 
@@ -13,6 +15,24 @@ describe('guards de rutas', () => {
     await router.push('/resumen')
     expect(router.currentRoute.value.name).toBe('login')
     expect(router.currentRoute.value.query.redirect).toBe('/resumen')
+  })
+  it('lleva al encargado al catálogo sin otorgar administración comercial', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/auth/me/', () =>
+        HttpResponse.json({
+          id: 19,
+          username: 'encargado',
+          display_name: 'Encargado',
+          capabilities: ['catalogo.crear_producto'],
+        }),
+      ),
+    )
+    const session = useSessionStore()
+    await session.login('vendedor', 'correcta')
+    await router.push('/resumen')
+    expect(router.currentRoute.value.name).toBe('productos')
+    expect(session.can('comercial.administrar')).toBe(false)
+    expect(session.can('comercial.operar')).toBe(false)
   })
   it('mantiene logout como sesión anónima', () => {
     const session = useSessionStore()

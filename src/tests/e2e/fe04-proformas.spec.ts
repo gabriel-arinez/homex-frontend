@@ -309,6 +309,64 @@ async function noOverflow(page: Page) {
   ).toBe(true)
 }
 
+async function studioStep(
+  page: Page,
+  name: 'General' | 'Estructura' | 'Accesorios' | 'Precio' | 'Revisar',
+) {
+  await page
+    .getByRole('navigation', { name: 'Apartados del mueble a pedido' })
+    .getByRole('button', { name: new RegExp(name) })
+    .click()
+}
+
+test('FURNITURE STUDIO abre una pagina propia, conserva cambios entre apartados y no persiste al incorporar', async ({
+  page,
+}) => {
+  await mockBackend(page)
+  const writes: string[] = []
+  page.on('request', (request) => {
+    if (
+      /\/proformas\/(?:integral\/)?$/.test(new URL(request.url()).pathname) &&
+      ['POST', 'PUT', 'PATCH'].includes(request.method())
+    )
+      writes.push(request.url())
+  })
+  await page.goto('/proformas/nueva')
+  await page.getByRole('button', { name: 'Añadir ítem' }).click()
+  await page.getByRole('button', { name: 'Mueble a pedido' }).click()
+  await expect(page.getByRole('heading', { name: 'Nuevo mueble a pedido' })).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Nueva proforma' })).toHaveCount(0)
+
+  await page.getByLabel('Nombre comercial del mueble').fill('Escritorio personalizado')
+  await studioStep(page, 'Estructura')
+  await page.getByRole('button', { name: 'Agregar componente' }).click()
+  await page.locator('#componente-nombre-0').fill('Tablero superior')
+  await page.locator('#componente-espesor-0').fill('18 mm')
+  await studioStep(page, 'General')
+  await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue(
+    'Escritorio personalizado',
+  )
+
+  await page.getByRole('button', { name: 'Volver a proforma' }).click()
+  await expect(page.getByRole('dialog', { name: 'Descartar ficha técnica' })).toBeVisible()
+  await page
+    .getByRole('dialog', { name: 'Descartar ficha técnica' })
+    .getByRole('button', { name: 'Cancelar' })
+    .click()
+  await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue(
+    'Escritorio personalizado',
+  )
+  await studioStep(page, 'Precio')
+  await page.getByLabel('Precio unitario negociado (BOB)').fill('350.00')
+  await studioStep(page, 'Revisar')
+  await expect(page.getByRole('heading', { name: 'Revisar mueble' })).toBeVisible()
+  await studioStep(page, 'Revisar')
+  await page.getByRole('button', { name: 'Agregar mueble a la proforma' }).click()
+  await expect(page.getByRole('heading', { name: 'Nueva proforma' })).toBeVisible()
+  expect(writes).toEqual([])
+})
+
 test('FE04 crea con unitario y descuento, revisa y aprueba', async ({ page }) => {
   await mockBackend(page)
   await page.goto('/proformas')
@@ -318,31 +376,43 @@ test('FE04 crea con unitario y descuento, revisa y aprueba', async ({ page }) =>
   await page.getByRole('button', { name: 'Añadir ítem' }).click()
   await page.getByRole('button', { name: 'Mueble a pedido' }).click()
   await page.getByLabel('Nombre comercial del mueble').fill('Tres escritorios')
+  await studioStep(page, 'Precio')
   await page.getByLabel('Cantidad cotizada').fill('3')
   await page.locator('#mueble-unidad').selectOption('20')
   await page.getByLabel('Precio unitario negociado (BOB)').fill('34.00')
   await page.getByLabel('Descuento monetario total de línea').fill('2.00')
+  await studioStep(page, 'Estructura')
   await page.getByRole('button', { name: 'Agregar componente' }).click()
   await page.locator('#componente-nombre-0').fill('Mesón')
   await page.locator('#componente-material-0').fill('Melamina')
   await page.locator('#componente-espesor-0').fill('25 mm')
-  await page.getByRole('button', { name: 'Guardar especificación' }).click()
+  await studioStep(page, 'Revisar')
+  await page.getByRole('button', { name: 'Agregar mueble a la proforma' }).click()
   await expect(page.getByText(/3 ×/)).toContainText('Bs 34,00')
   await page.getByRole('button', { name: 'Acciones de Tres escritorios' }).click()
   await page.getByRole('menuitem', { name: 'Editar' }).click()
   await page.getByLabel('Nombre comercial del mueble').fill('Tres escritorios ejecutivos')
-  await page.getByRole('button', { name: 'Guardar especificación' }).click()
+  await studioStep(page, 'Revisar')
+  await page.getByRole('button', { name: 'Agregar mueble a la proforma' }).click()
   await expect(page.getByText('Tres escritorios ejecutivos', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Acciones de Tres escritorios ejecutivos' }).click()
   await page.getByRole('menuitem', { name: 'Ficha técnica' }).click()
-  await page.locator('#tipo-mueble').selectOption('30')
+  await page.getByRole('combobox', { name: 'Tipo de mueble (opcional)' }).fill('Escritorio')
+  await page
+    .getByRole('option', { name: /Escritorio/ })
+    .first()
+    .click()
+  await studioStep(page, 'Estructura')
   await page.locator('#componente-dimensiones-0').fill('ancho 1.2 m')
-  await page.getByRole('button', { name: 'Guardar especificación' }).click()
+  await studioStep(page, 'Revisar')
+  await page.getByRole('button', { name: 'Agregar mueble a la proforma' }).click()
   await page.getByRole('button', { name: 'Acciones de Tres escritorios ejecutivos' }).click()
   await page.getByRole('menuitem', { name: 'Ficha técnica' }).click()
+  await studioStep(page, 'Estructura')
   await expect(page.locator('#componente-nombre-0')).toHaveValue('Mesón')
   await page.locator('#componente-color-0').fill('Nogal')
-  await page.getByRole('button', { name: 'Guardar especificación' }).click()
+  await studioStep(page, 'Revisar')
+  await page.getByRole('button', { name: 'Agregar mueble a la proforma' }).click()
   await page.getByRole('button', { name: /Cliente$/ }).click()
   await page.getByRole('radio', { name: /Existente/ }).check()
   await page.getByRole('combobox', { name: 'Cliente existente' }).focus()
@@ -642,26 +712,29 @@ test('PRF-01 previene líneas inválidas y conserva edición al cerrar', async (
   await page.getByRole('button', { name: 'Añadir ítem' }).click()
   await page.getByRole('button', { name: 'Mueble a pedido' }).click()
   await page.getByLabel('Nombre comercial del mueble').fill('Escritorio comercial')
+  await studioStep(page, 'Precio')
   await page.getByLabel('Cantidad cotizada').fill('1.5')
   await page.getByLabel('Precio unitario negociado (BOB)').fill('0')
-  await page.getByRole('button', { name: 'Guardar especificación' }).click()
+  await studioStep(page, 'Revisar')
+  await page.getByRole('button', { name: 'Agregar mueble a la proforma' }).click()
   await expect(page.getByRole('alert')).toContainText(
     'La cantidad cotizada debe ser un entero positivo.',
   )
   await expect(page.getByRole('alert')).toContainText(
     'El precio unitario negociado debe ser positivo.',
   )
-  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Escritorio comercial' })).toBeVisible()
 
-  await page.getByRole('button', { name: 'Cerrar', exact: true }).click()
+  await page.getByRole('button', { name: 'Volver a proforma' }).click()
   await expect(page.getByRole('dialog', { name: 'Descartar ficha técnica' })).toBeVisible()
   await page
     .getByRole('dialog', { name: 'Descartar ficha técnica' })
     .getByRole('button', { name: 'Cancelar' })
     .click()
+  await studioStep(page, 'General')
   await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Escritorio comercial')
 
-  await page.getByRole('button', { name: 'Cerrar', exact: true }).click()
+  await page.getByRole('button', { name: 'Volver a proforma' }).click()
   await page
     .getByRole('dialog', { name: 'Descartar ficha técnica' })
     .getByRole('button', { name: 'Descartar cambios' })
@@ -690,11 +763,13 @@ test('PRF-01 protege cambios pendientes de la ficha técnica', async ({ page }) 
   await page.getByRole('button', { name: 'Añadir ítem' }).click()
   await page.getByRole('button', { name: 'Mueble a pedido' }).click()
   await page.getByLabel('Nombre comercial del mueble').fill('Mueble con ficha')
+  await studioStep(page, 'Precio')
   await page.getByLabel('Precio unitario negociado (BOB)').fill('150')
+  await studioStep(page, 'Estructura')
   await page.getByRole('button', { name: 'Agregar componente' }).click()
   await page.locator('#componente-nombre-0').fill('Mesón')
 
-  await page.getByRole('button', { name: 'Cerrar', exact: true }).click()
+  await page.getByRole('button', { name: 'Volver a proforma' }).click()
   await expect(page.getByRole('dialog', { name: 'Descartar ficha técnica' })).toBeVisible()
   await page
     .getByRole('dialog', { name: 'Descartar ficha técnica' })
@@ -702,7 +777,7 @@ test('PRF-01 protege cambios pendientes de la ficha técnica', async ({ page }) 
     .click()
   await expect(page.locator('#componente-nombre-0')).toHaveValue('Mesón')
 
-  await page.getByRole('dialog').getByRole('button', { name: 'Cancelar', exact: true }).click()
+  await page.getByRole('button', { name: 'Volver a proforma' }).click()
   await page
     .getByRole('dialog', { name: 'Descartar ficha técnica' })
     .getByRole('button', { name: 'Descartar cambios' })
@@ -901,24 +976,19 @@ for (const width of [360, 390, 768, 1024, 1440])
     }
   })
 
-test('@a11y PRF04 cancelar reemplazo conserva formulario y devuelve foco', async ({ page }) => {
+test('@a11y PRF04 acciones directas de voz accesibles y sin reemplazo prematuro', async ({
+  page,
+}) => {
   await mockBackend(page)
   await page.goto('/proformas/nueva')
   await page.getByRole('button', { name: 'Añadir ítem' }).click()
   await page.getByRole('button', { name: 'Mueble a pedido' }).click()
   await page.getByLabel('Nombre comercial del mueble').fill('Mueble previo')
-  const voice = page.getByRole('button', { name: 'Dictar especificaciones' })
-  await voice.click()
-  const dialog = page.getByRole('dialog', { name: 'Reemplazar información del mueble' })
-  await expect(dialog).toBeVisible()
-  const results = await new AxeBuilder({ page })
-    .include('[aria-labelledby="prf04-replace-title"]')
-    .analyze()
+  await expect(page.getByRole('button', { name: 'Grabar descripción' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Subir audio' })).toBeVisible()
+  const results = await new AxeBuilder({ page }).include('.voice-workflow').analyze()
   expect(results.violations).toEqual([])
-  await page.keyboard.press('Escape')
-  await expect(dialog).not.toBeVisible()
   await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Mueble previo')
-  await expect(voice).toBeFocused()
 })
 
 // HTTP fixture → composable → captura → editor/aplicarCaptura → formulario real.
@@ -940,27 +1010,29 @@ for (const width of [360, 768, 1440]) {
     await page.route('**/api/v1/capturas/asistidas/24/', (r) => r.fulfill({ json: result }))
     await page.setViewportSize({ width, height: 900 })
     await page.goto('/proformas/nueva')
+    if (width === 768) await page.getByRole('button', { name: 'Compactar navegación' }).click()
     await page.getByRole('button', { name: 'Añadir ítem' }).click()
     await page.getByRole('button', { name: 'Mueble a pedido' }).click()
     await page.getByLabel('Nombre comercial del mueble').fill('Mueble previo')
-    await page.getByRole('button', { name: 'Dictar especificaciones' }).click()
-    await expect(
-      page.getByRole('dialog', { name: 'Reemplazar información del mueble' }),
-    ).toBeVisible()
+    await page.getByRole('button', { name: 'Subir audio' }).click()
     expect(captures).toBe(0)
     await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Mueble previo')
-    await page.getByRole('button', { name: 'Continuar con voz' }).click()
     await page
       .getByLabel('Seleccionar archivo de audio')
       .setInputFiles({ name: '24.wav', mimeType: 'audio/wav', buffer: Buffer.from('fixture') })
+    await expect(page.getByRole('heading', { name: 'Propuesta obtenida por voz' })).toBeVisible()
+    await expect(page.getByText('unidad del ancho', { exact: false }).first()).toBeVisible()
+    // El rediseño oculta la ficha anterior mientras se revisa la propuesta.
+    await expect(page.getByLabel('Nombre comercial del mueble')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Aplicar propuesta al mueble' }).click()
+    await studioStep(page, 'General')
     await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Escritorio')
+    await studioStep(page, 'Precio')
     await expect(page.getByLabel('Cantidad cotizada')).toHaveValue('2')
     await expect(page.getByLabel('Precio unitario negociado (BOB)')).toHaveValue('')
-    const summary = page.getByRole('complementary', { name: 'Información pendiente' })
-    await expect(summary).toContainText('unidad del ancho')
-    await summary.getByRole('button', { name: 'Revisar ancho' }).click()
+    await studioStep(page, 'General')
+    await expect(page.locator('#pendiente-ancho')).toContainText('ancho')
     const unit = page.getByLabel('Unidad de ancho', { exact: true })
-    await expect(unit).toBeFocused()
     await expect(unit).toHaveValue('')
     await expect(unit).toHaveAccessibleDescription(/unidad del ancho/)
     await expect(page.locator('#pendiente-ancho')).toBeVisible()
@@ -976,7 +1048,6 @@ for (const width of [360, 768, 1440]) {
       fullPage: true,
     })
     await unit.selectOption('cm')
-    await expect(summary).toBeHidden()
     await page.getByLabel('ancho', { exact: true }).fill('125')
     await page.getByText('Ver transcripción original', { exact: true }).click()
     await expect(
@@ -993,7 +1064,6 @@ for (const width of [360, 768, 1440]) {
         .getByLabel('Corregir texto para una nueva interpretación')
         .fill(`Corrección ${terminal}`)
       await page.getByRole('button', { name: 'Interpretar texto corregido' }).click()
-      await page.getByRole('button', { name: 'Continuar con voz' }).click()
       await expect(
         page.getByRole('alert').filter({ hasText: 'No se obtuvo una propuesta utilizable' }),
       ).toBeVisible()

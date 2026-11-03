@@ -11,6 +11,10 @@ import { ApiError } from '@/shared/api/errors'
 import Button from '@/shared/ui/Button.vue'
 import Select from '@/shared/ui/Select.vue'
 import TextField from '@/shared/ui/TextField.vue'
+import TextAreaField from '@/shared/ui/TextAreaField.vue'
+import Toast from '@/shared/ui/Toast.vue'
+import MuebleOptionPicker from './MuebleOptionPicker.vue'
+import { Pencil, AlertCircle, CheckCircle2, Layers3, Plus } from '@lucide/vue'
 import { asignarEspesorPendiente, pendienteResuelto } from '../services/pendientesAsistencia'
 import { proformasService } from '../services/proformasService'
 import {
@@ -28,6 +32,8 @@ import { calcularUnitarioExacto, totalComercialCoincide } from '../services/prec
 
 const props = defineProps<{
   tipos: ValorCatalogoPublico[]
+  studio?: boolean
+  activeSection?: 'general' | 'estructura' | 'accesorios' | 'comercial' | 'revision'
   especificacion?: EspecificacionMueble | null
   pendientesAsistencia?: PendienteAsistida[]
   processing?: boolean
@@ -58,16 +64,30 @@ const emit = defineEmits<{
   cancel: []
   changed: []
   typeCreated: [tipo: ValorCatalogoPublico]
+  requestSection: [section: 'general' | 'estructura' | 'accesorios' | 'comercial' | 'revision']
+  sectionStatus: [
+    statuses: Record<
+      'general' | 'estructura' | 'accesorios' | 'comercial' | 'revision',
+      'pending' | 'issues' | 'complete'
+    >,
+  ]
 }>()
 const base = leerDatosTecnicos(props.especificacion?.datos_tecnicos)
 const catalogo = ref<AtributoMueble[]>([])
 const limites = reactive({ max_conjuntos: 10, max_componentes: 40 })
 const catalogError = ref('')
 const error = ref('')
+const aviso = ref('')
 const search = ref('')
 const componentSearch = reactive<Record<string, string>>({})
 const nuevoTipo = ref('')
 const creatingType = ref(false)
+const submitAttempted = ref(false)
+const touched = reactive({ nombre: false, precio: false, cantidad: false, descuento: false })
+const touchedMedidas = reactive<Record<string, boolean>>({})
+const touchedPiezas = reactive<Record<string, boolean>>({})
+const touchedGrupos = reactive<Record<string, boolean>>({})
+const touchedAccesorios = reactive<Record<number, boolean>>({})
 const tiposLocales = ref([...props.tipos])
 const tiposParecidos = computed(() => {
   const buscar = normalized(nuevoTipo.value)
@@ -194,11 +214,40 @@ function aplicarEspesor(p: PendienteAsistida & { indice: number }) {
   error.value = ''
   changed()
 }
+const cantidadValida = computed(
+  () =>
+    comercial.cantidad.trim() !== '' &&
+    Number.isInteger(Number(comercial.cantidad)) &&
+    Number(comercial.cantidad) > 0,
+)
+const precioValido = computed(
+  () =>
+    comercial.precio_unitario.trim() !== '' &&
+    Number.isFinite(Number(comercial.precio_unitario)) &&
+    Number(comercial.precio_unitario) > 0,
+)
+const descuentoValido = computed(
+  () =>
+    comercial.descuento.trim() !== '' &&
+    Number.isFinite(Number(comercial.descuento)) &&
+    Number(comercial.descuento) >= 0,
+)
 const totalEstimado = computed(() => {
   const cantidad = Number(comercial.cantidad)
   const precio = Number(comercial.precio_unitario)
   const descuento = Number(comercial.descuento)
-  return [cantidad, precio, descuento].every(Number.isFinite) ? cantidad * precio - descuento : null
+  return comercial.precio_unitario.trim() &&
+    comercial.cantidad.trim() &&
+    comercial.descuento.trim() &&
+    Number.isFinite(cantidad) &&
+    Number.isFinite(precio) &&
+    Number.isFinite(descuento) &&
+    cantidad > 0 &&
+    precio > 0 &&
+    descuento >= 0 &&
+    descuento <= cantidad * precio
+    ? cantidad * precio - descuento
+    : null
 })
 type Medida = { clave: string; valor: string; unidad: string; original?: unknown }
 const clavesIniciales = ['ancho', 'alto', 'profundidad']
@@ -249,9 +298,28 @@ function enfocarDimension(clave: string) {
 
 const nuevaMedida = ref('')
 const opcionesMedidas = ['largo', 'diámetro', 'lado_1', 'lado_2', 'altura_total', 'ancho_mesón']
+function agregarMedidaElegida(value: string) {
+  nuevaMedida.value = value
+  agregarMedida()
+}
+function crearTipoDesdeBuscador(nombre: string) {
+  nuevoTipo.value = nombre
+  void createType()
+}
+function elegirAtributoGeneral(value: string) {
+  const item = catalogo.value.find((x) => String(x.id) === value)
+  if (item) addAttribute(atributosGenerales, item)
+}
 function agregarMedida() {
   const clave = nuevaMedida.value.trim().toLowerCase().replace(/\s+/g, '_')
-  if (!clave || medidas.some((x) => x.clave === clave)) return
+  if (!clave) {
+    aviso.value = 'Escribe el nombre de la medida.'
+    return
+  }
+  if (medidas.some((x) => normalized(x.clave) === normalized(clave))) {
+    aviso.value = 'Esta medida ya está agregada al mueble.'
+    return
+  }
   medidas.push({ clave, valor: '', unidad: 'cm' })
   nuevaMedida.value = ''
   changed()
@@ -324,7 +392,27 @@ function serializarDimensiones(): unknown {
 }
 const conjuntos = reactive<ConjuntoTecnico[]>(structuredClone(base.conjuntos ?? []))
 const componentes = reactive<ComponenteTecnico[]>(structuredClone(base.componentes ?? []))
+const activeComponentUid = ref(componentes[0]?.uid ?? (componentes.length ? '0' : ''))
+const gruposArbol = computed(() =>
+  [
+    ...conjuntos.map((grupo) => ({
+      id: grupo.uid,
+      nombre: grupo.nombre.trim() || 'Conjunto pendiente de nombre',
+      piezas: componentes
+        .map((pieza, index) => ({ pieza, index }))
+        .filter((x) => x.pieza.conjunto_uid === grupo.uid),
+    })),
+    {
+      id: 'independientes',
+      nombre: 'Piezas independientes',
+      piezas: componentes
+        .map((pieza, index) => ({ pieza, index }))
+        .filter((x) => !x.pieza.conjunto_uid),
+    },
+  ].filter((grupo) => grupo.piezas.length > 0),
+)
 const accesorios = reactive<string[]>(structuredClone(base.accesorios ?? []))
+const accesorioEnEdicion = ref<number | null>(null)
 const componentesRetirados = ref<Array<{ item: ComponenteTecnico; index: number }>>([])
 const accesoriosRetirados = ref<Array<{ item: string; index: number }>>([])
 const conjuntoPorEliminar = ref<string | null>(null)
@@ -381,7 +469,14 @@ function uid() {
   return crypto.randomUUID()
 }
 function addConjunto() {
-  if (conjuntos.some((g) => !componentes.some((c) => c.conjunto_uid === g.uid))) return
+  if (conjuntos.length >= limites.max_conjuntos) {
+    aviso.value = 'Has alcanzado el máximo de conjuntos permitidos.'
+    return
+  }
+  if (conjuntos.some((g) => !componentes.some((c) => c.conjunto_uid === g.uid))) {
+    aviso.value = 'Completa el conjunto existente con una pieza antes de crear otro.'
+    return
+  }
   conjuntos.push({ uid: uid(), nombre: '' })
   changed()
 }
@@ -414,15 +509,23 @@ function confirmarDestinoDelConjunto(id: string) {
   changed()
 }
 function addComponente(conjunto_uid?: string) {
-  if (componentes.some((c) => !c.nombre.trim()) || componentes.length >= limites.max_componentes)
+  if (componentes.length >= limites.max_componentes) {
+    aviso.value = 'Has alcanzado el máximo de componentes permitidos.'
     return
+  }
+  if (componentes.some((c) => !c.nombre.trim())) {
+    aviso.value = 'Asigna un nombre al componente sin completar antes de agregar otro.'
+    return
+  }
+  const nuevoUid = uid()
   componentes.push({
-    uid: uid(),
+    uid: nuevoUid,
     conjunto_uid: conjunto_uid || undefined,
     nombre: '',
     cantidad_interna: 1,
     atributos: [],
   })
+  activeComponentUid.value = nuevoUid
   changed()
 }
 function setCantidadInterna(componente: ComponenteTecnico, event: Event) {
@@ -439,17 +542,24 @@ function removeComponente(index: number) {
     index,
   })
   componentes.splice(index, 1)
+  if (activeComponentUid.value === (item.uid || String(index)))
+    activeComponentUid.value = componentes[0]?.uid ?? (componentes.length ? '0' : '')
   changed()
 }
 function deshacerComponente() {
   const removed = componentesRetirados.value.pop()
   if (!removed) return
   componentes.splice(Math.min(removed.index, componentes.length), 0, removed.item)
+  activeComponentUid.value = removed.item.uid ?? String(removed.index)
   changed()
 }
 function addAccesorio() {
-  if (accesorios.some((item) => !item.trim())) return
+  if (accesorios.some((item) => !item.trim())) {
+    aviso.value = 'Completa o elimina el accesorio sin descripción antes de agregar otro.'
+    return
+  }
   accesorios.push('')
+  accesorioEnEdicion.value = accesorios.length - 1
   changed()
 }
 function removeAccesorio(index: number) {
@@ -457,6 +567,7 @@ function removeAccesorio(index: number) {
   if (item === undefined) return
   accesoriosRetirados.value.push({ item, index })
   accesorios.splice(index, 1)
+  accesorioEnEdicion.value = null
   changed()
 }
 function deshacerAccesorio() {
@@ -466,11 +577,18 @@ function deshacerAccesorio() {
   changed()
 }
 function duplicateComponente(index: number) {
-  if (componentes.length >= limites.max_componentes || componentes.some((c) => !c.nombre.trim()))
+  if (componentes.length >= limites.max_componentes) {
+    aviso.value = 'No puedes duplicar: se alcanzó el máximo de componentes.'
     return
+  }
+  if (componentes.some((c) => !c.nombre.trim())) {
+    aviso.value = 'Completa primero los componentes sin nombre.'
+    return
+  }
   const copy = clonarTecnica(componentes[index]!)
   copy.uid = uid()
   componentes.splice(index + 1, 0, copy)
+  activeComponentUid.value = copy.uid
   changed()
 }
 function move(index: number, delta: number) {
@@ -482,7 +600,16 @@ function move(index: number, delta: number) {
 }
 function addAttribute(target: AtributoTecnico[], option?: AtributoMueble, localName?: string) {
   const nombre = option?.nombre ?? localName?.trim() ?? search.value.trim()
-  if (!nombre || target.some((a) => (a.codigo || a.nombre) === (option?.codigo || nombre))) return
+  if (!nombre.trim()) {
+    aviso.value = 'Escribe el nombre de la característica.'
+    return
+  }
+  if (
+    target.some((a) => normalized(a.codigo || a.nombre) === normalized(option?.codigo || nombre))
+  ) {
+    aviso.value = 'Esta característica ya está agregada.'
+    return
+  }
   target.push({
     ...(option ? { codigo: option.codigo, tipo_entrada: option.tipo_entrada } : {}),
     nombre,
@@ -542,7 +669,180 @@ async function createType() {
     creatingType.value = false
   }
 }
+type SeccionStudio = 'general' | 'estructura' | 'accesorios' | 'comercial' | 'revision'
+const pasosValidacion: SeccionStudio[] = ['general', 'estructura', 'accesorios', 'comercial']
+const erroresSecciones = computed<Record<SeccionStudio, string[]>>(() => {
+  const problemas: Record<SeccionStudio, string[]> = {
+    general: [],
+    estructura: [],
+    accesorios: [],
+    comercial: [],
+    revision: [],
+  }
+  if (!comercial.nombre.trim()) problemas.general.push('Indica el nombre comercial del mueble.')
+  for (const medida of medidas) {
+    if (!medida.valor.trim() || dimensionSinModificar(medida)) continue
+    const numero = Number(medida.valor)
+    if (!Number.isFinite(numero) || numero <= 0)
+      problemas.general.push(
+        'Introduce una medida válida y positiva para ' + medida.clave.replace(/_/g, ' ') + '.',
+      )
+    if (!medida.unidad)
+      problemas.general.push('Confirma la unidad de ' + medida.clave.replace(/_/g, ' ') + '.')
+  }
+  if (atributosGenerales.some((a) => !a.nombre.trim() || !a.valor.trim()))
+    problemas.general.push('Completa o quita las características generales sin valor.')
+  if (conjuntos.some((g) => !g.nombre.trim()))
+    problemas.estructura.push('Pon un nombre a cada conjunto.')
+  if (componentes.some((c) => !c.nombre.trim()))
+    problemas.estructura.push('Pon un nombre a cada componente.')
+  if (
+    componentes.some(
+      (c) =>
+        c.cantidad_interna !== undefined &&
+        (!Number.isInteger(c.cantidad_interna) || c.cantidad_interna <= 0),
+    )
+  )
+    problemas.estructura.push('La cantidad de cada componente debe ser un número entero positivo.')
+  if (conjuntos.some((g) => !componentes.some((c) => c.conjunto_uid === g.uid)))
+    problemas.estructura.push('Cada conjunto necesita al menos un componente.')
+  if (componentes.some((c) => c.atributos?.some((a) => !a.nombre.trim() || !a.valor.trim())))
+    problemas.estructura.push('Completa o quita las características vacías de los componentes.')
+  if (accesorios.some((a) => !a.trim()))
+    problemas.accesorios.push('Completa o quita los accesorios sin descripción.')
+  if (
+    !comercial.cantidad.trim() ||
+    !Number.isInteger(Number(comercial.cantidad)) ||
+    Number(comercial.cantidad) <= 0
+  )
+    problemas.comercial.push('La cantidad cotizada debe ser un número entero mayor que cero.')
+  if (
+    !props.unidades?.some(
+      (u) => ['PIEZA', 'JUEGO'].includes(u.codigo) && String(u.id) === comercial.unidad,
+    )
+  )
+    problemas.comercial.push('Elige una unidad comercial válida.')
+  if (
+    !comercial.precio_unitario.trim() ||
+    !Number.isFinite(Number(comercial.precio_unitario)) ||
+    Number(comercial.precio_unitario) <= 0
+  )
+    problemas.comercial.push('Introduce un precio unitario mayor que cero.')
+  if (
+    !comercial.descuento.trim() ||
+    !Number.isFinite(Number(comercial.descuento)) ||
+    Number(comercial.descuento) < 0
+  )
+    problemas.comercial.push('Indica un descuento válido; escribe cero si no hay descuento.')
+  else if (
+    Number(comercial.descuento) >
+    Number(comercial.cantidad) * Number(comercial.precio_unitario)
+  )
+    problemas.comercial.push('El descuento no puede superar el subtotal.')
+  if (diferenciaComercial.value && !diferenciaConfirmada.value)
+    problemas.comercial.push(
+      'Confirma la diferencia entre el precio dictado y el importe indicado.',
+    )
+  return problemas
+})
+const estadoSecciones = computed<Record<SeccionStudio, 'pending' | 'issues' | 'complete'>>(() => ({
+  general: erroresSecciones.value.general.length
+    ? comercial.nombre.trim() || submitAttempted.value
+      ? 'issues'
+      : 'pending'
+    : 'complete',
+  estructura: erroresSecciones.value.estructura.length
+    ? 'issues'
+    : componentes.length
+      ? 'complete'
+      : 'pending',
+  accesorios: erroresSecciones.value.accesorios.length
+    ? 'issues'
+    : accesorios.length || form.observaciones.trim()
+      ? 'complete'
+      : 'pending',
+  comercial: erroresSecciones.value.comercial.length
+    ? comercial.precio_unitario.trim() || submitAttempted.value
+      ? 'issues'
+      : 'pending'
+    : 'complete',
+  revision: 'pending',
+}))
+watch(estadoSecciones, (value) => emit('sectionStatus', value), { immediate: true })
+function dimensionSinModificar(medida: Medida): boolean {
+  const original = medida.original
+  if (original === undefined) return false
+  if (typeof original === 'object' && original !== null && !Array.isArray(original)) {
+    const dim = original as Record<string, unknown>
+    return String(dim.valor ?? '') === medida.valor && String(dim.unidad ?? '') === medida.unidad
+  }
+  return String(original) === medida.valor
+}
+function errorMedida(medida: Medida): string {
+  if (!touchedMedidas[medida.clave] && !submitAttempted.value) return ''
+  if (!medida.valor.trim() || dimensionSinModificar(medida)) return ''
+  if (!Number.isFinite(Number(medida.valor)) || Number(medida.valor) <= 0)
+    return 'Introduce una medida numérica mayor que cero.'
+  if (!medida.unidad) return 'Confirma la unidad de la medida.'
+  return ''
+}
+function errorAtributo(a: AtributoTecnico): string {
+  if (!submitAttempted.value) return ''
+  if (!a.nombre.trim() || !a.valor.trim()) return 'Completa esta característica o quítala.'
+  if (a.tipo_entrada === 'entero' && (!Number.isInteger(Number(a.valor)) || Number(a.valor) < 0))
+    return 'Introduce un número entero válido.'
+  if (a.tipo_entrada === 'numero_unidad') {
+    if (!Number.isFinite(Number(a.valor))) return 'Introduce un número válido.'
+    if (!a.unidad?.trim()) return 'Selecciona una unidad.'
+  }
+  return ''
+}
+function errorGrupo(grupo: ConjuntoTecnico): string {
+  return (submitAttempted.value || touchedGrupos[grupo.uid]) && !grupo.nombre.trim()
+    ? 'Pon un nombre a este conjunto.'
+    : ''
+}
+function errorAccesorio(index: number): string {
+  return (submitAttempted.value || touchedAccesorios[index]) && !accesorios[index]?.trim()
+    ? 'Describe el accesorio o quítalo.'
+    : ''
+}
+function errorPieza(pieza: ComponenteTecnico): string {
+  if (!touchedPiezas[pieza.uid ?? pieza.nombre] && !submitAttempted.value) return ''
+  return pieza.nombre.trim() ? '' : 'Introduce el nombre de este componente.'
+}
+function errorCampo(seccion: SeccionStudio, index: number, touchedField = false): string {
+  if (!submitAttempted.value && !touchedField) return ''
+  if (seccion === 'general' && index === 0)
+    return !comercial.nombre.trim() ? 'Indica el nombre comercial del mueble.' : ''
+  if (seccion !== 'comercial') return ''
+  if (index === 0)
+    return !comercial.cantidad.trim() ||
+      !Number.isInteger(Number(comercial.cantidad)) ||
+      Number(comercial.cantidad) <= 0
+      ? 'Introduce una cantidad entera mayor que cero.'
+      : ''
+  if (index === 2)
+    return !comercial.precio_unitario.trim() ||
+      !Number.isFinite(Number(comercial.precio_unitario)) ||
+      Number(comercial.precio_unitario) <= 0
+      ? 'Introduce un precio unitario mayor que cero.'
+      : ''
+  if (index === 3)
+    return !comercial.descuento.trim() ||
+      !Number.isFinite(Number(comercial.descuento)) ||
+      Number(comercial.descuento) < 0 ||
+      Number(comercial.descuento) > Number(comercial.cantidad) * Number(comercial.precio_unitario)
+      ? 'El descuento debe ser válido y no superar el subtotal.'
+      : ''
+  return ''
+}
+function irASeccion(seccion: SeccionStudio) {
+  emit('requestSection', seccion)
+}
+
 function submit() {
+  submitAttempted.value = true
   const dim = serializarDimensiones()
   const generalesActuales: Record<string, unknown> = { ...generales }
   const dimensionesPresentes =
@@ -580,6 +880,12 @@ function submit() {
         : limites.max_componentes,
   }
   const errores = validarDatosTecnicos(datos, limitesCompatibles)
+  for (const medida of medidas) {
+    if (!medida.valor.trim() || dimensionSinModificar(medida)) continue
+    if (!Number.isFinite(Number(medida.valor)) || Number(medida.valor) <= 0)
+      errores.push('La medida ' + medida.clave.replace(/_/g, ' ') + ' debe ser un número positivo.')
+    if (!medida.unidad) errores.push('Indica la unidad de ' + medida.clave.replace(/_/g, ' ') + '.')
+  }
   const atributos = [
     ...atributosGenerales,
     ...componentes.flatMap((parte) => parte.atributos ?? []),
@@ -643,8 +949,15 @@ onMounted(loadCatalog)
 </script>
 
 <template>
-  <form class="configurator" @input="changed" @change="changed" @submit.prevent="submit">
-    <header class="config-header">
+  <form
+    class="configurator"
+    :class="{ 'configurator--studio': studio }"
+    @input="changed"
+    @change="changed"
+    @submit.prevent="submit"
+  >
+    <Toast :visible="Boolean(aviso)" :message="aviso" tone="info" @close="aviso = ''" />
+    <header v-if="!studio" class="config-header">
       <div>
         <p class="eyebrow">Mueble a pedido · Sin guardar</p>
         <h2>{{ detalle?.nombre || 'Nuevo mueble a pedido' }}</h2>
@@ -655,551 +968,923 @@ onMounted(loadCatalog)
         ><a href="#comercial">Datos comerciales</a><a href="#revision">Revisar</a>
       </nav>
     </header>
-    <aside
-      v-if="pendientesVisibles.length"
-      class="pending-summary"
-      aria-label="Información pendiente"
-      aria-live="polite"
-    >
-      <h3>Información pendiente</h3>
-      <ul>
-        <li v-for="p in pendientesVisibles" :key="p.indice">
-          <span>{{ p.mensaje }}</span>
-          <Button
-            v-if="
-              p.resolucion?.tipo === 'DIMENSION' &&
-              medidas.some((m) => m.clave === p.resolucion?.clave)
-            "
-            variant="secondary"
-            @click="enfocarDimension(p.resolucion.clave!)"
-            >Revisar {{ p.resolucion.clave }}</Button
-          >
-          <div
-            v-if="
-              p.codigo === 'ESPESOR_SIN_COMPONENTE' &&
-              p.resolucion?.tipo === 'ESPESOR_SIN_COMPONENTE' &&
-              p.resolucion.valor
-            "
-            class="inline"
-          >
-            <label>
-              Componente para {{ p.resolucion.valor }}
-              <select v-model="destinosEspesor[p.indice]">
-                <option value="">Seleccione un componente</option>
-                <option v-for="c in componentes" :key="c.uid" :value="c.uid">
-                  {{ c.nombre }}
-                </option>
-              </select>
-            </label>
-            <Button variant="secondary" @click="aplicarEspesor(p)"> Asignar espesor </Button>
-          </div>
-        </li>
-      </ul>
-    </aside>
-    <section id="identificacion">
-      <h3>Identificación</h3>
-      <TextField
-        v-model="comercial.nombre"
-        name="mueble-nombre-comercial"
-        label="Nombre comercial del mueble"
-      />
-      <Select
-        v-model="form.tipo_mueble"
-        name="tipo-mueble"
-        label="Tipo de mueble"
-        :options="[
-          { label: 'Sin especificar', value: '' },
-          ...tiposLocales.map((x) => ({ label: x.nombre, value: String(x.id) })),
-        ]"
-      />
-      <div class="inline">
-        <TextField
-          v-model="nuevoTipo"
-          name="nuevo-tipo"
-          label="Buscar o crear tipo de mueble"
-        /><Button variant="secondary" :processing="creatingType" @click="createType"
-          >Crear tipo</Button
+    <div class="configurator-layout">
+      <div class="configurator-fields">
+        <aside
+          v-if="pendientesVisibles.length && !studio"
+          class="pending-summary"
+          aria-label="Información pendiente"
+          aria-live="polite"
         >
-      </div>
-      <div
-        v-if="tiposParecidos.length"
-        class="suggestions"
-        role="group"
-        aria-label="Tipos de mueble similares existentes"
-      >
-        <p>Tipos existentes similares; selecciónalos para evitar duplicados:</p>
-        <button
-          v-for="tipo in tiposParecidos"
-          :key="tipo.id"
-          type="button"
-          @click="elegirTipoSimilar(tipo.id)"
-        >
-          {{ tipo.nombre }}
-        </button>
-      </div>
-    </section>
-    <section id="dimensiones">
-      <h3>Dimensiones generales opcionales</h3>
-      <p>Cada medida conserva su unidad y los datos técnicos originales.</p>
-      <div v-for="medida in medidas" :key="medida.clave" class="inline">
-        <TextField
-          v-model="medida.valor"
-          :name="medida.clave"
-          :label="medida.clave.replace(/_/g, ' ')"
-        />
-        <label
-          >Unidad
-          <select
-            :id="`unidad-${medida.clave}`"
-            v-model="medida.unidad"
-            :aria-label="'Unidad de ' + medida.clave"
-            :aria-invalid="pendientesDimension(medida.clave).length ? true : undefined"
-            :aria-describedby="
-              pendientesDimension(medida.clave).length ? `pendiente-${medida.clave}` : undefined
-            "
-          >
-            <option value="">Sin unidad identificada</option>
-            <option v-for="unidad in unidadesPermitidas" :key="unidad" :value="unidad">
-              {{ unidad }}
-            </option>
-          </select>
-        </label>
-        <p
-          v-if="pendientesDimension(medida.clave).length"
-          :id="`pendiente-${medida.clave}`"
-          class="dimension-pending"
-        >
-          <strong>Revisar {{ medida.clave }}:</strong>
-          {{
-            pendientesDimension(medida.clave)
-              .map((p) => p.mensaje)
-              .join(' ')
-          }}
-        </p>
-        <Button
-          v-if="!clavesIniciales.includes(medida.clave)"
-          variant="secondary"
-          @click="eliminarMedida(medida.clave)"
-          >Quitar medida</Button
-        >
-      </div>
-      <div class="inline">
-        <label
-          >Nueva medida
-          <input v-model="nuevaMedida" list="medidas-sugeridas" aria-label="Nueva medida" />
-        </label>
-        <datalist id="medidas-sugeridas">
-          <option v-for="opcion in opcionesMedidas" :key="opcion" :value="opcion" />
-        </datalist>
-        <Button variant="secondary" :disabled="!nuevaMedida.trim()" @click="agregarMedida"
-          >Añadir medida</Button
-        >
-      </div>
-    </section>
-    <section>
-      <h3>Características generales</h3>
-      <div class="attribute-search">
-        <TextField v-model="search" name="buscar-atributo" label="Buscar característica" />
-        <div v-if="search" class="suggestions">
-          <button
-            v-for="item in resultados"
-            :key="item.id"
-            type="button"
-            @click="addAttribute(atributosGenerales, item)"
-          >
-            {{ item.nombre }} · {{ item.grupo }}</button
-          ><button type="button" @click="addAttribute(atributosGenerales)">
-            Añadir “{{ search }}” como atributo local
-          </button>
-        </div>
-      </div>
-      <p v-if="catalogError" role="status">{{ catalogError }}</p>
-      <div v-for="(a, i) in atributosGenerales" :key="a.codigo || a.nombre" class="inline">
-        <label v-if="a.tipo_entrada === 'entero'">
-          {{ a.nombre }}
-          <input v-model="a.valor" :name="`general-${i}`" type="number" step="1" />
-        </label>
-        <label v-else-if="a.tipo_entrada === 'numero_unidad'">
-          {{ a.nombre }}
-          <input v-model="a.valor" :name="`general-${i}`" type="number" step="any" />
-        </label>
-        <TextField v-else v-model="a.valor" :name="`general-${i}`" :label="a.nombre" />
-        <label v-if="a.tipo_entrada === 'numero_unidad'"
-          >Unidad de {{ a.nombre }}
-          <select v-model="a.unidad">
-            <option value="">No especificada</option>
-            <option v-for="unidad in unidadesPermitidas" :key="unidad" :value="unidad">
-              {{ unidad }}
-            </option>
-          </select>
-        </label>
-        <Button variant="secondary" @click="atributosGenerales.splice(i, 1)">Quitar</Button>
-      </div>
-    </section>
-    <section>
-      <div class="heading">
-        <h3>Conjuntos ({{ conjuntos.length }}/{{ limites.max_conjuntos }})</h3>
-        <Button
-          variant="secondary"
-          :disabled="
-            conjuntos.length >= limites.max_conjuntos ||
-            conjuntos.some((g) => !componentes.some((c) => c.conjunto_uid === g.uid))
-          "
-          @click="addConjunto"
-          >Añadir conjunto</Button
-        >
-      </div>
-      <article v-for="(g, gi) in conjuntos" :key="g.uid" class="card">
-        <div class="inline">
-          <TextField v-model="g.nombre" :name="`grupo-${gi}`" label="Nombre del conjunto" /><Button
-            variant="secondary"
-            @click="addComponente(g.uid)"
-            >Añadir componente</Button
-          ><Button variant="secondary" @click="removeConjunto(gi)">Quitar conjunto</Button>
-        </div>
-        <div
-          v-if="conjuntoPorEliminar === g.uid"
-          class="conjunto-destino"
-          role="group"
-          :aria-label="'Reasignación del conjunto ' + g.nombre"
-        >
-          <p>Elige a dónde mover sus componentes. Ninguna pieza se eliminará.</p>
-          <label
-            >Destino de componentes
-            <select v-model="destinoDelConjunto" aria-label="Destino de componentes">
-              <option value="">Sin conjunto</option>
-              <option
-                v-for="otro in conjuntos.filter((c) => c.uid !== g.uid)"
-                :key="otro.uid"
-                :value="otro.uid"
-              >
-                {{ otro.nombre }}
-              </option>
-            </select>
-          </label>
-          <Button variant="secondary" @click="confirmarDestinoDelConjunto(g.uid)">
-            Mover componentes y quitar conjunto
-          </Button>
-          <Button variant="secondary" @click="conjuntoPorEliminar = null">Cancelar traslado</Button>
-        </div>
-      </article>
-    </section>
-    <section id="componentes">
-      <div class="heading">
-        <h3>Componentes ({{ componentes.length }}/{{ limites.max_componentes }})</h3>
-        <Button
-          variant="secondary"
-          :disabled="
-            componentes.length >= limites.max_componentes ||
-            componentes.some((c) => !c.nombre.trim())
-          "
-          @click="addComponente()"
-          >Agregar componente</Button
-        >
-      </div>
-      <details v-for="(c, i) in componentes" :key="c.uid || i" class="card" open>
-        <summary>Componente {{ i + 1 }}: {{ c.nombre || 'Sin nombre' }}</summary>
-        <div class="heading">
-          <strong>Componente {{ i + 1 }}</strong>
-          <div>
-            <button type="button" @click="move(i, -1)">Subir</button
-            ><button type="button" @click="move(i, 1)">Bajar</button>
-          </div>
-        </div>
-        <div class="grid">
-          <TextField v-model="c.nombre" :name="`componente-nombre-${i}`" label="Nombre" /><label
-            class="number-field"
-            >Cantidad por mueble<input
-              :value="c.cantidad_interna ?? ''"
-              @input="setCantidadInterna(c, $event)"
-              :name="`componente-${i}-cantidad`"
-              type="number"
-              min="1" /></label
-          ><TextField
-            v-model="c.material"
-            :name="`componente-material-${i}`"
-            label="Material"
-          /><TextField
-            v-model="c.espesor"
-            :name="`componente-espesor-${i}`"
-            label="Espesor"
-          /><TextField v-model="c.color" :name="`componente-color-${i}`" label="Color" />
-          <p v-if="c.dimensiones && typeof c.dimensiones !== 'string'">
-            Dimensiones históricas: {{ readableDimension(c.dimensiones) }}
-          </p>
-          <TextField
-            v-else
-            v-model="c.dimensiones"
-            :name="`componente-dimensiones-${i}`"
-            label="Dimensiones literales"
-          />
-        </div>
-        <Select
-          v-model="c.conjunto_uid"
-          :name="`componente-${i}-grupo`"
-          label="Conjunto"
-          :options="[
-            { label: 'Sin conjunto', value: '' },
-            ...conjuntos.map((g) => ({ label: g.nombre || 'Sin nombre', value: g.uid })),
-          ]"
-        />
-        <div class="attribute-search component-attribute-search">
-          <TextField
-            v-model="componentSearch[c.uid || String(i)]"
-            :name="`buscar-atributo-componente-${i}`"
-            label="Buscar característica para este componente"
-          />
-          <div v-if="componentSearch[c.uid || String(i)]" class="suggestions">
-            <button
-              v-for="item in matchingAttributes(
-                componentSearch[c.uid || String(i)] || '',
-                'componente',
-              )"
-              :key="item.id"
-              type="button"
-              @click="addComponentAttribute(c, c.uid || String(i), item)"
-            >
-              {{ item.nombre }} · {{ item.grupo }}
-            </button>
-            <button type="button" @click="addComponentAttribute(c, c.uid || String(i))">
-              Añadir atributo personalizado local
-            </button>
-          </div>
-        </div>
-        <div v-for="(a, ai) in c.atributos" :key="a.codigo || a.nombre" class="inline">
-          <label v-if="a.tipo_entrada === 'entero'">
-            {{ a.nombre }}
-            <input v-model="a.valor" :name="`atributo-${i}-${ai}`" type="number" step="1" />
-          </label>
-          <label v-else-if="a.tipo_entrada === 'numero_unidad'">
-            {{ a.nombre }}
-            <input v-model="a.valor" :name="`atributo-${i}-${ai}`" type="number" step="any" />
-          </label>
-          <TextField v-else v-model="a.valor" :name="`atributo-${i}-${ai}`" :label="a.nombre" />
-          <label v-if="a.tipo_entrada === 'numero_unidad'"
-            >Unidad de {{ a.nombre }}
-            <select v-model="a.unidad">
-              <option value="">No especificada</option>
-              <option v-for="unidad in unidadesPermitidas" :key="unidad" :value="unidad">
-                {{ unidad }}
-              </option>
-            </select>
-          </label>
-          <Button variant="secondary" @click="c.atributos?.splice(ai, 1)">Quitar</Button>
-        </div>
-        <div class="inline">
-          <Button variant="secondary" @click="duplicateComponente(i)">Duplicar</Button
-          ><Button variant="secondary" @click="removeComponente(i)">Quitar</Button>
-        </div>
-      </details>
-      <Button v-if="componentesRetirados.length" variant="secondary" @click="deshacerComponente">
-        Deshacer eliminación de componente
-      </Button>
-    </section>
-    <section id="accesorios">
-      <h3>Accesorios incluidos</h3>
-      <div v-for="(_, i) in accesorios" :key="i" class="inline">
-        <TextField v-model="accesorios[i]" :name="`accesorio-${i}`" label="Descripción" /><Button
-          variant="secondary"
-          @click="removeAccesorio(i)"
-          >Quitar</Button
-        >
-      </div>
-      <Button
-        variant="secondary"
-        :disabled="accesorios.some((a) => !a.trim())"
-        @click="addAccesorio"
-        >Añadir accesorio</Button
-      >
-      <Button v-if="accesoriosRetirados.length" variant="secondary" @click="deshacerAccesorio">
-        Deshacer eliminación de accesorio
-      </Button>
-    </section>
-    <section>
-      <TextField
-        v-model="form.observaciones"
-        name="observaciones-especificacion"
-        label="Observaciones"
-      />
-      <div v-if="base.advertencias?.length">
-        <h4>Información pendiente histórica</h4>
-        <ul>
-          <li v-for="item in base.advertencias" :key="item">{{ item }}</li>
-        </ul>
-      </div>
-    </section>
-    <section id="comercial">
-      <h3>Datos comerciales de este mueble</h3>
-      <aside v-if="totalDictado" aria-label="Revisión de precio total dictado">
-        <p>
-          Total reconocido en el dictado:
-          <strong>{{ totalDictado.total_negociado }} {{ moneda ?? 'BOB' }}</strong
-          >. Es un total de línea, no un precio unitario.
-        </p>
-        <p v-if="unitarioSugerido">
-          Para {{ comercial.cantidad }} muebles, precio unitario calculado:
-          <strong>{{ unitarioSugerido }} {{ moneda ?? 'BOB' }}</strong
-          >. Se completa automáticamente en el campo editable si no había un precio previo.
-        </p>
-        <p v-else role="status">
-          Para calcular el unitario, indica una cantidad válida, sin descuento, y una división
-          exacta a centavos. Si no es posible, introduce el precio manualmente.
-        </p>
-        <label v-if="diferenciaComercial">
-          <input v-model="diferenciaConfirmada" type="checkbox" />
-          Confirmo que el importe comercial difiere del total dictado y deseo guardar esa
-          diferencia.
-        </label>
-      </aside>
-      <div class="grid">
-        <TextField
-          v-model="comercial.descripcion"
-          name="mueble-descripcion"
-          label="Descripción comercial opcional"
-        />
-        <TextField v-model="comercial.cantidad" name="mueble-cantidad" label="Cantidad cotizada" />
-        <Select
-          v-model="comercial.unidad"
-          name="mueble-unidad"
-          label="Unidad comercial"
-          :options="
-            (unidades ?? [])
-              .filter((u) => ['PIEZA', 'JUEGO'].includes(u.codigo))
-              .map((u) => ({ label: u.nombre, value: String(u.id) }))
-          "
-        />
-        <TextField
-          v-model="comercial.precio_unitario"
-          name="mueble-precio"
-          :label="'Precio unitario negociado (' + (moneda ?? 'BOB') + ')'"
-        />
-        <TextField
-          v-model="comercial.descuento"
-          name="mueble-descuento"
-          label="Descuento monetario total de línea"
-        />
-      </div>
-      <p role="status">
-        Total estimado en {{ moneda ?? 'BOB' }}:
-        {{ totalEstimado === null ? 'Pendiente' : totalEstimado.toFixed(2) }}. El importe definitivo
-        se calcula en PostgreSQL.
-      </p>
-    </section>
-    <section id="revision" aria-labelledby="revision-title">
-      <h3 id="revision-title">Revisar mueble</h3>
-      <dl class="review-grid">
-        <div>
-          <dt>Nombre comercial</dt>
-          <dd>{{ comercial.nombre || 'Dato no especificado' }}</dd>
-        </div>
-        <div>
-          <dt>Tipo</dt>
-          <dd>
-            {{
-              tiposLocales.find((x) => String(x.id) === form.tipo_mueble)?.nombre ||
-              'Dato no especificado'
-            }}
-          </dd>
-        </div>
-        <div>
-          <dt>Cantidad cotizada</dt>
-          <dd>
-            {{ comercial.cantidad || 'Dato no especificado' }}
-            {{ unidades?.find((u) => String(u.id) === comercial.unidad)?.nombre }}
-          </dd>
-        </div>
-        <div>
-          <dt>Precio unitario</dt>
-          <dd>{{ comercial.precio_unitario || 'Dato no especificado' }} {{ moneda ?? 'BOB' }}</dd>
-        </div>
-        <div>
-          <dt>Descuento de línea</dt>
-          <dd>{{ comercial.descuento ?? '0.00' }}</dd>
-        </div>
-        <div>
-          <dt>Componentes</dt>
-          <dd>{{ componentes.length }}</dd>
-        </div>
-        <div>
-          <dt>Accesorios</dt>
-          <dd>{{ accesorios.filter((x) => x.trim()).length }}</dd>
-        </div>
-        <div>
-          <dt>Total estimado</dt>
-          <dd>
-            {{ totalEstimado === null ? 'Pendiente' : totalEstimado.toFixed(2) }}
-            {{ moneda ?? 'BOB' }}
-          </dd>
-        </div>
-      </dl>
-      <div class="review-detail">
-        <h4>Dimensiones generales</h4>
-        <ul>
-          <li v-for="medida in medidas.filter((m) => m.valor.trim())" :key="medida.clave">
-            {{ medida.clave.replace(/_/g, ' ') }}: {{ medida.valor }} {{ medida.unidad }}
-          </li>
-        </ul>
-        <p v-if="!medidas.some((m) => m.valor.trim())">Dato no especificado.</p>
-        <h4>Atributos generales</h4>
-        <ul>
-          <li v-for="attr in atributosGenerales" :key="attr.codigo || attr.nombre">
-            {{ attr.nombre }}: {{ attr.valor }} {{ attr.unidad ?? '' }}
-          </li>
-        </ul>
-        <h4>Conjuntos</h4>
-        <ul>
-          <li v-for="grupo in conjuntos" :key="grupo.uid">
-            {{ grupo.nombre }}:
-            {{
-              componentes
-                .filter((c) => c.conjunto_uid === grupo.uid)
-                .map((c) => c.nombre)
-                .join(', ') || 'Sin componentes'
-            }}
-          </li>
-        </ul>
-        <h4>Componentes y sus características</h4>
-        <article v-for="c in componentes" :key="c.uid" class="review-piece">
-          <h5>
-            {{ c.nombre || 'Sin nombre' }} · Cantidad por mueble:
-            {{ c.cantidad_interna ?? 'No indicada' }}
-          </h5>
-          <p v-if="c.material">Material: {{ c.material }}</p>
-          <p v-if="c.espesor">Espesor: {{ c.espesor }}</p>
-          <p v-if="c.color">Color: {{ c.color }}</p>
-          <p v-if="c.dimensiones">Dimensiones: {{ c.dimensiones }}</p>
-          <p v-if="c.conjunto_uid">
-            Conjunto: {{ conjuntos.find((g) => g.uid === c.conjunto_uid)?.nombre }}
-          </p>
+          <h3>Información pendiente</h3>
           <ul>
-            <li v-for="attr in c.atributos ?? []" :key="attr.codigo || attr.nombre">
-              {{ attr.nombre }}: {{ attr.valor }} {{ attr.unidad ?? '' }}
+            <li v-for="p in pendientesVisibles" :key="p.indice">
+              <span>{{ p.mensaje }}</span>
+              <Button
+                v-if="
+                  p.resolucion?.tipo === 'DIMENSION' &&
+                  medidas.some((m) => m.clave === p.resolucion?.clave)
+                "
+                variant="secondary"
+                @click="enfocarDimension(p.resolucion.clave!)"
+                >Revisar {{ p.resolucion.clave }}</Button
+              >
+              <div
+                v-if="
+                  p.codigo === 'ESPESOR_SIN_COMPONENTE' &&
+                  p.resolucion?.tipo === 'ESPESOR_SIN_COMPONENTE' &&
+                  p.resolucion.valor
+                "
+                class="inline"
+              >
+                <label>
+                  Componente para {{ p.resolucion.valor }}
+                  <select v-model="destinosEspesor[p.indice]">
+                    <option value="">Seleccione un componente</option>
+                    <option v-for="c in componentes" :key="c.uid" :value="c.uid">
+                      {{ c.nombre }}
+                    </option>
+                  </select>
+                </label>
+                <Button variant="secondary" @click="aplicarEspesor(p)"> Asignar espesor </Button>
+              </div>
             </li>
           </ul>
-        </article>
-        <h4>Accesorios incluidos</h4>
-        <ul>
-          <li v-for="(acc, i) in accesorios" :key="i">{{ acc || 'Pendiente de completar' }}</li>
-        </ul>
-        <h4>Observaciones y pendientes</h4>
-        <p>{{ form.observaciones || 'Sin observaciones adicionales.' }}</p>
-        <ul>
-          <li v-for="(warning, i) in base.advertencias ?? []" :key="i">{{ warning }}</li>
-        </ul>
-        <p v-if="base.descripcion_original">
-          Descripción original conservada: {{ base.descripcion_original }}
-        </p>
+        </aside>
+        <section id="identificacion" v-show="!studio || activeSection === 'general'">
+          <h3>Identificación</h3>
+          <div class="studio-identification-fields">
+            <TextField
+              v-model="comercial.nombre"
+              name="mueble-nombre-comercial"
+              label="Nombre comercial del mueble *"
+              :max-length="200"
+              :error="errorCampo('general', 0, touched.nombre)"
+              @blur="touched.nombre = true"
+            />
+            <MuebleOptionPicker
+              v-if="studio"
+              v-model="form.tipo_mueble"
+              name="tipo-mueble-buscador"
+              label="Tipo de mueble (opcional)"
+              :options="tiposLocales.map((x) => ({ label: x.nombre, value: String(x.id) }))"
+              placeholder="Buscar un tipo existente..."
+              allow-create
+              create-label="Crear nuevo tipo"
+              :busy="creatingType"
+              @create="crearTipoDesdeBuscador"
+            />
+            <template v-else>
+              <Select
+                v-model="form.tipo_mueble"
+                name="tipo-mueble"
+                label="Tipo de mueble"
+                :options="[
+                  { label: 'Sin especificar', value: '' },
+                  ...tiposLocales.map((x) => ({ label: x.nombre, value: String(x.id) })),
+                ]"
+              />
+              <div class="inline">
+                <TextField
+                  v-model="nuevoTipo"
+                  name="nuevo-tipo"
+                  label="Buscar o crear tipo de mueble"
+                /><Button variant="secondary" :processing="creatingType" @click="createType"
+                  >Crear tipo</Button
+                >
+              </div>
+              <div
+                v-if="tiposParecidos.length"
+                class="suggestions"
+                role="group"
+                aria-label="Tipos de mueble similares existentes"
+              >
+                <p>Tipos existentes similares; selecciónalos para evitar duplicados:</p>
+                <button
+                  v-for="tipo in tiposParecidos"
+                  :key="tipo.id"
+                  type="button"
+                  @click="elegirTipoSimilar(tipo.id)"
+                >
+                  {{ tipo.nombre }}
+                </button>
+              </div>
+            </template>
+          </div>
+        </section>
+        <section
+          id="dimensiones"
+          class="dimensions-section"
+          v-show="!studio || activeSection === 'general'"
+        >
+          <h3>Dimensiones generales opcionales</h3>
+          <p>Cada medida conserva su unidad y los datos técnicos originales.</p>
+          <div class="measure-grid">
+            <div v-for="medida in medidas" :key="medida.clave" class="inline measure-row">
+              <TextField
+                v-model="medida.valor"
+                :name="medida.clave"
+                :label="medida.clave.replace(/_/g, ' ')"
+                input-mode="decimal"
+                :error="errorMedida(medida)"
+                @blur="touchedMedidas[medida.clave] = true"
+              />
+              <label
+                >Unidad
+                <select
+                  :id="`unidad-${medida.clave}`"
+                  v-model="medida.unidad"
+                  :aria-label="'Unidad de ' + medida.clave"
+                  :aria-invalid="pendientesDimension(medida.clave).length ? true : undefined"
+                  :aria-describedby="
+                    pendientesDimension(medida.clave).length
+                      ? `pendiente-${medida.clave}`
+                      : undefined
+                  "
+                >
+                  <option value="">Sin unidad identificada</option>
+                  <option v-for="unidad in unidadesPermitidas" :key="unidad" :value="unidad">
+                    {{ unidad }}
+                  </option>
+                </select>
+              </label>
+              <p
+                v-if="pendientesDimension(medida.clave).length"
+                :id="`pendiente-${medida.clave}`"
+                class="dimension-pending"
+              >
+                <strong>Revisar {{ medida.clave }}:</strong>
+                {{
+                  pendientesDimension(medida.clave)
+                    .map((p) => p.mensaje)
+                    .join(' ')
+                }}
+              </p>
+              <Button
+                v-if="!clavesIniciales.includes(medida.clave)"
+                variant="secondary"
+                @click="eliminarMedida(medida.clave)"
+                >Quitar medida</Button
+              >
+            </div>
+          </div>
+          <div v-if="!studio" class="inline">
+            <label
+              >Nueva medida
+              <input v-model="nuevaMedida" list="medidas-sugeridas" aria-label="Nueva medida" />
+            </label>
+            <datalist id="medidas-sugeridas">
+              <option v-for="opcion in opcionesMedidas" :key="opcion" :value="opcion" />
+            </datalist>
+            <Button variant="secondary" :disabled="!nuevaMedida.trim()" @click="agregarMedida"
+              >Añadir medida</Button
+            >
+          </div>
+          <MuebleOptionPicker
+            v-else
+            :model-value="''"
+            name="agregar-medida"
+            label="Agregar medida"
+            placeholder="Buscar una medida, por ejemplo: diámetro"
+            :options="
+              opcionesMedidas
+                .filter((x) => !medidas.some((m) => m.clave === x))
+                .map((x) => ({ value: x, label: x.replace(/_/g, ' ') }))
+            "
+            allow-create
+            create-label="Agregar medida personalizada"
+            @update:model-value="agregarMedidaElegida"
+            @create="agregarMedidaElegida"
+          />
+        </section>
+        <section v-show="!studio || activeSection === 'general'">
+          <h3>Características generales</h3>
+          <div class="attribute-search">
+            <MuebleOptionPicker
+              v-if="studio"
+              :model-value="''"
+              name="buscar-atributo-estudio"
+              label="Agregar característica"
+              placeholder="Buscar característica existente..."
+              :options="
+                catalogo
+                  .filter(
+                    (x) =>
+                      !Array.isArray(x.ambitos) ||
+                      !x.ambitos.length ||
+                      x.ambitos.includes('mueble'),
+                  )
+                  .map((x) => ({ value: String(x.id), label: x.nombre }))
+              "
+              allow-create
+              create-label="Agregar característica personalizada"
+              @update:model-value="elegirAtributoGeneral"
+              @create="addAttribute(atributosGenerales, undefined, $event)"
+            />
+            <TextField
+              v-else
+              v-model="search"
+              name="buscar-atributo"
+              label="Buscar característica"
+            />
+            <div v-if="search && !studio" class="suggestions">
+              <button
+                v-for="item in resultados"
+                :key="item.id"
+                type="button"
+                @click="addAttribute(atributosGenerales, item)"
+              >
+                {{ item.nombre }} · {{ item.grupo }}</button
+              ><button type="button" @click="addAttribute(atributosGenerales)">
+                Añadir “{{ search }}” como atributo local
+              </button>
+            </div>
+          </div>
+          <p v-if="catalogError" role="status">{{ catalogError }}</p>
+          <div class="studio-attributes-grid">
+            <div
+              v-for="(a, i) in atributosGenerales"
+              :key="a.codigo || a.nombre"
+              class="inline studio-attribute-row"
+            >
+              <p v-if="errorAtributo(a)" class="studio-attribute-error" role="alert">
+                {{ errorAtributo(a) }}
+              </p>
+              <label v-if="a.tipo_entrada === 'entero'">
+                {{ a.nombre }}
+                <input v-model="a.valor" :name="`general-${i}`" type="number" step="1" />
+              </label>
+              <label v-else-if="a.tipo_entrada === 'numero_unidad'">
+                {{ a.nombre }}
+                <input v-model="a.valor" :name="`general-${i}`" type="number" step="any" />
+              </label>
+              <TextField v-else v-model="a.valor" :name="`general-${i}`" :label="a.nombre" />
+              <label v-if="a.tipo_entrada === 'numero_unidad'"
+                >Unidad de {{ a.nombre }}
+                <select v-model="a.unidad">
+                  <option value="">No especificada</option>
+                  <option v-for="unidad in unidadesPermitidas" :key="unidad" :value="unidad">
+                    {{ unidad }}
+                  </option>
+                </select>
+              </label>
+              <Button variant="secondary" @click="atributosGenerales.splice(i, 1)">Quitar</Button>
+            </div>
+          </div>
+        </section>
+        <section
+          v-show="!studio || activeSection === 'estructura'"
+          :class="{ 'studio-group-management': studio }"
+        >
+          <div class="heading">
+            <h3>Conjuntos ({{ conjuntos.length }}/{{ limites.max_conjuntos }})</h3>
+            <Button
+              variant="secondary"
+              :disabled="
+                !studio &&
+                (conjuntos.length >= limites.max_conjuntos ||
+                  conjuntos.some((g) => !componentes.some((c) => c.conjunto_uid === g.uid)))
+              "
+              @click="addConjunto"
+              >Añadir conjunto</Button
+            >
+          </div>
+          <article v-for="(g, gi) in conjuntos" :key="g.uid" class="card studio-group-card">
+            <div class="inline">
+              <TextField
+                v-model="g.nombre"
+                :name="`grupo-${gi}`"
+                label="Nombre del conjunto *"
+                :error="errorGrupo(g)"
+                @blur="touchedGrupos[g.uid] = true"
+              /><Button variant="secondary" @click="addComponente(g.uid)">Añadir componente</Button
+              ><Button variant="secondary" @click="removeConjunto(gi)">Quitar conjunto</Button>
+            </div>
+            <div
+              v-if="conjuntoPorEliminar === g.uid"
+              class="conjunto-destino"
+              role="group"
+              :aria-label="'Reasignación del conjunto ' + g.nombre"
+            >
+              <p>Elige a dónde mover sus componentes. Ninguna pieza se eliminará.</p>
+              <label
+                >Destino de componentes
+                <select v-model="destinoDelConjunto" aria-label="Destino de componentes">
+                  <option value="">Sin conjunto</option>
+                  <option
+                    v-for="otro in conjuntos.filter((c) => c.uid !== g.uid)"
+                    :key="otro.uid"
+                    :value="otro.uid"
+                  >
+                    {{ otro.nombre }}
+                  </option>
+                </select>
+              </label>
+              <Button variant="secondary" @click="confirmarDestinoDelConjunto(g.uid)">
+                Mover componentes y quitar conjunto
+              </Button>
+              <Button variant="secondary" @click="conjuntoPorEliminar = null"
+                >Cancelar traslado</Button
+              >
+            </div>
+          </article>
+        </section>
+        <section id="componentes" v-show="!studio || activeSection === 'estructura'">
+          <div class="heading">
+            <h3>Componentes ({{ componentes.length }}/{{ limites.max_componentes }})</h3>
+            <Button
+              variant="secondary"
+              :disabled="
+                !studio &&
+                (componentes.length >= limites.max_componentes ||
+                  componentes.some((c) => !c.nombre.trim()))
+              "
+              @click="addComponente()"
+              >Agregar componente</Button
+            >
+          </div>
+          <div class="studio-component-layout">
+            <aside
+              v-if="studio"
+              class="studio-component-tree"
+              aria-label="Explorador de componentes"
+            >
+              <p class="tree-heading">
+                <Layers3 :size="15" aria-hidden="true" /> ELEMENTOS DEL MUEBLE
+              </p>
+              <p v-if="!componentes.length" class="tree-empty">
+                No hay piezas todavía. Utiliza «Agregar componente» para comenzar.
+              </p>
+              <div v-for="grupo in gruposArbol" :key="grupo.id" class="tree-group">
+                <h4>
+                  {{ grupo.nombre }} <small>{{ grupo.piezas.length }}</small>
+                </h4>
+                <button
+                  v-for="item in grupo.piezas"
+                  :key="item.pieza.uid || item.index"
+                  type="button"
+                  class="tree-item"
+                  :class="{
+                    'tree-item--active':
+                      activeComponentUid === (item.pieza.uid || String(item.index)),
+                  }"
+                  :aria-pressed="activeComponentUid === (item.pieza.uid || String(item.index))"
+                  @click="activeComponentUid = item.pieza.uid || String(item.index)"
+                >
+                  <strong>{{ item.pieza.nombre || 'Componente sin nombre' }}</strong>
+                  <small>{{ item.pieza.cantidad_interna ?? '—' }} por mueble</small>
+                </button>
+              </div>
+            </aside>
+            <div class="studio-component-detail">
+              <details
+                v-for="(c, i) in componentes"
+                v-show="!studio || activeComponentUid === (c.uid || String(i))"
+                :key="c.uid || i"
+                class="card"
+                open
+              >
+                <summary v-if="!studio">
+                  Componente {{ i + 1 }}: {{ c.nombre || 'Sin nombre' }}
+                </summary>
+                <div class="heading">
+                  <strong>Componente {{ i + 1 }}</strong>
+                  <div>
+                    <button type="button" :disabled="i === 0" @click="move(i, -1)">Subir</button
+                    ><button
+                      type="button"
+                      :disabled="i === componentes.length - 1"
+                      @click="move(i, 1)"
+                    >
+                      Bajar
+                    </button>
+                  </div>
+                </div>
+                <div class="grid">
+                  <TextField
+                    v-model="c.nombre"
+                    :name="`componente-nombre-${i}`"
+                    label="Nombre *"
+                    :error="errorPieza(c)"
+                    @blur="touchedPiezas[c.uid ?? c.nombre] = true"
+                  /><label class="number-field"
+                    >Cantidad por mueble<input
+                      :value="c.cantidad_interna ?? ''"
+                      @input="setCantidadInterna(c, $event)"
+                      :name="`componente-${i}-cantidad`"
+                      type="number"
+                      min="1" /></label
+                  ><TextField
+                    v-model="c.material"
+                    :name="`componente-material-${i}`"
+                    label="Material"
+                  /><TextField
+                    v-model="c.espesor"
+                    :name="`componente-espesor-${i}`"
+                    label="Espesor"
+                  /><TextField v-model="c.color" :name="`componente-color-${i}`" label="Color" />
+                  <p v-if="c.dimensiones && typeof c.dimensiones !== 'string'">
+                    Dimensiones históricas: {{ readableDimension(c.dimensiones) }}
+                  </p>
+                  <TextField
+                    v-else
+                    v-model="c.dimensiones"
+                    :name="`componente-dimensiones-${i}`"
+                    label="Medidas o dimensiones de la pieza"
+                  />
+                </div>
+                <Select
+                  v-model="c.conjunto_uid"
+                  :name="`componente-${i}-grupo`"
+                  label="Conjunto"
+                  :options="[
+                    { label: 'Sin conjunto', value: '' },
+                    ...conjuntos.map((g) => ({ label: g.nombre || 'Sin nombre', value: g.uid })),
+                  ]"
+                />
+                <div class="attribute-search component-attribute-search">
+                  <TextField
+                    v-model="componentSearch[c.uid || String(i)]"
+                    :name="`buscar-atributo-componente-${i}`"
+                    label="Buscar característica para este componente"
+                  />
+                  <div v-if="componentSearch[c.uid || String(i)]" class="suggestions">
+                    <button
+                      v-for="item in matchingAttributes(
+                        componentSearch[c.uid || String(i)] || '',
+                        'componente',
+                      )"
+                      :key="item.id"
+                      type="button"
+                      @click="addComponentAttribute(c, c.uid || String(i), item)"
+                    >
+                      {{ item.nombre }} · {{ item.grupo }}
+                    </button>
+                    <button type="button" @click="addComponentAttribute(c, c.uid || String(i))">
+                      Añadir atributo personalizado local
+                    </button>
+                  </div>
+                </div>
+                <div v-for="(a, ai) in c.atributos" :key="a.codigo || a.nombre" class="inline">
+                  <p v-if="errorAtributo(a)" class="studio-attribute-error" role="alert">
+                    {{ errorAtributo(a) }}
+                  </p>
+                  <label v-if="a.tipo_entrada === 'entero'">
+                    {{ a.nombre }}
+                    <input v-model="a.valor" :name="`atributo-${i}-${ai}`" type="number" step="1" />
+                  </label>
+                  <label v-else-if="a.tipo_entrada === 'numero_unidad'">
+                    {{ a.nombre }}
+                    <input
+                      v-model="a.valor"
+                      :name="`atributo-${i}-${ai}`"
+                      type="number"
+                      step="any"
+                    />
+                  </label>
+                  <TextField
+                    v-else
+                    v-model="a.valor"
+                    :name="`atributo-${i}-${ai}`"
+                    :label="a.nombre"
+                  />
+                  <label v-if="a.tipo_entrada === 'numero_unidad'"
+                    >Unidad de {{ a.nombre }}
+                    <select v-model="a.unidad">
+                      <option value="">No especificada</option>
+                      <option v-for="unidad in unidadesPermitidas" :key="unidad" :value="unidad">
+                        {{ unidad }}
+                      </option>
+                    </select>
+                  </label>
+                  <Button variant="secondary" @click="c.atributos?.splice(ai, 1)">Quitar</Button>
+                </div>
+                <details v-if="studio" class="component-actions-menu">
+                  <summary>Acciones de esta pieza</summary>
+                  <div>
+                    <Button variant="secondary" @click="duplicateComponente(i)"
+                      >Duplicar componente</Button
+                    >
+                    <Button variant="secondary" @click="removeComponente(i)"
+                      >Quitar componente</Button
+                    >
+                  </div>
+                </details>
+                <div v-else class="inline">
+                  <Button variant="secondary" @click="duplicateComponente(i)">Duplicar</Button>
+                  <Button variant="secondary" @click="removeComponente(i)">Quitar</Button>
+                </div>
+              </details>
+              <div v-if="studio && !componentes.length" class="empty-editor">
+                <h4>Empieza por una pieza</h4>
+                <p>
+                  Agrega un componente y podrás completar sus materiales, dimensiones y
+                  características.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div v-if="studio && componentesRetirados.length" class="undo-notice" role="status">
+            Se quitó un componente.
+            <button type="button" @click="deshacerComponente">Deshacer</button>
+          </div>
+          <Button
+            v-else-if="componentesRetirados.length"
+            variant="secondary"
+            @click="deshacerComponente"
+            >Deshacer eliminación de componente</Button
+          >
+        </section>
+        <section id="accesorios" v-show="!studio || activeSection === 'accesorios'">
+          <div class="heading">
+            <h3>Accesorios incluidos</h3>
+            <span v-if="studio" class="accessory-count"
+              >{{ accesorios.filter((a) => a.trim()).length }} registrados</span
+            >
+          </div>
+          <div
+            v-for="(_, i) in accesorios"
+            :key="i"
+            class="accessory-item"
+            :class="{ 'accessory-item--studio': studio }"
+          >
+            <template v-if="studio && accesorios[i]?.trim() && accesorioEnEdicion !== i">
+              <div class="accessory-item-label">
+                <CheckCircle2 :size="18" aria-hidden="true" /><strong>{{ accesorios[i] }}</strong>
+              </div>
+              <Button variant="secondary" @click="accesorioEnEdicion = i"
+                ><Pencil :size="15" aria-hidden="true" /> Editar</Button
+              >
+            </template>
+            <TextField
+              v-else
+              v-model="accesorios[i]"
+              :name="`accesorio-${i}`"
+              label="Descripción del accesorio *"
+              :error="errorAccesorio(i)"
+              @blur="touchedAccesorios[i] = true"
+            />
+            <Button variant="secondary" @click="removeAccesorio(i)">Quitar</Button>
+            <Button
+              v-if="studio && accesorioEnEdicion === i && accesorios[i]?.trim()"
+              variant="secondary"
+              @click="accesorioEnEdicion = null"
+              >Listo</Button
+            >
+          </div>
+          <Button
+            variant="secondary"
+            :disabled="!studio && accesorios.some((a) => !a.trim())"
+            @click="addAccesorio"
+            ><Plus :size="16" aria-hidden="true" /> Añadir accesorio</Button
+          >
+          <div v-if="studio && accesoriosRetirados.length" class="undo-notice" role="status">
+            Se quitó un accesorio.
+            <button type="button" @click="deshacerAccesorio">Deshacer</button>
+          </div>
+          <Button
+            v-else-if="accesoriosRetirados.length"
+            variant="secondary"
+            @click="deshacerAccesorio"
+            >Deshacer eliminación de accesorio</Button
+          >
+        </section>
+        <section v-show="!studio || activeSection === 'accesorios'">
+          <TextAreaField
+            v-model="form.observaciones"
+            name="observaciones-especificacion"
+            label="Observaciones y detalles adicionales"
+            :rows="5"
+            hint="Incluye indicaciones de fabricación, instalación o acuerdos especiales."
+          />
+          <div v-if="base.advertencias?.length">
+            <h4>Información pendiente histórica</h4>
+            <ul>
+              <li v-for="item in base.advertencias" :key="item">{{ item }}</li>
+            </ul>
+          </div>
+        </section>
+        <section id="comercial" v-show="!studio || activeSection === 'comercial'">
+          <h3>Datos comerciales de este mueble</h3>
+          <aside v-if="totalDictado" aria-label="Revisión de precio total dictado">
+            <p>
+              Total reconocido en el dictado:
+              <strong>{{ totalDictado.total_negociado }} {{ moneda ?? 'BOB' }}</strong
+              >. Es un total de línea, no un precio unitario.
+            </p>
+            <p v-if="unitarioSugerido">
+              Para {{ comercial.cantidad }} muebles, precio unitario calculado:
+              <strong>{{ unitarioSugerido }} {{ moneda ?? 'BOB' }}</strong
+              >. Se completa automáticamente en el campo editable si no había un precio previo.
+            </p>
+            <p v-else role="status">
+              Para calcular el unitario, indica una cantidad válida, sin descuento, y una división
+              exacta a centavos. Si no es posible, introduce el precio manualmente.
+            </p>
+            <label v-if="diferenciaComercial">
+              <input v-model="diferenciaConfirmada" type="checkbox" />
+              Confirmo que el importe comercial difiere del total dictado y deseo guardar esa
+              diferencia.
+            </label>
+          </aside>
+          <div class="grid">
+            <TextField
+              v-model="comercial.descripcion"
+              name="mueble-descripcion"
+              label="Descripción comercial opcional"
+            />
+            <TextField
+              v-model="comercial.cantidad"
+              name="mueble-cantidad"
+              label="Cantidad cotizada *"
+              input-mode="numeric"
+              :error="errorCampo('comercial', 0, touched.cantidad)"
+              @blur="touched.cantidad = true"
+            />
+            <Select
+              v-model="comercial.unidad"
+              name="mueble-unidad"
+              label="Unidad comercial *"
+              :options="
+                (unidades ?? [])
+                  .filter((u) => ['PIEZA', 'JUEGO'].includes(u.codigo))
+                  .map((u) => ({ label: u.nombre, value: String(u.id) }))
+              "
+            />
+            <TextField
+              v-model="comercial.precio_unitario"
+              name="mueble-precio"
+              :label="'Precio unitario negociado (' + (moneda ?? 'BOB') + ') *'"
+              input-mode="decimal"
+              :error="errorCampo('comercial', 2, touched.precio)"
+              @blur="touched.precio = true"
+            />
+            <TextField
+              v-model="comercial.descuento"
+              name="mueble-descuento"
+              label="Descuento monetario total de línea *"
+              input-mode="decimal"
+              :error="errorCampo('comercial', 3, touched.descuento)"
+              @blur="touched.descuento = true"
+            />
+          </div>
+          <div class="commercial-total" role="status">
+            <div>
+              <span>Subtotal</span
+              ><strong>{{
+                cantidadValida && precioValido
+                  ? (Number(comercial.cantidad) * Number(comercial.precio_unitario)).toFixed(2) +
+                    ' ' +
+                    (moneda ?? 'BOB')
+                  : 'Pendiente'
+              }}</strong>
+            </div>
+            <div>
+              <span>Descuento</span
+              ><strong>{{
+                descuentoValido ? comercial.descuento + ' ' + (moneda ?? 'BOB') : 'Pendiente'
+              }}</strong>
+            </div>
+            <div class="commercial-total-main">
+              <span>Total estimado del mueble</span
+              ><strong>{{
+                totalEstimado === null
+                  ? 'Importe pendiente'
+                  : totalEstimado.toFixed(2) + ' ' + (moneda ?? 'BOB')
+              }}</strong>
+            </div>
+            <p>El total definitivo se confirmará al guardar la proforma.</p>
+          </div>
+        </section>
+        <section
+          id="revision"
+          v-show="!studio || activeSection === 'revision'"
+          class="furniture-review"
+          aria-labelledby="revision-title"
+        >
+          <header class="review-hero">
+            <div>
+              <p class="review-eyebrow">FICHA TÉCNICO-COMERCIAL</p>
+              <h3 id="revision-title">Revisar mueble</h3>
+              <h4>{{ comercial.nombre || 'Mueble pendiente de nombre' }}</h4>
+              <p>
+                {{
+                  tiposLocales.find((x) => String(x.id) === form.tipo_mueble)?.nombre ||
+                  'Tipo de mueble no especificado'
+                }}
+              </p>
+            </div>
+            <span
+              v-if="
+                !Object.values(erroresSecciones).some((lista) => lista.length) &&
+                !pendientesVisibles.length
+              "
+              class="review-check"
+              ><CheckCircle2 :size="24" aria-label="Sin datos obligatorios pendientes"
+            /></span>
+            <span v-else class="review-check review-check--pending"
+              ><AlertCircle :size="24" aria-label="Hay información que revisar"
+            /></span>
+          </header>
+          <div
+            v-if="Object.values(erroresSecciones).some((lista) => lista.length)"
+            class="review-alert"
+            aria-label="Datos que debes revisar"
+          >
+            <h4><AlertCircle :size="19" aria-hidden="true" /> Información por completar</h4>
+            <p>Revisa estos datos antes de incorporar el mueble a la proforma.</p>
+            <div v-for="section in pasosValidacion" :key="section">
+              <button
+                v-for="(issue, index) in erroresSecciones[section]"
+                :key="index"
+                type="button"
+                @click="irASeccion(section)"
+              >
+                <AlertCircle :size="15" aria-hidden="true" /> {{ issue }}
+                <Pencil :size="14" aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+          <div v-if="pendientesVisibles.length" class="review-pending">
+            <h4>Datos reconocidos por voz pendientes de comprobación</h4>
+            <p>
+              Revisa las propuestas del dictado. Los datos ambiguos no se confirmarán
+              automáticamente.
+            </p>
+            <ul>
+              <li v-for="p in pendientesVisibles" :key="p.indice">{{ p.mensaje }}</li>
+            </ul>
+          </div>
+          <article class="review-card">
+            <header>
+              <h4>Información general</h4>
+              <button type="button" @click="irASeccion('general')">
+                <Pencil :size="15" aria-hidden="true" /> Editar
+              </button>
+            </header>
+            <div class="review-info">
+              <div>
+                <span>Nombre comercial</span><strong>{{ comercial.nombre || 'Pendiente' }}</strong>
+              </div>
+              <div>
+                <span>Tipo de mueble</span
+                ><strong>{{
+                  tiposLocales.find((x) => String(x.id) === form.tipo_mueble)?.nombre ||
+                  'No especificado'
+                }}</strong>
+              </div>
+            </div>
+            <h5>Dimensiones generales</h5>
+            <div v-if="medidas.some((m) => m.valor.trim())" class="review-measures">
+              <div v-for="medida in medidas.filter((m) => m.valor.trim())" :key="medida.clave">
+                <span>{{ medida.clave.replace(/_/g, ' ') }}</span>
+                <strong>{{ medida.valor }} {{ medida.unidad || 'Unidad pendiente' }}</strong>
+              </div>
+            </div>
+            <p v-else class="review-empty">No se especificaron medidas generales.</p>
+            <div v-if="atributosGenerales.length">
+              <h5>Características generales</h5>
+              <div class="review-attributes">
+                <p v-for="attr in atributosGenerales" :key="attr.codigo || attr.nombre">
+                  {{ attr.nombre }}:
+                  <strong>{{ attr.valor || 'Pendiente' }} {{ attr.unidad ?? '' }}</strong>
+                </p>
+              </div>
+            </div>
+          </article>
+          <article class="review-card">
+            <header>
+              <h4>Estructura y componentes</h4>
+              <button type="button" @click="irASeccion('estructura')">
+                <Pencil :size="15" aria-hidden="true" /> Editar
+              </button>
+            </header>
+            <div class="review-metrics">
+              <span>{{ conjuntos.length }} conjuntos</span
+              ><span>{{ componentes.length }} componentes</span>
+            </div>
+            <p v-if="!componentes.length" class="review-empty">
+              No se agregaron componentes técnicos.
+            </p>
+            <details v-for="grupo in gruposArbol" :key="grupo.id" class="review-group" open>
+              <summary>
+                {{ grupo.nombre }} <small>{{ grupo.piezas.length }} componentes</small>
+              </summary>
+              <div
+                v-for="item in grupo.piezas"
+                :key="item.pieza.uid || item.index"
+                class="review-piece"
+              >
+                <div>
+                  <strong>{{ item.pieza.nombre || 'Componente pendiente de nombre' }}</strong
+                  ><span>{{ item.pieza.cantidad_interna ?? '—' }} por mueble</span>
+                </div>
+                <dl class="review-piece-attributes">
+                  <div v-if="item.pieza.material">
+                    <dt>Material</dt>
+                    <dd>{{ item.pieza.material }}</dd>
+                  </div>
+                  <div v-if="item.pieza.espesor">
+                    <dt>Espesor</dt>
+                    <dd>{{ item.pieza.espesor }}</dd>
+                  </div>
+                  <div v-if="item.pieza.color">
+                    <dt>Color</dt>
+                    <dd>{{ item.pieza.color }}</dd>
+                  </div>
+                  <div v-if="item.pieza.dimensiones">
+                    <dt>Dimensiones</dt>
+                    <dd>{{ readableDimension(item.pieza.dimensiones) }}</dd>
+                  </div>
+                  <div v-for="attr in item.pieza.atributos ?? []" :key="attr.codigo || attr.nombre">
+                    <dt>{{ attr.nombre }}</dt>
+                    <dd>{{ attr.valor }} {{ attr.unidad ?? '' }}</dd>
+                  </div>
+                </dl>
+              </div>
+            </details>
+          </article>
+          <article class="review-card">
+            <header>
+              <h4>Accesorios y observaciones</h4>
+              <button type="button" @click="irASeccion('accesorios')">
+                <Pencil :size="15" aria-hidden="true" /> Editar
+              </button>
+            </header>
+            <ul v-if="accesorios.filter((a) => a.trim()).length" class="review-accessories">
+              <li v-for="(acc, index) in accesorios.filter((a) => a.trim())" :key="index">
+                <CheckCircle2 :size="16" aria-hidden="true" /> {{ acc }}
+              </li>
+            </ul>
+            <p v-else class="review-empty">Sin accesorios registrados.</p>
+            <h5>Observaciones</h5>
+            <p>{{ form.observaciones || 'Sin observaciones adicionales.' }}</p>
+            <div v-if="base.advertencias?.length" class="review-history">
+              <h5>Advertencias de la información anterior</h5>
+              <ul>
+                <li v-for="warning in base.advertencias" :key="warning">{{ warning }}</li>
+              </ul>
+            </div>
+            <details v-if="base.descripcion_original">
+              <summary>Ver descripción técnica original conservada</summary>
+              <p>{{ base.descripcion_original }}</p>
+            </details>
+          </article>
+          <article class="review-card review-commercial">
+            <header>
+              <h4>Datos comerciales</h4>
+              <button type="button" @click="irASeccion('comercial')">
+                <Pencil :size="15" aria-hidden="true" /> Editar
+              </button>
+            </header>
+            <div class="review-price-grid">
+              <div>
+                <span>Cantidad cotizada</span
+                ><strong
+                  >{{ cantidadValida ? comercial.cantidad : 'Pendiente' }}
+                  {{
+                    unidades?.find((u) => String(u.id) === comercial.unidad)?.nombre ?? ''
+                  }}</strong
+                >
+              </div>
+              <div>
+                <span>Precio unitario</span
+                ><strong>{{
+                  precioValido ? comercial.precio_unitario + ' ' + (moneda ?? 'BOB') : 'Pendiente'
+                }}</strong>
+              </div>
+              <div>
+                <span>Descuento</span
+                ><strong>{{
+                  descuentoValido ? comercial.descuento + ' ' + (moneda ?? 'BOB') : 'Pendiente'
+                }}</strong>
+              </div>
+            </div>
+            <p v-if="comercial.descripcion">Descripción comercial: {{ comercial.descripcion }}</p>
+            <div class="review-price-total">
+              <span>Total estimado del mueble</span
+              ><strong>{{
+                totalEstimado === null
+                  ? 'Importe pendiente'
+                  : totalEstimado.toFixed(2) + ' ' + (moneda ?? 'BOB')
+              }}</strong>
+            </div>
+            <p class="review-price-hint">
+              El total definitivo se confirmará cuando guardes la proforma.
+            </p>
+          </article>
+          <p class="review-final-note">
+            El mueble se añadirá a esta proforma. Después podrás guardar la proforma o emitirla.
+          </p>
+        </section>
       </div>
-      <p>
-        La ficha se incorporará localmente. La proforma sólo se enviará al servidor al guardar el
-        borrador o emitirla.
-      </p>
-    </section>
+    </div>
     <p v-if="error || externalError" role="alert">{{ error || externalError }}</p>
-    <div class="actions">
-      <Button type="submit" :disabled="processing" aria-label="Guardar especificación"
-        >Agregar mueble a la proforma</Button
-      ><Button variant="secondary" @click="emit('cancel')">Cancelar</Button>
+    <div v-if="!studio || activeSection === 'revision'" class="actions review-actions">
+      <Button type="submit" :disabled="processing">{{
+        studio ? 'Agregar mueble a la proforma' : 'Guardar especificación'
+      }}</Button>
+      <Button v-if="!studio" variant="secondary" @click="emit('cancel')">Cancelar</Button>
     </div>
   </form>
 </template>
@@ -1342,5 +2027,700 @@ details.card[open] > summary {
   .attribute-search {
     position: static;
   }
+}
+
+/* Furniture Studio 2.0 — el editor ocupa toda la superficie disponible. */
+.configurator--studio .configurator-layout {
+  display: block;
+  min-width: 0;
+}
+.configurator--studio .configurator-fields {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.configurator--studio .configurator-fields > section {
+  min-width: 0;
+  padding: clamp(1rem, 2.2vw, 1.6rem);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+}
+.configurator--studio .configurator-fields > section > h3 {
+  margin-bottom: 0.4rem;
+  font-size: 1rem;
+}
+.configurator--studio .configurator-fields > section > p {
+  color: var(--color-text-secondary);
+  font-size: 0.83rem;
+}
+.configurator--studio .configurator-fields #identificacion {
+  gap: 1.05rem;
+}
+.configurator--studio #identificacion .field:first-of-type {
+  max-width: 46rem;
+}
+.configurator--studio .dimensions-section .measure-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+}
+.configurator--studio .dimensions-section .measure-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(5.8rem, 0.38fr);
+  gap: 0.6rem;
+  align-items: start;
+  min-width: 0;
+}
+.configurator--studio .dimensions-section .measure-row label {
+  min-width: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.configurator--studio .dimensions-section .measure-row label select {
+  width: 100%;
+  min-height: 2.75rem;
+  margin-top: 0.45rem;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+}
+.configurator--studio .dimensions-section .dimension-pending {
+  grid-column: 1/-1;
+  color: var(--color-danger-text);
+  margin: 0;
+  font-size: 0.77rem;
+}
+.configurator--studio .dimensions-section .measure-row > button {
+  grid-column: 1/-1;
+  justify-self: start;
+}
+.configurator--studio .dimensions-section .mueble-picker {
+  max-width: 36rem;
+}
+.configurator--studio .attribute-search {
+  position: static;
+  background: transparent;
+  padding: 0;
+  max-width: 40rem;
+}
+.configurator--studio #componentes {
+  display: grid;
+  gap: 1rem;
+}
+.configurator--studio .studio-component-layout {
+  display: grid;
+  grid-template-columns: minmax(13rem, 0.72fr) minmax(0, 1.6fr);
+  gap: 1rem;
+  align-items: start;
+  min-width: 0;
+}
+.configurator--studio .studio-component-tree {
+  display: grid;
+  align-content: start;
+  gap: 0.65rem;
+  padding: 1rem;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  min-width: 0;
+}
+.configurator--studio .tree-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.5rem;
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+  font-weight: 750;
+  letter-spacing: 0.06em;
+}
+.configurator--studio .tree-empty {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+.configurator--studio .tree-group {
+  display: grid;
+  gap: 0.4rem;
+}
+.configurator--studio .tree-group h4 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.83rem;
+  margin: 0.5rem 0 0.15rem;
+}
+.configurator--studio .tree-group h4 small {
+  color: var(--color-text-secondary);
+}
+.configurator--studio .tree-item {
+  display: grid;
+  gap: 0.2rem;
+  text-align: left;
+  padding: 0.75rem;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  background: var(--color-surface);
+  font: inherit;
+  cursor: pointer;
+}
+.configurator--studio .tree-item:hover {
+  border-color: var(--color-border-strong);
+}
+.configurator--studio .tree-item--active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+.configurator--studio .tree-item:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.configurator--studio .tree-item strong {
+  overflow-wrap: anywhere;
+  font-size: 0.85rem;
+}
+.configurator--studio .tree-item small {
+  color: var(--color-text-secondary);
+  font-size: 0.73rem;
+}
+.configurator--studio .studio-component-detail {
+  min-width: 0;
+}
+.configurator--studio .studio-component-detail details.card {
+  background: var(--color-surface-muted);
+  min-width: 0;
+  margin: 0;
+}
+.configurator--studio .studio-component-detail .heading {
+  gap: 0.5rem;
+  align-items: center;
+}
+.configurator--studio .studio-component-detail .grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.configurator--studio .studio-component-detail button {
+  cursor: pointer;
+}
+.configurator--studio .component-actions-menu {
+  border-top: 1px solid var(--color-border);
+  padding-top: 0.65rem;
+}
+.configurator--studio .component-actions-menu summary {
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+}
+.configurator--studio .component-actions-menu > div {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+.configurator--studio .studio-component-detail button:focus-visible {
+  outline: 2px solid var(--color-primary);
+}
+.configurator--studio .studio-component-detail .attribute-search {
+  margin-top: 1rem;
+}
+.configurator--studio .empty-editor {
+  padding: 2.5rem;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-card);
+  text-align: center;
+}
+.configurator--studio .empty-editor h4 {
+  margin: 0 0 0.3rem;
+}
+.configurator--studio .empty-editor p {
+  font-size: 0.83rem;
+  color: var(--color-text-secondary);
+}
+.configurator--studio .studio-group-card {
+  background: var(--color-surface-muted);
+}
+.configurator--studio .studio-group-card .inline {
+  align-items: end;
+}
+.configurator--studio .undo-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
+  font-size: 0.8rem;
+}
+.configurator--studio .undo-notice button {
+  border: 0;
+  background: none;
+  color: var(--color-primary-accent);
+  font-weight: 700;
+  cursor: pointer;
+}
+.configurator--studio .accessory-count {
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+}
+.configurator--studio .accessory-item--studio {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  align-items: center;
+  max-width: 55rem;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  padding: 0.75rem;
+  border-radius: var(--radius-control);
+}
+.configurator--studio .accessory-item--studio .field {
+  flex: 1;
+  min-width: 13rem;
+}
+.configurator--studio .accessory-item-label {
+  display: flex;
+  gap: 0.6rem;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+}
+.configurator--studio .accessory-item-label svg {
+  color: var(--color-success);
+  flex-shrink: 0;
+}
+.configurator--studio .accessory-item-label strong {
+  overflow-wrap: anywhere;
+  font-size: 0.85rem;
+}
+.configurator--studio .commercial-total {
+  display: grid;
+  gap: 0.7rem;
+  padding: 1rem;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  max-width: 45rem;
+}
+.configurator--studio .commercial-total > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: baseline;
+  font-size: 0.86rem;
+}
+.configurator--studio .commercial-total > div span {
+  color: var(--color-text-secondary);
+}
+.configurator--studio .commercial-total .commercial-total-main {
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border-strong);
+  font-weight: 700;
+}
+.configurator--studio .commercial-total .commercial-total-main strong {
+  font-size: 1.45rem;
+  font-variant-numeric: tabular-nums;
+}
+.configurator--studio .commercial-total p {
+  margin: 0.1rem 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+}
+.configurator--studio #revision {
+  display: grid;
+  gap: 1.2rem;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+.configurator--studio .review-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+  padding: 1.6rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+.configurator--studio .review-eyebrow {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.67rem;
+  font-weight: 750;
+  letter-spacing: 0.09em;
+}
+.configurator--studio .review-hero h3 {
+  margin: 0.3rem 0 0.65rem;
+  font-size: 0.87rem;
+  color: var(--color-text-secondary);
+}
+.configurator--studio .review-hero h4 {
+  margin: 0 0 0.35rem;
+  font-size: clamp(1.25rem, 2vw, 1.65rem);
+}
+.configurator--studio .review-hero p:last-child {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+.configurator--studio .review-check {
+  color: var(--color-success);
+}
+.configurator--studio .review-check--pending {
+  color: var(--color-danger);
+}
+.configurator--studio .review-card {
+  display: grid;
+  gap: 1rem;
+  padding: clamp(1rem, 2vw, 1.6rem);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  min-width: 0;
+}
+.configurator--studio .review-card > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+.configurator--studio .review-card h4 {
+  font-size: 1.02rem;
+  margin: 0;
+}
+.configurator--studio .review-card h5 {
+  font-size: 0.83rem;
+  margin: 0.2rem 0 0.25rem;
+}
+.configurator--studio .review-card header button {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  color: var(--color-primary-accent);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.configurator--studio .review-info,
+.configurator--studio .review-measures,
+.configurator--studio .review-price-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+.configurator--studio .review-info {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.configurator--studio .review-info > div,
+.configurator--studio .review-measures > div,
+.configurator--studio .review-price-grid > div {
+  display: grid;
+  gap: 0.4rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: 0.8rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.configurator--studio .review-card span,
+.configurator--studio .review-card dt {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
+.configurator--studio .review-card strong {
+  font-size: 0.92rem;
+}
+.configurator--studio .review-empty {
+  color: var(--color-text-secondary);
+  font-size: 0.83rem;
+}
+.configurator--studio .review-attributes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  font-size: 0.8rem;
+}
+.configurator--studio .review-attributes p {
+  background: var(--color-surface-muted);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-control);
+  margin: 0;
+}
+.configurator--studio .review-metrics {
+  display: flex;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+.configurator--studio .review-metrics span {
+  background: var(--color-surface-muted);
+  border-radius: 999px;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.74rem;
+}
+.configurator--studio .review-group {
+  border: 1px solid var(--color-border);
+  padding: 1rem;
+  border-radius: var(--radius-control);
+  min-width: 0;
+}
+.configurator--studio .review-group summary {
+  display: flex;
+  justify-content: space-between;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.87rem;
+  gap: 1rem;
+}
+.configurator--studio .review-group summary small {
+  color: var(--color-text-secondary);
+  font-weight: 400;
+}
+.configurator--studio .review-piece {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.configurator--studio .review-piece:last-child {
+  border-bottom: 0;
+}
+.configurator--studio .review-piece > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+}
+.configurator--studio .review-piece-attributes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin: 0;
+}
+.configurator--studio .review-piece-attributes > div {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-control);
+}
+.configurator--studio .review-piece-attributes dd {
+  margin: 0;
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+.configurator--studio .review-accessories {
+  display: grid;
+  gap: 0.55rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.configurator--studio .review-accessories li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.84rem;
+}
+.configurator--studio .review-accessories svg {
+  color: var(--color-success);
+  flex-shrink: 0;
+}
+.configurator--studio .review-history {
+  padding: 0.8rem;
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-control);
+}
+.configurator--studio .review-price-total {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-control);
+}
+.configurator--studio .review-price-total strong {
+  font-size: 1.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.configurator--studio .review-price-hint {
+  font-size: 0.77rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+.configurator--studio .review-alert,
+.configurator--studio .review-pending {
+  display: grid;
+  gap: 0.65rem;
+  padding: 1.1rem;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+.configurator--studio .review-pending {
+  border-color: var(--color-border-strong);
+}
+.configurator--studio .review-alert h4,
+.configurator--studio .review-pending h4 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0;
+  font-size: 0.96rem;
+}
+.configurator--studio .review-alert p,
+.configurator--studio .review-pending p {
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  margin: 0;
+}
+.configurator--studio .review-alert button {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0.4rem 0.1rem;
+}
+.configurator--studio .review-final-note {
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+}
+.configurator--studio .review-actions {
+  display: flex;
+  justify-content: end;
+  background: var(--color-surface);
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+@media (max-width: 75rem) {
+  .configurator--studio .studio-component-layout {
+    grid-template-columns: minmax(11rem, 0.7fr) minmax(0, 1.4fr);
+  }
+  .configurator--studio .dimensions-section .measure-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 55rem) {
+  .configurator--studio .studio-component-layout {
+    grid-template-columns: 1fr;
+  }
+  .configurator--studio .studio-component-tree {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .configurator--studio .tree-heading,
+  .configurator--studio .tree-empty {
+    grid-column: 1/-1;
+  }
+  .configurator--studio .review-piece-attributes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 38rem) {
+  .configurator--studio .dimensions-section .measure-grid,
+  .configurator--studio .review-price-grid,
+  .configurator--studio .review-info {
+    grid-template-columns: 1fr;
+  }
+  .configurator--studio .review-measures {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .configurator--studio .studio-component-tree,
+  .configurator--studio .studio-component-detail .grid {
+    grid-template-columns: 1fr;
+  }
+  .configurator--studio .review-piece-attributes {
+    grid-template-columns: 1fr;
+  }
+  .configurator--studio .review-price-total strong {
+    font-size: 1.35rem;
+  }
+  .configurator--studio .configurator-fields > section {
+    padding: var(--space-3);
+  }
+}
+.configurator--studio .studio-identification-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 1.1rem;
+  align-items: start;
+}
+.configurator--studio .studio-identification-fields > * {
+  min-width: 0;
+  max-width: none;
+}
+.configurator--studio .studio-attributes-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.configurator--studio .studio-attribute-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: end;
+  gap: 0.45rem;
+  padding: 0.8rem;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  min-width: 0;
+}
+.configurator--studio .studio-attribute-row > label,
+.configurator--studio .studio-attribute-row > .field {
+  min-width: 0;
+  width: 100%;
+  display: grid;
+  gap: 0.35rem;
+}
+.configurator--studio .studio-attribute-row input,
+.configurator--studio .studio-attribute-row select {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.75rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  padding: 0.6rem;
+  color: var(--color-text);
+  background: var(--color-surface);
+  font: inherit;
+}
+.configurator--studio .studio-attribute-row > button {
+  justify-self: start;
+}
+@media (max-width: 72rem) {
+  .configurator--studio .studio-attributes-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 48rem) {
+  .configurator--studio .studio-identification-fields,
+  .configurator--studio .studio-attributes-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.configurator--studio .studio-attribute-error {
+  color: var(--color-danger);
+  margin: 0;
+  font-size: 0.78rem;
 }
 </style>

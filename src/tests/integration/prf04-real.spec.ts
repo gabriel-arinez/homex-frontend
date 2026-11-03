@@ -18,33 +18,56 @@ test('PRF-04 voz real hasta guardado integral sin escrituras prematuras', async 
   await page.goto('/proformas/nueva')
   await page.getByRole('button', { name: 'Añadir ítem' }).click()
   await page.getByRole('button', { name: 'Mueble a pedido' }).click()
-  await page.getByRole('button', { name: 'Dictar especificaciones' }).click()
-  await page.getByRole('button', { name: 'Grabar', exact: true }).click()
+  await page.getByRole('button', { name: 'Grabar descripción' }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Grabando' })).toBeVisible()
   // Reproducir el fixture completo a través de MediaRecorder real de Chromium.
   await page.waitForTimeout(12000)
   await page.getByRole('button', { name: 'Detener', exact: true }).click()
-  await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue(/escritorio/i, {
+  await expect(page.getByRole('heading', { name: 'Propuesta obtenida por voz' })).toBeVisible({
     timeout: 120000,
   })
+  await page.getByRole('button', { name: 'Aplicar propuesta al mueble' }).click()
+  await page
+    .getByRole('navigation', { name: 'Apartados del mueble a pedido' })
+    .getByRole('button', { name: /General/ })
+    .click()
+  await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue(/escritorio/i)
   expect(comerciales).toEqual([])
+  await page
+    .getByRole('navigation', { name: 'Apartados del mueble a pedido' })
+    .getByRole('button', { name: /Precio/ })
+    .click()
   await page.getByLabel('Cantidad cotizada').fill('3')
   await page.getByLabel('Precio unitario negociado (BOB)').fill('100')
   await page.locator('input[name="mueble-descuento"]').fill('0.00')
   // El dictado comunica 100 BOB de total, mientras que 3 × 100 BOB = 300 BOB.
   // El guardado no debe omitir la confirmación comercial explícita.
-  await page.getByRole('button', { name: 'Guardar especificación' }).click()
-  await expect(page.getByRole('dialog')).toBeVisible()
+  await page
+    .getByRole('navigation', { name: 'Apartados del mueble a pedido' })
+    .getByRole('button', { name: /Revisar/ })
+    .click()
+  await page.getByRole('button', { name: 'Agregar mueble a la proforma' }).click()
+  await expect(
+    page.getByRole('heading', { name: /Configurar|Nuevo mueble|escritorio/i }).first(),
+  ).toBeVisible()
   await expect(
     page.getByRole('alert').filter({ hasText: 'Confirma la diferencia entre el total dictado' }),
   ).toBeVisible()
+  await page
+    .getByRole('navigation', { name: 'Apartados del mueble a pedido' })
+    .getByRole('button', { name: /Precio/ })
+    .click()
   await page
     .getByRole('checkbox', {
       name: /Confirmo que el importe comercial difiere del total dictado/,
     })
     .check()
-  await page.getByRole('button', { name: 'Guardar especificación' }).click()
-  await expect(page.getByRole('dialog')).not.toBeVisible()
+  await page
+    .getByRole('navigation', { name: 'Apartados del mueble a pedido' })
+    .getByRole('button', { name: /Revisar/ })
+    .click()
+  await page.getByRole('button', { name: 'Agregar mueble a la proforma' }).click()
+  await expect(page.getByRole('heading', { name: 'Nueva proforma' })).toBeVisible()
   expect(comerciales).toEqual([])
   await page.getByRole('button', { name: 'Guardar borrador' }).click()
   await expect(page).toHaveURL(/\/proformas\/\d+\/editar$/)
@@ -68,14 +91,11 @@ test('PRF-04 cancelar configurador no persiste datos comerciales', async ({ page
   await page.getByRole('button', { name: 'Añadir ítem' }).click()
   await page.getByRole('button', { name: 'Mueble a pedido' }).click()
   await page.getByLabel('Nombre comercial del mueble').fill('Mueble cancelado de laboratorio')
-  await page
-    .getByRole('dialog', { name: /Configurador integral de/ })
-    .getByRole('button', { name: 'Cancelar', exact: true })
-    .click()
+  await page.getByRole('button', { name: 'Volver a proforma' }).click()
   const discard = page.getByRole('dialog', { name: 'Descartar ficha técnica' })
   await expect(discard).toBeVisible()
   await discard.getByRole('button', { name: 'Descartar cambios' }).click()
-  await expect(page.getByRole('dialog', { name: /Configurador integral de/ })).not.toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Nueva proforma' })).toBeVisible()
   await expect(discard).not.toBeVisible()
   expect(commercialWrites).toEqual([])
 })

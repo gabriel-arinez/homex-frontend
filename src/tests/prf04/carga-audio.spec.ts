@@ -89,11 +89,19 @@ describe('PRF-04 carga de grabaciones', () => {
     const wrapper = montar()
 
     try {
-      await wrapper.get('button').trigger('click')
+      await wrapper
+        .findAll('button')
+        .find((button) => button.text().includes('Subir audio'))!
+        .trigger('click')
 
       await seleccionar(wrapper, new File(['audio'], 'escritorio.aac', { type: 'audio/aac' }))
       expect(wrapper.text()).toContain('Formato no admitido')
 
+      // Cada nuevo archivo requiere una acción expresa del vendedor.
+      await wrapper
+        .findAll('button')
+        .find((button) => button.text().includes('Subir audio'))!
+        .trigger('click')
       await seleccionar(wrapper, new File([], 'vacio.m4a', { type: 'audio/mp4' }))
       expect(wrapper.text()).toContain('archivo de audio está vacío')
       expect(crear).not.toHaveBeenCalled()
@@ -107,7 +115,7 @@ describe('PRF-04 carga de grabaciones', () => {
 
     try {
       await wrapper.get('button').trigger('click')
-      expect(wrapper.find('input[type="file"]').exists()).toBe(false)
+      expect(wrapper.get('input[type="file"]').attributes('disabled')).toBeDefined()
       expect(wrapper.text()).toContain('reemplazará toda la información')
 
       const continuar = wrapper
@@ -115,7 +123,7 @@ describe('PRF-04 carga de grabaciones', () => {
         .find((button) => button.text() === 'Continuar con voz')
       expect(continuar).toBeDefined()
       await continuar!.trigger('click')
-      expect(wrapper.find('input[type="file"]').exists()).toBe(true)
+      expect(wrapper.get('input[type="file"]').attributes('disabled')).toBeUndefined()
     } finally {
       wrapper.unmount()
     }

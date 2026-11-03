@@ -14,6 +14,7 @@ async function start() {
   await r.start()
   emit('ready', null)
 }
+defineExpose({ startRecording: start })
 function stop() {
   r.stop()
 }
@@ -24,12 +25,24 @@ function cancel() {
 </script>
 <template>
   <section class="recorder" aria-labelledby="recorder-title">
-    <h2 id="recorder-title">Dictado por voz</h2>
+    <h2 id="recorder-title">Grabación de audio</h2>
     <p v-if="r.state.value === 'RECORDING'" role="status" class="recording">
       <span aria-hidden="true"></span>Grabando {{ time }}
     </p>
+    <div
+      v-if="r.state.value === 'RECORDING'"
+      class="live-waveform"
+      role="img"
+      aria-label="Actividad real del micrófono"
+    >
+      <span
+        v-for="(level, index) in r.levels.value"
+        :key="index"
+        :style="{ height: 4 + level * 34 + 'px' }"
+      />
+    </div>
     <p v-else-if="r.state.value === 'READY'" role="status">
-      Audio listo para enviar. Se conservará sólo mientras el backend lo procesa.
+      Audio listo. Se enviará para su interpretación.
     </p>
     <p v-if="r.error.value" role="alert" class="error">{{ r.error.value }}</p>
     <div class="actions">
@@ -89,6 +102,53 @@ h2 {
   .actions > * {
     width: 100%;
     min-height: 2.75rem;
+  }
+}
+.recorder {
+  background: transparent;
+  padding: 0;
+  border: 0;
+}
+.recorder h2 {
+  font-size: 0.87rem;
+  margin: 0 0 0.45rem;
+}
+.recorder .actions button {
+  min-height: 2.75rem;
+}
+.recorder .recording {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.6rem 0.8rem;
+  background: var(--color-primary-soft);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+.live-waveform {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 3px;
+  min-height: 44px;
+  max-width: 38rem;
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-control);
+  padding: 5px;
+  margin: 0.5rem 0 1rem;
+}
+.live-waveform span {
+  display: block;
+  flex: 1;
+  max-width: 8px;
+  min-width: 2px;
+  border-radius: 3px;
+  background: var(--color-primary);
+  transition: height 70ms linear;
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-waveform span {
+    transition: none;
   }
 }
 </style>

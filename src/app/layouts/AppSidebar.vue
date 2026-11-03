@@ -68,7 +68,7 @@ const groups: Array<{
         label: 'Productos',
         to: '/productos',
         icon: PackageOpen,
-        capabilities: ['comercial.operar'],
+        capabilities: ['comercial.operar', 'catalogo.crear_producto'],
       },
     ],
   },

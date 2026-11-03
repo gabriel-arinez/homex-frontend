@@ -54,8 +54,7 @@ import ClienteFormFields from '@/modules/clientes/components/ClienteFormFields.v
 import DetalleForm from '../components/DetalleForm.vue'
 import CatalogoContextual from '../components/CatalogoContextual.vue'
 import type { CatalogoContextState } from '../services/catalogoContext'
-import EspecificacionForm from '../components/EspecificacionForm.vue'
-import CapturaAsistida from '../components/CapturaAsistida.vue'
+import MuebleStudio from '../components/MuebleStudio.vue'
 import { mapearCapturaAsistida } from '../services/capturaAsistidaMapper'
 import { leerDatosTecnicos, tecnicaIgual } from '../services/muebleTecnico'
 import { proformasService } from '../services/proformasService'
@@ -119,6 +118,7 @@ const readMaster = ref<Producto | null>(null)
 let readRequestId = 0
 const specLine = ref<number | null>(null)
 const draftingFurniture = ref<LineaLocal | null>(null)
+const furnitureOpen = computed(() => specLine.value !== null || draftingFurniture.value !== null)
 const sesionBorrador = ref(crypto.randomUUID())
 const specRenderVersion = ref(0)
 const voiceProcessing = ref(false)
@@ -1121,777 +1121,779 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       @close="answerConfirmation(false)"
       @confirm="answerConfirmation(true)"
     />
-    <div class="quote-topline" aria-label="Ubicación en el proceso">
-      <span>COMERCIAL <span class="quote-divider">/</span> PROFORMAS</span>
-      <div class="quote-topline__right">
-        <span class="quote-progress">Paso {{ currentStep + 1 }} de {{ steps.length }}</span>
-        <div
-          class="quote-save-status"
-          :class="{
-            'quote-save-status--saved': persisted && !dirty && !saving && !conflicted,
-            'quote-save-status--warning': conflicted,
-          }"
-          role="status"
-          aria-live="polite"
-        >
-          <CheckCircle2
-            v-if="persisted && !dirty && !saving && !conflicted"
-            :size="14"
-            aria-hidden="true"
-          />
-          <CircleAlert v-else-if="conflicted" :size="14" aria-hidden="true" />
-          <Info v-else :size="14" aria-hidden="true" />
-          <span>{{ editingStatus }}</span>
-        </div>
-        <span v-if="persisted" class="quote-save-reference">
-          {{ persisted.estado_info.nombre }} · Proforma {{ persisted.numero }}
-        </span>
-      </div>
-    </div>
-    <PageHeader
-      :title="persisted ? `Editar proforma #${persisted.numero}` : 'Nueva proforma'"
-      description="Prepara productos, cliente y condiciones antes de guardar."
-      show-menu
-      @menu="emit('openMenu')"
-    />
-    <LoadingSkeleton v-if="loading || referenceLoading" :lines="8" />
-    <ErrorState v-else-if="error && !tipos.length" :description="error">
-      <button @click="loadReferences">Reintentar</button>
-    </ErrorState>
-    <template v-else>
-      <nav class="steps" aria-label="Apartados de la proforma">
-        <button
-          v-for="(step, index) in steps"
-          :key="step"
-          type="button"
-          :class="{ active: currentStep === index }"
-          :aria-current="currentStep === index ? 'step' : undefined"
-          @click="currentStep = index"
-        >
-          <span class="step-number">{{ String(index + 1).padStart(2, '0') }}</span>
-          <span class="step-label">{{ step }}</span>
-          <span class="step-marker" aria-hidden="true" />
-        </button>
-      </nav>
-
-      <div v-if="error" role="alert" class="error error-summary">
-        <strong>{{ error }}</strong>
-        <ul v-if="fieldErrorMessages.length">
-          <li v-for="message in fieldErrorMessages" :key="message">{{ message }}</li>
-        </ul>
-      </div>
-      <div v-if="conflicted" class="conflict-actions">
-        <Button variant="secondary" @click="discardAndReload">
-          Descartar cambios y recargar
-        </Button>
-      </div>
-
-      <section
-        v-show="currentStep === 0"
-        class="quote-panel products-panel"
-        aria-labelledby="productos-title"
-      >
-        <div class="section-title">
-          <div class="section-title__identity">
-            <span class="section-icon"><PackageOpen :size="22" aria-hidden="true" /></span>
-            <div>
-              <p class="section-kicker">01 · COMPOSICIÓN</p>
-              <h2 id="productos-title">Productos</h2>
-              <p>Agrega productos antes o después de elegir cliente.</p>
-            </div>
-          </div>
-          <div class="section-title__tools">
-            <span v-if="lineas.length" class="count-pill"
-              >{{ lineas.length }} {{ lineas.length === 1 ? 'ítem' : 'ítems' }}</span
-            >
-            <Button @click="additionMode = 'choose'"
-              ><Plus :size="17" aria-hidden="true" />Añadir ítem</Button
-            >
-          </div>
-        </div>
-        <div v-if="additionMode === 'choose'" class="choice-panel">
-          <div class="choice-panel__heading">
-            <div>
-              <p class="section-kicker">AGREGAR A LA PROFORMA</p>
-              <h3>¿Qué deseas incorporar a la cotización?</h3>
-              <p>Selecciona cómo quieres incorporar el siguiente ítem.</p>
-            </div>
-            <Button variant="secondary" @click="additionMode = 'none'">Cancelar</Button>
-          </div>
-          <div class="choice-grid">
-            <button type="button" class="choice-card" @click="chooseCatalog">
-              <span class="choice-card__icon"><PackageOpen :size="24" aria-hidden="true" /></span>
-              <span class="choice-card__copy">
-                <strong>Producto de catálogo</strong>
-                <small>Busca un producto existente y añádelo a la cotización.</small>
-              </span>
-              <ArrowRight :size="20" aria-hidden="true" />
-            </button>
-            <button type="button" class="choice-card" @click="chooseManualFurniture">
-              <span class="choice-card__icon"><Sofa :size="24" aria-hidden="true" /></span>
-              <span class="choice-card__copy">
-                <strong>Mueble a pedido</strong>
-                <small>Define las características y el importe de un mueble a medida.</small>
-              </span>
-              <ArrowRight :size="20" aria-hidden="true" />
-            </button>
-          </div>
-        </div>
-        <div v-if="catalogInitialized" v-show="additionMode === 'catalog'">
-          <CatalogoContextual
-            :categorias="catalogCategories"
-            :familias="familias"
-            :existing-product-ids="existingProductIds"
-            :can-admin="session.can('comercial.administrar')"
-            :initial-state="catalogState ?? undefined"
-            @state-change="catalogState = $event"
-            @create="createProductFromCategory"
-            @edit="editProductContextually"
-            @select="selectCatalogProduct"
-            @duplicate="focusDuplicateProduct"
-            @pending="quotePendingFamily"
-            @cancel="additionMode = 'none'"
-          />
-        </div>
-        <Card v-for="(line, index) in lineas" :key="line.localId" class="line-card">
-          <span class="line-index" aria-hidden="true">{{
-            String(index + 1).padStart(2, '0')
-          }}</span>
+    <div v-if="!furnitureOpen" class="quote-main">
+      <div class="quote-topline" aria-label="Ubicación en el proceso">
+        <span>COMERCIAL <span class="quote-divider">/</span> PROFORMAS</span>
+        <div class="quote-topline__right">
+          <span class="quote-progress">Paso {{ currentStep + 1 }} de {{ steps.length }}</span>
           <div
-            :id="`ap3-linea-${line.localId}`"
-            class="line-summary"
-            tabindex="0"
-            role="button"
-            :aria-label="'Ver detalle completo de ' + line.nombre"
-            @click="openLineRead(line.localId)"
-            @keydown.enter.prevent="openLineRead(line.localId)"
-            @keydown.space.prevent="openLineRead(line.localId)"
+            class="quote-save-status"
+            :class="{
+              'quote-save-status--saved': persisted && !dirty && !saving && !conflicted,
+              'quote-save-status--warning': conflicted,
+            }"
+            role="status"
+            aria-live="polite"
           >
-            <strong>{{ line.nombre }}</strong>
-            <p v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
-              Importe histórico negociado: {{ money(Number(line.importe_negociado || 0)) }}
-            </p>
-            <p v-else-if="totalEstimadoLinea(line) !== null">
-              {{ line.cantidad }} × {{ money(Number(line.precio_unitario)) }}
-              <span v-if="Number(line.descuento) === 0">· Sin descuento</span>
-            </p>
-            <p v-else class="pending-value">Precio pendiente</p>
-          </div>
-          <strong v-if="totalEstimadoLinea(line) !== null">
-            {{ money(totalEstimadoLinea(line)!) }}
-          </strong>
-          <strong v-else class="pending-value">Importe pendiente</strong>
-          <div class="line-menu" @keydown.esc="menuLineId = null">
-            <button
-              type="button"
-              class="menu-trigger"
-              :aria-expanded="menuLineId === line.localId"
-              :aria-label="'Acciones de ' + line.nombre"
-              aria-haspopup="menu"
-              @click.stop="menuLineId = menuLineId === line.localId ? null : line.localId"
-            >
-              ⋮
-            </button>
-            <div v-if="menuLineId === line.localId" class="menu-panel" role="menu">
-              <button
-                type="button"
-                role="menuitem"
-                :disabled="line.modo_calculo === 'TOTAL_NEGOCIADO'"
-                @click="selectMenuAction('edit', index)"
-              >
-                Editar
-              </button>
-              <button
-                v-if="tipos.find((x) => x.id === line.tipo_item)?.codigo === 'MUEBLE_MEDIDA'"
-                type="button"
-                role="menuitem"
-                @click="selectMenuAction('spec', index)"
-              >
-                Ficha técnica
-              </button>
-              <button
-                v-if="tipos.find((x) => x.id === line.tipo_item)?.codigo === 'MUEBLE_MEDIDA'"
-                type="button"
-                role="menuitem"
-                @click="selectMenuAction('duplicate', index)"
-              >
-                Duplicar mueble
-              </button>
-              <button type="button" role="menuitem" @click="selectMenuAction('remove', index)">
-                Eliminar
-              </button>
-            </div>
-          </div>
-        </Card>
-        <p v-if="removedLines.length" role="status" class="undo">
-          {{ removedLines.length }} eliminación(es) provisional(es) pendiente(s) de guardar.
-          <button type="button" @click="undoRemove">Deshacer última eliminación</button>
-        </p>
-        <div v-if="!lineas.length && additionMode === 'none'" class="empty empty-products">
-          <span class="empty-products__icon"><PackageOpen :size="30" aria-hidden="true" /></span>
-          <h3>Aún no agregaste productos.</h3>
-          <p>
-            Comienza con un producto de catálogo o un mueble a pedido para construir esta proforma.
-          </p>
-          <div class="empty-actions">
-            <Button @click="chooseCatalog"
-              ><PackageOpen :size="17" aria-hidden="true" />Producto de catálogo</Button
-            >
-            <Button variant="secondary" @click="chooseManualFurniture"
-              ><Sofa :size="17" aria-hidden="true" />Mueble a pedido</Button
-            >
-          </div>
-        </div>
-        <p v-if="lineas.some((line) => line.modo_calculo === 'TOTAL_NEGOCIADO')" class="warning">
-          Las líneas de importe histórico negociado se conservan sin conversión automática.
-        </p>
-      </section>
-
-      <section
-        v-show="currentStep === 1"
-        class="quote-panel client-panel"
-        aria-labelledby="cliente-title"
-      >
-        <div class="section-title">
-          <div class="section-title__identity">
-            <span class="section-icon"><UserRound :size="22" aria-hidden="true" /></span>
-            <div>
-              <p class="section-kicker">02 · DESTINATARIO</p>
-              <h2 id="cliente-title">Cliente</h2>
-              <p>
-                Indica a quién corresponde la cotización. Puedes dejarlo pendiente para el borrador.
-              </p>
-            </div>
-          </div>
-        </div>
-        <div class="mode" role="radiogroup" aria-label="Origen del cliente">
-          <label
-            class="client-option"
-            :class="{ 'client-option--active': clienteMode === 'pendiente' }"
-          >
-            <input v-model="clienteMode" type="radio" value="pendiente" />
-            <span><strong>Pendiente</strong><small>Completar el cliente más adelante</small></span>
-          </label>
-          <label
-            class="client-option"
-            :class="{ 'client-option--active': clienteMode === 'existente' }"
-          >
-            <input v-model="clienteMode" type="radio" value="existente" />
-            <span
-              ><strong>Existente</strong><small>Seleccionar desde clientes registrados</small></span
-            >
-          </label>
-          <label
-            class="client-option"
-            :class="{ 'client-option--active': clienteMode === 'nuevo' }"
-          >
-            <input v-model="clienteMode" type="radio" value="nuevo" />
-            <span
-              ><strong>Registrar nuevo</strong><small>Registrar al guardar la proforma</small></span
-            >
-          </label>
-        </div>
-        <ClienteSelector
-          v-if="clienteMode === 'existente'"
-          :model-value="header.cliente"
-          label="Cliente existente"
-          @update:model-value="setExistingClient"
-          @select="clienteSeleccionado = $event"
-          @input.stop
-          @change.stop
-        />
-        <Card v-if="clienteMode === 'nuevo'" class="client-fields">
-          <ClienteFormFields
-            :model="nuevoCliente"
-            :tipos="tiposCliente"
-            :errors="clientErrors"
-            :validate="validationAttempted"
-            prefix="proforma-cliente"
-            @change="updateNuevoCliente"
-          />
-        </Card>
-        <div v-if="clienteMode === 'pendiente'" class="context-note">
-          <Info :size="19" aria-hidden="true" />
-          <p>Puedes guardar el borrador sin cliente. Para emitir deberás definirlo.</p>
-        </div>
-      </section>
-
-      <section
-        v-show="currentStep === 2"
-        class="quote-panel conditions-panel"
-        aria-labelledby="condiciones-title"
-      >
-        <div class="section-title">
-          <div class="section-title__identity">
-            <span class="section-icon"><SlidersHorizontal :size="22" aria-hidden="true" /></span>
-            <div>
-              <p class="section-kicker">03 · ACUERDOS</p>
-              <h2 id="condiciones-title">Condiciones</h2>
-              <p>Especifica los datos comerciales que acompañarán a la proforma.</p>
-            </div>
-          </div>
-        </div>
-        <div class="form-grid">
-          <div class="form-grid__full">
-            <TextField
-              v-model="header.titulo"
-              name="titulo"
-              label="Título"
-              :max-length="QUOTE_LIMITS.titulo"
-              :error="conditionError('titulo')"
-              @blur="conditionsTouched.titulo = true"
+            <CheckCircle2
+              v-if="persisted && !dirty && !saving && !conflicted"
+              :size="14"
+              aria-hidden="true"
             />
-            <small>Un título breve que identifique esta cotización.</small>
+            <CircleAlert v-else-if="conflicted" :size="14" aria-hidden="true" />
+            <Info v-else :size="14" aria-hidden="true" />
+            <span>{{ editingStatus }}</span>
           </div>
-          <fieldset class="currency-choice form-grid__full">
-            <legend>Moneda</legend>
-            <div class="currency-choice__options">
-              <label
-                v-for="moneda in monedas.filter((item) => ['BOB', 'USD'].includes(item.codigo))"
-                :key="moneda.id"
-                class="currency-choice__option"
-                :class="{
-                  'currency-choice__option--selected': header.moneda_codigo === moneda.codigo,
-                }"
-              >
-                <input
-                  v-model="header.moneda_codigo"
-                  type="radio"
-                  name="moneda"
-                  :value="moneda.codigo"
-                />
-                <span
-                  ><strong>{{
-                    moneda.codigo === 'BOB' ? 'Bolivianos (BOB)' : 'Dólares (USD)'
-                  }}</strong
-                  ><small>{{
-                    moneda.codigo === 'BOB' ? 'Moneda nacional' : 'Cotización en dólares'
-                  }}</small></span
-                >
-              </label>
-            </div>
-          </fieldset>
-          <TextField
-            v-model="header.porcentaje_adelanto"
-            name="adelanto"
-            label="Adelanto (%)"
-            type="text"
-            input-mode="decimal"
-            input-rule="decimal"
-            :max-length="6"
-            :error="conditionError('porcentaje_adelanto')"
-            @blur="conditionsTouched.porcentaje_adelanto = true"
-            hint="Opcional: 0–100 %, hasta 2 decimales."
-          />
-          <TextField
-            v-model="header.plazo_entrega"
-            name="plazo"
-            label="Plazo de entrega"
-            :max-length="QUOTE_LIMITS.plazo_entrega"
-            :error="conditionError('plazo_entrega')"
-            @blur="conditionsTouched.plazo_entrega = true"
-            hint="Máximo 45 caracteres."
-          />
-          <TextField
-            v-model="header.validez_oferta"
-            name="validez"
-            label="Validez de la oferta (días)"
-            type="text"
-            input-mode="numeric"
-            input-rule="digits"
-            :max-length="3"
-            :error="conditionError('validez_oferta')"
-            @blur="conditionsTouched.validez_oferta = true"
-            hint="Opcional: entre 1 y 99 días."
-          />
-          <label class="quote-textarea form-grid__full" for="quote-observaciones">
-            <span>Observaciones</span>
-            <textarea
-              id="quote-observaciones"
-              v-model="header.observaciones"
-              name="observaciones"
-              rows="4"
-              :maxlength="QUOTE_LIMITS.observaciones"
-              @blur="conditionsTouched.observaciones = true"
-              :aria-invalid="Boolean(conditionError('observaciones'))"
-              placeholder="Condiciones adicionales para esta cotización..."
-            />
-            <small v-if="conditionError('observaciones')" class="condition-error" role="alert">{{
-              conditionError('observaciones')
-            }}</small>
-            <small v-else class="field-count"
-              >{{ header.observaciones.length }}/250 caracteres</small
-            >
-          </label>
+          <span v-if="persisted" class="quote-save-reference">
+            {{ persisted.estado_info.nombre }} · Proforma {{ persisted.numero }}
+          </span>
         </div>
-      </section>
+      </div>
+      <PageHeader
+        :title="persisted ? `Editar proforma #${persisted.numero}` : 'Nueva proforma'"
+        description="Prepara productos, cliente y condiciones antes de guardar."
+        show-menu
+        @menu="emit('openMenu')"
+      />
+      <LoadingSkeleton v-if="loading || referenceLoading" :lines="8" />
+      <ErrorState v-else-if="error && !tipos.length" :description="error">
+        <button @click="loadReferences">Reintentar</button>
+      </ErrorState>
+      <template v-else>
+        <nav class="steps" aria-label="Apartados de la proforma">
+          <button
+            v-for="(step, index) in steps"
+            :key="step"
+            type="button"
+            :class="{ active: currentStep === index }"
+            :aria-current="currentStep === index ? 'step' : undefined"
+            @click="currentStep = index"
+          >
+            <span class="step-number">{{ String(index + 1).padStart(2, '0') }}</span>
+            <span class="step-label">{{ step }}</span>
+            <span class="step-marker" aria-hidden="true" />
+          </button>
+        </nav>
 
-      <section
-        v-if="currentStep === 3"
-        class="quote-panel review-panel"
-        aria-labelledby="revisar-title"
-      >
-        <div class="section-title">
-          <div class="section-title__identity">
-            <span class="section-icon"><ClipboardCheck :size="22" aria-hidden="true" /></span>
-            <div>
-              <p class="section-kicker">04 · COMPROBACIÓN</p>
-              <h2 id="revisar-title">Revisar</h2>
-              <p>Comprueba los datos registrados antes de guardar o emitir.</p>
-            </div>
-          </div>
+        <div v-if="error" role="alert" class="error error-summary">
+          <strong>{{ error }}</strong>
+          <ul v-if="fieldErrorMessages.length">
+            <li v-for="message in fieldErrorMessages" :key="message">{{ message }}</li>
+          </ul>
         </div>
-        <div class="review-grid">
-          <Card class="review-summary-card"
-            ><h3><PackageOpen :size="17" aria-hidden="true" />Productos</h3>
-            <p>{{ lineas.length }} línea(s)</p>
-            <button @click="currentStep = 0">Corregir productos</button></Card
-          >
-          <Card class="review-summary-card"
-            ><h3><UserRound :size="17" aria-hidden="true" />Cliente</h3>
-            <p>
-              {{
-                clienteMode === 'pendiente'
-                  ? 'Pendiente'
-                  : clienteMode === 'nuevo'
-                    ? nuevoCliente.empresa || `${nuevoCliente.nombres} ${nuevoCliente.apellidos}`
-                    : nombreClienteVisible()
-              }}
-            </p>
-            <button @click="currentStep = 1">Corregir cliente</button></Card
-          >
-          <Card class="review-summary-card"
-            ><h3><SlidersHorizontal :size="17" aria-hidden="true" />Condiciones</h3>
-            <p>{{ header.plazo_entrega || 'Plazo pendiente' }} · {{ header.moneda_codigo }}</p>
-            <button @click="currentStep = 2">Corregir condiciones</button></Card
-          >
+        <div v-if="conflicted" class="conflict-actions">
+          <Button variant="secondary" @click="discardAndReload">
+            Descartar cambios y recargar
+          </Button>
         </div>
-        <Card class="commercial-preview"
-          ><div class="preview-brand">
-            <span class="preview-mark">H</span>
-            <p class="brand">HOMEX · VISTA PREVIA</p>
-          </div>
-          <h3>{{ header.titulo || 'Cotización comercial' }}</h3>
-          <p v-for="line in lineas" :key="line.localId" class="review-line">
-            <strong>{{ line.nombre }}</strong> —
-            <template v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
-              importe negociado {{ money(Number(line.importe_negociado || 0)) }}
-            </template>
-            <template v-else-if="totalEstimadoLinea(line) !== null">
-              cantidad {{ line.cantidad }}, precio {{ money(Number(line.precio_unitario)) }}
-            </template>
-            <template v-else>precio pendiente</template>
-            <span v-if="line.descripcion"><br />{{ line.descripcion }}</span>
-          </p>
-          <p v-if="header.plazo_entrega"><strong>Plazo:</strong> {{ header.plazo_entrega }}</p>
-          <p v-if="header.validez_oferta">
-            <strong>Validez:</strong> {{ header.validez_oferta }} días
-          </p>
-          <div class="whatsapp-share" @input.stop @change.stop>
-            <div class="whatsapp-share__summary">
-              <span class="whatsapp-share__icon"
-                ><MessageCircle :size="20" aria-hidden="true"
-              /></span>
-              <div class="whatsapp-share__heading">
-                <strong>Mensaje para WhatsApp</strong>
-                <small>Personaliza el saludo para acompañar el PDF.</small>
+
+        <section
+          v-show="currentStep === 0"
+          class="quote-panel products-panel"
+          aria-labelledby="productos-title"
+        >
+          <div class="section-title">
+            <div class="section-title__identity">
+              <span class="section-icon"><PackageOpen :size="22" aria-hidden="true" /></span>
+              <div>
+                <p class="section-kicker">01 · COMPOSICIÓN</p>
+                <h2 id="productos-title">Productos</h2>
+                <p>Agrega productos antes o después de elegir cliente.</p>
               </div>
-              <div class="whatsapp-share__controls">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  :disabled="!canShareWhatsApp || !whatsappDraft.trim()"
-                  @click="copyCommercialSummary"
-                  >Copiar mensaje</Button
-                >
+            </div>
+            <div class="section-title__tools">
+              <span v-if="lineas.length" class="count-pill"
+                >{{ lineas.length }} {{ lineas.length === 1 ? 'ítem' : 'ítems' }}</span
+              >
+              <Button @click="additionMode = 'choose'"
+                ><Plus :size="17" aria-hidden="true" />Añadir ítem</Button
+              >
+            </div>
+          </div>
+          <div v-if="additionMode === 'choose'" class="choice-panel">
+            <div class="choice-panel__heading">
+              <div>
+                <p class="section-kicker">AGREGAR A LA PROFORMA</p>
+                <h3>¿Qué deseas incorporar a la cotización?</h3>
+                <p>Selecciona cómo quieres incorporar el siguiente ítem.</p>
+              </div>
+              <Button variant="secondary" @click="additionMode = 'none'">Cancelar</Button>
+            </div>
+            <div class="choice-grid">
+              <button type="button" class="choice-card" @click="chooseCatalog">
+                <span class="choice-card__icon"><PackageOpen :size="24" aria-hidden="true" /></span>
+                <span class="choice-card__copy">
+                  <strong>Producto de catálogo</strong>
+                  <small>Busca un producto existente y añádelo a la cotización.</small>
+                </span>
+                <ArrowRight :size="20" aria-hidden="true" />
+              </button>
+              <button type="button" class="choice-card" @click="chooseManualFurniture">
+                <span class="choice-card__icon"><Sofa :size="24" aria-hidden="true" /></span>
+                <span class="choice-card__copy">
+                  <strong>Mueble a pedido</strong>
+                  <small>Define las características y el importe de un mueble a medida.</small>
+                </span>
+                <ArrowRight :size="20" aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+          <div v-if="catalogInitialized" v-show="additionMode === 'catalog'">
+            <CatalogoContextual
+              :categorias="catalogCategories"
+              :familias="familias"
+              :existing-product-ids="existingProductIds"
+              :can-admin="session.can('comercial.administrar')"
+              :initial-state="catalogState ?? undefined"
+              @state-change="catalogState = $event"
+              @create="createProductFromCategory"
+              @edit="editProductContextually"
+              @select="selectCatalogProduct"
+              @duplicate="focusDuplicateProduct"
+              @pending="quotePendingFamily"
+              @cancel="additionMode = 'none'"
+            />
+          </div>
+          <Card v-for="(line, index) in lineas" :key="line.localId" class="line-card">
+            <span class="line-index" aria-hidden="true">{{
+              String(index + 1).padStart(2, '0')
+            }}</span>
+            <div
+              :id="`ap3-linea-${line.localId}`"
+              class="line-summary"
+              tabindex="0"
+              role="button"
+              :aria-label="'Ver detalle completo de ' + line.nombre"
+              @click="openLineRead(line.localId)"
+              @keydown.enter.prevent="openLineRead(line.localId)"
+              @keydown.space.prevent="openLineRead(line.localId)"
+            >
+              <strong>{{ line.nombre }}</strong>
+              <p v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
+                Importe histórico negociado: {{ money(Number(line.importe_negociado || 0)) }}
+              </p>
+              <p v-else-if="totalEstimadoLinea(line) !== null">
+                {{ line.cantidad }} × {{ money(Number(line.precio_unitario)) }}
+                <span v-if="Number(line.descuento) === 0">· Sin descuento</span>
+              </p>
+              <p v-else class="pending-value">Precio pendiente</p>
+            </div>
+            <strong v-if="totalEstimadoLinea(line) !== null">
+              {{ money(totalEstimadoLinea(line)!) }}
+            </strong>
+            <strong v-else class="pending-value">Importe pendiente</strong>
+            <div class="line-menu" @keydown.esc="menuLineId = null">
+              <button
+                type="button"
+                class="menu-trigger"
+                :aria-expanded="menuLineId === line.localId"
+                :aria-label="'Acciones de ' + line.nombre"
+                aria-haspopup="menu"
+                @click.stop="menuLineId = menuLineId === line.localId ? null : line.localId"
+              >
+                ⋮
+              </button>
+              <div v-if="menuLineId === line.localId" class="menu-panel" role="menu">
                 <button
                   type="button"
-                  class="whatsapp-share__toggle"
-                  :aria-expanded="whatsappExpanded"
-                  aria-controls="whatsapp-message-content"
-                  :aria-label="
-                    whatsappExpanded ? 'Ocultar mensaje de WhatsApp' : 'Mostrar mensaje de WhatsApp'
-                  "
-                  @click="whatsappExpanded = !whatsappExpanded"
+                  role="menuitem"
+                  :disabled="line.modo_calculo === 'TOTAL_NEGOCIADO'"
+                  @click="selectMenuAction('edit', index)"
                 >
-                  <ChevronUp v-if="whatsappExpanded" :size="20" aria-hidden="true" />
-                  <ChevronDown v-else :size="20" aria-hidden="true" />
+                  Editar
+                </button>
+                <button
+                  v-if="tipos.find((x) => x.id === line.tipo_item)?.codigo === 'MUEBLE_MEDIDA'"
+                  type="button"
+                  role="menuitem"
+                  @click="selectMenuAction('spec', index)"
+                >
+                  Ficha técnica
+                </button>
+                <button
+                  v-if="tipos.find((x) => x.id === line.tipo_item)?.codigo === 'MUEBLE_MEDIDA'"
+                  type="button"
+                  role="menuitem"
+                  @click="selectMenuAction('duplicate', index)"
+                >
+                  Duplicar mueble
+                </button>
+                <button type="button" role="menuitem" @click="selectMenuAction('remove', index)">
+                  Eliminar
                 </button>
               </div>
             </div>
-            <p v-if="!canShareWhatsApp" class="whatsapp-share__hint">
-              Selecciona un cliente o completa los datos del nuevo cliente para copiar el mensaje.
-            </p>
-            <div
-              v-show="whatsappExpanded"
-              id="whatsapp-message-content"
-              class="whatsapp-share__content"
-            >
-              <label for="whatsapp-message">Contenido del mensaje</label>
-              <textarea
-                id="whatsapp-message"
-                :value="whatsappDraft"
-                rows="5"
-                @input="editWhatsapp(($event.target as HTMLTextAreaElement).value)"
-              />
-              <div class="whatsapp-share__edit-actions">
-                <small
-                  >Al copiar se incluye únicamente el texto. Adjunta el PDF por separado.</small
-                >
-                <Button
-                  v-if="whatsappEdited"
-                  type="button"
-                  variant="secondary"
-                  @click="resetWhatsapp"
-                  >Restaurar mensaje sugerido</Button
-                >
-              </div>
-            </div>
-          </div></Card
-        >
-        <div class="totals">
-          <template v-if="persisted && !dirty">
-            <span>Total confirmado por HOMEX</span>
-            <strong>{{ money(Number(persisted.total)) }}</strong>
-            <small>Importe guardado y calculado por el servidor.</small>
-          </template>
-          <template v-else>
-            <span>Estimación local</span>
-            <strong v-if="totalPreview !== null">{{ money(totalPreview) }}</strong>
-            <strong v-else class="pending-value">Total pendiente</strong>
-            <small>El total confirmado será el que devuelva HOMEX al guardar.</small>
-            <small v-if="persisted">
-              Último total guardado: {{ money(Number(persisted.total)) }}. Los cambios actuales aún
-              no se guardaron.
-            </small>
-          </template>
-        </div>
-        <div v-if="!canEmit" class="emission-checklist">
-          <div class="emission-checklist__header">
-            <span class="emission-checklist__icon"
-              ><ClipboardCheck :size="22" aria-hidden="true"
-            /></span>
-            <div class="emission-checklist__heading">
-              <h3>Verificación de la proforma</h3>
-              <p>Completa la información necesaria antes de emitir.</p>
-            </div>
-            <span class="emission-checklist__count" aria-live="polite">
-              {{ emissionIssues.length }}
-              {{ emissionIssues.length === 1 ? 'pendiente' : 'pendientes' }}
-            </span>
-          </div>
-          <ul>
-            <li v-for="issue in emissionIssues" :key="issue.id">
-              <CircleAlert :size="18" aria-hidden="true" />
-              <div class="emission-checklist__detail">
-                <strong>{{ issue.title }}</strong>
-                <p>{{ issue.description }}</p>
-              </div>
-              <button type="button" @click="currentStep = issue.step">
-                {{ issue.action }} <ChevronRight :size="16" aria-hidden="true" />
-              </button>
-            </li>
-          </ul>
-        </div>
-        <div v-else class="emission-ready" role="status">
-          <CheckCircle2 :size="19" aria-hidden="true" />
-          <span>Información completa. La proforma está lista para emitir.</span>
-        </div>
-      </section>
-
-      <footer class="editor-actions">
-        <div class="editor-actions__inner">
-          <div class="editor-actions__navigation">
-            <Button variant="secondary" :disabled="currentStep === 0" @click="currentStep--"
-              ><ArrowLeft :size="17" aria-hidden="true" />Anterior</Button
-            >
-            <Button v-if="currentStep < 3" @click="currentStep++"
-              >Continuar<ArrowRight :size="17" aria-hidden="true"
-            /></Button>
-          </div>
-          <div class="editor-actions__operations">
-            <Button variant="secondary" :processing="saving" @click="persist(false)"
-              >Guardar borrador</Button
-            >
-            <Button :disabled="!canEmit" :processing="saving" @click="persist(true)"
-              >Emitir proforma</Button
-            >
-            <Button
-              v-if="persisted"
-              variant="secondary"
-              @click="router.push(`/proformas/${persisted.id}`)"
-              >Ver detalle, aprobar y gestionar adjuntos</Button
-            >
-          </div>
-        </div>
-      </footer>
-    </template>
-
-    <Modal
-      :open="Boolean(readingLine)"
-      :title="readingLine?.nombre ?? 'Detalle de línea'"
-      @close="closeLineRead"
-    >
-      <div v-if="readingLine" class="read-line">
-        <p>
-          <strong>Tipo:</strong> {{ tipos.find((x) => x.id === readingLine?.tipo_item)?.nombre }}
-        </p>
-        <p>
-          <strong>SKU:</strong>
-          {{
-            readMaster?.sku ||
-            (readingLine.producto
-              ? 'Producto #' + readingLine.producto
-              : 'Variante pendiente / mueble a pedido')
-          }}
-        </p>
-        <p>
-          <strong>Descripción:</strong> {{ readingLine.descripcion || 'Sin descripción adicional' }}
-        </p>
-        <p>
-          <strong>Cantidad:</strong> {{ readingLine.cantidad }}
-          {{ unidades.find((x) => x.id === readingLine?.unidad)?.nombre }}
-        </p>
-        <p v-if="readingLine.familia_producto && !readingLine.producto" role="status">
-          Variante pendiente; no se reserva stock.
-        </p>
-        <p v-if="readingLine.modo_calculo === 'TOTAL_NEGOCIADO'">
-          <strong>Importe negociado histórico:</strong> {{ readingLine.importe_negociado }}
-        </p>
-        <p v-else>
-          <strong>Precio unitario cotizado:</strong>
-          {{ money(Number(readingLine.precio_unitario)) }}
-        </p>
-        <p><strong>Descuento:</strong> {{ money(Number(readingLine.descuento)) }}</p>
-        <p>
-          <strong>Importe estimado:</strong>
-          {{
-            totalEstimadoLinea(readingLine) === null
-              ? 'Pendiente'
-              : money(totalEstimadoLinea(readingLine)!)
-          }}
-        </p>
-        <template v-if="readMaster">
-          <h3>Datos actuales del catálogo · solo lectura</h3>
-          <p>{{ readMaster.nombre }} · {{ readMaster.categoria_info?.nombre }}</p>
-          <p>Precio vigente de referencia BOB: {{ readMaster.precio_vigente }}</p>
-          <p>Disponibilidad referencial: {{ readMaster.disponibilidad_referencial }}</p>
-          <p v-if="readMaster.silla">Silla: {{ readMaster.silla.modelo }}</p>
-          <p v-if="readMaster.piso">
-            Piso: {{ readMaster.piso.modelo }} · {{ readMaster.piso.espesor_mm }} mm
+          </Card>
+          <p v-if="removedLines.length" role="status" class="undo">
+            {{ removedLines.length }} eliminación(es) provisional(es) pendiente(s) de guardar.
+            <button type="button" @click="undoRemove">Deshacer última eliminación</button>
           </p>
-        </template>
-        <template v-if="readingLine.especificacion">
-          <h3>Ficha técnica · solo lectura</h3>
-          <p v-if="readingLine.especificacion.tipo_mueble">
-            Tipo de mueble:
+          <div v-if="!lineas.length && additionMode === 'none'" class="empty empty-products">
+            <span class="empty-products__icon"><PackageOpen :size="30" aria-hidden="true" /></span>
+            <h3>Aún no agregaste productos.</h3>
+            <p>
+              Comienza con un producto de catálogo o un mueble a pedido para construir esta
+              proforma.
+            </p>
+            <div class="empty-actions">
+              <Button @click="chooseCatalog"
+                ><PackageOpen :size="17" aria-hidden="true" />Producto de catálogo</Button
+              >
+              <Button variant="secondary" @click="chooseManualFurniture"
+                ><Sofa :size="17" aria-hidden="true" />Mueble a pedido</Button
+              >
+            </div>
+          </div>
+          <p v-if="lineas.some((line) => line.modo_calculo === 'TOTAL_NEGOCIADO')" class="warning">
+            Las líneas de importe histórico negociado se conservan sin conversión automática.
+          </p>
+        </section>
+
+        <section
+          v-show="currentStep === 1"
+          class="quote-panel client-panel"
+          aria-labelledby="cliente-title"
+        >
+          <div class="section-title">
+            <div class="section-title__identity">
+              <span class="section-icon"><UserRound :size="22" aria-hidden="true" /></span>
+              <div>
+                <p class="section-kicker">02 · DESTINATARIO</p>
+                <h2 id="cliente-title">Cliente</h2>
+                <p>
+                  Indica a quién corresponde la cotización. Puedes dejarlo pendiente para el
+                  borrador.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="mode" role="radiogroup" aria-label="Origen del cliente">
+            <label
+              class="client-option"
+              :class="{ 'client-option--active': clienteMode === 'pendiente' }"
+            >
+              <input v-model="clienteMode" type="radio" value="pendiente" />
+              <span
+                ><strong>Pendiente</strong><small>Completar el cliente más adelante</small></span
+              >
+            </label>
+            <label
+              class="client-option"
+              :class="{ 'client-option--active': clienteMode === 'existente' }"
+            >
+              <input v-model="clienteMode" type="radio" value="existente" />
+              <span
+                ><strong>Existente</strong
+                ><small>Seleccionar desde clientes registrados</small></span
+              >
+            </label>
+            <label
+              class="client-option"
+              :class="{ 'client-option--active': clienteMode === 'nuevo' }"
+            >
+              <input v-model="clienteMode" type="radio" value="nuevo" />
+              <span
+                ><strong>Registrar nuevo</strong
+                ><small>Registrar al guardar la proforma</small></span
+              >
+            </label>
+          </div>
+          <ClienteSelector
+            v-if="clienteMode === 'existente'"
+            :model-value="header.cliente"
+            label="Cliente existente"
+            @update:model-value="setExistingClient"
+            @select="clienteSeleccionado = $event"
+            @input.stop
+            @change.stop
+          />
+          <Card v-if="clienteMode === 'nuevo'" class="client-fields">
+            <ClienteFormFields
+              :model="nuevoCliente"
+              :tipos="tiposCliente"
+              :errors="clientErrors"
+              :validate="validationAttempted"
+              prefix="proforma-cliente"
+              @change="updateNuevoCliente"
+            />
+          </Card>
+          <div v-if="clienteMode === 'pendiente'" class="context-note">
+            <Info :size="19" aria-hidden="true" />
+            <p>Puedes guardar el borrador sin cliente. Para emitir deberás definirlo.</p>
+          </div>
+        </section>
+
+        <section
+          v-show="currentStep === 2"
+          class="quote-panel conditions-panel"
+          aria-labelledby="condiciones-title"
+        >
+          <div class="section-title">
+            <div class="section-title__identity">
+              <span class="section-icon"><SlidersHorizontal :size="22" aria-hidden="true" /></span>
+              <div>
+                <p class="section-kicker">03 · ACUERDOS</p>
+                <h2 id="condiciones-title">Condiciones</h2>
+                <p>Especifica los datos comerciales que acompañarán a la proforma.</p>
+              </div>
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-grid__full">
+              <TextField
+                v-model="header.titulo"
+                name="titulo"
+                label="Título"
+                :max-length="QUOTE_LIMITS.titulo"
+                :error="conditionError('titulo')"
+                @blur="conditionsTouched.titulo = true"
+              />
+              <small>Un título breve que identifique esta cotización.</small>
+            </div>
+            <fieldset class="currency-choice form-grid__full">
+              <legend>Moneda</legend>
+              <div class="currency-choice__options">
+                <label
+                  v-for="moneda in monedas.filter((item) => ['BOB', 'USD'].includes(item.codigo))"
+                  :key="moneda.id"
+                  class="currency-choice__option"
+                  :class="{
+                    'currency-choice__option--selected': header.moneda_codigo === moneda.codigo,
+                  }"
+                >
+                  <input
+                    v-model="header.moneda_codigo"
+                    type="radio"
+                    name="moneda"
+                    :value="moneda.codigo"
+                  />
+                  <span
+                    ><strong>{{
+                      moneda.codigo === 'BOB' ? 'Bolivianos (BOB)' : 'Dólares (USD)'
+                    }}</strong
+                    ><small>{{
+                      moneda.codigo === 'BOB' ? 'Moneda nacional' : 'Cotización en dólares'
+                    }}</small></span
+                  >
+                </label>
+              </div>
+            </fieldset>
+            <TextField
+              v-model="header.porcentaje_adelanto"
+              name="adelanto"
+              label="Adelanto (%)"
+              type="text"
+              input-mode="decimal"
+              input-rule="decimal"
+              :max-length="6"
+              :error="conditionError('porcentaje_adelanto')"
+              @blur="conditionsTouched.porcentaje_adelanto = true"
+              hint="Opcional: 0–100 %, hasta 2 decimales."
+            />
+            <TextField
+              v-model="header.plazo_entrega"
+              name="plazo"
+              label="Plazo de entrega"
+              :max-length="QUOTE_LIMITS.plazo_entrega"
+              :error="conditionError('plazo_entrega')"
+              @blur="conditionsTouched.plazo_entrega = true"
+              hint="Máximo 45 caracteres."
+            />
+            <TextField
+              v-model="header.validez_oferta"
+              name="validez"
+              label="Validez de la oferta (días)"
+              type="text"
+              input-mode="numeric"
+              input-rule="digits"
+              :max-length="3"
+              :error="conditionError('validez_oferta')"
+              @blur="conditionsTouched.validez_oferta = true"
+              hint="Opcional: entre 1 y 99 días."
+            />
+            <label class="quote-textarea form-grid__full" for="quote-observaciones">
+              <span>Observaciones</span>
+              <textarea
+                id="quote-observaciones"
+                v-model="header.observaciones"
+                name="observaciones"
+                rows="4"
+                :maxlength="QUOTE_LIMITS.observaciones"
+                @blur="conditionsTouched.observaciones = true"
+                :aria-invalid="Boolean(conditionError('observaciones'))"
+                placeholder="Condiciones adicionales para esta cotización..."
+              />
+              <small v-if="conditionError('observaciones')" class="condition-error" role="alert">{{
+                conditionError('observaciones')
+              }}</small>
+              <small v-else class="field-count"
+                >{{ header.observaciones.length }}/250 caracteres</small
+              >
+            </label>
+          </div>
+        </section>
+
+        <section
+          v-if="currentStep === 3"
+          class="quote-panel review-panel"
+          aria-labelledby="revisar-title"
+        >
+          <div class="section-title">
+            <div class="section-title__identity">
+              <span class="section-icon"><ClipboardCheck :size="22" aria-hidden="true" /></span>
+              <div>
+                <p class="section-kicker">04 · COMPROBACIÓN</p>
+                <h2 id="revisar-title">Revisar</h2>
+                <p>Comprueba los datos registrados antes de guardar o emitir.</p>
+              </div>
+            </div>
+          </div>
+          <div class="review-grid">
+            <Card class="review-summary-card"
+              ><h3><PackageOpen :size="17" aria-hidden="true" />Productos</h3>
+              <p>{{ lineas.length }} línea(s)</p>
+              <button @click="currentStep = 0">Corregir productos</button></Card
+            >
+            <Card class="review-summary-card"
+              ><h3><UserRound :size="17" aria-hidden="true" />Cliente</h3>
+              <p>
+                {{
+                  clienteMode === 'pendiente'
+                    ? 'Pendiente'
+                    : clienteMode === 'nuevo'
+                      ? nuevoCliente.empresa || `${nuevoCliente.nombres} ${nuevoCliente.apellidos}`
+                      : nombreClienteVisible()
+                }}
+              </p>
+              <button @click="currentStep = 1">Corregir cliente</button></Card
+            >
+            <Card class="review-summary-card"
+              ><h3><SlidersHorizontal :size="17" aria-hidden="true" />Condiciones</h3>
+              <p>{{ header.plazo_entrega || 'Plazo pendiente' }} · {{ header.moneda_codigo }}</p>
+              <button @click="currentStep = 2">Corregir condiciones</button></Card
+            >
+          </div>
+          <Card class="commercial-preview"
+            ><div class="preview-brand">
+              <span class="preview-mark">H</span>
+              <p class="brand">HOMEX · VISTA PREVIA</p>
+            </div>
+            <h3>{{ header.titulo || 'Cotización comercial' }}</h3>
+            <p v-for="line in lineas" :key="line.localId" class="review-line">
+              <strong>{{ line.nombre }}</strong> —
+              <template v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
+                importe negociado {{ money(Number(line.importe_negociado || 0)) }}
+              </template>
+              <template v-else-if="totalEstimadoLinea(line) !== null">
+                cantidad {{ line.cantidad }}, precio {{ money(Number(line.precio_unitario)) }}
+              </template>
+              <template v-else>precio pendiente</template>
+              <span v-if="line.descripcion"><br />{{ line.descripcion }}</span>
+            </p>
+            <p v-if="header.plazo_entrega"><strong>Plazo:</strong> {{ header.plazo_entrega }}</p>
+            <p v-if="header.validez_oferta">
+              <strong>Validez:</strong> {{ header.validez_oferta }} días
+            </p>
+            <div class="whatsapp-share" @input.stop @change.stop>
+              <div class="whatsapp-share__summary">
+                <span class="whatsapp-share__icon"
+                  ><MessageCircle :size="20" aria-hidden="true"
+                /></span>
+                <div class="whatsapp-share__heading">
+                  <strong>Mensaje para WhatsApp</strong>
+                  <small>Personaliza el saludo para acompañar el PDF.</small>
+                </div>
+                <div class="whatsapp-share__controls">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    :disabled="!canShareWhatsApp || !whatsappDraft.trim()"
+                    @click="copyCommercialSummary"
+                    >Copiar mensaje</Button
+                  >
+                  <button
+                    type="button"
+                    class="whatsapp-share__toggle"
+                    :aria-expanded="whatsappExpanded"
+                    aria-controls="whatsapp-message-content"
+                    :aria-label="
+                      whatsappExpanded
+                        ? 'Ocultar mensaje de WhatsApp'
+                        : 'Mostrar mensaje de WhatsApp'
+                    "
+                    @click="whatsappExpanded = !whatsappExpanded"
+                  >
+                    <ChevronUp v-if="whatsappExpanded" :size="20" aria-hidden="true" />
+                    <ChevronDown v-else :size="20" aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+              <p v-if="!canShareWhatsApp" class="whatsapp-share__hint">
+                Selecciona un cliente o completa los datos del nuevo cliente para copiar el mensaje.
+              </p>
+              <div
+                v-show="whatsappExpanded"
+                id="whatsapp-message-content"
+                class="whatsapp-share__content"
+              >
+                <label for="whatsapp-message">Contenido del mensaje</label>
+                <textarea
+                  id="whatsapp-message"
+                  :value="whatsappDraft"
+                  rows="5"
+                  @input="editWhatsapp(($event.target as HTMLTextAreaElement).value)"
+                />
+                <div class="whatsapp-share__edit-actions">
+                  <small
+                    >Al copiar se incluye únicamente el texto. Adjunta el PDF por separado.</small
+                  >
+                  <Button
+                    v-if="whatsappEdited"
+                    type="button"
+                    variant="secondary"
+                    @click="resetWhatsapp"
+                    >Restaurar mensaje sugerido</Button
+                  >
+                </div>
+              </div>
+            </div></Card
+          >
+          <div class="totals">
+            <template v-if="persisted && !dirty">
+              <span>Total confirmado por HOMEX</span>
+              <strong>{{ money(Number(persisted.total)) }}</strong>
+              <small>Importe guardado y calculado por el servidor.</small>
+            </template>
+            <template v-else>
+              <span>Estimación local</span>
+              <strong v-if="totalPreview !== null">{{ money(totalPreview) }}</strong>
+              <strong v-else class="pending-value">Total pendiente</strong>
+              <small>El total confirmado será el que devuelva HOMEX al guardar.</small>
+              <small v-if="persisted">
+                Último total guardado: {{ money(Number(persisted.total)) }}. Los cambios actuales
+                aún no se guardaron.
+              </small>
+            </template>
+          </div>
+          <div v-if="!canEmit" class="emission-checklist">
+            <div class="emission-checklist__header">
+              <span class="emission-checklist__icon"
+                ><ClipboardCheck :size="22" aria-hidden="true"
+              /></span>
+              <div class="emission-checklist__heading">
+                <h3>Verificación de la proforma</h3>
+                <p>Completa la información necesaria antes de emitir.</p>
+              </div>
+              <span class="emission-checklist__count" aria-live="polite">
+                {{ emissionIssues.length }}
+                {{ emissionIssues.length === 1 ? 'pendiente' : 'pendientes' }}
+              </span>
+            </div>
+            <ul>
+              <li v-for="issue in emissionIssues" :key="issue.id">
+                <CircleAlert :size="18" aria-hidden="true" />
+                <div class="emission-checklist__detail">
+                  <strong>{{ issue.title }}</strong>
+                  <p>{{ issue.description }}</p>
+                </div>
+                <button type="button" @click="currentStep = issue.step">
+                  {{ issue.action }} <ChevronRight :size="16" aria-hidden="true" />
+                </button>
+              </li>
+            </ul>
+          </div>
+          <div v-else class="emission-ready" role="status">
+            <CheckCircle2 :size="19" aria-hidden="true" />
+            <span>Información completa. La proforma está lista para emitir.</span>
+          </div>
+        </section>
+
+        <footer class="editor-actions">
+          <div class="editor-actions__inner">
+            <div class="editor-actions__navigation">
+              <Button variant="secondary" :disabled="currentStep === 0" @click="currentStep--"
+                ><ArrowLeft :size="17" aria-hidden="true" />Anterior</Button
+              >
+              <Button v-if="currentStep < 3" @click="currentStep++"
+                >Continuar<ArrowRight :size="17" aria-hidden="true"
+              /></Button>
+            </div>
+            <div class="editor-actions__operations">
+              <Button variant="secondary" :processing="saving" @click="persist(false)"
+                >Guardar borrador</Button
+              >
+              <Button :disabled="!canEmit" :processing="saving" @click="persist(true)"
+                >Emitir proforma</Button
+              >
+              <Button
+                v-if="persisted"
+                variant="secondary"
+                @click="router.push(`/proformas/${persisted.id}`)"
+                >Ver detalle, aprobar y gestionar adjuntos</Button
+              >
+            </div>
+          </div>
+        </footer>
+      </template>
+
+      <Modal
+        :open="Boolean(readingLine)"
+        :title="readingLine?.nombre ?? 'Detalle de línea'"
+        @close="closeLineRead"
+      >
+        <div v-if="readingLine" class="read-line">
+          <p>
+            <strong>Tipo:</strong> {{ tipos.find((x) => x.id === readingLine?.tipo_item)?.nombre }}
+          </p>
+          <p>
+            <strong>SKU:</strong>
             {{
-              tiposMueble.find((t) => t.id === readingLine?.especificacion?.tipo_mueble)?.nombre ??
-              'Histórico'
+              readMaster?.sku ||
+              (readingLine.producto
+                ? 'Producto #' + readingLine.producto
+                : 'Variante pendiente / mueble a pedido')
             }}
           </p>
-          <p v-if="readingLine.especificacion.observaciones">
-            Observaciones: {{ readingLine.especificacion.observaciones }}
+          <p>
+            <strong>Descripción:</strong>
+            {{ readingLine.descripcion || 'Sin descripción adicional' }}
           </p>
-          <h4>Características y dimensiones</h4>
-          <p>{{ readableTechnical(readingTechnical.caracteristicas_generales) }}</p>
-          <h4>Conjuntos</h4>
-          <ul>
-            <li v-for="g in readingTechnical.conjuntos ?? []" :key="g.uid">{{ g.nombre }}</li>
-          </ul>
-          <h4>Componentes</h4>
-          <ul>
-            <li v-for="(c, i) in readingTechnical.componentes ?? []" :key="c.uid ?? i">
-              <strong>{{ c.nombre }}</strong>
-              <span v-if="c.cantidad_interna"> · {{ c.cantidad_interna }} por mueble</span>
-              <span v-if="c.material"> · {{ c.material }}</span>
-              <span v-if="c.espesor"> · {{ c.espesor }}</span>
-              <span v-if="c.color"> · {{ c.color }}</span>
-              <span v-if="c.dimensiones"> · {{ readableTechnical(c.dimensiones) }}</span>
-              <span v-for="a in c.atributos ?? []" :key="a.codigo || a.nombre">
-                · {{ a.nombre }}: {{ a.valor }} {{ a.unidad ?? '' }}
-              </span>
-            </li>
-          </ul>
-          <h4>Accesorios</h4>
-          <ul>
-            <li v-for="(a, i) in readingTechnical.accesorios ?? []" :key="i">{{ a }}</li>
-          </ul>
-          <h4 v-if="readingTechnical.advertencias?.length">Información pendiente histórica</h4>
-          <ul>
-            <li v-for="(a, i) in readingTechnical.advertencias ?? []" :key="i">{{ a }}</li>
-          </ul>
-          <p v-if="readingTechnical.descripcion_original">
-            Descripción original: {{ readingTechnical.descripcion_original }}
+          <p>
+            <strong>Cantidad:</strong> {{ readingLine.cantidad }}
+            {{ unidades.find((x) => x.id === readingLine?.unidad)?.nombre }}
           </p>
-        </template>
-        <div class="actions">
-          <Button
-            v-if="readingLine.modo_calculo !== 'TOTAL_NEGOCIADO'"
-            variant="secondary"
-            @click="editReadLine"
-            >Editar</Button
-          >
-          <Button variant="secondary" @click="closeLineRead">Cerrar</Button>
+          <p v-if="readingLine.familia_producto && !readingLine.producto" role="status">
+            Variante pendiente; no se reserva stock.
+          </p>
+          <p v-if="readingLine.modo_calculo === 'TOTAL_NEGOCIADO'">
+            <strong>Importe negociado histórico:</strong> {{ readingLine.importe_negociado }}
+          </p>
+          <p v-else>
+            <strong>Precio unitario cotizado:</strong>
+            {{ money(Number(readingLine.precio_unitario)) }}
+          </p>
+          <p><strong>Descuento:</strong> {{ money(Number(readingLine.descuento)) }}</p>
+          <p>
+            <strong>Importe estimado:</strong>
+            {{
+              totalEstimadoLinea(readingLine) === null
+                ? 'Pendiente'
+                : money(totalEstimadoLinea(readingLine)!)
+            }}
+          </p>
+          <template v-if="readMaster">
+            <h3>Datos actuales del catálogo · solo lectura</h3>
+            <p>{{ readMaster.nombre }} · {{ readMaster.categoria_info?.nombre }}</p>
+            <p>Precio vigente de referencia BOB: {{ readMaster.precio_vigente }}</p>
+            <p>Disponibilidad referencial: {{ readMaster.disponibilidad_referencial }}</p>
+            <p v-if="readMaster.silla">Silla: {{ readMaster.silla.modelo }}</p>
+            <p v-if="readMaster.piso">
+              Piso: {{ readMaster.piso.modelo }} · {{ readMaster.piso.espesor_mm }} mm
+            </p>
+          </template>
+          <template v-if="readingLine.especificacion">
+            <h3>Ficha técnica · solo lectura</h3>
+            <p v-if="readingLine.especificacion.tipo_mueble">
+              Tipo de mueble:
+              {{
+                tiposMueble.find((t) => t.id === readingLine?.especificacion?.tipo_mueble)
+                  ?.nombre ?? 'Histórico'
+              }}
+            </p>
+            <p v-if="readingLine.especificacion.observaciones">
+              Observaciones: {{ readingLine.especificacion.observaciones }}
+            </p>
+            <h4>Características y dimensiones</h4>
+            <p>{{ readableTechnical(readingTechnical.caracteristicas_generales) }}</p>
+            <h4>Conjuntos</h4>
+            <ul>
+              <li v-for="g in readingTechnical.conjuntos ?? []" :key="g.uid">{{ g.nombre }}</li>
+            </ul>
+            <h4>Componentes</h4>
+            <ul>
+              <li v-for="(c, i) in readingTechnical.componentes ?? []" :key="c.uid ?? i">
+                <strong>{{ c.nombre }}</strong>
+                <span v-if="c.cantidad_interna"> · {{ c.cantidad_interna }} por mueble</span>
+                <span v-if="c.material"> · {{ c.material }}</span>
+                <span v-if="c.espesor"> · {{ c.espesor }}</span>
+                <span v-if="c.color"> · {{ c.color }}</span>
+                <span v-if="c.dimensiones"> · {{ readableTechnical(c.dimensiones) }}</span>
+                <span v-for="a in c.atributos ?? []" :key="a.codigo || a.nombre">
+                  · {{ a.nombre }}: {{ a.valor }} {{ a.unidad ?? '' }}
+                </span>
+              </li>
+            </ul>
+            <h4>Accesorios</h4>
+            <ul>
+              <li v-for="(a, i) in readingTechnical.accesorios ?? []" :key="i">{{ a }}</li>
+            </ul>
+            <h4 v-if="readingTechnical.advertencias?.length">Información pendiente histórica</h4>
+            <ul>
+              <li v-for="(a, i) in readingTechnical.advertencias ?? []" :key="i">{{ a }}</li>
+            </ul>
+            <p v-if="readingTechnical.descripcion_original">
+              Descripción original: {{ readingTechnical.descripcion_original }}
+            </p>
+          </template>
+          <div class="actions">
+            <Button
+              v-if="readingLine.modo_calculo !== 'TOTAL_NEGOCIADO'"
+              variant="secondary"
+              @click="editReadLine"
+              >Editar</Button
+            >
+            <Button variant="secondary" @click="closeLineRead">Cerrar</Button>
+          </div>
         </div>
-      </div>
-    </Modal>
-    <Modal
-      wide
-      :open="lineModal"
-      :title="editingLine === null ? 'Agregar producto' : 'Editar producto'"
-      @close="closeLineModal"
-    >
-      <DetalleForm
-        :key="lineFormVersion"
-        :tipos
-        :categorias="catalogCategories"
-        :unidades
-        :familias
-        :moneda="header.moneda_codigo"
-        :detail="editableDetail"
-        :existing-product-ids="existingProductIds"
-        :processing="saving"
-        :initial-product-id="preferredProductId"
-        :initial-draft="pendingLineDraft ?? undefined"
-        @save="saveLine"
-        @duplicate-product="focusDuplicateProduct"
-        @create-product="createProductContextually"
-        @changed="lineModalDirty = true"
-        @cancel="closeLineModal"
-      />
-    </Modal>
-    <Modal
-      :open="specLine !== null || draftingFurniture !== null"
-      title="Configurador integral de mueble a pedido"
-      fullscreen
-      @close="closeSpec"
-    >
-      <CapturaAsistida
-        v-if="draftingFurniture"
-        :dirty="specModalDirty"
-        :sesion="sesionBorrador"
-        :moneda="header.moneda_codigo === 'USD' ? 'USD' : 'BOB'"
-        :proforma="proformaId"
-        @applied="aplicarCaptura"
-        @processing="voiceProcessing = $event"
-      />
-      <fieldset :disabled="voiceProcessing" style="border: 0; padding: 0; min-width: 0">
-        <EspecificacionForm
-          :key="`${specLine ?? -1}:${specRenderVersion}`"
-          :tipos="tiposMueble"
-          :especificacion="editableSpec"
-          :detalle="editableSpecDetail"
-          :unidades="unidades"
-          :pendientes-asistencia="draftingFurniture ? pendientesAsistencia : []"
-          :moneda="header.moneda_codigo === 'USD' ? 'USD' : 'BOB'"
-          @save="saveSpec"
-          @type-created="registrarTipoMueble"
-          @changed="specModalDirty = true"
-          @cancel="closeSpec"
+      </Modal>
+      <Modal
+        wide
+        :open="lineModal"
+        :title="editingLine === null ? 'Agregar producto' : 'Editar producto'"
+        @close="closeLineModal"
+      >
+        <DetalleForm
+          :key="lineFormVersion"
+          :tipos
+          :categorias="catalogCategories"
+          :unidades
+          :familias
+          :moneda="header.moneda_codigo"
+          :detail="editableDetail"
+          :existing-product-ids="existingProductIds"
+          :processing="saving"
+          :initial-product-id="preferredProductId"
+          :initial-draft="pendingLineDraft ?? undefined"
+          @save="saveLine"
+          @duplicate-product="focusDuplicateProduct"
+          @create-product="createProductContextually"
+          @changed="lineModalDirty = true"
+          @cancel="closeLineModal"
         />
-      </fieldset>
-    </Modal>
+      </Modal>
+    </div>
+    <MuebleStudio
+      v-if="furnitureOpen"
+      :form-version="specRenderVersion"
+      :nueva="Boolean(draftingFurniture)"
+      :dirty="specModalDirty"
+      :sesion="sesionBorrador"
+      :moneda="header.moneda_codigo === 'USD' ? 'USD' : 'BOB'"
+      :proforma="proformaId"
+      :tipos="tiposMueble"
+      :especificacion="editableSpec"
+      :detalle="editableSpecDetail"
+      :unidades="unidades"
+      :pendientes-asistencia="draftingFurniture ? pendientesAsistencia : []"
+      :processing="voiceProcessing"
+      :external-error="error"
+      @save="saveSpec"
+      @type-created="registrarTipoMueble"
+      @changed="specModalDirty = true"
+      @cancel="closeSpec"
+      @applied="aplicarCaptura"
+      @processing="voiceProcessing = $event"
+    />
   </div>
 </template>
 

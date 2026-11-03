@@ -35,7 +35,11 @@ async function addCatalogLine(page: Page) {
   await page.getByRole('button', { name: 'Añadir ítem' }).click()
   await page.getByRole('button', { name: 'Producto de catálogo' }).click()
   await expect(page.getByText('FE08-SILLA-001')).toBeVisible()
-  await page.getByRole('button', { name: 'Seleccionar para cotizar' }).click()
+  await page
+    .locator('article')
+    .filter({ hasText: 'FE08-SILLA-001' })
+    .getByRole('button', { name: 'Seleccionar para cotizar' })
+    .click()
   await page.getByLabel('Cantidad', { exact: true }).fill('1')
   await expect(page.locator('#unidad-linea')).toBeDisabled()
   await expect(page.locator('#unidad-linea option:checked')).toHaveText('Pieza')
@@ -205,7 +209,7 @@ test.describe.serial('FE08 backend real', () => {
     await page.getByRole('button', { name: 'Grabar' }).click()
     await expect(page.getByRole('status')).toContainText('Grabando')
     await page.getByRole('button', { name: 'Detener' }).click()
-    await expect(page.getByRole('status')).toContainText('Audio listo para enviar')
+    await expect(page.getByRole('status')).toContainText(/Audio listo/)
     await page.getByRole('button', { name: 'Enviar a procesamiento' }).click()
     await expect(page).toHaveURL(/\/capturas\/\d+$/)
     await expect(page.getByText('Propuesta IA · requiere revisión')).toBeVisible()
@@ -268,32 +272,38 @@ test.describe.serial('FE08 backend real', () => {
       await page.getByRole('button', { name: /Productos$/ }).click()
       await page.getByRole('button', { name: 'Añadir ítem' }).click()
       await page.getByRole('button', { name: 'Mueble a pedido' }).click()
-      const modal = page.getByRole('dialog')
-      await expect(modal).toBeVisible()
-      await modal.getByLabel('Nombre comercial del mueble').fill(caso.nombre)
-      await modal.getByLabel('Cantidad cotizada').fill('2')
-      await modal.getByLabel('Precio unitario negociado (BOB)').fill('350')
+      const studio = page.locator('.furniture-studio')
+      const navigation = studio.getByRole('navigation', { name: 'Apartados del mueble a pedido' })
+      await expect(studio).toBeVisible()
+      await studio.getByLabel('Nombre comercial del mueble').fill(caso.nombre)
+      await navigation.getByRole('button', { name: /Precio/ }).click()
+      await studio.getByLabel('Cantidad cotizada').fill('2')
+      await studio.getByLabel('Precio unitario negociado (BOB)').fill('350')
+      await navigation.getByRole('button', { name: /General/ }).click()
       for (const medida of caso.medidas) {
         if (!['ancho', 'alto', 'profundidad'].includes(medida.clave)) {
-          await modal.getByLabel('Nueva medida').fill(medida.clave)
-          await modal.getByRole('button', { name: 'Añadir medida' }).click()
+          await studio.getByRole('combobox', { name: 'Agregar medida' }).fill(medida.clave)
+          await studio.getByRole('combobox', { name: 'Agregar medida' }).press('Enter')
         }
-        await modal.locator(`input[name="${medida.clave}"]`).fill(medida.valor)
+        await studio.locator(`input[name="${medida.clave}"]`).fill(medida.valor)
       }
+      await navigation.getByRole('button', { name: /Estructura/ }).click()
       if (caso.grupo) {
-        await modal.getByRole('button', { name: 'Añadir conjunto' }).click()
-        await modal.locator('input[name="grupo-0"]').fill(caso.grupo)
-        await modal.getByRole('button', { name: 'Añadir componente' }).click()
+        await studio.getByRole('button', { name: 'Añadir conjunto' }).click()
+        await studio.locator('input[name="grupo-0"]').fill(caso.grupo)
+        await studio.getByRole('button', { name: 'Añadir componente' }).click()
       } else {
-        await modal.getByRole('button', { name: 'Agregar componente' }).click()
+        await studio.getByRole('button', { name: 'Agregar componente' }).click()
       }
-      await modal.locator('#componente-nombre-0').fill(caso.componente)
-      await modal.locator('input[name="componente-0-cantidad"]').fill(String(caso.cantidad))
+      await studio.locator('#componente-nombre-0').fill(caso.componente)
+      await studio.locator('input[name="componente-0-cantidad"]').fill(String(caso.cantidad))
       if (caso.accesorio) {
-        await modal.getByRole('button', { name: 'Añadir accesorio' }).click()
-        await modal.locator('input[name="accesorio-0"]').fill(caso.accesorio)
+        await navigation.getByRole('button', { name: /Accesorios/ }).click()
+        await studio.getByRole('button', { name: 'Añadir accesorio' }).click()
+        await studio.locator('input[name="accesorio-0"]').fill(caso.accesorio)
       }
-      await modal.getByRole('button', { name: 'Guardar especificación' }).click()
+      await navigation.getByRole('button', { name: /Revisar/ }).click()
+      await studio.getByRole('button', { name: 'Agregar mueble a la proforma' }).click()
       await expect(page.locator('.line-card').getByText(caso.nombre, { exact: true })).toBeVisible()
 
       const escritura = page.waitForResponse(
