@@ -95,19 +95,15 @@ describe('Voz en creación de catálogo', () => {
     expect(w.emitted('apply')).toBeUndefined()
     w.unmount()
   })
-  it('conserva campos manuales al rechazar confirmación y nunca guarda al aplicar', async () => {
+  it('revisa conflictos sin sobrescribir valores manuales y sin guardar automáticamente', async () => {
     vi.spyOn(proformasService, 'families').mockResolvedValue({
-      count: 0,
-      next: null,
-      previous: null,
-      results: [],
+      count: 0, next: null, previous: null, results: [],
     })
     vi.spyOn(proformasService, 'options').mockImplementation(async (key) =>
       key === 'CATEGORIA_PRODUCTO'
         ? [{ id: 10, codigo: 'OTRO', nombre: 'Otro', concepto_codigo: key }]
         : [],
     )
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     const w = mount(ProductoForm, {
       props: { preselectCategory: 'OTRO' },
       global: { stubs: { CapturaCatalogo: true } },
@@ -115,31 +111,45 @@ describe('Voz en creación de catálogo', () => {
     await flushPromises()
     const input = w.get('input[name="nombre"]')
     await input.setValue('Manual')
+    // La captura se monta sólo después de abrir el panel lateral.
+    await button(w, 'Completar por voz').trigger('click')
     w.findComponent({ name: 'CapturaCatalogo' }).vm.$emit('apply', { nombre: 'Propuesto' })
     await flushPromises()
-    expect(confirm).toHaveBeenCalled()
+    const checkbox = document.body.querySelector<HTMLInputElement>(
+      'input[aria-label="Reemplazar Nombre comercial"]',
+    )
+    expect(checkbox).not.toBeNull()
     expect((input.element as HTMLInputElement).value).toBe('Manual')
     expect(w.emitted('save')).toBeUndefined()
-    confirm.mockReturnValue(true)
-    w.findComponent({ name: 'CapturaCatalogo' }).vm.$emit('apply', {
-      nombre: 'Propuesto',
-      sku: 'NO',
-      stock: 99,
-    })
+    const cancel = [...document.body.querySelectorAll('button')].find(
+      (item) => item.textContent?.trim() === 'Conservar valores actuales',
+    )
+    cancel?.click()
+    await flushPromises()
+    expect((input.element as HTMLInputElement).value).toBe('Manual')
+    await button(w, 'Completar por voz').trigger('click')
+    w.findComponent({ name: 'CapturaCatalogo' }).vm.$emit('apply', { nombre: 'Propuesto', sku: 'NO', stock: 99 })
+    await flushPromises()
+    const confirmCheck = document.body.querySelector<HTMLInputElement>(
+      'input[aria-label="Reemplazar Nombre comercial"]',
+    )
+    confirmCheck?.click()
+    const apply = [...document.body.querySelectorAll('button')].find(
+      (item) => item.textContent?.trim() === 'Aplicar selección',
+    )
+    apply?.click()
     await flushPromises()
     expect((input.element as HTMLInputElement).value).toBe('Propuesto')
-    expect(w.emitted('save')).toBeUndefined()
     expect((w.get('input[name="sku"]').element as HTMLInputElement).value).toBe('')
+    expect(w.emitted('save')).toBeUndefined()
     w.unmount()
   })
+
 })
 
-it('aplica el color secundario activo, confirma conflictos y descarta referencias ajenas', async () => {
+it('aplica color secundario desde un catálogo activo sólo cuando se acepta el conflicto', async () => {
   vi.spyOn(proformasService, 'families').mockResolvedValue({
-    count: 0,
-    next: null,
-    previous: null,
-    results: [],
+    count: 0, next: null, previous: null, results: [],
   })
   vi.spyOn(proformasService, 'options').mockImplementation(async (key) =>
     key === 'CATEGORIA_PRODUCTO'
@@ -151,23 +161,29 @@ it('aplica el color secundario activo, confirma conflictos y descarta referencia
           ]
         : [],
   )
-  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
   const w = mount(ProductoForm, {
     props: { preselectCategory: 'SILLA' },
     global: { stubs: { CapturaCatalogo: true } },
   })
   await flushPromises()
   await w.get('select[name="color2"]').setValue('11')
-  const voice = w.findComponent({ name: 'CapturaCatalogo' })
-  voice.vm.$emit('apply', { color_secundario: 12 })
+  await button(w, 'Completar por voz').trigger('click')
+  w.findComponent({ name: 'CapturaCatalogo' }).vm.$emit('apply', { color_secundario: 12 })
   await flushPromises()
-  expect(confirm).toHaveBeenCalled()
   expect((w.get('select[name="color2"]').element as HTMLSelectElement).value).toBe('11')
-  confirm.mockReturnValue(true)
-  voice.vm.$emit('apply', { color_secundario: 12 })
+  const checkbox = document.body.querySelector<HTMLInputElement>(
+    'input[aria-label="Reemplazar Color secundario"]',
+  )
+  expect(checkbox).not.toBeNull()
+  checkbox?.click()
+  const apply = [...document.body.querySelectorAll('button')].find(
+    (item) => item.textContent?.trim() === 'Aplicar selección',
+  )
+  apply?.click()
   await flushPromises()
   expect((w.get('select[name="color2"]').element as HTMLSelectElement).value).toBe('12')
-  voice.vm.$emit('apply', { color_secundario: 999 })
+  await button(w, 'Completar por voz').trigger('click')
+  w.findComponent({ name: 'CapturaCatalogo' }).vm.$emit('apply', { color_secundario: 999 })
   await flushPromises()
   expect((w.get('select[name="color2"]').element as HTMLSelectElement).value).toBe('12')
   expect(w.emitted('save')).toBeUndefined()
