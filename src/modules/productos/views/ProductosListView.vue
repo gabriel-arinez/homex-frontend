@@ -88,7 +88,9 @@ const extras = reactive<Record<ExtraKey, string>>({
   unidad_stock: catalogoId(routeString('unidad_stock')),
 })
 showAdvanced.value = extraKeys.some((key) => Boolean(extras[key]))
-const categoryCode = computed(() => categories.value.find((x) => String(x.id) === category.value)?.codigo)
+const categoryCode = computed(
+  () => categories.value.find((x) => String(x.id) === category.value)?.codigo,
+)
 const availableExtra = computed<ExtraKey[]>(() => {
   if (categoryCode.value === 'SILLA') return ['familia', 'marca', 'modelo', 'color_primario']
   if (categoryCode.value === 'PISO_FLOTANTE')
@@ -107,7 +109,8 @@ const hasFilters = computed(
     extraKeys.some((key) => Boolean(extras[key])),
 )
 const filterLabel = (key: ExtraKey, value: string) => {
-  if (key === 'familia') return families.value.find((x) => String(x.id) === value)?.nombre || '#' + value
+  if (key === 'familia')
+    return families.value.find((x) => String(x.id) === value)?.nombre || '#' + value
   if (key === 'modelo' || key === 'espesor_mm') return value
   const code: Record<string, string> = {
     marca: 'MARCA',
@@ -135,34 +138,47 @@ const extraNames: Record<ExtraKey, string> = {
 const activeFilters = computed(() => [
   ...(search.value.trim() ? [{ key: 'q', label: 'Búsqueda: ' + search.value.trim() }] : []),
   ...(category.value
-    ? [{
-        key: 'categoria',
-        label: 'Categoría: ' +
-          (categories.value.find((x) => String(x.id) === category.value)?.nombre || '#' + category.value),
-      }]
+    ? [
+        {
+          key: 'categoria',
+          label:
+            'Categoría: ' +
+            (categories.value.find((x) => String(x.id) === category.value)?.nombre ||
+              '#' + category.value),
+        },
+      ]
     : []),
-  ...(status.value !== 'activos' ? [{
-    key: 'estado',
-    label: 'Estado: ' + (status.value === 'todos' ? 'Todos' : 'Inactivos'),
-  }] : []),
-  ...availableExtra.value.filter((key) => Boolean(extras[key])).map((key) => ({
-    key,
-    label: extraNames[key] + ': ' + filterLabel(key, extras[key]),
-  })),
+  ...(status.value !== 'activos'
+    ? [
+        {
+          key: 'estado',
+          label: 'Estado: ' + (status.value === 'todos' ? 'Todos' : 'Inactivos'),
+        },
+      ]
+    : []),
+  ...availableExtra.value
+    .filter((key) => Boolean(extras[key]))
+    .map((key) => ({
+      key,
+      label: extraNames[key] + ': ' + filterLabel(key, extras[key]),
+    })),
 ])
 let requestId = 0
 let debounce: ReturnType<typeof setTimeout> | undefined
 let restoring = false
 let mounted = false
 
-const numberId = (value: string): number | undefined => (catalogoId(value) ? Number(value) : undefined)
+const numberId = (value: string): number | undefined =>
+  catalogoId(value) ? Number(value) : undefined
 const optionList = (code: string, placeholder: string) => [
   { value: '', label: placeholder },
   ...(options[code] || []).map((value) => ({ value: String(value.id), label: value.nombre })),
 ]
 const familyOptions = computed(() => [
   { value: '', label: 'Todas las familias' },
-  ...families.value.filter((x) => x.activo !== false).map((x) => ({ value: String(x.id), label: x.nombre })),
+  ...families.value
+    .filter((x) => x.activo !== false)
+    .map((x) => ({ value: String(x.id), label: x.nombre })),
 ])
 const categoryOptions = computed(() => [
   { value: '', label: 'Todas las categorías' },
@@ -256,16 +272,20 @@ async function loadCategories() {
   categoryError.value = ''
   try {
     const items = await proformasService.options('CATEGORIA_PRODUCTO')
-    categories.value = items.filter((item) =>
-      ['SILLA', 'PISO_FLOTANTE', 'OTRO'].includes(item.codigo) && item.concepto_codigo === 'CATEGORIA_PRODUCTO',
+    categories.value = items.filter(
+      (item) =>
+        ['SILLA', 'PISO_FLOTANTE', 'OTRO'].includes(item.codigo) &&
+        item.concepto_codigo === 'CATEGORIA_PRODUCTO',
     )
     if (category.value && !categories.value.some((x) => String(x.id) === category.value)) {
-      notice.value = 'La categoría seleccionada ya no está disponible. Se mostrará el catálogo general.'
+      notice.value =
+        'La categoría seleccionada ya no está disponible. Se mostrará el catálogo general.'
       changeCategory('')
     }
     if (category.value) scheduleLoad()
   } catch {
-    categoryError.value = 'No se pudieron cargar las categorías. Reintenta para filtrar o crear productos.'
+    categoryError.value =
+      'No se pudieron cargar las categorías. Reintenta para filtrar o crear productos.'
   } finally {
     categoryLoading.value = false
   }
@@ -275,16 +295,27 @@ async function loadAdvanced() {
   advancedLoading.value = true
   advancedError.value = ''
   try {
-    const keys = ['MARCA', 'COLOR', 'TIPO_PISO', 'MATERIAL_PISO', 'DISENO_PISO', 'ACABADO_PISO', 'UNIDAD_MEDIDA'] as const
+    const keys = [
+      'MARCA',
+      'COLOR',
+      'TIPO_PISO',
+      'MATERIAL_PISO',
+      'DISENO_PISO',
+      'ACABADO_PISO',
+      'UNIDAD_MEDIDA',
+    ] as const
     const [response, ...values] = await Promise.all([
       proformasService.families(),
       ...keys.map((code) => proformasService.options(code)),
     ])
     families.value = response.results
-    keys.forEach((key, index) => { options[key] = values[index] as ValorCatalogoPublico[] })
+    keys.forEach((key, index) => {
+      options[key] = values[index] as ValorCatalogoPublico[]
+    })
     advancedLoaded.value = true
     if (response.count > response.results.length)
-      advancedError.value = 'Hay más familias disponibles. La búsqueda avanzada muestra las primeras 100.'
+      advancedError.value =
+        'Hay más familias disponibles. La búsqueda avanzada muestra las primeras 100.'
   } catch {
     advancedError.value = 'No se pudieron cargar los filtros avanzados. Puedes reintentarlo.'
   } finally {
@@ -295,7 +326,9 @@ function toggleAdvanced() {
   showAdvanced.value = !showAdvanced.value
   if (showAdvanced.value) void loadAdvanced()
 }
-function closeCreate() { showCreate.value = false }
+function closeCreate() {
+  showCreate.value = false
+}
 async function toggleCreate() {
   showCreate.value = !showCreate.value
   if (showCreate.value) {
@@ -325,9 +358,8 @@ function restoreFilters() {
   view.value = routeString('vista') === 'grid' ? 'grid' : 'lista'
   page.value = pageNumberProducto(routeString('pagina'))
   for (const key of extraKeys)
-    extras[key] = key === 'modelo' || key === 'espesor_mm'
-      ? routeString(key)
-      : catalogoId(routeString(key))
+    extras[key] =
+      key === 'modelo' || key === 'espesor_mm' ? routeString(key) : catalogoId(routeString(key))
   showAdvanced.value = extraKeys.some((key) => Boolean(extras[key]))
   if (showAdvanced.value) void loadAdvanced()
   void nextTick(() => {
@@ -336,17 +368,23 @@ function restoreFilters() {
   })
 }
 watch([search, status, category], (next, previous) =>
-  filtersChanged(next[0] !== previous[0] ? 300 : 0))
+  filtersChanged(next[0] !== previous[0] ? 300 : 0),
+)
 watch(extras, () => filtersChanged())
 watch(page, () => {
   if (restoring) return
   syncRoute()
   scheduleLoad()
 })
-watch(view, () => { if (!restoring) syncRoute() })
-watch(() => route.fullPath, () => {
-  if (!routeMatches(queryFromFilters())) restoreFilters()
+watch(view, () => {
+  if (!restoring) syncRoute()
 })
+watch(
+  () => route.fullPath,
+  () => {
+    if (!routeMatches(queryFromFilters())) restoreFilters()
+  },
+)
 onMounted(() => {
   mounted = true
   document.addEventListener('pointerdown', onDocumentPointer)
@@ -379,7 +417,8 @@ onBeforeUnmount(() => {
             :aria-expanded="showCreate"
             aria-controls="productos-create-options"
             @click="toggleCreate"
-          ><Plus :size="18" aria-hidden="true" />Nuevo producto</Button>
+            ><Plus :size="18" aria-hidden="true" />Nuevo producto</Button
+          >
           <div
             v-if="showCreate"
             id="productos-create-options"
@@ -392,12 +431,24 @@ onBeforeUnmount(() => {
               <button
                 v-for="(item, index) in categories"
                 :key="item.id"
-                :ref="(element) => { if (index === 0) createFirst = element as HTMLButtonElement | null }"
+                :ref="
+                  (element) => {
+                    if (index === 0) createFirst = element as HTMLButtonElement | null
+                  }
+                "
                 type="button"
                 @click="createProduct(item.codigo)"
-              >{{ item.nombre }}</button>
+              >
+                {{ item.nombre }}
+              </button>
             </template>
-            <p v-else class="muted">{{ categoryLoading ? 'Cargando categorías…' : categoryError || 'No hay categorías disponibles.' }}</p>
+            <p v-else class="muted">
+              {{
+                categoryLoading
+                  ? 'Cargando categorías…'
+                  : categoryError || 'No hay categorías disponibles.'
+              }}
+            </p>
             <button v-if="categoryError" type="button" @click="loadCategories">Reintentar</button>
           </div>
         </div>
@@ -412,19 +463,25 @@ onBeforeUnmount(() => {
           :aria-pressed="view === 'grid'"
           :class="{ selected: view === 'grid' }"
           @click="view = 'grid'"
-        ><LayoutGrid :size="17" aria-hidden="true" />Cuadrícula</button>
+        >
+          <LayoutGrid :size="17" aria-hidden="true" />Cuadrícula
+        </button>
         <button
           type="button"
           :aria-pressed="view === 'lista'"
           :class="{ selected: view === 'lista' }"
           @click="view = 'lista'"
-        ><List :size="17" aria-hidden="true" />Lista</button>
+        >
+          <List :size="17" aria-hidden="true" />Lista
+        </button>
       </div>
     </div>
 
     <section class="filters" aria-label="Filtros de productos">
       <div class="filters-primary">
-        <div class="search-wrap"><SearchField v-model="search" label="Buscar por SKU o nombre" /></div>
+        <div class="search-wrap">
+          <SearchField v-model="search" label="Buscar por SKU o nombre" />
+        </div>
         <Select
           :model-value="category"
           name="categoria-producto-filtro"
@@ -449,12 +506,20 @@ onBeforeUnmount(() => {
           :aria-expanded="showAdvanced"
           :aria-controls="showAdvanced ? 'productos-filtros-avanzados' : undefined"
           @click="toggleAdvanced"
-        ><SlidersHorizontal :size="18" aria-hidden="true" />Más filtros<ChevronDown :size="16" aria-hidden="true" /></button>
+        >
+          <SlidersHorizontal :size="18" aria-hidden="true" />Más filtros<ChevronDown
+            :size="16"
+            aria-hidden="true"
+          />
+        </button>
       </div>
       <div v-if="showAdvanced" id="productos-filtros-avanzados" class="advanced-filters">
-        <p class="advanced-hint">Selecciona los atributos que quieras utilizar para encontrar el producto.</p>
+        <p class="advanced-hint">
+          Selecciona los atributos que quieras utilizar para encontrar el producto.
+        </p>
         <p v-if="advancedLoading" role="status">Cargando filtros…</p>
-        <p v-if="advancedError" role="status" class="filter-message">{{ advancedError }}
+        <p v-if="advancedError" role="status" class="filter-message">
+          {{ advancedError }}
           <button v-if="!advancedLoaded" type="button" @click="loadAdvanced">Reintentar</button>
         </p>
         <div class="advanced-grid">
@@ -475,7 +540,8 @@ onBeforeUnmount(() => {
             />
           </template>
           <template v-if="categoryCode === 'SILLA'">
-            <label class="advanced-input">Modelo
+            <label class="advanced-input"
+              >Modelo
               <input v-model.trim="extras.modelo" maxlength="150" placeholder="Buscar modelo…" />
             </label>
             <Select
@@ -487,15 +553,48 @@ onBeforeUnmount(() => {
             />
           </template>
           <template v-if="categoryCode === 'PISO_FLOTANTE'">
-            <Select v-model="extras.tipo" name="tipo-producto-filtro" label="Tipo de piso" :options="optionList('TIPO_PISO', 'Todos los tipos')" :disabled="!advancedLoaded" />
-            <Select v-model="extras.material" name="material-producto-filtro" label="Material" :options="optionList('MATERIAL_PISO', 'Todos los materiales')" :disabled="!advancedLoaded" />
-            <Select v-model="extras.diseno" name="diseno-producto-filtro" label="Diseño" :options="optionList('DISENO_PISO', 'Todos los diseños')" :disabled="!advancedLoaded" />
-            <Select v-model="extras.acabado" name="acabado-producto-filtro" label="Acabado" :options="optionList('ACABADO_PISO', 'Todos los acabados')" :disabled="!advancedLoaded" />
-            <label class="advanced-input">Espesor (mm)
-              <input v-model="extras.espesor_mm" type="number" min="0.01" max="999999" step="0.01" placeholder="Ej. 8" />
+            <Select
+              v-model="extras.tipo"
+              name="tipo-producto-filtro"
+              label="Tipo de piso"
+              :options="optionList('TIPO_PISO', 'Todos los tipos')"
+              :disabled="!advancedLoaded"
+            />
+            <Select
+              v-model="extras.material"
+              name="material-producto-filtro"
+              label="Material"
+              :options="optionList('MATERIAL_PISO', 'Todos los materiales')"
+              :disabled="!advancedLoaded"
+            />
+            <Select
+              v-model="extras.diseno"
+              name="diseno-producto-filtro"
+              label="Diseño"
+              :options="optionList('DISENO_PISO', 'Todos los diseños')"
+              :disabled="!advancedLoaded"
+            />
+            <Select
+              v-model="extras.acabado"
+              name="acabado-producto-filtro"
+              label="Acabado"
+              :options="optionList('ACABADO_PISO', 'Todos los acabados')"
+              :disabled="!advancedLoaded"
+            />
+            <label class="advanced-input"
+              >Espesor (mm)
+              <input
+                v-model="extras.espesor_mm"
+                type="number"
+                min="0.01"
+                max="999999"
+                step="0.01"
+                placeholder="Ej. 8"
+              />
             </label>
           </template>
-          <Select v-if="categoryCode === 'OTRO'"
+          <Select
+            v-if="categoryCode === 'OTRO'"
             v-model="extras.unidad_stock"
             name="unidad-producto-filtro"
             label="Unidad comercial"
@@ -506,12 +605,18 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
-    <p v-if="categoryError" class="options-warning" role="status">{{ categoryError }} <button type="button" @click="loadCategories">Reintentar</button></p>
+    <p v-if="categoryError" class="options-warning" role="status">
+      {{ categoryError }} <button type="button" @click="loadCategories">Reintentar</button>
+    </p>
     <p v-if="notice" role="status" class="options-warning">{{ notice }}</p>
     <ActiveFilters :filters="activeFilters" @remove="removeFilter" @clear="clearFilters" />
 
     <div class="results-header">
-      <strong v-if="!loading && !error">{{ total }} producto{{ total === 1 ? '' : 's' }} encontrado{{ total === 1 ? '' : 's' }}</strong>
+      <strong v-if="!loading && !error"
+        >{{ total }} producto{{ total === 1 ? '' : 's' }} encontrado{{
+          total === 1 ? '' : 's'
+        }}</strong
+      >
       <span v-else>Catálogo de productos</span>
       <span class="results-order">Ordenados por nombre</span>
     </div>
@@ -521,10 +626,21 @@ onBeforeUnmount(() => {
     </ErrorState>
     <EmptyState
       v-else-if="!products.length"
-      :title="hasFilters ? (status === 'activos' && !search.trim() && !category && !activeFilters.some((f) => f.key !== 'estado') ? 'No hay productos activos' : 'Sin resultados') : 'No hay productos activos'"
-      :description="hasFilters
-        ? 'No hay productos que coincidan con los criterios seleccionados.'
-        : 'No hay productos activos para mostrar. Puedes consultar también los inactivos.'"
+      :title="
+        hasFilters
+          ? status === 'activos' &&
+            !search.trim() &&
+            !category &&
+            !activeFilters.some((f) => f.key !== 'estado')
+            ? 'No hay productos activos'
+            : 'Sin resultados'
+          : 'No hay productos activos'
+      "
+      :description="
+        hasFilters
+          ? 'No hay productos que coincidan con los criterios seleccionados.'
+          : 'No hay productos activos para mostrar. Puedes consultar también los inactivos.'
+      "
     >
       <Button v-if="hasFilters" variant="secondary" @click="clearFilters">Limpiar filtros</Button>
       <Button v-else variant="secondary" @click="status = 'todos'">Ver todos los productos</Button>
@@ -538,20 +654,36 @@ onBeforeUnmount(() => {
           <div class="card-body">
             <div class="card-flags">
               <span class="category-label">{{ categoriaProducto(product) }}</span>
-              <Badge :tone="product.activo === false ? 'neutral' : 'success'">{{ product.activo === false ? 'Inactivo' : 'Activo' }}</Badge>
+              <Badge :tone="product.activo === false ? 'neutral' : 'success'">{{
+                product.activo === false ? 'Inactivo' : 'Activo'
+              }}</Badge>
             </div>
-            <h2 class="product-name" :title="product.nombre"><RouterLink :to="'/productos/' + product.id">{{ product.nombre }}</RouterLink></h2>
-            <small class="sku" :title="product.sku || undefined">{{ product.sku || 'Sin SKU' }}</small>
+            <h2 class="product-name" :title="product.nombre">
+              <RouterLink :to="'/productos/' + product.id">{{ product.nombre }}</RouterLink>
+            </h2>
+            <small class="sku" :title="product.sku || undefined">{{
+              product.sku || 'Sin SKU'
+            }}</small>
             <p v-if="product.familia_info" class="family">{{ product.familia_info.nombre }}</p>
             <div class="price-row">
               <strong>{{ dineroProducto(product.precio_vigente) }}</strong>
               <Badge v-if="product.promocion?.vigente" tone="info">Promoción</Badge>
             </div>
             <div class="stock-summary">
-              <div><span>Existencias</span><strong>{{ unidadesProducto(product, product.stock) }}</strong></div>
-              <div><span>Cantidad pendiente</span><span>{{ unidadesProducto(product, product.demanda_pendiente) }}</span></div>
+              <div>
+                <span>Existencias</span
+                ><strong>{{ unidadesProducto(product, product.stock) }}</strong>
+              </div>
+              <div>
+                <span>Cantidad pendiente</span
+                ><span>{{ unidadesProducto(product, product.demanda_pendiente) }}</span>
+              </div>
             </div>
-            <RouterLink class="card-detail" :to="'/productos/' + product.id" :aria-label="'Ver producto ' + product.nombre">
+            <RouterLink
+              class="card-detail"
+              :to="'/productos/' + product.id"
+              :aria-label="'Ver producto ' + product.nombre"
+            >
               Ver detalle <Eye :size="15" aria-hidden="true" />
             </RouterLink>
           </div>
@@ -559,22 +691,33 @@ onBeforeUnmount(() => {
       </div>
       <div v-else class="table-wrap">
         <table class="product-table">
-          <caption class="sr-only">Listado de productos de catálogo</caption>
-          <thead><tr>
-            <th scope="col">Producto</th>
-            <th scope="col">Categoría</th>
-            <th scope="col" class="numeric">Precio vigente</th>
-            <th scope="col" class="numeric">Existencias</th>
-            <th scope="col">Estado</th>
-            <th scope="col" class="actions">Acciones</th>
-          </tr></thead>
+          <caption class="sr-only">
+            Listado de productos de catálogo
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Producto</th>
+              <th scope="col">Categoría</th>
+              <th scope="col" class="numeric">Precio vigente</th>
+              <th scope="col" class="numeric">Existencias</th>
+              <th scope="col">Estado</th>
+              <th scope="col" class="actions">Acciones</th>
+            </tr>
+          </thead>
           <tbody>
             <tr v-for="product in products" :key="product.id">
               <td class="identity" data-label="Producto">
                 <div class="identity-content">
-                  <div class="thumbnail"><ProductImage :image="product.imagen_principal" :alt="product.nombre" /></div>
+                  <div class="thumbnail">
+                    <ProductImage :image="product.imagen_principal" :alt="product.nombre" />
+                  </div>
                   <div class="identity-copy">
-                    <RouterLink :to="'/productos/' + product.id" class="table-name" :title="product.nombre">{{ product.nombre }}</RouterLink>
+                    <RouterLink
+                      :to="'/productos/' + product.id"
+                      class="table-name"
+                      :title="product.nombre"
+                      >{{ product.nombre }}</RouterLink
+                    >
                     <small :title="product.sku || undefined">{{ product.sku || 'Sin SKU' }}</small>
                   </div>
                 </div>
@@ -589,16 +732,34 @@ onBeforeUnmount(() => {
               </td>
               <td class="numeric stock-cell" data-label="Existencias">
                 <strong>{{ unidadesProducto(product, product.stock) }}</strong>
-                <small :title="'Cantidad pendiente: ' + unidadesProducto(product, product.demanda_pendiente)">
+                <small
+                  :title="
+                    'Cantidad pendiente: ' + unidadesProducto(product, product.demanda_pendiente)
+                  "
+                >
                   Pendiente: {{ cantidadProducto(product.demanda_pendiente) }}
                 </small>
-                <small :title="'Saldo referencial: ' + unidadesProducto(product, product.disponibilidad_referencial)">
+                <small
+                  :title="
+                    'Saldo referencial: ' +
+                    unidadesProducto(product, product.disponibilidad_referencial)
+                  "
+                >
                   Saldo ref.: {{ cantidadProducto(product.disponibilidad_referencial) }}
                 </small>
               </td>
-              <td data-label="Estado"><Badge :tone="product.activo === false ? 'neutral' : 'success'">{{ product.activo === false ? 'Inactivo' : 'Activo' }}</Badge></td>
+              <td data-label="Estado">
+                <Badge :tone="product.activo === false ? 'neutral' : 'success'">{{
+                  product.activo === false ? 'Inactivo' : 'Activo'
+                }}</Badge>
+              </td>
               <td class="actions" data-label="Acciones">
-                <RouterLink class="view-detail" :to="'/productos/' + product.id" :aria-label="'Ver producto ' + product.nombre" title="Ver detalle">
+                <RouterLink
+                  class="view-detail"
+                  :to="'/productos/' + product.id"
+                  :aria-label="'Ver producto ' + product.nombre"
+                  title="Ver detalle"
+                >
                   <Eye :size="18" aria-hidden="true" />
                 </RouterLink>
               </td>
@@ -619,150 +780,545 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.productos-bandeja { min-width: 0; }
-.create-root { position: relative; }
+.productos-bandeja {
+  min-width: 0;
+}
+.create-root {
+  position: relative;
+}
 .create-options {
-  position: absolute; z-index: 15; right: 0; top: calc(100% + 0.5rem);
-  display: grid; gap: 0.3rem; width: min(20rem, calc(100vw - 2rem));
-  padding: 0.6rem; border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-card); background: var(--color-surface);
+  position: absolute;
+  z-index: 15;
+  right: 0;
+  top: calc(100% + 0.5rem);
+  display: grid;
+  gap: 0.3rem;
+  width: min(20rem, calc(100vw - 2rem));
+  padding: 0.6rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
   box-shadow: 0 12px 32px #0004;
 }
-.create-options p { margin: 0.3rem 0.5rem 0.5rem; font-size: 0.84rem; }
+.create-options p {
+  margin: 0.3rem 0.5rem 0.5rem;
+  font-size: 0.84rem;
+}
 .create-options button {
-  min-height: 2.75rem; padding: 0.6rem 0.75rem; text-align: left;
-  background: transparent; color: var(--color-text); border: 0; border-radius: var(--radius-control);
+  min-height: 2.75rem;
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  background: transparent;
+  color: var(--color-text);
+  border: 0;
+  border-radius: var(--radius-control);
   cursor: pointer;
 }
-.create-options button:hover, .create-options button:focus-visible { background: var(--color-surface-hover); }
-.create-options .muted { color: var(--color-text-secondary); }
-.product-toolbar, .results-header {
-  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+.create-options button:hover,
+.create-options button:focus-visible {
+  background: var(--color-surface-hover);
+}
+.create-options .muted {
+  color: var(--color-text-secondary);
+}
+.product-toolbar,
+.results-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-3);
 }
-.product-toolbar { margin-bottom: var(--space-4); }
-.view-switch { display: flex; gap: 0.25rem; padding: 0.25rem; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-surface); }
-.view-switch button {
-  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
-  min-height: 2.35rem; padding: 0.45rem 0.7rem; border: 0; border-radius: 0.35rem;
-  background: transparent; color: var(--color-text-secondary); font-weight: 600; cursor: pointer;
+.product-toolbar {
+  margin-bottom: var(--space-4);
 }
-.view-switch .selected { background: var(--color-surface-hover); color: var(--color-text); box-shadow: inset 0 0 0 1px var(--color-border); }
-.filters {
-  padding: var(--space-4); margin-bottom: var(--space-4);
-  border: 1px solid var(--color-border); border-radius: var(--radius-card);
+.view-switch {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
   background: var(--color-surface);
 }
-.filters-primary { display: grid; grid-template-columns: minmax(12rem, 1fr) minmax(10rem, 13rem) minmax(8rem, 11rem) auto; gap: var(--space-3); align-items: end; }
-.filters-primary > * { min-width: 0; }
-.filters-primary :deep(.search) { min-height: 2.75rem; }
+.view-switch button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.35rem;
+  padding: 0.45rem 0.7rem;
+  border: 0;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  cursor: pointer;
+}
+.view-switch .selected {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+  box-shadow: inset 0 0 0 1px var(--color-border);
+}
+.filters {
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+.filters-primary {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) minmax(10rem, 13rem) minmax(8rem, 11rem) auto;
+  gap: var(--space-3);
+  align-items: end;
+}
+.filters-primary > * {
+  min-width: 0;
+}
+.filters-primary :deep(.search) {
+  min-height: 2.75rem;
+}
 .more-filters {
-  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.6rem 0.8rem;
-  min-height: 2.75rem; white-space: nowrap; border: 1px solid var(--color-border);
-  border-radius: var(--radius-control); background: transparent; color: var(--color-text);
-  font-weight: 600; cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  min-height: 2.75rem;
+  white-space: nowrap;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-text);
+  font-weight: 600;
+  cursor: pointer;
 }
-.more-filters:hover { background: var(--color-surface-hover); }
-.advanced-filters { margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--color-border); }
-.advanced-hint { margin: 0 0 var(--space-3); color: var(--color-text-secondary); font-size: 0.84rem; }
-.advanced-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
-.advanced-input { display: grid; gap: var(--space-2); font-weight: 600; }
+.more-filters:hover {
+  background: var(--color-surface-hover);
+}
+.advanced-filters {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+.advanced-hint {
+  margin: 0 0 var(--space-3);
+  color: var(--color-text-secondary);
+  font-size: 0.84rem;
+}
+.advanced-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+.advanced-input {
+  display: grid;
+  gap: var(--space-2);
+  font-weight: 600;
+}
 .advanced-input input {
-  min-width: 0; min-height: 2.75rem; padding: 0.625rem 0.75rem;
-  color: var(--color-text); border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-control); background: var(--color-surface);
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 0.625rem 0.75rem;
+  color: var(--color-text);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
 }
-.filter-message, .options-warning { padding: 0.6rem 0; color: var(--color-warning); font-size: 0.85rem; }
-.filter-message button, .options-warning button { margin-left: 0.5rem; color: var(--color-text); border: 0; background: transparent; cursor: pointer; text-decoration: underline; }
-.results-header { margin-bottom: var(--space-3); font-size: 0.85rem; }
-.results-order { color: var(--color-text-secondary); }
-.product-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); }
+.filter-message,
+.options-warning {
+  padding: 0.6rem 0;
+  color: var(--color-warning);
+  font-size: 0.85rem;
+}
+.filter-message button,
+.options-warning button {
+  margin-left: 0.5rem;
+  color: var(--color-text);
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.results-header {
+  margin-bottom: var(--space-3);
+  font-size: 0.85rem;
+}
+.results-order {
+  color: var(--color-text-secondary);
+}
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+}
 .product-card {
-  display: flex; min-width: 0; flex-direction: column; overflow: hidden;
-  border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface);
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
   transition: border-color var(--transition-fast);
 }
-.product-card:hover { border-color: var(--color-border-strong); }
-.product-visual { display: grid; aspect-ratio: 4 / 3; overflow: hidden; background: var(--color-background); }
-.product-visual :deep(.product-image) { width: 100%; height: 100%; min-height: 0; border-radius: 0; aspect-ratio: 4 / 3 !important; }
-.product-visual :deep(img) { object-fit: contain; }
-.card-body { display: flex; flex: 1; flex-direction: column; gap: 0.45rem; min-width: 0; padding: var(--space-4); }
-.card-flags { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.4rem; align-items: center; }
-.category-label { font-size: 0.75rem; color: var(--color-text-secondary); }
-.product-name { margin: 0.3rem 0 0; min-width: 0; font-size: 1rem; line-height: 1.4; }
-.product-name a {
-  display: -webkit-box; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3; color: var(--color-text); text-decoration: none;
+.product-card:hover {
+  border-color: var(--color-border-strong);
 }
-.product-name a:hover { color: var(--color-primary-accent); text-decoration: underline; }
-.sku { color: var(--color-text-secondary); font-size: 0.75rem; overflow-wrap: anywhere; }
-.family { margin: 0; color: var(--color-text-secondary); font-size: 0.77rem; }
-.price-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: auto; padding-top: 0.65rem; }
-.price-row strong { font-size: 1.1rem; font-variant-numeric: tabular-nums; }
-.stock-summary { display: grid; gap: 0.45rem; padding: 0.75rem 0; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); font-size: 0.8rem; }
-.stock-summary div { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.3rem; }
-.stock-summary div > span:first-child { color: var(--color-text-secondary); }
-.stock-summary strong, .stock-summary div > span:last-child { font-variant-numeric: tabular-nums; }
-.card-detail { display: inline-flex; align-items: center; gap: 0.4rem; align-self: start; padding: 0.3rem 0; color: var(--color-primary-accent); font-size: 0.82rem; font-weight: 600; text-decoration: none; }
-.card-detail:hover { text-decoration: underline; }
-.table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface); }
-.product-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.product-table th, .product-table td { padding: 0.8rem 0.9rem; text-align: left; vertical-align: middle; border-bottom: 1px solid var(--color-border); }
-.product-table th { color: var(--color-text-secondary); font-size: 0.75rem; }
-.product-table tr:last-child td { border-bottom: none; }
-.product-table tbody tr:hover { background: var(--color-surface-hover); }
-.product-table th:nth-child(1) { width: 34%; }
-.product-table th:nth-child(2) { width: 18%; }
-.product-table th:nth-child(3) { width: 15%; }
-.product-table th:nth-child(4) { width: 17%; }
-.product-table th:nth-child(5) { width: 10%; }
-.product-table th:nth-child(6) { width: 6%; }
-.product-table th.numeric, .product-table td.numeric { text-align: right; }
-.product-table th.actions, .product-table td.actions { text-align: center; }
-.identity-content { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
-.thumbnail { flex: none; width: 3.2rem; height: 3.2rem; overflow: hidden; border-radius: 0.4rem; background: var(--color-background); }
-.thumbnail :deep(.product-image) { width: 100%; height: 100%; min-height: 0; aspect-ratio: 1 !important; }
-.thumbnail :deep(.fallback) { gap: 0; font-size: 0; }
-.thumbnail :deep(.fallback svg) { width: 1.1rem; height: 1.1rem; }
-.identity-copy { display: grid; gap: 0.3rem; min-width: 0; }
-.table-name { display: -webkit-box; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: var(--color-text); text-decoration: none; font-weight: 700; font-size: 0.88rem; }
-.table-name:hover { color: var(--color-primary-accent); text-decoration: underline; }
-.identity-copy small { color: var(--color-text-secondary); overflow-wrap: anywhere; }
-.category-cell, .price-cell, .stock-cell { font-size: 0.83rem; }
-.category-cell small, .price-cell small, .stock-cell small { display: block; margin-top: 0.3rem; color: var(--color-text-secondary); font-size: 0.72rem; }
-.price-cell strong, .stock-cell strong { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.stock-cell small { font-variant-numeric: tabular-nums; }
-.view-detail { display: inline-grid; place-items: center; width: 2.75rem; height: 2.75rem; border: 1px solid var(--color-border); border-radius: var(--radius-control); color: var(--color-text); }
-.view-detail:hover { color: var(--color-primary-accent); background: var(--color-surface-hover); }
-.pagination, .pagination-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
-.pagination { margin-top: var(--space-4); color: var(--color-text-secondary); font-size: 0.82rem; }
-.pagination-actions { margin-left: auto; }
-@media (max-width: 78rem) { .product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.product-visual {
+  display: grid;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: var(--color-background);
+}
+.product-visual :deep(.product-image) {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border-radius: 0;
+  aspect-ratio: 4 / 3 !important;
+}
+.product-visual :deep(img) {
+  object-fit: contain;
+}
+.card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: var(--space-4);
+}
+.card-flags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.4rem;
+  align-items: center;
+}
+.category-label {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+.product-name {
+  margin: 0.3rem 0 0;
+  min-width: 0;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+.product-name a {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  color: var(--color-text);
+  text-decoration: none;
+}
+.product-name a:hover {
+  color: var(--color-primary-accent);
+  text-decoration: underline;
+}
+.sku {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+.family {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.77rem;
+}
+.price-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding-top: 0.65rem;
+}
+.price-row strong {
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+}
+.stock-summary {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.8rem;
+}
+.stock-summary div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.3rem;
+}
+.stock-summary div > span:first-child {
+  color: var(--color-text-secondary);
+}
+.stock-summary strong,
+.stock-summary div > span:last-child {
+  font-variant-numeric: tabular-nums;
+}
+.card-detail {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  align-self: start;
+  padding: 0.3rem 0;
+  color: var(--color-primary-accent);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.card-detail:hover {
+  text-decoration: underline;
+}
+.table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+.product-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.product-table th,
+.product-table td {
+  padding: 0.8rem 0.9rem;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--color-border);
+}
+.product-table th {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
+.product-table tr:last-child td {
+  border-bottom: none;
+}
+.product-table tbody tr:hover {
+  background: var(--color-surface-hover);
+}
+.product-table th:nth-child(1) {
+  width: 34%;
+}
+.product-table th:nth-child(2) {
+  width: 18%;
+}
+.product-table th:nth-child(3) {
+  width: 15%;
+}
+.product-table th:nth-child(4) {
+  width: 17%;
+}
+.product-table th:nth-child(5) {
+  width: 10%;
+}
+.product-table th:nth-child(6) {
+  width: 6%;
+}
+.product-table th.numeric,
+.product-table td.numeric {
+  text-align: right;
+}
+.product-table th.actions,
+.product-table td.actions {
+  text-align: center;
+}
+.identity-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.thumbnail {
+  flex: none;
+  width: 3.2rem;
+  height: 3.2rem;
+  overflow: hidden;
+  border-radius: 0.4rem;
+  background: var(--color-background);
+}
+.thumbnail :deep(.product-image) {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  aspect-ratio: 1 !important;
+}
+.thumbnail :deep(.fallback) {
+  gap: 0;
+  font-size: 0;
+}
+.thumbnail :deep(.fallback svg) {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.identity-copy {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.table-name {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--color-text);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+.table-name:hover {
+  color: var(--color-primary-accent);
+  text-decoration: underline;
+}
+.identity-copy small {
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+.category-cell,
+.price-cell,
+.stock-cell {
+  font-size: 0.83rem;
+}
+.category-cell small,
+.price-cell small,
+.stock-cell small {
+  display: block;
+  margin-top: 0.3rem;
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+}
+.price-cell strong,
+.stock-cell strong {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.stock-cell small {
+  font-variant-numeric: tabular-nums;
+}
+.view-detail {
+  display: inline-grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+}
+.view-detail:hover {
+  color: var(--color-primary-accent);
+  background: var(--color-surface-hover);
+}
+.pagination,
+.pagination-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.pagination {
+  margin-top: var(--space-4);
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+}
+.pagination-actions {
+  margin-left: auto;
+}
+@media (max-width: 78rem) {
+  .product-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
 @media (max-width: 62rem) {
-  .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .filters-primary { grid-template-columns: minmax(12rem, 1fr) minmax(9rem, 12rem); }
-  .advanced-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .filters-primary {
+    grid-template-columns: minmax(12rem, 1fr) minmax(9rem, 12rem);
+  }
+  .advanced-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 @media (max-width: 47.99rem) {
-  .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .product-table thead { display: none; }
-  .product-table, .product-table tbody, .product-table tr { display: block; }
-  .product-table tbody tr { padding: var(--space-3); border-bottom: 1px solid var(--color-border); }
-  .product-table tbody tr:last-child { border-bottom: 0; }
-  .product-table td { display: grid; grid-template-columns: minmax(6rem, 34%) minmax(0, 1fr); gap: var(--space-3); padding: 0.4rem; border: 0; text-align: left !important; }
-  .product-table td::before { content: attr(data-label); color: var(--color-text-secondary); font-weight: 600; font-size: 0.8rem; }
-  .product-table td.actions { text-align: left; }
-  .product-table .identity-content { min-width: 0; }
-  .product-table .view-detail { justify-self: start; }
-  .product-table .numeric strong { white-space: normal; }
+  .product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .product-table thead {
+    display: none;
+  }
+  .product-table,
+  .product-table tbody,
+  .product-table tr {
+    display: block;
+  }
+  .product-table tbody tr {
+    padding: var(--space-3);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .product-table tbody tr:last-child {
+    border-bottom: 0;
+  }
+  .product-table td {
+    display: grid;
+    grid-template-columns: minmax(6rem, 34%) minmax(0, 1fr);
+    gap: var(--space-3);
+    padding: 0.4rem;
+    border: 0;
+    text-align: left !important;
+  }
+  .product-table td::before {
+    content: attr(data-label);
+    color: var(--color-text-secondary);
+    font-weight: 600;
+    font-size: 0.8rem;
+  }
+  .product-table td.actions {
+    text-align: left;
+  }
+  .product-table .identity-content {
+    min-width: 0;
+  }
+  .product-table .view-detail {
+    justify-self: start;
+  }
+  .product-table .numeric strong {
+    white-space: normal;
+  }
 }
 @media (max-width: 35rem) {
-  .filters-primary, .advanced-grid { grid-template-columns: 1fr; }
-  .product-grid { grid-template-columns: 1fr; }
-  .product-toolbar { align-items: stretch; }
-  .view-switch { width: 100%; }
-  .view-switch button { flex: 1; }
-  .product-table td { grid-template-columns: minmax(5.5rem, 35%) minmax(0, 1fr); }
-  .pagination-actions { width: 100%; }
+  .filters-primary,
+  .advanced-grid {
+    grid-template-columns: 1fr;
+  }
+  .product-grid {
+    grid-template-columns: 1fr;
+  }
+  .product-toolbar {
+    align-items: stretch;
+  }
+  .view-switch {
+    width: 100%;
+  }
+  .view-switch button {
+    flex: 1;
+  }
+  .product-table td {
+    grid-template-columns: minmax(5.5rem, 35%) minmax(0, 1fr);
+  }
+  .pagination-actions {
+    width: 100%;
+  }
 }
 </style>

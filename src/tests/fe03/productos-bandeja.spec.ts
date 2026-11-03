@@ -33,17 +33,26 @@ const sample: Producto = {
 
 function mockServices() {
   const list = vi.spyOn(productosService, 'list').mockResolvedValue({
-    count: 1, next: null, previous: null, results: [sample],
+    count: 1,
+    next: null,
+    previous: null,
+    results: [sample],
   })
   vi.spyOn(proformasService, 'options').mockImplementation(async (concepto) => {
     if (concepto === 'CATEGORIA_PRODUCTO')
-      return [catalog(1, 'SILLA', 'Silla'), catalog(2, 'PISO_FLOTANTE', 'Piso flotante'), catalog(3, 'OTRO', 'Otro producto')]
+      return [
+        catalog(1, 'SILLA', 'Silla'),
+        catalog(2, 'PISO_FLOTANTE', 'Piso flotante'),
+        catalog(3, 'OTRO', 'Otro producto'),
+      ]
     if (concepto === 'MARCA') return [catalog(10, 'MARCA_A', 'Marca A', 'MARCA')]
     if (concepto === 'COLOR') return [catalog(11, 'AZUL', 'Azul', 'COLOR')]
     return []
   })
   vi.spyOn(proformasService, 'families').mockResolvedValue({
-    count: 1, next: null, previous: null,
+    count: 1,
+    next: null,
+    previous: null,
     results: [{ id: 22, codigo: 'SILLAS', nombre: 'Sillas', activo: true }],
   })
   return list
@@ -62,7 +71,10 @@ async function makeMounted(path = '/productos', canCreate = false) {
   await router.isReady()
   const store = useSessionStore(pinia)
   if (canCreate) store.capabilities = ['catalogo.crear_producto']
-  const wrapper = mount(ProductosListView, { attachTo: document.body, global: { plugins: [pinia, router] } })
+  const wrapper = mount(ProductosListView, {
+    attachTo: document.body,
+    global: { plugins: [pinia, router] },
+  })
   await flushPromises()
   return { wrapper, router }
 }
@@ -98,7 +110,9 @@ describe('Bandeja administrativa de productos', () => {
     try {
       await wrapper.get('#categoria-producto-filtro').setValue('1')
       await flushPromises()
-      expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ categoria: 1, activo: true, page: 1 }))
+      expect(list).toHaveBeenLastCalledWith(
+        expect.objectContaining({ categoria: 1, activo: true, page: 1 }),
+      )
       await wrapper.get('.more-filters').trigger('click')
       await flushPromises()
       expect(wrapper.find('#material-producto-filtro').exists()).toBe(false)
@@ -138,9 +152,13 @@ describe('Bandeja administrativa de productos', () => {
     const { wrapper } = await makeMounted('/productos?estado=todos&categoria=1&vista=grid&pagina=2')
     try {
       expect(wrapper.find('.product-grid').exists()).toBe(true)
-      expect(list).toHaveBeenLastCalledWith(expect.objectContaining({
-        activo: undefined, categoria: 1, page: 2,
-      }))
+      expect(list).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          activo: undefined,
+          categoria: 1,
+          page: 2,
+        }),
+      )
       expect(wrapper.text()).toContain('1 producto encontrado')
     } finally {
       wrapper.unmount()

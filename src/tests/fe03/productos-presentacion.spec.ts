@@ -11,7 +11,12 @@ import {
 
 const base = {
   categoria: 1,
-  categoria_info: { id: 1, codigo: 'SILLA', nombre: 'Silla', concepto_codigo: 'CATEGORIA_PRODUCTO' },
+  categoria_info: {
+    id: 1,
+    codigo: 'SILLA',
+    nombre: 'Silla',
+    concepto_codigo: 'CATEGORIA_PRODUCTO',
+  },
   unidad_stock: 2,
   unidad_stock_info: { id: 2, codigo: 'PIEZA', nombre: 'Pieza', concepto_codigo: 'UNIDAD_MEDIDA' },
 } as Producto
@@ -23,10 +28,20 @@ describe('Presentación de bandeja de productos', () => {
     expect(cantidadProducto('0.1234')).toBe('0,1234')
     expect(unidadesProducto(base, '1.0000')).toBe('1 pieza')
     expect(unidadesProducto(base, '28.0000')).toBe('28 piezas')
-    expect(unidadesProducto({
-      ...base,
-      unidad_stock_info: { id: 3, codigo: 'M2', nombre: 'Metro cuadrado', concepto_codigo: 'UNIDAD_MEDIDA' },
-    }, '3.7500')).toBe('3,75 m²')
+    expect(
+      unidadesProducto(
+        {
+          ...base,
+          unidad_stock_info: {
+            id: 3,
+            codigo: 'M2',
+            nombre: 'Metro cuadrado',
+            concepto_codigo: 'UNIDAD_MEDIDA',
+          },
+        },
+        '3.7500',
+      ),
+    ).toBe('3,75 m²')
   })
 
   it('mantiene precios vigentes exactos y no inventa valores inválidos', () => {
