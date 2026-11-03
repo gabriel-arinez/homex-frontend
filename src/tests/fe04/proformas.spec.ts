@@ -195,6 +195,7 @@ describe('FE04 proformas manuales', () => {
     const wrapper = mount(ProformasListView, { global: { plugins: [createPinia(), r] } })
     await flushPromises()
     await wrapper.get('input[type=search]').setValue('Ana')
+    await new Promise((resolve) => setTimeout(resolve, 350))
     await flushPromises()
     expect(url).toContain('search=Ana')
     expect(url).toContain('page_size=10')
@@ -413,7 +414,7 @@ describe('FE04 proformas manuales', () => {
       ),
       http.get('http://localhost:8000/api/v1/proformas/', async ({ request }) => {
         const search = new URL(request.url).searchParams.get('search')
-        if (search === 'lenta') await new Promise((resolve) => setTimeout(resolve, 50))
+        if (search === 'lenta') await new Promise((resolve) => setTimeout(resolve, 720))
         if (!search) return HttpResponse.json({ count: 0, next: null, previous: null, results: [] })
         const current = quote()
         return HttpResponse.json({
@@ -437,10 +438,13 @@ describe('FE04 proformas manuales', () => {
     await flushPromises()
     const search = wrapper.get('input[type=search]')
     await search.setValue('lenta')
+    await new Promise((resolve) => setTimeout(resolve, 340))
     await search.setValue('rápida')
-    await new Promise((resolve) => setTimeout(resolve, 80))
+    await new Promise((resolve) => setTimeout(resolve, 420))
     await flushPromises()
     expect(wrapper.text()).toContain('Respuesta rápida')
+    await new Promise((resolve) => setTimeout(resolve, 420))
+    await flushPromises()
     expect(wrapper.text()).not.toContain('Respuesta lenta')
   })
 })
