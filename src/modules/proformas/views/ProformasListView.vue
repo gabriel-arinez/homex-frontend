@@ -306,7 +306,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="proformas-list">
+  <div class="proformas-list">
     <PageHeader
       title="Proformas"
       description="Gestiona tus cotizaciones comerciales."
@@ -482,7 +482,7 @@ onBeforeUnmount(() => {
         </div>
       </nav>
     </template>
-  </main>
+  </div>
 </template>
 
 <style scoped>
