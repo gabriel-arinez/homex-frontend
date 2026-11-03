@@ -1219,7 +1219,9 @@ test('@a11y FE04 bandeja de proformas usa menú único y visualización de solo 
   await expect(page.getByRole('button', { name: 'Acciones de la proforma #101' })).toBeVisible()
 })
 
-test('FE04 muestra creación real y alinea totales; histórico sin hora inventada', async ({ page }) => {
+test('FE04 muestra creación real y alinea totales; histórico sin hora inventada', async ({
+  page,
+}) => {
   await mockBackend(page)
   const nueva = {
     ...makeQuote(),
@@ -1261,7 +1263,9 @@ test('FE04 muestra creación real y alinea totales; histórico sin hora inventad
     const importe = document.querySelector<HTMLElement>('.proforma-table td.total-cell strong')
     if (!encabezado || !importe) return Infinity
     const padding = parseFloat(getComputedStyle(encabezado).paddingRight) || 0
-    return Math.abs(encabezado.getBoundingClientRect().right - padding - importe.getBoundingClientRect().right)
+    return Math.abs(
+      encabezado.getBoundingClientRect().right - padding - importe.getBoundingClientRect().right,
+    )
   })
   expect(alineacion).toBeLessThanOrEqual(2)
   await page.setViewportSize({ width: 390, height: 844 })

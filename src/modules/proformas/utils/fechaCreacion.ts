@@ -55,7 +55,8 @@ export function presentarCreacion(
   fecha: string,
   ahora: number = Date.now(),
 ): PresentacionCreacion {
-  const valida = typeof creadoEn === 'string' &&
+  const valida =
+    typeof creadoEn === 'string' &&
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:[0-5]\d(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(creadoEn)
   const instante = valida ? new Date(creadoEn) : null
   if (!instante || Number.isNaN(instante.getTime())) {

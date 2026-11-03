@@ -1,7 +1,15 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ChevronDown, ChevronLeft, ChevronRight, Clock3, Eye, Plus, SlidersHorizontal } from '@lucide/vue'
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  Eye,
+  Plus,
+  SlidersHorizontal,
+} from '@lucide/vue'
 import type { Cliente, ProformaListado, ValorCatalogoPublico } from '@/generated/api'
 import { proformasService } from '../services/proformasService'
 import { presentarCreacion } from '../utils/fechaCreacion'
@@ -31,10 +39,16 @@ const routePage = () => {
 }
 const rows = ref<ProformaListado[]>([])
 const ahora = ref(Date.now())
-const filasConCreacion = computed(() => rows.value.map((row) => {
-  const creadoEn = (row as ProformaListado & { creado_en?: string | null }).creado_en
-  return { ...row, creado_en: creadoEn, creacion: presentarCreacion(creadoEn, row.fecha, ahora.value) }
-}))
+const filasConCreacion = computed(() =>
+  rows.value.map((row) => {
+    const creadoEn = (row as ProformaListado & { creado_en?: string | null }).creado_en
+    return {
+      ...row,
+      creado_en: creadoEn,
+      creacion: presentarCreacion(creadoEn, row.fecha, ahora.value),
+    }
+  }),
+)
 const states = ref<ValorCatalogoPublico[]>([])
 const currencies = ref<ValorCatalogoPublico[]>([])
 const loading = ref(true)
@@ -278,7 +292,9 @@ function clearFilters() {
 }
 onMounted(() => {
   mounted = true
-  intervaloCreacion = setInterval(() => { ahora.value = Date.now() }, 60_000)
+  intervaloCreacion = setInterval(() => {
+    ahora.value = Date.now()
+  }, 60_000)
   void load()
   void proformasService
     .options('ESTADO_PROFORMA')
@@ -448,14 +464,29 @@ onBeforeUnmount(() => {
                 <span>{{ row.cliente_resumen ? 'Cliente registrado' : 'Prospecto' }}</span>
               </td>
               <td class="date-cell" data-label="Creación">
-                <div class="creation-cell" :title="row.creacion.historica ? 'Registro histórico sin hora de creación' : undefined">
-                  <div class="creation-primary" :class="{ 'creation-primary--recent': row.creacion.reciente }">
+                <div
+                  class="creation-cell"
+                  :title="
+                    row.creacion.historica ? 'Registro histórico sin hora de creación' : undefined
+                  "
+                >
+                  <div
+                    class="creation-primary"
+                    :class="{ 'creation-primary--recent': row.creacion.reciente }"
+                  >
                     <Clock3 :size="15" aria-hidden="true" />
                     <strong>{{ row.creacion.principal }}</strong>
                   </div>
-                  <time v-if="row.creacion.hora" class="creation-hour" :datetime="row.creado_en ?? undefined">{{ row.creacion.hora }}</time>
+                  <time
+                    v-if="row.creacion.hora"
+                    class="creation-hour"
+                    :datetime="row.creado_en ?? undefined"
+                    >{{ row.creacion.hora }}</time
+                  >
                   <span v-else class="creation-hour">Hora no registrada</span>
-                  <span v-if="row.creacion.mostrarFechaSeparada" class="creation-date">{{ row.creacion.fecha }}</span>
+                  <span v-if="row.creacion.mostrarFechaSeparada" class="creation-date">{{
+                    row.creacion.fecha
+                  }}</span>
                 </div>
               </td>
               <td class="status-cell" data-label="Estado">

@@ -19,7 +19,9 @@ describe('Fecha de creación de proformas', () => {
     expect(presentarCreacion(hora, fecha, ahora - 4 * 60_000).principal).toBe('Hace 1 minuto')
     expect(presentarCreacion(hora, fecha, ahora - 6 * 60_000).principal).toBe('Hace un momento')
     expect(presentarCreacion(hora, fecha, ahora + 3 * 60 * 60_000).principal).toBe('Hace 3 horas')
-    expect(presentarCreacion(hora, fecha, ahora + 2 * 24 * 60 * 60_000).principal).toBe('Hace 2 días')
+    expect(presentarCreacion(hora, fecha, ahora + 2 * 24 * 60 * 60_000).principal).toBe(
+      'Hace 2 días',
+    )
   })
 
   it('no atribuye horas falsas a proformas históricas o timestamps sin zona', () => {
@@ -44,7 +46,11 @@ describe('Fecha de creación de proformas', () => {
   })
 
   it('interpreta correctamente zona +00:00 y paso de medianoche', () => {
-    const vista = presentarCreacion('2026-10-15T01:30:00+00:00', fecha, Date.parse('2026-10-15T01:34:00Z'))
+    const vista = presentarCreacion(
+      '2026-10-15T01:30:00+00:00',
+      fecha,
+      Date.parse('2026-10-15T01:34:00Z'),
+    )
     expect(vista.fecha).toBe('14 de oct de 2026')
     expect(vista.hora).toBe('09:30 p. m.')
     expect(vista.principal).toBe('Hace 4 minutos')
