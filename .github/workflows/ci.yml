@@ -103,8 +103,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: gabriel-arinez/homex-backend
-          # Backend PR #49: orden alfabético opcional de clientes, sin migraciones.
-          ref: 923173342f9ddb97c1ed27686c60edd20cdc3fa3
+          # Backend PR #50: contexto de catálogo y contrato coordinado.
+          ref: 665690c2305d153056a15bcd18b632b37cdc6e20
           path: backend-prf04-contract
       - name: Verificar snapshot OpenAPI idéntico al backend coordinado
         run: cmp contracts/backend-openapi.yaml backend-prf04-contract/docs/openapi.yaml
@@ -196,7 +196,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: gabriel-arinez/homex-backend
-          ref: 3f35efa8bdcc0d4034028487628c5461f388caa7
+          ref: 665690c2305d153056a15bcd18b632b37cdc6e20
           path: backend
       - uses: actions/setup-node@v4
         with: { node-version: 24.12.0, cache: npm }
@@ -206,7 +206,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: .cache/fe08-asr
-          key: faster-whisper-base-v1
+          key: faster-whisper-small-536b066-v1
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: uv sync --project backend --locked --extra dev --extra worker

@@ -6,6 +6,7 @@ export default defineConfig({
   timeout: 240_000,
   expect: { timeout: 180_000 },
   reporter: 'list',
+  outputDir: 'test-results/playwright-catalogo',
   use: {
     baseURL: process.env.HOMEX_CATALOGO_BASE_URL ?? 'http://127.0.0.1:18080',
     headless: true,
