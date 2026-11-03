@@ -108,6 +108,33 @@ const hasFilters = computed(
     Boolean(category.value) ||
     extraKeys.some((key) => Boolean(extras[key])),
 )
+const hasSpecificFilters = computed(
+  () => Boolean(search.value.trim() || category.value || extraKeys.some((key) => Boolean(extras[key]))),
+)
+const emptyTitle = computed(() => {
+  if (hasSpecificFilters.value) return 'Sin resultados'
+  if (status.value === 'activos') return 'No hay productos activos'
+  if (status.value === 'inactivos') return 'No hay productos inactivos'
+  return 'Aún no hay productos registrados'
+})
+const emptyDescription = computed(() =>
+  hasSpecificFilters.value
+    ? 'No encontramos productos que coincidan con los criterios seleccionados.'
+    : status.value === 'activos'
+      ? 'No hay productos activos para mostrar. Puedes consultar también los inactivos.'
+      : status.value === 'inactivos'
+        ? 'No existen productos inactivos con los filtros actuales.'
+        : 'El catálogo todavía no contiene productos registrados.',
+)
+const filterError = computed(() => {
+  if (availableExtra.value.includes('modelo') && extras.modelo.trim().length > 150)
+    return 'El modelo no puede superar 150 caracteres.'
+  const thickness = extras.espesor_mm.trim()
+  if (availableExtra.value.includes('espesor_mm') && thickness &&
+    (!/^\d{1,6}(?:\.\d{1,2})?$/.test(thickness) || Number(thickness) <= 0))
+    return 'Introduce un espesor válido, mayor que cero y con hasta dos decimales.'
+  return ''
+})
 const filterLabel = (key: ExtraKey, value: string) => {
   if (key === 'familia')
     return families.value.find((x) => String(x.id) === value)?.nombre || '#' + value
@@ -208,6 +235,13 @@ async function load() {
   const current = ++requestId
   loading.value = true
   error.value = ''
+  if (filterError.value) {
+    products.value = []
+    total.value = 0
+    error.value = filterError.value
+    loading.value = false
+    return
+  }
   try {
     const query: NonNullable<Parameters<typeof productosService.list>[0]> = {
       search: search.value.trim() || undefined,
@@ -224,6 +258,11 @@ async function load() {
     }
     const response = await productosService.list(query)
     if (current !== requestId) return
+    const lastPage = Math.max(1, Math.ceil(response.count / size))
+    if (page.value > lastPage) {
+      page.value = lastPage
+      return
+    }
     products.value = response.results
     total.value = response.count
   } catch (cause) {
@@ -278,9 +317,9 @@ async function loadCategories() {
         item.concepto_codigo === 'CATEGORIA_PRODUCTO',
     )
     if (category.value && !categories.value.some((x) => String(x.id) === category.value)) {
+      changeCategory('')
       notice.value =
         'La categoría seleccionada ya no está disponible. Se mostrará el catálogo general.'
-      changeCategory('')
     }
     if (category.value) scheduleLoad()
   } catch {
@@ -622,28 +661,12 @@ onBeforeUnmount(() => {
     </div>
     <LoadingSkeleton v-if="loading" :lines="6" />
     <ErrorState v-else-if="error" :description="error">
-      <Button variant="secondary" @click="load">Reintentar</Button>
+      <Button v-if="!filterError" variant="secondary" @click="load">Reintentar</Button>
     </ErrorState>
-    <EmptyState
-      v-else-if="!products.length"
-      :title="
-        hasFilters
-          ? status === 'activos' &&
-            !search.trim() &&
-            !category &&
-            !activeFilters.some((f) => f.key !== 'estado')
-            ? 'No hay productos activos'
-            : 'Sin resultados'
-          : 'No hay productos activos'
-      "
-      :description="
-        hasFilters
-          ? 'No hay productos que coincidan con los criterios seleccionados.'
-          : 'No hay productos activos para mostrar. Puedes consultar también los inactivos.'
-      "
-    >
+    <EmptyState v-else-if="!products.length" :title="emptyTitle" :description="emptyDescription">
       <Button v-if="hasFilters" variant="secondary" @click="clearFilters">Limpiar filtros</Button>
-      <Button v-else variant="secondary" @click="status = 'todos'">Ver todos los productos</Button>
+      <Button v-else-if="status === 'activos'" variant="secondary" @click="status = 'todos'">Ver todos los productos</Button>
+      <Button v-else-if="canCreate" variant="secondary" @click="toggleCreate">Nuevo producto</Button>
     </EmptyState>
     <template v-else>
       <div v-if="view === 'grid'" class="product-grid">
