@@ -29,7 +29,7 @@ describe('Formulario comercial de productos', () => {
   it('presenta secciones claras, sin control de stock y con asistente contextual', async () => {
     catalog()
     const w = mount(ProductoForm, {
-      props: { preselectCategory: 'SILLA' },
+      props: { preselectCategory: 'SILLA', canUploadImage: true },
       global: { stubs: { CapturaCatalogo: true } },
     })
     await flushPromises()

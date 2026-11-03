@@ -322,7 +322,7 @@ function nullable(value: string) {
   return value ? Number(value) : null
 }
 function submit() {
-  if (loading.value || props.processing) return
+  if ((loading.value && !props.initial) || props.processing) return
   error.value = ''
   fields.value = {}
   if (!form.categoria) fields.value.categoria = ['Selecciona una categoría.']
@@ -421,8 +421,8 @@ onMounted(load)
       </Button>
     </header>
     <p v-if="error" class="error-summary" role="alert">{{ error }}</p>
-    <div v-if="loading" role="status" class="loading-note">Cargando opciones del catálogo…</div>
-    <div v-else class="catalog-layout">
+    <p v-if="loading" role="status" class="loading-note">Cargando opciones del catálogo…</p>
+    <div class="catalog-layout">
       <div class="form-main">
         <section class="catalog-section" aria-labelledby="general-title">
           <div class="section-heading"><Package :size="20" aria-hidden="true" />
@@ -492,7 +492,7 @@ onMounted(load)
           </div>
           <div v-if="categoria === 'SILLA'" class="extras">
             <div class="extras-heading">
-              <div><h4>Características adicionales</h4>
+              <div><h4>Características adicionales de la silla</h4>
                 <p class="muted">Añade propiedades particulares de esta silla.</p></div>
             </div>
             <div v-if="!modoJson" class="extras-list">
@@ -653,7 +653,7 @@ onMounted(load)
             <X :size="20" aria-hidden="true" />
           </button>
         </header>
-        <CapturaCatalogo v-if="categoria" :key="categoria" :categoria="categoria"
+        <CapturaCatalogo v-if="categoria === 'SILLA' || categoria === 'PISO_FLOTANTE' || categoria === 'OTRO'" :key="categoria" :categoria="categoria"
           :opciones="opciones" @apply="applyVoice" />
       </aside>
     </div>
