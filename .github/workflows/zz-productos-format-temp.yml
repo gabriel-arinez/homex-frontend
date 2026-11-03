@@ -26,13 +26,14 @@ jobs:
             src/tests/fe03/productos-presentacion.spec.ts \
             src/tests/fe03/productos-bandeja.spec.ts \
             src/tests/e2e/fe03-clientes-productos.spec.ts \
-            src/tests/e2e/fe035-usabilidad-nielsen.spec.ts
+            src/tests/e2e/fe035-usabilidad-nielsen.spec.ts \
+            src/tests/e2e/productos-bandeja-ux.spec.ts
       - name: Commit formatting
         run: |
           if ! git diff --quiet; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add src/modules/productos/views/ProductosListView.vue src/modules/productos/utils/presentacionCatalogo.ts src/tests/fe03/productos-presentacion.spec.ts src/tests/fe03/productos-bandeja.spec.ts src/tests/e2e/fe03-clientes-productos.spec.ts src/tests/e2e/fe035-usabilidad-nielsen.spec.ts
+            git add src/modules/productos/views/ProductosListView.vue src/modules/productos/utils/presentacionCatalogo.ts src/tests/fe03/productos-presentacion.spec.ts src/tests/fe03/productos-bandeja.spec.ts src/tests/e2e/fe03-clientes-productos.spec.ts src/tests/e2e/fe035-usabilidad-nielsen.spec.ts src/tests/e2e/productos-bandeja-ux.spec.ts
             git commit -m "style(productos): aplicar Prettier [formatted]"
             git push origin HEAD:feat/productos-bandeja-ux-20261103
           fi
