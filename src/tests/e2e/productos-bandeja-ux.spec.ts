@@ -97,7 +97,13 @@ async function mockBackend(page: Page, canCreate = false) {
         ? category
         : code === 'MARCA'
           ? [{ id: 10, codigo: 'MARCA_A', nombre: 'Marca A', concepto_codigo: 'MARCA' }]
-          : []
+          : code === 'UNIDAD_MEDIDA'
+            ? [
+                { id: 12, codigo: 'PIEZA', nombre: 'Pieza', concepto_codigo: 'UNIDAD_MEDIDA' },
+                { id: 13, codigo: 'M2', nombre: 'Metro cuadrado', concepto_codigo: 'UNIDAD_MEDIDA' },
+                { id: 14, codigo: 'BARRA', nombre: 'Barra', concepto_codigo: 'UNIDAD_MEDIDA' },
+              ]
+            : []
     return route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -187,14 +193,14 @@ test('FE03 filtros por categoría y atributos conservan búsqueda y vista en URL
 }) => {
   const calls = await mockBackend(page)
   await page.goto('/productos')
-  await page.getByLabel('Categoría', { exact: true }).selectOption('1')
+  await page.getByRole('combobox', { name: 'Categoría', exact: true }).selectOption('1')
   await expect.poll(() => calls[calls.length - 1]?.searchParams.get('categoria')).toBe('1')
   await page.getByRole('button', { name: 'Más filtros' }).click()
-  await page.getByLabel('Marca', { exact: true }).selectOption('10')
+  await page.getByRole('combobox', { name: 'Marca', exact: true }).selectOption('10')
   await expect.poll(() => calls[calls.length - 1]?.searchParams.get('marca')).toBe('10')
   await expect(page).toHaveURL(/marca=10/)
   await expect(page.getByRole('combobox', { name: 'Material' })).toHaveCount(0)
-  await page.getByLabel('Categoría', { exact: true }).selectOption('2')
+  await page.getByRole('combobox', { name: 'Categoría', exact: true }).selectOption('2')
   await expect(page.getByRole('combobox', { name: 'Material' })).toBeVisible()
   await expect(page).not.toHaveURL(/marca=10/)
   await page.getByRole('button', { name: 'Cuadrícula' }).click()
@@ -204,7 +210,7 @@ test('FE03 filtros por categoría y atributos conservan búsqueda y vista en URL
     'aria-pressed',
     'true',
   )
-  await expect(page.getByLabel('Categoría', { exact: true })).toHaveValue('2')
+  await expect(page.getByRole('combobox', { name: 'Categoría', exact: true })).toHaveValue('2')
 })
 
 test('FE03 creación por categoría exige capacidad y presenta opciones reales', async ({ page }) => {
@@ -233,6 +239,36 @@ for (const width of [390, 768, 1440]) {
       await page.getByRole('button', { name: 'Cuadrícula' }).click()
       await expect(page.locator('.product-card')).toHaveCount(2)
       await noOverflow(page)
+    },
+  )
+}
+
+for (const width of [390, 1440]) {
+  test(
+    '@a11y FE03 creación de productos operable y sin desbordamiento a ' + width + 'px',
+    async ({ page }) => {
+      await mockBackend(page, true)
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto('/productos/nuevo?categoria=SILLA')
+      await expect(page.getByRole('heading', { name: 'Nueva silla' })).toBeVisible()
+      await expect(page.getByRole('combobox', { name: 'Unidad comercial *' })).toHaveValue('12')
+      await expect(page.getByRole('heading', { name: 'Características de la silla' })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Completar por voz' })).toBeVisible()
+      expect(await page.locator('input[name="stock"]').count()).toBe(0)
+      await noOverflow(page)
+      const violations = (await new AxeBuilder({ page }).analyze()).violations.filter(
+        (item) => item.impact === 'serious' || item.impact === 'critical',
+      )
+      expect(violations).toEqual([])
+      await page.getByRole('button', { name: 'Completar por voz' }).click()
+      await expect(page.getByRole('dialog', { name: 'Completar por voz' })).toBeVisible()
+      await page.getByRole('button', { name: 'Cerrar asistente de voz' }).click()
+      await expect(page.getByRole('dialog', { name: 'Completar por voz' })).toHaveCount(0)
+      await page.getByRole('textbox', { name: 'Nombre comercial *' }).fill('Silla de prueba')
+      await page.getByRole('button', { name: 'Cancelar', exact: true }).click()
+      await expect(page.getByRole('dialog', { name: 'Descartar producto' })).toBeVisible()
+      await page.getByRole('button', { name: 'Descartar y salir' }).click()
+      await expect(page).toHaveURL(/\/productos$/)
     },
   )
 }
