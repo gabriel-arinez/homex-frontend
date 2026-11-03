@@ -168,6 +168,12 @@ for (const [category, file] of samples) {
           }
           expect(fields).not.toHaveProperty('sku')
           expect(fields).not.toHaveProperty('stock')
+          // OTRO no tiene unidad obligatoria fija. El encargado elige la adecuada
+          // cuando el dictado no aporta una unidad reconocida por el catálogo.
+          if (category === 'OTRO') {
+            const unit = page.getByRole('combobox', { name: 'Unidad comercial *' })
+            if (!(await unit.inputValue())) await unit.selectOption({ label: 'Barra' })
+          }
           expect(fields.precio_lista).toBeDefined()
           if (category === 'SILLA') expect(fields.especificaciones).toBeDefined()
           if (category === 'PISO_FLOTANTE') expect(fields.espesor_mm).toBeDefined()
