@@ -1,0 +1,33 @@
+name: Temporary date view formatter
+
+on:
+  push:
+    branches:
+      - feat/proformas-totales-fechas-20261102
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: "!contains(github.event.head_commit.message, '[formatted]')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: |
+          npx prettier --write src/modules/proformas/utils/fechaCreacion.ts src/modules/proformas/views/ProformasListView.vue src/tests/fe04/proformas-fecha-creacion.spec.ts src/tests/e2e/fe04-proformas.spec.ts
+      - run: |
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/modules/proformas/utils/fechaCreacion.ts src/modules/proformas/views/ProformasListView.vue src/tests/fe04/proformas-fecha-creacion.spec.ts src/tests/e2e/fe04-proformas.spec.ts
+            git commit -m "style(proformas): formato de fechas y totales [formatted]"
+            git push origin HEAD:feat/proformas-totales-fechas-20261102
+          fi
