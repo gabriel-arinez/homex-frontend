@@ -100,7 +100,12 @@ async function mockBackend(page: Page, canCreate = false) {
           : code === 'UNIDAD_MEDIDA'
             ? [
                 { id: 12, codigo: 'PIEZA', nombre: 'Pieza', concepto_codigo: 'UNIDAD_MEDIDA' },
-                { id: 13, codigo: 'M2', nombre: 'Metro cuadrado', concepto_codigo: 'UNIDAD_MEDIDA' },
+                {
+                  id: 13,
+                  codigo: 'M2',
+                  nombre: 'Metro cuadrado',
+                  concepto_codigo: 'UNIDAD_MEDIDA',
+                },
                 { id: 14, codigo: 'BARRA', nombre: 'Barra', concepto_codigo: 'UNIDAD_MEDIDA' },
               ]
             : []
