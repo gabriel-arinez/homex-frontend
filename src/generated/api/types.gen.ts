@@ -731,8 +731,6 @@ export type ProformaListado = {
   estado_info: ValorCatalogoResumen
   titulo?: string | null
   readonly fecha: string
-  /** Hora de creación real si está disponible; nula para registros históricos. */
-  readonly creado_en?: string | null
   plazo_entrega?: string | null
   validez_oferta?: number | null
   porcentaje_adelanto?: string | null
