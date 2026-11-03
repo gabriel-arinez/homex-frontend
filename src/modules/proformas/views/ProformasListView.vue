@@ -734,7 +734,7 @@ onBeforeUnmount(() => {
   color: var(--color-text-secondary);
   font-size: 0.75rem;
 }
-.total-cell,
+.proforma-table td.total-cell,
 .proforma-table th.numeric {
   text-align: right;
   padding-right: 1rem;
@@ -878,7 +878,7 @@ onBeforeUnmount(() => {
     grid-column: 2;
     text-align: right;
   }
-  .total-cell {
+  .proforma-table td.total-cell {
     grid-column: 1;
     display: flex !important;
     flex-direction: column;
