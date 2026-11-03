@@ -1,9 +1,18 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ChevronDown, ChevronLeft, ChevronRight, Eye, Plus, SlidersHorizontal } from '@lucide/vue'
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  Eye,
+  Plus,
+  SlidersHorizontal,
+} from '@lucide/vue'
 import type { Cliente, ProformaListado, ValorCatalogoPublico } from '@/generated/api'
 import { proformasService } from '../services/proformasService'
+import { presentarCreacion } from '../utils/fechaCreacion'
 import ClienteSelector from '../components/ClienteSelector.vue'
 import ProformaActionsMenu from '../components/ProformaActionsMenu.vue'
 import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
@@ -29,6 +38,17 @@ const routePage = () => {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 1
 }
 const rows = ref<ProformaListado[]>([])
+const ahora = ref(Date.now())
+const filasConCreacion = computed(() =>
+  rows.value.map((row) => {
+    const creadoEn = (row as ProformaListado & { creado_en?: string | null }).creado_en
+    return {
+      ...row,
+      creado_en: creadoEn,
+      creacion: presentarCreacion(creadoEn, row.fecha, ahora.value),
+    }
+  }),
+)
 const states = ref<ValorCatalogoPublico[]>([])
 const currencies = ref<ValorCatalogoPublico[]>([])
 const loading = ref(true)
@@ -95,19 +115,11 @@ const filters = computed(() => [
 
 let requestId = 0
 let debounce: ReturnType<typeof setTimeout> | undefined
+let intervaloCreacion: ReturnType<typeof setInterval> | undefined
 let restoringRoute = false
 let synchronizing = false
 let mounted = false
 
-function formatDate(value: string) {
-  if (!validDate(value)) return 'Sin fecha'
-  return new Intl.DateTimeFormat('es-BO', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  }).format(new Date(`${value}T12:00:00Z`))
-}
 function money(value: string, code: string) {
   const amount = Number(value)
   if (!Number.isFinite(amount)) return 'Importe pendiente'
@@ -280,6 +292,9 @@ function clearFilters() {
 }
 onMounted(() => {
   mounted = true
+  intervaloCreacion = setInterval(() => {
+    ahora.value = Date.now()
+  }, 60_000)
   void load()
   void proformasService
     .options('ESTADO_PROFORMA')
@@ -300,6 +315,7 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
   mounted = false
+  if (intervaloCreacion) clearInterval(intervaloCreacion)
   ++requestId
   if (debounce) clearTimeout(debounce)
 })
@@ -429,14 +445,14 @@ onBeforeUnmount(() => {
             <tr>
               <th scope="col">Proforma</th>
               <th scope="col">Cliente</th>
-              <th scope="col">Fecha</th>
+              <th scope="col">Creación</th>
               <th scope="col">Estado</th>
               <th scope="col" class="numeric">Total</th>
               <th scope="col" class="actions-heading">Acciones</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="row in rows" :key="row.id">
+            <tr v-for="row in filasConCreacion" :key="row.id">
               <td class="quote-cell">
                 <strong>#{{ row.numero }}</strong>
                 <span :title="row.titulo || 'Sin título'">{{
@@ -447,7 +463,32 @@ onBeforeUnmount(() => {
                 <strong :title="customerLabel(row)">{{ customerLabel(row) }}</strong>
                 <span>{{ row.cliente_resumen ? 'Cliente registrado' : 'Prospecto' }}</span>
               </td>
-              <td class="date-cell" data-label="Fecha">{{ formatDate(row.fecha) }}</td>
+              <td class="date-cell" data-label="Creación">
+                <div
+                  class="creation-cell"
+                  :title="
+                    row.creacion.historica ? 'Registro histórico sin hora de creación' : undefined
+                  "
+                >
+                  <div
+                    class="creation-primary"
+                    :class="{ 'creation-primary--recent': row.creacion.reciente }"
+                  >
+                    <Clock3 :size="15" aria-hidden="true" />
+                    <strong>{{ row.creacion.principal }}</strong>
+                  </div>
+                  <time
+                    v-if="row.creacion.hora"
+                    class="creation-hour"
+                    :datetime="row.creado_en ?? undefined"
+                    >{{ row.creacion.hora }}</time
+                  >
+                  <span v-else class="creation-hour">Hora no registrada</span>
+                  <span v-if="row.creacion.mostrarFechaSeparada" class="creation-date">{{
+                    row.creacion.fecha
+                  }}</span>
+                </div>
+              </td>
               <td class="status-cell" data-label="Estado">
                 <Badge :tone="tone(row.estado_info.codigo)">{{ row.estado_info.nombre }}</Badge>
               </td>
@@ -630,19 +671,19 @@ onBeforeUnmount(() => {
   table-layout: fixed;
 }
 .col-quote {
-  width: 24%;
+  width: 21%;
 }
 .col-client {
-  width: 23%;
+  width: 20%;
 }
 .col-date {
-  width: 13%;
+  width: 18%;
 }
 .col-status {
   width: 15%;
 }
 .col-total {
-  width: 17%;
+  width: 18%;
 }
 .col-actions {
   width: 8%;
@@ -691,13 +732,48 @@ onBeforeUnmount(() => {
 .date-cell {
   font-size: 0.84rem;
   color: var(--color-text-secondary);
-  white-space: nowrap;
 }
-.total-cell,
+.creation-cell {
+  display: grid;
+  gap: 0.24rem;
+  justify-items: start;
+  min-width: 0;
+}
+.creation-primary {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--color-text);
+}
+.creation-primary svg {
+  flex: none;
+  color: var(--color-text-secondary);
+}
+.creation-primary--recent svg {
+  color: var(--color-success);
+}
+.creation-primary strong {
+  font-weight: 650;
+}
+.creation-hour {
+  font-size: 0.78rem;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+.creation-date {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
+.proforma-table td.total-cell,
 .proforma-table th.numeric {
   text-align: right;
+  padding-right: 1rem;
 }
 .total-cell strong {
+  display: block;
+  width: 100%;
+  text-align: right;
   font-size: 0.87rem;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -758,16 +834,16 @@ onBeforeUnmount(() => {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .col-quote {
-    width: 22%;
+    width: 20%;
   }
   .col-client {
-    width: 21%;
+    width: 20%;
   }
   .col-date {
-    width: 14%;
+    width: 19%;
   }
   .col-status {
-    width: 17%;
+    width: 15%;
   }
   .col-total {
     width: 17%;
@@ -833,7 +909,7 @@ onBeforeUnmount(() => {
     grid-column: 2;
     text-align: right;
   }
-  .total-cell {
+  .proforma-table td.total-cell {
     grid-column: 1;
     display: flex !important;
     flex-direction: column;
@@ -848,6 +924,7 @@ onBeforeUnmount(() => {
   }
   .total-cell strong {
     font-size: 1rem;
+    text-align: left;
   }
   .actions-cell {
     grid-column: 2;
