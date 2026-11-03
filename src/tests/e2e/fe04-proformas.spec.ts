@@ -1161,3 +1161,38 @@ test('PRF-FINAL editar mensaje no altera el estado local del formulario', async 
   await page.getByLabel('Contenido del mensaje').fill('Mensaje de prueba independiente')
   await expect(status).toContainText('Nueva cotización sin guardar')
 })
+
+test('@a11y FE04 bandeja de proformas usa menú único y visualización de solo lectura', async ({ page }) => {
+  await mockBackend(page)
+  const editableQuote = makeQuote()
+  const sentQuote = {
+    ...makeQuote(),
+    id: 2,
+    numero: 102,
+    titulo: 'Proforma enviada',
+    estado_info: { id: 4, codigo: 'ENVIADA', nombre: 'Enviada' },
+  }
+  await page.route(/\/api\/v1\/proformas\/(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ count: 2, next: null, previous: null, results: [editableQuote, sentQuote] }),
+    }),
+  )
+  await page.goto('/proformas')
+  const actions = page.getByRole('button', { name: 'Acciones de la proforma #101' })
+  await expect(actions).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Ver proforma #102' })).toHaveAttribute('href', '/proformas/2')
+  await actions.click()
+  await expect(page.getByRole('menuitem', { name: 'Continuar edición' })).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: 'Ver detalle y acciones' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('menuitem', { name: 'Continuar edición' })).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Más filtros' }).click()
+  await page.locator('#moneda-proforma-filtro').selectOption('USD')
+  await expect(page).toHaveURL(/moneda=USD/)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await noOverflow(page)
+  await expect(page.getByRole('button', { name: 'Acciones de la proforma #101' })).toBeVisible()
+})
