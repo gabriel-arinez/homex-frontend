@@ -30,7 +30,10 @@ for (const [category, file] of samples) {
         try {
           const writes: string[] = []
           page.on('request', (request) => {
-            if (request.method() === 'POST' && /\/catalogo\/productos\/$/.test(request.url()))
+            if (
+              request.method() === 'POST' &&
+              new URL(request.url()).pathname.endsWith('/catalogo/productos/')
+            )
               writes.push(request.url())
           })
           await page.goto('/login')
