@@ -25,9 +25,10 @@ async function toggle() {
   if (!rect) return
   const width = 228
   const height = 104
-  const top = window.innerHeight - rect.bottom >= height + 10
-    ? rect.bottom + 6
-    : Math.max(8, rect.top - height - 6)
+  const top =
+    window.innerHeight - rect.bottom >= height + 10
+      ? rect.bottom + 6
+      : Math.max(8, rect.top - height - 6)
   menuPosition.value = {
     top: `${top}px`,
     left: `${Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8))}px`,
@@ -68,7 +69,9 @@ onMounted(() => {
   window.addEventListener('scroll', onScroll, true)
   window.addEventListener('resize', onScroll)
 })
-function onScroll() { close() }
+function onScroll() {
+  close()
+}
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', outside)
   document.removeEventListener('focusin', onFocus)
@@ -102,19 +105,11 @@ onBeforeUnmount(() => {
         :aria-label="`Acciones de la proforma #${numero}`"
         :style="menuPosition"
       >
-        <RouterLink
-          role="menuitem"
-          :to="`/proformas/${id}/editar`"
-          @click="close(false)"
-        >
+        <RouterLink role="menuitem" :to="`/proformas/${id}/editar`" @click="close(false)">
           <Pencil :size="17" aria-hidden="true" />
           Continuar edición
         </RouterLink>
-        <RouterLink
-          role="menuitem"
-          :to="`/proformas/${id}`"
-          @click="close(false)"
-        >
+        <RouterLink role="menuitem" :to="`/proformas/${id}`" @click="close(false)">
           <ClipboardList :size="17" aria-hidden="true" />
           Ver detalle y acciones
         </RouterLink>
@@ -124,30 +119,62 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.proforma-actions { display:flex; justify-content:flex-end; }
+.proforma-actions {
+  display: flex;
+  justify-content: flex-end;
+}
 .proforma-actions__trigger {
-  width:2.75rem; height:2.75rem; display:inline-grid; place-items:center;
-  border:1px solid var(--color-border); border-radius:var(--radius-control);
-  background:var(--color-surface); color:var(--color-text); cursor:pointer;
+  width: 2.75rem;
+  height: 2.75rem;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
 }
-.proforma-actions__trigger:hover, .proforma-actions__trigger[aria-expanded="true"] {
-  background:var(--color-surface-hover); border-color:var(--color-border-strong);
+.proforma-actions__trigger:hover,
+.proforma-actions__trigger[aria-expanded='true'] {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border-strong);
 }
-.proforma-actions__trigger:focus-visible { outline:2px solid var(--color-primary-accent); outline-offset:2px; }
+.proforma-actions__trigger:focus-visible {
+  outline: 2px solid var(--color-primary-accent);
+  outline-offset: 2px;
+}
 .proforma-actions__menu {
-  position:fixed; width:228px; z-index:1000; display:grid; gap:2px;
-  padding:5px; border:1px solid var(--color-border-strong);
-  border-radius:var(--radius-card); background:var(--color-surface);
-  box-shadow:0 16px 42px rgb(0 0 0 / 25%);
+  position: fixed;
+  width: 228px;
+  z-index: 1000;
+  display: grid;
+  gap: 2px;
+  padding: 5px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: 0 16px 42px rgb(0 0 0 / 25%);
 }
 .proforma-actions__menu a {
-  min-height:2.75rem; display:flex; gap:.65rem; align-items:center;
-  padding:.7rem .75rem; border-radius:var(--radius-control);
-  color:var(--color-text); text-decoration:none; font-size:.85rem;
-  font-weight:600; white-space:nowrap;
+  min-height: 2.75rem;
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+  padding: 0.7rem 0.75rem;
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
-.proforma-actions__menu a:hover, .proforma-actions__menu a:focus-visible {
-  background:var(--color-surface-hover); color:var(--color-primary-accent);
+.proforma-actions__menu a:hover,
+.proforma-actions__menu a:focus-visible {
+  background: var(--color-surface-hover);
+  color: var(--color-primary-accent);
 }
-.proforma-actions__menu a:focus-visible { outline:2px solid var(--color-primary-accent); outline-offset:-2px; }
+.proforma-actions__menu a:focus-visible {
+  outline: 2px solid var(--color-primary-accent);
+  outline-offset: -2px;
+}
 </style>

@@ -1162,7 +1162,9 @@ test('PRF-FINAL editar mensaje no altera el estado local del formulario', async 
   await expect(status).toContainText('Nueva cotización sin guardar')
 })
 
-test('@a11y FE04 bandeja de proformas usa menú único y visualización de solo lectura', async ({ page }) => {
+test('@a11y FE04 bandeja de proformas usa menú único y visualización de solo lectura', async ({
+  page,
+}) => {
   await mockBackend(page)
   const editableQuote = makeQuote()
   const sentQuote = {
@@ -1176,13 +1178,21 @@ test('@a11y FE04 bandeja de proformas usa menú único y visualización de solo 
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ count: 2, next: null, previous: null, results: [editableQuote, sentQuote] }),
+      body: JSON.stringify({
+        count: 2,
+        next: null,
+        previous: null,
+        results: [editableQuote, sentQuote],
+      }),
     }),
   )
   await page.goto('/proformas')
   const actions = page.getByRole('button', { name: 'Acciones de la proforma #101' })
   await expect(actions).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Ver proforma #102' })).toHaveAttribute('href', '/proformas/2')
+  await expect(page.getByRole('link', { name: 'Ver proforma #102' })).toHaveAttribute(
+    'href',
+    '/proformas/2',
+  )
   await actions.click()
   await expect(page.getByRole('menuitem', { name: 'Continuar edición' })).toBeVisible()
   await expect(page.getByRole('menuitem', { name: 'Ver detalle y acciones' })).toBeVisible()

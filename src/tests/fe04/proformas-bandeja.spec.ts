@@ -40,12 +40,21 @@ function makeRouter(path = '/proformas') {
 }
 function mockList() {
   const list = vi.spyOn(proformasService, 'list').mockResolvedValue({
-    count: 2, next: null, previous: null, results: [quote(1, 'BORRADOR'), quote(2, 'ENVIADA')],
+    count: 2,
+    next: null,
+    previous: null,
+    results: [quote(1, 'BORRADOR'), quote(2, 'ENVIADA')],
   })
   vi.spyOn(proformasService, 'options').mockImplementation(async (concepto) =>
     concepto === 'MONEDA'
-      ? [{ id: 40, codigo: 'BOB', nombre: 'Bolivianos', concepto_codigo: 'MONEDA' }, { id: 41, codigo: 'USD', nombre: 'Dólares', concepto_codigo: 'MONEDA' }]
-      : [{ id: 1, codigo: 'BORRADOR', nombre: 'Borrador', concepto_codigo: 'ESTADO_PROFORMA' }, { id: 2, codigo: 'ENVIADA', nombre: 'Enviada', concepto_codigo: 'ESTADO_PROFORMA' }],
+      ? [
+          { id: 40, codigo: 'BOB', nombre: 'Bolivianos', concepto_codigo: 'MONEDA' },
+          { id: 41, codigo: 'USD', nombre: 'Dólares', concepto_codigo: 'MONEDA' },
+        ]
+      : [
+          { id: 1, codigo: 'BORRADOR', nombre: 'Borrador', concepto_codigo: 'ESTADO_PROFORMA' },
+          { id: 2, codigo: 'ENVIADA', nombre: 'Enviada', concepto_codigo: 'ESTADO_PROFORMA' },
+        ],
   )
   return list
 }
@@ -55,7 +64,10 @@ describe('Bandeja de proformas HOMEX', () => {
   it('muestra título, fecha, estado y total; menú único en editable y ojo en no editable', async () => {
     mockList()
     const router = await makeRouter()
-    const wrapper = mount(ProformasListView, { attachTo: document.body, global: { plugins: [router] } })
+    const wrapper = mount(ProformasListView, {
+      attachTo: document.body,
+      global: { plugins: [router] },
+    })
     try {
       await flushPromises()
       expect(wrapper.text()).toContain('Oficina ejecutiva')
@@ -64,7 +76,9 @@ describe('Bandeja de proformas HOMEX', () => {
       expect(wrapper.findAll('th')).toHaveLength(6)
       expect(wrapper.findAll('[aria-label^="Acciones de la proforma"]')).toHaveLength(1)
       expect(wrapper.findAll('[aria-label^="Ver proforma"]')).toHaveLength(1)
-      expect(wrapper.get('[aria-label="Ver proforma #102"]').attributes('href')).toBe('/proformas/2')
+      expect(wrapper.get('[aria-label="Ver proforma #102"]').attributes('href')).toBe(
+        '/proformas/2',
+      )
       await wrapper.get('[aria-label="Acciones de la proforma #101"]').trigger('click')
       await flushPromises()
       const menu = document.body.querySelector('[role="menu"]')
@@ -93,9 +107,15 @@ describe('Bandeja de proformas HOMEX', () => {
       await wrapper.get('input[name="fecha-hasta-proforma"]').setValue('2026-10-31')
       await new Promise((resolve) => setTimeout(resolve, 30))
       await flushPromises()
-      expect(list).toHaveBeenLastCalledWith(expect.objectContaining({
-        estado: 'BORRADOR', moneda: 'USD', fecha_desde: '2026-10-01', fecha_hasta: '2026-10-31', page: 1,
-      }))
+      expect(list).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          estado: 'BORRADOR',
+          moneda: 'USD',
+          fecha_desde: '2026-10-01',
+          fecha_hasta: '2026-10-31',
+          page: 1,
+        }),
+      )
       expect(router.currentRoute.value.query.moneda).toBe('USD')
       expect(router.currentRoute.value.query.fecha_desde).toBe('2026-10-01')
     } finally {

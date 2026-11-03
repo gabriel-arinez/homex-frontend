@@ -19,9 +19,11 @@ import Select from '@/shared/ui/Select.vue'
 const emit = defineEmits<{ openMenu: [] }>()
 const route = useRoute()
 const router = useRouter()
-const queryString = (key: string) => typeof route.query[key] === 'string' ? String(route.query[key]) : ''
-const validDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value))
-const routeDate = (key: string) => validDate(queryString(key)) ? queryString(key) : ''
+const queryString = (key: string) =>
+  typeof route.query[key] === 'string' ? String(route.query[key]) : ''
+const validDate = (value: string) =>
+  /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value))
+const routeDate = (key: string) => (validDate(queryString(key)) ? queryString(key) : '')
 const routePage = () => {
   const parsed = Number(queryString('pagina'))
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 1
@@ -34,14 +36,20 @@ const error = ref('')
 const search = ref(queryString('q'))
 const state = ref(queryString('estado'))
 const currency = ref(queryString('moneda'))
-const customer = ref(/^\d+$/.test(queryString('cliente')) && Number(queryString('cliente')) > 0 ? queryString('cliente') : '')
+const customer = ref(
+  /^\d+$/.test(queryString('cliente')) && Number(queryString('cliente')) > 0
+    ? queryString('cliente')
+    : '',
+)
 const customerName = ref('')
 const dateFrom = ref(routeDate('fecha_desde'))
 const dateTo = ref(routeDate('fecha_hasta'))
 const page = ref(routePage())
 const total = ref(0)
 const size = 10
-const showAdvanced = ref(Boolean(currency.value || customer.value || dateFrom.value || dateTo.value))
+const showAdvanced = ref(
+  Boolean(currency.value || customer.value || dateFrom.value || dateTo.value),
+)
 const pages = computed(() => Math.max(1, Math.ceil(total.value / size)))
 const fromItem = computed(() => (page.value - 1) * size + 1)
 const toItem = computed(() => Math.min(total.value, page.value * size))
@@ -50,12 +58,37 @@ const dateError = computed(() =>
     ? 'La fecha inicial no puede ser posterior a la fecha final.'
     : '',
 )
-const hasFilters = computed(() => Boolean(search.value.trim() || state.value || currency.value || customer.value || dateFrom.value || dateTo.value))
+const hasFilters = computed(() =>
+  Boolean(
+    search.value.trim() ||
+    state.value ||
+    currency.value ||
+    customer.value ||
+    dateFrom.value ||
+    dateTo.value,
+  ),
+)
 const filters = computed(() => [
   ...(search.value.trim() ? [{ key: 'q', label: `Búsqueda: ${search.value.trim()}` }] : []),
-  ...(state.value ? [{ key: 'state', label: `Estado: ${states.value.find((x) => x.codigo === state.value)?.nombre ?? state.value}` }] : []),
-  ...(currency.value ? [{ key: 'currency', label: `Moneda: ${currencies.value.find((x) => x.codigo === currency.value)?.nombre ?? currency.value}` }] : []),
-  ...(customer.value ? [{ key: 'customer', label: `Cliente: ${customerName.value || '#' + customer.value}` }] : []),
+  ...(state.value
+    ? [
+        {
+          key: 'state',
+          label: `Estado: ${states.value.find((x) => x.codigo === state.value)?.nombre ?? state.value}`,
+        },
+      ]
+    : []),
+  ...(currency.value
+    ? [
+        {
+          key: 'currency',
+          label: `Moneda: ${currencies.value.find((x) => x.codigo === currency.value)?.nombre ?? currency.value}`,
+        },
+      ]
+    : []),
+  ...(customer.value
+    ? [{ key: 'customer', label: `Cliente: ${customerName.value || '#' + customer.value}` }]
+    : []),
   ...(dateFrom.value ? [{ key: 'from', label: `Desde: ${dateFrom.value}` }] : []),
   ...(dateTo.value ? [{ key: 'to', label: `Hasta: ${dateTo.value}` }] : []),
 ])
@@ -68,8 +101,12 @@ let mounted = false
 
 function formatDate(value: string) {
   if (!validDate(value)) return 'Sin fecha'
-  return new Intl.DateTimeFormat('es-BO', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })
-    .format(new Date(`${value}T12:00:00Z`))
+  return new Intl.DateTimeFormat('es-BO', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${value}T12:00:00Z`))
 }
 function money(value: string, code: string) {
   const amount = Number(value)
@@ -94,7 +131,10 @@ function customerLabel(row: ProformaListado) {
   return row.cliente_resumen?.empresa?.trim() || row.cliente_resumen?.nombre?.trim() || 'Prospecto'
 }
 function selectCustomer(value: Cliente | null) {
-  customerName.value = value?.empresa?.trim() || (value ? [value.nombres, value.apellidos].filter(Boolean).join(' ').trim() : '') || ''
+  customerName.value =
+    value?.empresa?.trim() ||
+    (value ? [value.nombres, value.apellidos].filter(Boolean).join(' ').trim() : '') ||
+    ''
 }
 
 function currentQuery() {
@@ -113,7 +153,9 @@ function syncRoute() {
   const keys = Object.keys(query) as Array<keyof typeof query>
   if (keys.every((key) => (query[key] ?? '') === queryString(key))) return
   synchronizing = true
-  void router.replace({ query }).finally(() => { synchronizing = false })
+  void router.replace({ query }).finally(() => {
+    synchronizing = false
+  })
 }
 async function load() {
   const id = ++requestId
@@ -164,44 +206,66 @@ function scheduleLoad(delay = 0) {
 watch([search, state, currency, customer, dateFrom, dateTo], (_newValues, oldValues) => {
   if (restoringRoute || !mounted) return
   if (page.value !== 1) page.value = 1
-  const onlySearchChanged = oldValues &&
-    state.value === oldValues[1] && currency.value === oldValues[2] &&
-    customer.value === oldValues[3] && dateFrom.value === oldValues[4] && dateTo.value === oldValues[5]
+  const onlySearchChanged =
+    oldValues &&
+    state.value === oldValues[1] &&
+    currency.value === oldValues[2] &&
+    customer.value === oldValues[3] &&
+    dateFrom.value === oldValues[4] &&
+    dateTo.value === oldValues[5]
   scheduleLoad(onlySearchChanged ? 300 : 0)
 })
 watch(page, () => {
   if (restoringRoute || !mounted) return
   scheduleLoad(0)
 })
-watch(() => route.fullPath, async () => {
-  if (synchronizing || !mounted) return
-  const incoming = {
-    search: queryString('q'), state: queryString('estado'), currency: queryString('moneda'),
-    customer: /^\d+$/.test(queryString('cliente')) ? queryString('cliente') : '',
-    dateFrom: routeDate('fecha_desde'), dateTo: routeDate('fecha_hasta'), page: routePage(),
-  }
-  if (search.value === incoming.search && state.value === incoming.state &&
-    currency.value === incoming.currency && customer.value === incoming.customer &&
-    dateFrom.value === incoming.dateFrom && dateTo.value === incoming.dateTo && page.value === incoming.page) return
-  restoringRoute = true
-  search.value = incoming.search
-  state.value = incoming.state
-  currency.value = incoming.currency
-  customer.value = incoming.customer
-  dateFrom.value = incoming.dateFrom
-  dateTo.value = incoming.dateTo
-  page.value = incoming.page
-  if (incoming.currency || incoming.customer || incoming.dateFrom || incoming.dateTo) showAdvanced.value = true
-  if (debounce) clearTimeout(debounce)
-  await nextTick()
-  restoringRoute = false
-  void load()
-})
+watch(
+  () => route.fullPath,
+  async () => {
+    if (synchronizing || !mounted) return
+    const incoming = {
+      search: queryString('q'),
+      state: queryString('estado'),
+      currency: queryString('moneda'),
+      customer: /^\d+$/.test(queryString('cliente')) ? queryString('cliente') : '',
+      dateFrom: routeDate('fecha_desde'),
+      dateTo: routeDate('fecha_hasta'),
+      page: routePage(),
+    }
+    if (
+      search.value === incoming.search &&
+      state.value === incoming.state &&
+      currency.value === incoming.currency &&
+      customer.value === incoming.customer &&
+      dateFrom.value === incoming.dateFrom &&
+      dateTo.value === incoming.dateTo &&
+      page.value === incoming.page
+    )
+      return
+    restoringRoute = true
+    search.value = incoming.search
+    state.value = incoming.state
+    currency.value = incoming.currency
+    customer.value = incoming.customer
+    dateFrom.value = incoming.dateFrom
+    dateTo.value = incoming.dateTo
+    page.value = incoming.page
+    if (incoming.currency || incoming.customer || incoming.dateFrom || incoming.dateTo)
+      showAdvanced.value = true
+    if (debounce) clearTimeout(debounce)
+    await nextTick()
+    restoringRoute = false
+    void load()
+  },
+)
 function removeFilter(key: string) {
   if (key === 'q') search.value = ''
   if (key === 'state') state.value = ''
   if (key === 'currency') currency.value = ''
-  if (key === 'customer') { customer.value = ''; customerName.value = '' }
+  if (key === 'customer') {
+    customer.value = ''
+    customerName.value = ''
+  }
   if (key === 'from') dateFrom.value = ''
   if (key === 'to') dateTo.value = ''
 }
@@ -217,8 +281,22 @@ function clearFilters() {
 onMounted(() => {
   mounted = true
   void load()
-  void proformasService.options('ESTADO_PROFORMA').then((value) => { states.value = value }).catch(() => { states.value = [] })
-  void proformasService.options('MONEDA').then((value) => { currencies.value = value }).catch(() => { currencies.value = [] })
+  void proformasService
+    .options('ESTADO_PROFORMA')
+    .then((value) => {
+      states.value = value
+    })
+    .catch(() => {
+      states.value = []
+    })
+  void proformasService
+    .options('MONEDA')
+    .then((value) => {
+      currencies.value = value
+    })
+    .catch(() => {
+      currencies.value = []
+    })
 })
 onBeforeUnmount(() => {
   mounted = false
@@ -255,7 +333,9 @@ onBeforeUnmount(() => {
             :options="[
               { label: 'Todos los estados', value: '' },
               ...states.map((x) => ({ label: x.nombre, value: x.codigo })),
-              ...(state && !states.some((x) => x.codigo === state) ? [{ label: state, value: state }] : []),
+              ...(state && !states.some((x) => x.codigo === state)
+                ? [{ label: state, value: state }]
+                : []),
             ]"
           />
         </div>
@@ -268,7 +348,7 @@ onBeforeUnmount(() => {
         >
           <SlidersHorizontal :size="18" aria-hidden="true" />
           Más filtros
-          <ChevronDown :size="16" aria-hidden="true" :class="{ 'rotated': showAdvanced }" />
+          <ChevronDown :size="16" aria-hidden="true" :class="{ rotated: showAdvanced }" />
         </button>
       </div>
       <div v-if="showAdvanced" id="proforma-filtros-avanzados" class="proforma-filters__advanced">
@@ -282,11 +362,27 @@ onBeforeUnmount(() => {
           :options="[
             { label: 'Todas las monedas', value: '' },
             ...currencies.map((x) => ({ label: x.nombre, value: x.codigo })),
-            ...(currency && !currencies.some((x) => x.codigo === currency) ? [{ label: currency, value: currency }] : []),
+            ...(currency && !currencies.some((x) => x.codigo === currency)
+              ? [{ label: currency, value: currency }]
+              : []),
           ]"
         />
-        <label class="proforma-date">Desde <input v-model="dateFrom" type="date" name="fecha-desde-proforma" :max="dateTo || undefined" /></label>
-        <label class="proforma-date">Hasta <input v-model="dateTo" type="date" name="fecha-hasta-proforma" :min="dateFrom || undefined" /></label>
+        <label class="proforma-date"
+          >Desde
+          <input
+            v-model="dateFrom"
+            type="date"
+            name="fecha-desde-proforma"
+            :max="dateTo || undefined"
+        /></label>
+        <label class="proforma-date"
+          >Hasta
+          <input
+            v-model="dateTo"
+            type="date"
+            name="fecha-hasta-proforma"
+            :min="dateFrom || undefined"
+        /></label>
       </div>
       <p v-if="dateError" class="proforma-date-error" role="alert">{{ dateError }}</p>
     </section>
@@ -297,23 +393,37 @@ onBeforeUnmount(() => {
     <ErrorState v-else-if="error" :description="error">
       <button type="button" @click="load">Reintentar</button>
     </ErrorState>
-    <div v-else-if="dateError" class="proforma-no-results" role="status">Corrige el rango de fechas para ver las proformas.</div>
+    <div v-else-if="dateError" class="proforma-no-results" role="status">
+      Corrige el rango de fechas para ver las proformas.
+    </div>
     <EmptyState
       v-else-if="!rows.length"
       :title="hasFilters ? 'Sin resultados' : 'Sin proformas'"
-      :description="hasFilters ? 'No hay proformas que coincidan con los filtros seleccionados.' : 'Todavía no hay proformas registradas.'"
+      :description="
+        hasFilters
+          ? 'No hay proformas que coincidan con los filtros seleccionados.'
+          : 'Todavía no hay proformas registradas.'
+      "
     />
     <template v-else>
       <div class="proforma-results">
-        <p>{{ total }} proforma{{ total === 1 ? '' : 's' }} encontrada{{ total === 1 ? '' : 's' }}</p>
+        <p>
+          {{ total }} proforma{{ total === 1 ? '' : 's' }} encontrada{{ total === 1 ? '' : 's' }}
+        </p>
         <span>Más recientes primero</span>
       </div>
       <div class="proforma-table">
         <table>
-          <caption class="sr-only">Bandeja de proformas comerciales</caption>
+          <caption class="sr-only">
+            Bandeja de proformas comerciales
+          </caption>
           <colgroup>
-            <col class="col-quote" /><col class="col-client" /><col class="col-date" />
-            <col class="col-status" /><col class="col-total" /><col class="col-actions" />
+            <col class="col-quote" />
+            <col class="col-client" />
+            <col class="col-date" />
+            <col class="col-status" />
+            <col class="col-total" />
+            <col class="col-actions" />
           </colgroup>
           <thead>
             <tr>
@@ -329,7 +439,9 @@ onBeforeUnmount(() => {
             <tr v-for="row in rows" :key="row.id">
               <td class="quote-cell">
                 <strong>#{{ row.numero }}</strong>
-                <span :title="row.titulo || 'Sin título'">{{ row.titulo?.trim() || 'Sin título' }}</span>
+                <span :title="row.titulo || 'Sin título'">{{
+                  row.titulo?.trim() || 'Sin título'
+                }}</span>
               </td>
               <td class="client-cell">
                 <strong :title="customerLabel(row)">{{ customerLabel(row) }}</strong>
@@ -350,7 +462,8 @@ onBeforeUnmount(() => {
                   class="proforma-view-link"
                   :aria-label="`Ver proforma #${row.numero}`"
                   :title="`Ver proforma #${row.numero}`"
-                ><Eye :size="19" aria-hidden="true" /></RouterLink>
+                  ><Eye :size="19" aria-hidden="true"
+                /></RouterLink>
               </td>
             </tr>
           </tbody>
@@ -373,112 +486,399 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.proformas-list { min-width:0; }
-.proformas-list :deep(.page-header) { margin-bottom:var(--space-6); }
-.proformas-list :deep(.page-header__actions button) { display:inline-flex; align-items:center; gap:.5rem; }
+.proformas-list {
+  min-width: 0;
+}
+.proformas-list :deep(.page-header) {
+  margin-bottom: var(--space-6);
+}
+.proformas-list :deep(.page-header__actions button) {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
 .proforma-filters {
-  display:grid; gap:1rem; padding:1.1rem 1.25rem;
-  border:1px solid var(--color-border); border-radius:var(--radius-card);
-  background:var(--color-surface); margin-bottom:1rem;
+  display: grid;
+  gap: 1rem;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  margin-bottom: 1rem;
 }
-.proforma-filters__main { display:grid; grid-template-columns:minmax(18rem,1fr) minmax(11rem,14rem) auto; align-items:end; gap:.85rem; }
-.proforma-search { min-width:0; }
-.proforma-search :deep(.search) { width:100%; }
-.proforma-search :deep(.search input) { min-width:0; width:100%; min-height:2.6rem; font-size:.89rem; }
-.proforma-state-filter { min-width:0; }
-.proforma-state-filter :deep(.select select) { width:100%; }
-.proforma-more-filters, .proforma-pagination button {
-  display:inline-flex; align-items:center; justify-content:center; gap:.55rem;
-  padding:.65rem .85rem; min-height:2.75rem; border:1px solid var(--color-border-strong);
-  border-radius:var(--radius-control); background:var(--color-surface);
-  color:var(--color-text); font:inherit; font-size:.84rem; font-weight:650; cursor:pointer;
+.proforma-filters__main {
+  display: grid;
+  grid-template-columns: minmax(18rem, 1fr) minmax(11rem, 14rem) auto;
+  align-items: end;
+  gap: 0.85rem;
 }
-.proforma-more-filters:hover, .proforma-pagination button:not(:disabled):hover { background:var(--color-surface-hover); }
-.proforma-more-filters .rotated { transform:rotate(180deg); }
-.proforma-more-filters:focus-visible, .proforma-pagination button:focus-visible, .proforma-view-link:focus-visible {
-  outline:2px solid var(--color-primary-accent); outline-offset:2px;
+.proforma-search {
+  min-width: 0;
+}
+.proforma-search :deep(.search) {
+  width: 100%;
+}
+.proforma-search :deep(.search input) {
+  min-width: 0;
+  width: 100%;
+  min-height: 2.6rem;
+  font-size: 0.89rem;
+}
+.proforma-state-filter {
+  min-width: 0;
+}
+.proforma-state-filter :deep(.select select) {
+  width: 100%;
+}
+.proforma-more-filters,
+.proforma-pagination button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0.65rem 0.85rem;
+  min-height: 2.75rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+.proforma-more-filters:hover,
+.proforma-pagination button:not(:disabled):hover {
+  background: var(--color-surface-hover);
+}
+.proforma-more-filters .rotated {
+  transform: rotate(180deg);
+}
+.proforma-more-filters:focus-visible,
+.proforma-pagination button:focus-visible,
+.proforma-view-link:focus-visible {
+  outline: 2px solid var(--color-primary-accent);
+  outline-offset: 2px;
 }
 .proforma-filters__advanced {
-  display:grid; grid-template-columns:minmax(13rem,1.4fr) minmax(10rem,1fr) minmax(9rem,.85fr) minmax(9rem,.85fr);
-  gap:1rem; align-items:start; border-top:1px solid var(--color-border); padding-top:1rem;
+  display: grid;
+  grid-template-columns: minmax(13rem, 1.4fr) minmax(10rem, 1fr) minmax(9rem, 0.85fr) minmax(
+      9rem,
+      0.85fr
+    );
+  gap: 1rem;
+  align-items: start;
+  border-top: 1px solid var(--color-border);
+  padding-top: 1rem;
 }
-.proforma-customer { min-width:0; }
-.proforma-customer :deep(.client-picker) { min-width:0; }
-.proforma-customer :deep(.client-picker__hint) { display:none; }
-.proforma-date { display:grid; gap:.5rem; font-size:.87rem; font-weight:650; }
+.proforma-customer {
+  min-width: 0;
+}
+.proforma-customer :deep(.client-picker) {
+  min-width: 0;
+}
+.proforma-customer :deep(.client-picker__hint) {
+  display: none;
+}
+.proforma-date {
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.87rem;
+  font-weight: 650;
+}
 .proforma-date input {
-  min-width:0; width:100%; min-height:2.75rem; color:var(--color-text);
-  padding:.55rem .7rem; border:1px solid var(--color-border-strong);
-  border-radius:var(--radius-control); background:var(--color-surface);
-  font:inherit;
+  min-width: 0;
+  width: 100%;
+  min-height: 2.75rem;
+  color: var(--color-text);
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  font: inherit;
 }
-.proforma-date-error { color:var(--color-danger); font-size:.8rem; margin:0; }
-.proforma-results { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin:1.1rem 0 .8rem; }
-.proforma-results p { margin:0; font-size:.88rem; font-weight:650; }
-.proforma-results > span { color:var(--color-text-secondary); font-size:.76rem; }
-.proforma-table { min-width:0; border:1px solid var(--color-border); border-radius:var(--radius-card); background:var(--color-surface); }
-.proforma-table table { width:100%; border-collapse:collapse; table-layout:fixed; }
-.col-quote { width:24%; } .col-client { width:23%; } .col-date { width:13%; }
-.col-status { width:15%; } .col-total { width:17%; } .col-actions { width:8%; }
-.proforma-table th, .proforma-table td { text-align:left; padding:.8rem 1rem; border-bottom:1px solid var(--color-border); vertical-align:middle; }
-.proforma-table th { color:var(--color-text-secondary); font-size:.76rem; font-weight:650; }
-.proforma-table tbody tr:last-child td { border-bottom:0; }
-.proforma-table tbody tr:hover { background:var(--color-surface-hover); }
-.quote-cell, .client-cell { min-width:0; }
-.quote-cell strong, .client-cell strong { display:block; font-weight:700; font-size:.89rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.quote-cell span, .client-cell span { display:block; color:var(--color-text-secondary); font-size:.75rem; margin-top:.25rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.date-cell { font-size:.84rem; color:var(--color-text-secondary); white-space:nowrap; }
-.total-cell, .proforma-table th.numeric { text-align:right; }
-.total-cell strong { font-size:.87rem; font-variant-numeric:tabular-nums; white-space:nowrap; }
-.actions-cell, .proforma-table th.actions-heading { text-align:right; }
+.proforma-date-error {
+  color: var(--color-danger);
+  font-size: 0.8rem;
+  margin: 0;
+}
+.proforma-results {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1.1rem 0 0.8rem;
+}
+.proforma-results p {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+.proforma-results > span {
+  color: var(--color-text-secondary);
+  font-size: 0.76rem;
+}
+.proforma-table {
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+.proforma-table table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.col-quote {
+  width: 24%;
+}
+.col-client {
+  width: 23%;
+}
+.col-date {
+  width: 13%;
+}
+.col-status {
+  width: 15%;
+}
+.col-total {
+  width: 17%;
+}
+.col-actions {
+  width: 8%;
+}
+.proforma-table th,
+.proforma-table td {
+  text-align: left;
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+.proforma-table th {
+  color: var(--color-text-secondary);
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+.proforma-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.proforma-table tbody tr:hover {
+  background: var(--color-surface-hover);
+}
+.quote-cell,
+.client-cell {
+  min-width: 0;
+}
+.quote-cell strong,
+.client-cell strong {
+  display: block;
+  font-weight: 700;
+  font-size: 0.89rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.quote-cell span,
+.client-cell span {
+  display: block;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.date-cell {
+  font-size: 0.84rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+.total-cell,
+.proforma-table th.numeric {
+  text-align: right;
+}
+.total-cell strong {
+  font-size: 0.87rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.actions-cell,
+.proforma-table th.actions-heading {
+  text-align: right;
+}
 .proforma-view-link {
-  display:inline-grid; place-items:center; width:2.75rem; height:2.75rem;
-  border:1px solid var(--color-border); border-radius:var(--radius-control);
-  color:var(--color-text); background:var(--color-surface); text-decoration:none;
+  display: inline-grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  background: var(--color-surface);
+  text-decoration: none;
 }
-.proforma-view-link:hover { background:var(--color-surface-hover); color:var(--color-primary-accent); }
-.proforma-pagination { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.75rem; margin-top:1rem; }
-.proforma-pagination p { font-size:.8rem; color:var(--color-text-secondary); margin:0; }
-.proforma-pagination__buttons { display:flex; gap:.8rem; align-items:center; }
-.proforma-pagination__buttons span { font-size:.8rem; color:var(--color-text-secondary); }
-.proforma-pagination button:disabled { opacity:.45; cursor:not-allowed; }
-.proforma-no-results { color:var(--color-text-secondary); padding:1rem; border:1px solid var(--color-border); border-radius:var(--radius-card); }
-@media(max-width:72rem) {
-  .proforma-filters__advanced { grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .col-quote { width:22%; } .col-client { width:21%; } .col-date { width:14%; }
-  .col-status { width:17%; } .col-total { width:17%; } .col-actions { width:9%; }
-  .proforma-table th,.proforma-table td { padding:.75rem .65rem; }
+.proforma-view-link:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-primary-accent);
 }
-@media(max-width:53rem) {
-  .proforma-filters__main { grid-template-columns:minmax(0,1fr) auto; }
-  .proforma-search { grid-column:1/-1; }
-  .proforma-table { background:transparent; border:0; }
-  .proforma-table colgroup,.proforma-table thead { display:none; }
-  .proforma-table tbody { display:grid; gap:.75rem; }
-  .proforma-table tbody tr {
-    display:grid; grid-template-columns:1fr 1fr; gap:.6rem 1rem;
-    padding:1rem; border:1px solid var(--color-border);
-    border-radius:var(--radius-card); background:var(--color-surface);
+.proforma-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.proforma-pagination p {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+.proforma-pagination__buttons {
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+}
+.proforma-pagination__buttons span {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+.proforma-pagination button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.proforma-no-results {
+  color: var(--color-text-secondary);
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+@media (max-width: 72rem) {
+  .proforma-filters__advanced {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .proforma-table tbody td { display:block; padding:0; border:0; min-width:0; }
-  .quote-cell { grid-column:1/-1; }
-  .quote-cell strong { font-size:1rem; }
-  .quote-cell span { font-size:.81rem; }
-  .client-cell { grid-column:1/-1; }
-  .date-cell { grid-column:1; }
-  .status-cell { grid-column:2; text-align:right; }
-  .total-cell { grid-column:1; display:flex !important; flex-direction:column; align-items:start; gap:.3rem; text-align:left; }
-  .total-cell::before { content:attr(data-label); font-size:.75rem; color:var(--color-text-secondary); }
-  .total-cell strong { font-size:1rem; }
-  .actions-cell { grid-column:2; align-self:end; }
+  .col-quote {
+    width: 22%;
+  }
+  .col-client {
+    width: 21%;
+  }
+  .col-date {
+    width: 14%;
+  }
+  .col-status {
+    width: 17%;
+  }
+  .col-total {
+    width: 17%;
+  }
+  .col-actions {
+    width: 9%;
+  }
+  .proforma-table th,
+  .proforma-table td {
+    padding: 0.75rem 0.65rem;
+  }
 }
-@media(max-width:36rem) {
-  .proforma-filters__main,.proforma-filters__advanced { grid-template-columns:1fr; }
-  .proforma-search { grid-column:auto; }
-  .proforma-more-filters { justify-self:start; }
-  .proforma-results > span { display:none; }
-  .proforma-pagination { align-items:flex-start; flex-direction:column; }
-  .proforma-pagination__buttons { width:100%; justify-content:space-between; gap:.4rem; }
-  .proforma-pagination button { padding:.55rem .6rem; }
+@media (max-width: 53rem) {
+  .proforma-filters__main {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .proforma-search {
+    grid-column: 1/-1;
+  }
+  .proforma-table {
+    background: transparent;
+    border: 0;
+  }
+  .proforma-table colgroup,
+  .proforma-table thead {
+    display: none;
+  }
+  .proforma-table tbody {
+    display: grid;
+    gap: 0.75rem;
+  }
+  .proforma-table tbody tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem 1rem;
+    padding: 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+  }
+  .proforma-table tbody td {
+    display: block;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+  }
+  .quote-cell {
+    grid-column: 1/-1;
+  }
+  .quote-cell strong {
+    font-size: 1rem;
+  }
+  .quote-cell span {
+    font-size: 0.81rem;
+  }
+  .client-cell {
+    grid-column: 1/-1;
+  }
+  .date-cell {
+    grid-column: 1;
+  }
+  .status-cell {
+    grid-column: 2;
+    text-align: right;
+  }
+  .total-cell {
+    grid-column: 1;
+    display: flex !important;
+    flex-direction: column;
+    align-items: start;
+    gap: 0.3rem;
+    text-align: left;
+  }
+  .total-cell::before {
+    content: attr(data-label);
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+  }
+  .total-cell strong {
+    font-size: 1rem;
+  }
+  .actions-cell {
+    grid-column: 2;
+    align-self: end;
+  }
+}
+@media (max-width: 36rem) {
+  .proforma-filters__main,
+  .proforma-filters__advanced {
+    grid-template-columns: 1fr;
+  }
+  .proforma-search {
+    grid-column: auto;
+  }
+  .proforma-more-filters {
+    justify-self: start;
+  }
+  .proforma-results > span {
+    display: none;
+  }
+  .proforma-pagination {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .proforma-pagination__buttons {
+    width: 100%;
+    justify-content: space-between;
+    gap: 0.4rem;
+  }
+  .proforma-pagination button {
+    padding: 0.55rem 0.6rem;
+  }
 }
 </style>
