@@ -137,7 +137,7 @@ describe('Bandeja administrativa de productos', () => {
     const list = mockServices()
     const { wrapper } = await makeMounted('/productos?estado=todos&categoria=1&vista=grid&pagina=2')
     try {
-      expect(wrapper.get('.product-grid').exists()).toBe(true)
+      expect(wrapper.find('.product-grid').exists()).toBe(true)
       expect(list).toHaveBeenLastCalledWith(expect.objectContaining({
         activo: undefined, categoria: 1, page: 2,
       }))
