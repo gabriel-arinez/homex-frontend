@@ -7,7 +7,10 @@ afterEach(() => vi.restoreAllMocks())
 
 function catalog() {
   vi.spyOn(proformasService, 'families').mockResolvedValue({
-    count: 0, next: null, previous: null, results: [],
+    count: 0,
+    next: null,
+    previous: null,
+    results: [],
   })
   vi.spyOn(proformasService, 'options').mockImplementation(async (key) => {
     const entries: Record<string, Array<{ id: number; codigo: string; nombre: string }>> = {

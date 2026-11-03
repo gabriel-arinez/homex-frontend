@@ -102,24 +102,48 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     <PageHeader
       title="Nuevo producto"
       description="Registra un artículo comercial en el catálogo HOMEX."
-      show-menu @menu="emit('openMenu')"
+      show-menu
+      @menu="emit('openMenu')"
     />
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
-    <ProductoForm :processing="saving" :server-errors="serverErrors"
+    <ProductoForm
+      :processing="saving"
+      :server-errors="serverErrors"
       :can-upload-image="session.can('comercial.administrar')"
-      :preselect-category="typeof route.query.categoria === 'string' ? route.query.categoria : undefined"
-      @change="dirty = true" @save="save" @cancel="cancel" />
-    <ConfirmDialog :open="confirmCancel" title="Descartar producto"
+      :preselect-category="
+        typeof route.query.categoria === 'string' ? route.query.categoria : undefined
+      "
+      @change="dirty = true"
+      @save="save"
+      @cancel="cancel"
+    />
+    <ConfirmDialog
+      :open="confirmCancel"
+      title="Descartar producto"
       description="Los datos que ingresaste no se guardarán."
-      confirm-label="Descartar y salir" @close="confirmCancel = false" @confirm="discard" />
-    <ConfirmDialog :open="confirmLeave" title="Salir sin guardar"
+      confirm-label="Descartar y salir"
+      @close="confirmCancel = false"
+      @confirm="discard"
+    />
+    <ConfirmDialog
+      :open="confirmLeave"
+      title="Salir sin guardar"
       description="Hay cambios sin guardar en este producto. Si sales, se descartarán."
-      confirm-label="Salir sin guardar" @close="answerLeave(false)" @confirm="answerLeave(true)" />
+      confirm-label="Salir sin guardar"
+      @close="answerLeave(false)"
+      @confirm="answerLeave(true)"
+    />
   </div>
 </template>
 <style scoped>
-.create-product-page { min-width: 0; }
-.form-error { color: var(--color-danger-text); padding: var(--space-3);
-  border: 1px solid var(--color-danger); border-radius: var(--radius-control);
-  margin-bottom: var(--space-4); }
+.create-product-page {
+  min-width: 0;
+}
+.form-error {
+  color: var(--color-danger-text);
+  padding: var(--space-3);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-control);
+  margin-bottom: var(--space-4);
+}
 </style>

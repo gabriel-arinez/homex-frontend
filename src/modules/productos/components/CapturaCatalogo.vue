@@ -127,8 +127,8 @@ function displayValue(field: string, value: unknown) {
   }
   if (concepts[field])
     return (
-      props.opciones?.[concepts[field]]?.find((option) => String(option.id) === String(value))?.nombre ??
-      'Valor pendiente de revisión'
+      props.opciones?.[concepts[field]]?.find((option) => String(option.id) === String(value))
+        ?.nombre ?? 'Valor pendiente de revisión'
     )
   if (value && typeof value === 'object')
     return Object.entries(value)
@@ -142,19 +142,33 @@ function upload(event: Event) {
 }
 </script>
 <template>
-  <section class="voice-catalog" aria-label="Autocompletar producto por voz" :aria-busy="processing">
+  <section
+    class="voice-catalog"
+    aria-label="Autocompletar producto por voz"
+    :aria-busy="processing"
+  >
     <div class="voice-block">
-      <div class="block-title"><Mic :size="19" aria-hidden="true" />
-        <div><h2>Descripción por voz</h2>
-          <p>Dicta nombre, marca, colores o características del producto.</p></div>
+      <div class="block-title">
+        <Mic :size="19" aria-hidden="true" />
+        <div>
+          <h2>Descripción por voz</h2>
+          <p>Dicta nombre, marca, colores o características del producto.</p>
+        </div>
       </div>
       <Button class="record-button" :disabled="processing" @click="startRecording">
         <Mic :size="18" aria-hidden="true" /> Grabar descripción
       </Button>
       <AudioRecorder v-if="recording && !processing" ref="recorder" @ready="audio = $event" />
-      <label class="upload-label">O subir un archivo de audio
-        <span class="upload-control"><FileAudio :size="18" aria-hidden="true" />
-          <input type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm" :disabled="processing" @change="upload" />
+      <label class="upload-label"
+        >O subir un archivo de audio
+        <span class="upload-control"
+          ><FileAudio :size="18" aria-hidden="true" />
+          <input
+            type="file"
+            accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm"
+            :disabled="processing"
+            @change="upload"
+          />
         </span>
       </label>
       <div class="voice-action">
@@ -170,20 +184,30 @@ function upload(event: Event) {
       <span>Transcribiendo e interpretando…</span>
       <Button variant="secondary" @click="cancel">Cancelar procesamiento</Button>
     </div>
-    <p v-if="error" role="alert" class="error"><AlertTriangle :size="17" aria-hidden="true" />{{ error }}</p>
+    <p v-if="error" role="alert" class="error">
+      <AlertTriangle :size="17" aria-hidden="true" />{{ error }}
+    </p>
 
     <div class="voice-block">
-      <div class="block-title"><RotateCcw :size="19" aria-hidden="true" />
-        <div><h2>Revisar transcripción</h2>
-          <p>Corrige las palabras o códigos antes de aplicar los datos.</p></div>
+      <div class="block-title">
+        <RotateCcw :size="19" aria-hidden="true" />
+        <div>
+          <h2>Revisar transcripción</h2>
+          <p>Corrige las palabras o códigos antes de aplicar los datos.</p>
+        </div>
       </div>
       <details v-if="original" class="original">
         <summary>Ver transcripción original</summary>
         <p>{{ original }}</p>
       </details>
-      <label class="transcript-label">Transcripción / texto corregido
-        <textarea v-model="text" rows="4" :disabled="processing"
-          placeholder="Ej. Silla ergonómica, marca…, color…, precio…" />
+      <label class="transcript-label"
+        >Transcripción / texto corregido
+        <textarea
+          v-model="text"
+          rows="4"
+          :disabled="processing"
+          placeholder="Ej. Silla ergonómica, marca…, color…, precio…"
+        />
       </label>
       <Button variant="secondary" :disabled="!text.trim() || processing" @click="interpret(false)">
         <RotateCcw :size="16" aria-hidden="true" /> Reinterpretar texto
@@ -191,9 +215,12 @@ function upload(event: Event) {
     </div>
 
     <div v-if="result?.propuesta" class="voice-block results">
-      <div class="block-title"><CheckCircle2 :size="19" aria-hidden="true" />
-        <div><h2>Campos detectados</h2>
-          <p>Estos valores son una propuesta; todavía no se ha guardado el producto.</p></div>
+      <div class="block-title">
+        <CheckCircle2 :size="19" aria-hidden="true" />
+        <div>
+          <h2>Campos detectados</h2>
+          <p>Estos valores son una propuesta; todavía no se ha guardado el producto.</p>
+        </div>
       </div>
       <dl class="detected-list">
         <div v-for="(value, field) in result.propuesta.fields" :key="field" class="detected-item">
@@ -203,7 +230,9 @@ function upload(event: Event) {
       </dl>
       <div v-if="result.propuesta.warnings.length" class="warnings">
         <h3><AlertTriangle :size="17" aria-hidden="true" /> Datos a revisar</h3>
-        <ul><li v-for="warning in result.propuesta.warnings" :key="warning">{{ warning }}</li></ul>
+        <ul>
+          <li v-for="warning in result.propuesta.warnings" :key="warning">{{ warning }}</li>
+        </ul>
       </div>
       <details class="evidences">
         <summary>Evidencias y datos sin reconocer</summary>
@@ -212,53 +241,215 @@ function upload(event: Event) {
             {{ evidence.label }}: «{{ evidence.text }}» — {{ evidence.decision }}
           </li>
         </ul>
-        <p v-for="(fragment, index) in result.propuesta.unrecognized" :key="index">{{ fragment }}</p>
+        <p v-for="(fragment, index) in result.propuesta.unrecognized" :key="index">
+          {{ fragment }}
+        </p>
       </details>
-      <Button class="apply-button"
-        :disabled="!Object.keys(result.propuesta.fields).length || processing || text !== result.texto_transcrito_original"
-        @click="emit('apply', result.propuesta.fields)">
+      <Button
+        class="apply-button"
+        :disabled="
+          !Object.keys(result.propuesta.fields).length ||
+          processing ||
+          text !== result.texto_transcrito_original
+        "
+        @click="emit('apply', result.propuesta.fields)"
+      >
         <CheckCircle2 :size="18" aria-hidden="true" /> Aplicar al formulario
       </Button>
       <p v-if="text !== result.texto_transcrito_original" class="hint">
         El texto cambió; vuelve a reinterpretarlo antes de aplicar.
       </p>
     </div>
-    <p class="voice-footer">Los datos sugeridos deben revisarse. El producto se crea únicamente al pulsar Guardar producto.</p>
+    <p class="voice-footer">
+      Los datos sugeridos deben revisarse. El producto se crea únicamente al pulsar Guardar
+      producto.
+    </p>
   </section>
 </template>
 <style scoped>
-.voice-catalog { display: grid; gap: var(--space-5); padding: var(--space-5); }
-.voice-block { display: grid; gap: var(--space-3); }
-.voice-block + .voice-block { padding-top: var(--space-5); border-top: 1px solid var(--color-border); }
-.block-title { display: flex; align-items: flex-start; gap: var(--space-3); }
-.block-title > svg { flex: 0 0 auto; color: var(--color-primary); }
-.block-title h2 { margin: 0; font-size: 1.06rem; }
-.block-title p { margin: .35rem 0 0; font-size: .82rem; color: var(--color-text-secondary); line-height: 1.5; }
-.record-button { width: 100%; }
-.upload-label, .transcript-label { display: grid; gap: .55rem; font-size: .85rem; font-weight: 600; }
-.upload-control { display: flex; align-items: center; gap: .6rem; min-width: 0; border: 1px solid var(--color-border); border-radius: var(--radius-control); padding: .7rem; }
-.upload-control input { max-width: 100%; min-width: 0; font-size: .8rem; }
-.transcript-label textarea { min-height: 7rem; padding: .75rem; border: 1px solid var(--color-border-strong); border-radius: var(--radius-control); background: var(--color-surface); color: var(--color-text); resize: vertical; }
-.voice-action { display: grid; gap: var(--space-2); }
-.voice-action > :deep(button) { width: 100%; }
-.hint { margin: 0; font-size: .8rem; color: var(--color-text-secondary); }
-.original, .evidences { border: 1px solid var(--color-border); border-radius: var(--radius-control); padding: var(--space-3); overflow-wrap: anywhere; }
-.original summary, .evidences summary { font-weight: 600; cursor: pointer; }
-.original p, .evidences p { font-size: .83rem; }
-.processing-note { display: grid; gap: var(--space-3); align-items: center; background: var(--color-surface-soft); border-radius: var(--radius-control); padding: var(--space-4); font-size: .86rem; }
-.loader { width: 1.25rem; height: 1.25rem; border: 2px solid var(--color-border); border-top-color: var(--color-primary); border-radius: 50%; animation: rotate 1s linear infinite; }
-.error { display: flex; align-items: flex-start; gap: .5rem; padding: var(--space-3); border-radius: var(--radius-control); background: var(--color-danger-soft); color: var(--color-danger-text); }
-.detected-list { display: grid; gap: var(--space-2); margin: 0; }
-.detected-item { border: 1px solid var(--color-border); border-radius: var(--radius-control); padding: var(--space-3); overflow-wrap: anywhere; }
-.detected-item dt { color: var(--color-text-secondary); font-size: .78rem; margin-bottom: .35rem; }
-.detected-item dd { margin: 0; font-size: .94rem; font-weight: 600; }
-.warnings { padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-control); }
-.warnings h3 { display: flex; gap: .5rem; align-items: center; font-size: .9rem; margin: 0 0 .5rem; }
-.warnings ul { margin: 0; padding-left: 1.25rem; font-size: .83rem; }
-.evidences ul { padding-left: 1.2rem; font-size: .82rem; }
-.apply-button { width: 100%; }
-.voice-footer { margin: 0; color: var(--color-text-secondary); font-size: .8rem; line-height: 1.5; }
-@keyframes rotate { to { transform: rotate(360deg); } }
-@media (max-width: 36rem) { .voice-catalog { padding: var(--space-4); } }
-@media (prefers-reduced-motion: reduce) { .loader { animation: none; } }
+.voice-catalog {
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-5);
+}
+.voice-block {
+  display: grid;
+  gap: var(--space-3);
+}
+.voice-block + .voice-block {
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border);
+}
+.block-title {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.block-title > svg {
+  flex: 0 0 auto;
+  color: var(--color-primary);
+}
+.block-title h2 {
+  margin: 0;
+  font-size: 1.06rem;
+}
+.block-title p {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+.record-button {
+  width: 100%;
+}
+.upload-label,
+.transcript-label {
+  display: grid;
+  gap: 0.55rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.upload-control {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: 0.7rem;
+}
+.upload-control input {
+  max-width: 100%;
+  min-width: 0;
+  font-size: 0.8rem;
+}
+.transcript-label textarea {
+  min-height: 7rem;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+  resize: vertical;
+}
+.voice-action {
+  display: grid;
+  gap: var(--space-2);
+}
+.voice-action > :deep(button) {
+  width: 100%;
+}
+.hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+.original,
+.evidences {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: var(--space-3);
+  overflow-wrap: anywhere;
+}
+.original summary,
+.evidences summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+.original p,
+.evidences p {
+  font-size: 0.83rem;
+}
+.processing-note {
+  display: grid;
+  gap: var(--space-3);
+  align-items: center;
+  background: var(--color-surface-soft);
+  border-radius: var(--radius-control);
+  padding: var(--space-4);
+  font-size: 0.86rem;
+}
+.loader {
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: rotate 1s linear infinite;
+}
+.error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--color-danger-soft);
+  color: var(--color-danger-text);
+}
+.detected-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+.detected-item {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: var(--space-3);
+  overflow-wrap: anywhere;
+}
+.detected-item dt {
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  margin-bottom: 0.35rem;
+}
+.detected-item dd {
+  margin: 0;
+  font-size: 0.94rem;
+  font-weight: 600;
+}
+.warnings {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+.warnings h3 {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.9rem;
+  margin: 0 0 0.5rem;
+}
+.warnings ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.83rem;
+}
+.evidences ul {
+  padding-left: 1.2rem;
+  font-size: 0.82rem;
+}
+.apply-button {
+  width: 100%;
+}
+.voice-footer {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+@keyframes rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 36rem) {
+  .voice-catalog {
+    padding: var(--space-4);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .loader {
+    animation: none;
+  }
+}
 </style>

@@ -97,7 +97,10 @@ describe('Voz en creación de catálogo', () => {
   })
   it('revisa conflictos sin sobrescribir valores manuales y sin guardar automáticamente', async () => {
     vi.spyOn(proformasService, 'families').mockResolvedValue({
-      count: 0, next: null, previous: null, results: [],
+      count: 0,
+      next: null,
+      previous: null,
+      results: [],
     })
     vi.spyOn(proformasService, 'options').mockImplementation(async (key) =>
       key === 'CATEGORIA_PRODUCTO'
@@ -128,7 +131,11 @@ describe('Voz en creación de catálogo', () => {
     await flushPromises()
     expect((input.element as HTMLInputElement).value).toBe('Manual')
     await button(w, 'Completar por voz').trigger('click')
-    w.findComponent({ name: 'CapturaCatalogo' }).vm.$emit('apply', { nombre: 'Propuesto', sku: 'NO', stock: 99 })
+    w.findComponent({ name: 'CapturaCatalogo' }).vm.$emit('apply', {
+      nombre: 'Propuesto',
+      sku: 'NO',
+      stock: 99,
+    })
     await flushPromises()
     const confirmCheck = document.body.querySelector<HTMLInputElement>(
       'input[aria-label="Reemplazar Nombre comercial"]',
@@ -144,12 +151,14 @@ describe('Voz en creación de catálogo', () => {
     expect(w.emitted('save')).toBeUndefined()
     w.unmount()
   })
-
 })
 
 it('aplica color secundario desde un catálogo activo sólo cuando se acepta el conflicto', async () => {
   vi.spyOn(proformasService, 'families').mockResolvedValue({
-    count: 0, next: null, previous: null, results: [],
+    count: 0,
+    next: null,
+    previous: null,
+    results: [],
   })
   vi.spyOn(proformasService, 'options').mockImplementation(async (key) =>
     key === 'CATEGORIA_PRODUCTO'
