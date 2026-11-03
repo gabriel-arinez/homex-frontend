@@ -63,8 +63,7 @@ const preferences = usePreferencesStore()
   }
 }
 @media (max-width: 47.99rem) {
-  /* El selector específico protege el layout móvil ante estilos del sidebar. */
-  .shell > main#main-content {
+  .shell main {
     margin-left: 0;
     padding: var(--space-4);
   }
