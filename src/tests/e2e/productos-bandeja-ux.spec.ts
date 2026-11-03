@@ -128,6 +128,14 @@ async function mockBackend(page: Page, canCreate = false) {
     }),
   )
   await page.route(/\/api\/v1\/catalogo\/productos\/(?:\?.*)?$/, (route) => {
+    if (route.request().method() === 'POST') {
+      const body = route.request().postDataJSON() as Record<string, unknown>
+      return route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ ...body, id: 99, stock: '0.0000' }),
+      })
+    }
     const url = new URL(route.request().url())
     seen.push(url)
     let filtered = items.filter((x) => {
@@ -277,3 +285,32 @@ for (const width of [390, 1440]) {
     },
   )
 }
+
+test('FE03 guardado confirmado redirige sin pedir descartar ni crear un duplicado', async ({
+  page,
+}) => {
+  await mockBackend(page, true)
+  let creates = 0
+  page.on('request', (request) => {
+    if (
+      request.method() === 'POST' &&
+      new URL(request.url()).pathname.endsWith('/catalogo/productos/')
+    )
+      creates++
+  })
+  await page.goto('/productos/nuevo?categoria=SILLA')
+  await expect(page.getByRole('heading', { name: 'Nueva silla' })).toBeVisible()
+  await page.getByRole('textbox', { name: 'Nombre comercial *' }).fill('Silla de integración')
+  await page.getByLabel('Código SKU *').fill('E2E-VOICE-001')
+  await page.getByRole('spinbutton', { name: 'Precio de lista (BOB) *' }).fill('150')
+  const created = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname.endsWith('/catalogo/productos/'),
+  )
+  await page.getByRole('button', { name: 'Guardar producto' }).click()
+  expect((await created).status()).toBe(201)
+  await expect(page).toHaveURL(/\/productos(?:\?|$)/)
+  expect(creates).toBe(1)
+  await expect(page.getByRole('dialog', { name: 'Salir sin guardar' })).toHaveCount(0)
+})
