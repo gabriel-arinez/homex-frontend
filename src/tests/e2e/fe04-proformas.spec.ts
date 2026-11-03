@@ -314,7 +314,41 @@ async function noOverflow(page: Page) {
         right: Math.round(node.getBoundingClientRect().right),
         width: Math.round(node.getBoundingClientRect().width),
       }))
-    return { width, scrollWidth, offenders }
+    const targets = [
+      '.shell',
+      '.shell > main',
+      '.proformas-list',
+      '.page-header',
+      '.proforma-filters',
+      '.proforma-filters__main',
+      '.proforma-table',
+      '.proforma-table table',
+    ].map((selector) => {
+      const node = document.querySelector<HTMLElement>(selector)
+      if (!node) return { selector, missing: true }
+      const rect = node.getBoundingClientRect()
+      const css = getComputedStyle(node)
+      return {
+        selector,
+        left: Math.round(rect.left),
+        right: Math.round(rect.right),
+        width: Math.round(rect.width),
+        marginLeft: css.marginLeft,
+        paddingLeft: css.paddingLeft,
+        display: css.display,
+        minWidth: css.minWidth,
+        gridTemplateColumns: css.gridTemplateColumns,
+      }
+    })
+    return {
+      width,
+      scrollWidth,
+      cssViewport: window.innerWidth,
+      rootFontSize: getComputedStyle(document.documentElement).fontSize,
+      mobileQueryMatches: matchMedia('(max-width: 47.99rem)').matches,
+      offenders,
+      targets,
+    }
   })
   expect(result.scrollWidth, JSON.stringify(result)).toBeLessThanOrEqual(result.width + 1)
 }
