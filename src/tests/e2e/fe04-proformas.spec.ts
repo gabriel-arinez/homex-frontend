@@ -302,11 +302,32 @@ async function mockBackend(page: Page) {
   return { quote: () => quote }
 }
 async function noOverflow(page: Page) {
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
-    ),
-  ).toBe(true)
+  // El sidebar anima margin-left al cambiar de viewport. Medir al
+  // terminar el reflujo evita reportar el desbordamiento transitorio.
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        ),
+      { timeout: 4000 },
+    )
+    .toBeLessThanOrEqual(1)
+  const result = await page.evaluate(() => {
+    const width = document.documentElement.clientWidth
+    const scrollWidth = document.documentElement.scrollWidth
+    const offenders = Array.from(document.querySelectorAll<HTMLElement>('body *'))
+      .filter((node) => node.getBoundingClientRect().right > width + 1)
+      .slice(0, 12)
+      .map((node) => ({
+        tag: node.tagName.toLowerCase(),
+        className: typeof node.className === 'string' ? node.className : '',
+        right: Math.round(node.getBoundingClientRect().right),
+        width: Math.round(node.getBoundingClientRect().width),
+      }))
+    return { width, scrollWidth, offenders }
+  })
+  expect(result.scrollWidth, JSON.stringify(result)).toBeLessThanOrEqual(result.width + 1)
 }
 
 async function studioStep(
@@ -1230,4 +1251,51 @@ test('PRF-FINAL editar mensaje no altera el estado local del formulario', async 
   await page.getByRole('button', { name: 'Mostrar mensaje de WhatsApp' }).click()
   await page.getByLabel('Contenido del mensaje').fill('Mensaje de prueba independiente')
   await expect(status).toContainText('Nueva cotización sin guardar')
+})
+
+test('@a11y FE04 bandeja de proformas usa menú único y visualización de solo lectura', async ({
+  page,
+}) => {
+  await mockBackend(page)
+  const editableQuote = makeQuote()
+  const sentQuote = {
+    ...makeQuote(),
+    id: 2,
+    numero: 102,
+    titulo: 'Proforma enviada',
+    estado_info: { id: 4, codigo: 'ENVIADA', nombre: 'Enviada' },
+  }
+  await page.route(/\/api\/v1\/proformas\/(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        count: 2,
+        next: null,
+        previous: null,
+        results: [editableQuote, sentQuote],
+      }),
+    }),
+  )
+  await page.goto('/proformas')
+  const actions = page.getByRole('button', { name: 'Acciones de la proforma #101' })
+  await expect(actions).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Ver proforma #102' })).toHaveAttribute(
+    'href',
+    '/proformas/2',
+  )
+  await actions.click()
+  await expect(page.getByRole('menuitem', { name: 'Continuar edición' })).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: 'Ver detalle y acciones' })).toBeVisible()
+  const accessibility = await new AxeBuilder({ page }).include('.proforma-table').analyze()
+  expect(accessibility.violations).toEqual([])
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('menuitem', { name: 'Continuar edición' })).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Más filtros' }).click()
+  await page.locator('#moneda-proforma-filtro').selectOption('USD')
+  await expect(page).toHaveURL(/moneda=USD/)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await noOverflow(page)
+  await expect(page.getByRole('button', { name: 'Acciones de la proforma #101' })).toBeVisible()
 })
