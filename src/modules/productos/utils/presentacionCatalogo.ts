@@ -9,11 +9,13 @@ const dineroFormatter = new Intl.NumberFormat('es-BO', {
 })
 
 export function dineroProducto(valor: string): string {
+  if (!valor.trim()) return 'Precio no disponible'
   const n = Number(valor)
   return Number.isFinite(n) ? dineroFormatter.format(n) : 'Precio no disponible'
 }
 
 export function cantidadProducto(valor: string | number): string {
+  if (String(valor).trim() === '') return '—'
   const n = Number(valor)
   return Number.isFinite(n) ? cantidadFormatter.format(n) : '—'
 }
