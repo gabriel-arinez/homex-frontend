@@ -78,6 +78,10 @@ function close(event: FocusEvent) {
   open.value = false
   active.value = -1
 }
+function buscarOpciones() {
+  open.value = true
+  active.value = -1
+}
 </script>
 <template>
   <div class="mueble-picker" @focusout="close">
@@ -96,10 +100,7 @@ function close(event: FocusEvent) {
         :aria-activedescendant="open && active >= 0 ? listId + '-' + active : undefined"
         :placeholder="selected && !open ? selected.label : placeholder"
         @focus="open = true"
-        @input="
-          open = true;
-          active = -1
-        "
+        @input="buscarOpciones"
         @keydown="keydown"
       />
       <ChevronDown :size="16" aria-hidden="true" />

@@ -31,6 +31,25 @@ export type CambiarEstadoPedido = {
   estado_codigo: EstadoCodigoEnum
 }
 
+export type CamposCatalogo = {
+  nombre?: string
+  observaciones?: string
+  precio_lista?: string
+  unidad_stock?: number
+  marca?: number
+  modelo?: string
+  color_primario?: number
+  especificaciones?: unknown
+  tipo?: number
+  material?: number
+  diseno?: number
+  acabado?: number
+  espesor_mm?: string
+  largo_mm?: string
+  ancho_mm?: string
+  m2_por_caja?: string
+}
+
 export type CapturaAceptada = {
   readonly id: number
   readonly estado: string
@@ -63,6 +82,20 @@ export type CatalogoAtributosMueble = {
   limites: LimitesConfigurador
   atributos: Array<AtributoMueble>
 }
+
+/**
+ * * `SILLA` - SILLA
+ * * `PISO_FLOTANTE` - PISO_FLOTANTE
+ * * `OTRO` - OTRO
+ */
+export type CategoriaEnum = 'SILLA' | 'PISO_FLOTANTE' | 'OTRO'
+
+/**
+ * * `SILLA` - SILLA
+ * * `PISO_FLOTANTE` - PISO_FLOTANTE
+ * * `OTRO` - OTRO
+ */
+export type CategoryEnum = 'SILLA' | 'PISO_FLOTANTE' | 'OTRO'
 
 export type Cliente = {
   readonly id: number
@@ -149,6 +182,14 @@ export type CrearCapturaTexto = {
   texto: string
 }
 
+export type CrearCatalogo = {
+  clave_idempotencia: string
+  texto?: string
+  sesion_borrador: string
+  captura_origen?: number | null
+  categoria: CategoriaEnum
+}
+
 export type CrearProforma = {
   cliente?: number | null
   titulo?: string | null
@@ -161,6 +202,13 @@ export type CrearProforma = {
   prospecto_celular?: string | null
   prospecto_direccion?: string | null
 }
+
+/**
+ * * `ACCEPTED` - ACCEPTED
+ * * `REJECTED` - REJECTED
+ * * `UNRESOLVED` - UNRESOLVED
+ */
+export type DecisionEnum = 'ACCEPTED' | 'REJECTED' | 'UNRESOLVED'
 
 export type DescuentoProducto = {
   readonly id: number
@@ -266,6 +314,17 @@ export type EspecificacionMueble = {
  * * `ENTREGADO` - ENTREGADO
  */
 export type EstadoCodigoEnum = 'EN_PRODUCCION' | 'LISTO_ENTREGA' | 'ENTREGADO'
+
+export type EvidenciaCatalogo = {
+  candidate_id: string
+  label: string
+  start: number
+  end: number
+  text: string
+  decision: DecisionEnum
+  normalized_value: unknown
+  reason: string | null
+}
 
 export type FamiliaProducto = {
   readonly id: number
@@ -741,6 +800,15 @@ export type ProformaListado = {
   readonly total: string
 }
 
+export type PropuestaCatalogo = {
+  category: CategoryEnum
+  fields: CamposCatalogo
+  evidence: Array<EvidenciaCatalogo>
+  warnings: Array<string>
+  unrecognized: Array<string>
+  version: string
+}
+
 export type PropuestaConfigurador = {
   comercial: ComercialAsistida
   especificacion: EspecificacionAsistida
@@ -786,6 +854,15 @@ export type ResultadoAsistida = {
   pendientes: Array<PendienteAsistida>
   version_proyeccion: string
   motor: MotorAsistida | null
+  error_codigo: string | null
+}
+
+export type ResultadoCatalogo = {
+  id: number
+  estado: string
+  categoria: CategoriaEnum
+  texto_transcrito_original: string | null
+  propuesta: PropuestaCatalogo | null
   error_codigo: string | null
 }
 
@@ -895,6 +972,15 @@ export type CrearCapturaMultipartWritable = {
   proforma_detalle?: number | null
   texto?: string
   audio?: Blob | File
+}
+
+export type CrearCatalogoWritable = {
+  clave_idempotencia: string
+  texto?: string
+  audio?: Blob | File
+  sesion_borrador: string
+  captura_origen?: number | null
+  categoria: CategoriaEnum
 }
 
 export type CrearProformaWritable = {
@@ -1367,6 +1453,39 @@ export type V1CapturasAsistidasRetrieveResponses = {
 
 export type V1CapturasAsistidasRetrieveResponse =
   V1CapturasAsistidasRetrieveResponses[keyof V1CapturasAsistidasRetrieveResponses]
+
+export type V1CapturasCatalogoCreateData = {
+  body: CrearCatalogoWritable
+  path?: never
+  query?: never
+  url: '/api/v1/capturas/catalogo/'
+}
+
+export type V1CapturasCatalogoCreateResponses = {
+  202: CapturaAceptada
+}
+
+export type V1CapturasCatalogoCreateResponse =
+  V1CapturasCatalogoCreateResponses[keyof V1CapturasCatalogoCreateResponses]
+
+export type V1CapturasCatalogoRetrieveData = {
+  body?: never
+  path: {
+    /**
+     * Un valor de entero único que identifique este captura.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/capturas/catalogo/{id}/'
+}
+
+export type V1CapturasCatalogoRetrieveResponses = {
+  200: ResultadoCatalogo
+}
+
+export type V1CapturasCatalogoRetrieveResponse =
+  V1CapturasCatalogoRetrieveResponses[keyof V1CapturasCatalogoRetrieveResponses]
 
 export type V1CatalogoAtributosMuebleListData = {
   body?: never

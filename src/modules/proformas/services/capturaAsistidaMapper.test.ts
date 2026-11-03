@@ -23,7 +23,9 @@ function propuestaCredenza(): PropuestaConfigurador {
       observaciones: null,
       datos_tecnicos: {
         caracteristicas_generales: {
-          atributos: [{ valor: 'melamina', codigo: 'MATERIAL', nombre: 'Material', tipo_entrada: 'texto' }],
+          atributos: [
+            { valor: 'melamina', codigo: 'MATERIAL', nombre: 'Material', tipo_entrada: 'texto' },
+          ],
           dimensiones: {
             alto: { valor: '0.75', unidad: 'm' },
             ancho: { valor: '1.45', unidad: 'm' },
@@ -38,12 +40,14 @@ function propuestaCredenza(): PropuestaConfigurador {
         conjuntos: [],
       },
     },
-    pendientes: [{
-      codigo: 'ESPESOR_SIN_COMPONENTE',
-      ruta: 'especificacion.datos_tecnicos.componentes',
-      mensaje: 'El espesor 18 milímetros no tiene una pieza identificada de forma confiable.',
-      resolucion: { tipo: 'ESPESOR_SIN_COMPONENTE', valor: '18 mm' },
-    }],
+    pendientes: [
+      {
+        codigo: 'ESPESOR_SIN_COMPONENTE',
+        ruta: 'especificacion.datos_tecnicos.componentes',
+        mensaje: 'El espesor 18 milímetros no tiene una pieza identificada de forma confiable.',
+        resolucion: { tipo: 'ESPESOR_SIN_COMPONENTE', valor: '18 mm' },
+      },
+    ],
   }
 }
 
@@ -60,7 +64,10 @@ describe('captura asistida PRF04_2 - intento 230', () => {
       caracteristicas_generales: { dimensiones: Record<string, { valor: string; unidad: string }> }
       componentes: Array<{ nombre: string; cantidad_interna: number }>
     }
-    expect(datos.caracteristicas_generales.dimensiones.ancho).toEqual({ valor: '1.45', unidad: 'm' })
+    expect(datos.caracteristicas_generales.dimensiones.ancho).toEqual({
+      valor: '1.45',
+      unidad: 'm',
+    })
     expect(datos.componentes).toHaveLength(2)
     expect(datos.componentes[0]?.cantidad_interna).toBe(2)
   })

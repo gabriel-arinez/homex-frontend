@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import type { Producto } from '@/generated/api'
+import type { Producto, ValorCatalogoPublico } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
+import { proformasService } from '@/modules/proformas/services/proformasService'
 import { productosService } from '../services/productosService'
 import ProductImage from '../components/ProductImage.vue'
 import Button from '@/shared/ui/Button.vue'
@@ -23,6 +24,8 @@ const router = useRouter()
 const session = useSessionStore()
 const products = ref<Producto[]>([])
 const total = ref(0)
+const createCategory = ref('')
+const categories = ref<ValorCatalogoPublico[]>([])
 const loading = ref(true)
 const error = ref('')
 const search = ref(typeof route.query.q === 'string' ? route.query.q : '')
@@ -109,7 +112,16 @@ watch(page, () => {
   void load()
 })
 watch(view, syncRoute)
-onMounted(load)
+onMounted(async () => {
+  void load()
+  if (session.can('catalogo.crear_producto')) {
+    try {
+      categories.value = await proformasService.options('CATEGORIA_PRODUCTO')
+    } catch {
+      error.value = 'No se pudieron cargar las categorías para crear productos.'
+    }
+  }
+})
 
 const columns = [
   { key: 'producto', label: 'Producto' },
@@ -132,7 +144,22 @@ const money = (value: string) =>
       @menu="emit('openMenu')"
     >
       <template #actions>
-        <Button v-if="session.can('comercial.administrar')" @click="router.push('/productos/nuevo')"
+        <Select
+          v-if="session.can('catalogo.crear_producto')"
+          v-model="createCategory"
+          name="categoria-crear"
+          label="Categoría para crear"
+          :options="[
+            { label: 'Seleccionar categoría', value: '' },
+            ...categories
+              .filter((c) => ['SILLA', 'PISO_FLOTANTE', 'OTRO'].includes(c.codigo))
+              .map((c) => ({ label: c.nombre, value: c.codigo })),
+          ]"
+        />
+        <Button
+          v-if="session.can('catalogo.crear_producto')"
+          :disabled="!createCategory"
+          @click="router.push({ path: '/productos/nuevo', query: { categoria: createCategory } })"
           >Nuevo producto</Button
         >
         <Button

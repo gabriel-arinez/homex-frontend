@@ -134,6 +134,10 @@ function confirmarCaptura() {
 function retroceder() {
   if (indice.value > 0) seccion.value = secciones[indice.value - 1]!.id
 }
+function seleccionarApartado(id: typeof seccion.value) {
+  seccion.value = id
+  volverARevision.value = false
+}
 </script>
 
 <template>
@@ -164,10 +168,7 @@ function retroceder() {
         type="button"
         :class="{ 'studio-step--active': seccion === item.id }"
         :aria-current="seccion === item.id ? 'step' : undefined"
-        @click="
-          seccion = item.id;
-          volverARevision = false
-        "
+        @click="seleccionarApartado(item.id)"
       >
         <span class="studio-step-icon"
           ><component :is="item.icono" :size="18" aria-hidden="true"
