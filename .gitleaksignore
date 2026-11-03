@@ -1,0 +1,26 @@
+# Exact historical test fixtures found by the new workflow_dispatch full-history scan.
+# No rules, paths, real credentials or production configuration are excluded.
+# UUID fixture for idempotency, not an authentication secret.
+4b4aac605c3604f65a94d26efef1c0808f99c2d9:src/tests/e2e/fe04-proformas.spec.ts:generic-api-key:711
+# Unsigned, synthetic browser token used by mocked E2E APIs.
+ffd1a3c27b4ec039760baddfd9649af4f4c3f100:src/tests/release/fe09-release.spec.ts:generic-api-key:3
+# Unsigned, synthetic browser token used by mocked E2E APIs.
+dcb4bf229411fe57f798175539f6bc71f463d333:src/tests/e2e/fe07-resumen.spec.ts:generic-api-key:3
+# Unsigned, synthetic browser token used by mocked E2E APIs.
+92ba0947b5be15576b81b63e7dfb4e9d92dcc3be:src/tests/e2e/fe06-capturas-hitl.spec.ts:generic-api-key:3
+# Public disposable CI integration key; never used by production.
+41f388850c944bf236c6fb927901359ab56e1a97:.github/workflows/ci.yml:generic-api-key:142
+# Unsigned, synthetic browser token used by mocked E2E APIs.
+66523f3f80b0befc5d69202e78d931abd71cd821:src/tests/e2e/fe05-operaciones.spec.ts:generic-api-key:3
+# Unsigned, synthetic browser token used by mocked E2E APIs.
+b19869352f926f1efa9b70b4100aaeb0069f3735:src/tests/e2e/fe035-usabilidad-nielsen.spec.ts:generic-api-key:4
+# Unsigned, synthetic browser token used by mocked E2E APIs.
+a05c3515fc2883ccc71ef96ce580d3e33eb18eb3:src/tests/e2e/fe04-proformas.spec.ts:generic-api-key:3
+# Unsigned, synthetic browser token used by mocked E2E APIs.
+99a327ece01703633bfe3964109f927ef5a6053f:src/tests/e2e/fe03-clientes-productos.spec.ts:generic-api-key:4
+# Unsigned, synthetic browser token used by mocked E2E APIs.
+30eadeca07d234e7cbfed5546c216c38f7020588:src/tests/e2e/fe02-auth.spec.ts:generic-api-key:3
+# Unsigned, synthetic browser token used by mocked E2E APIs.
+30eadeca07d234e7cbfed5546c216c38f7020588:src/tests/e2e/fe01-responsive.spec.ts:generic-api-key:10
+# Same unsigned browser mock token on a historical branch.
+5f46b7f924400c84202765cc7ab10518dbaa1b6c:src/tests/e2e/fe07-resumen.spec.ts:generic-api-key:3
