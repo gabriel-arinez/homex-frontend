@@ -214,9 +214,24 @@ function aplicarEspesor(p: PendienteAsistida & { indice: number }) {
   error.value = ''
   changed()
 }
-const cantidadValida = computed(() => comercial.cantidad.trim() !== '' && Number.isInteger(Number(comercial.cantidad)) && Number(comercial.cantidad) > 0)
-const precioValido = computed(() => comercial.precio_unitario.trim() !== '' && Number.isFinite(Number(comercial.precio_unitario)) && Number(comercial.precio_unitario) > 0)
-const descuentoValido = computed(() => comercial.descuento.trim() !== '' && Number.isFinite(Number(comercial.descuento)) && Number(comercial.descuento) >= 0)
+const cantidadValida = computed(
+  () =>
+    comercial.cantidad.trim() !== '' &&
+    Number.isInteger(Number(comercial.cantidad)) &&
+    Number(comercial.cantidad) > 0,
+)
+const precioValido = computed(
+  () =>
+    comercial.precio_unitario.trim() !== '' &&
+    Number.isFinite(Number(comercial.precio_unitario)) &&
+    Number(comercial.precio_unitario) > 0,
+)
+const descuentoValido = computed(
+  () =>
+    comercial.descuento.trim() !== '' &&
+    Number.isFinite(Number(comercial.descuento)) &&
+    Number(comercial.descuento) >= 0,
+)
 const totalEstimado = computed(() => {
   const cantidad = Number(comercial.cantidad)
   const precio = Number(comercial.precio_unitario)
@@ -297,7 +312,10 @@ function elegirAtributoGeneral(value: string) {
 }
 function agregarMedida() {
   const clave = nuevaMedida.value.trim().toLowerCase().replace(/\s+/g, '_')
-  if (!clave) { aviso.value = 'Escribe el nombre de la medida.'; return }
+  if (!clave) {
+    aviso.value = 'Escribe el nombre de la medida.'
+    return
+  }
   if (medidas.some((x) => normalized(x.clave) === normalized(clave))) {
     aviso.value = 'Esta medida ya está agregada al mueble.'
     return
@@ -451,8 +469,14 @@ function uid() {
   return crypto.randomUUID()
 }
 function addConjunto() {
-  if (conjuntos.length >= limites.max_conjuntos) { aviso.value = 'Has alcanzado el máximo de conjuntos permitidos.'; return }
-  if (conjuntos.some((g) => !componentes.some((c) => c.conjunto_uid === g.uid))) { aviso.value = 'Completa el conjunto existente con una pieza antes de crear otro.'; return }
+  if (conjuntos.length >= limites.max_conjuntos) {
+    aviso.value = 'Has alcanzado el máximo de conjuntos permitidos.'
+    return
+  }
+  if (conjuntos.some((g) => !componentes.some((c) => c.conjunto_uid === g.uid))) {
+    aviso.value = 'Completa el conjunto existente con una pieza antes de crear otro.'
+    return
+  }
   conjuntos.push({ uid: uid(), nombre: '' })
   changed()
 }
@@ -485,8 +509,14 @@ function confirmarDestinoDelConjunto(id: string) {
   changed()
 }
 function addComponente(conjunto_uid?: string) {
-  if (componentes.length >= limites.max_componentes) { aviso.value = 'Has alcanzado el máximo de componentes permitidos.'; return }
-  if (componentes.some((c) => !c.nombre.trim())) { aviso.value = 'Asigna un nombre al componente sin completar antes de agregar otro.'; return }
+  if (componentes.length >= limites.max_componentes) {
+    aviso.value = 'Has alcanzado el máximo de componentes permitidos.'
+    return
+  }
+  if (componentes.some((c) => !c.nombre.trim())) {
+    aviso.value = 'Asigna un nombre al componente sin completar antes de agregar otro.'
+    return
+  }
   const nuevoUid = uid()
   componentes.push({
     uid: nuevoUid,
@@ -524,7 +554,10 @@ function deshacerComponente() {
   changed()
 }
 function addAccesorio() {
-  if (accesorios.some((item) => !item.trim())) { aviso.value = 'Completa o elimina el accesorio sin descripción antes de agregar otro.'; return }
+  if (accesorios.some((item) => !item.trim())) {
+    aviso.value = 'Completa o elimina el accesorio sin descripción antes de agregar otro.'
+    return
+  }
   accesorios.push('')
   accesorioEnEdicion.value = accesorios.length - 1
   changed()
@@ -544,8 +577,14 @@ function deshacerAccesorio() {
   changed()
 }
 function duplicateComponente(index: number) {
-  if (componentes.length >= limites.max_componentes) { aviso.value = 'No puedes duplicar: se alcanzó el máximo de componentes.'; return }
-  if (componentes.some((c) => !c.nombre.trim())) { aviso.value = 'Completa primero los componentes sin nombre.'; return }
+  if (componentes.length >= limites.max_componentes) {
+    aviso.value = 'No puedes duplicar: se alcanzó el máximo de componentes.'
+    return
+  }
+  if (componentes.some((c) => !c.nombre.trim())) {
+    aviso.value = 'Completa primero los componentes sin nombre.'
+    return
+  }
   const copy = clonarTecnica(componentes[index]!)
   copy.uid = uid()
   componentes.splice(index + 1, 0, copy)
@@ -561,8 +600,13 @@ function move(index: number, delta: number) {
 }
 function addAttribute(target: AtributoTecnico[], option?: AtributoMueble, localName?: string) {
   const nombre = option?.nombre ?? localName?.trim() ?? search.value.trim()
-  if (!nombre.trim()) { aviso.value = 'Escribe el nombre de la característica.'; return }
-  if (target.some((a) => normalized(a.codigo || a.nombre) === normalized(option?.codigo || nombre))) {
+  if (!nombre.trim()) {
+    aviso.value = 'Escribe el nombre de la característica.'
+    return
+  }
+  if (
+    target.some((a) => normalized(a.codigo || a.nombre) === normalized(option?.codigo || nombre))
+  ) {
     aviso.value = 'Esta característica ya está agregada.'
     return
   }
@@ -970,62 +1014,62 @@ onMounted(loadCatalog)
         <section id="identificacion" v-show="!studio || activeSection === 'general'">
           <h3>Identificación</h3>
           <div class="studio-identification-fields">
-          <TextField
-            v-model="comercial.nombre"
-            name="mueble-nombre-comercial"
-            label="Nombre comercial del mueble *"
-            :max-length="200"
-            :error="errorCampo('general', 0, touched.nombre)"
-            @blur="touched.nombre = true"
-          />
-          <MuebleOptionPicker
-            v-if="studio"
-            v-model="form.tipo_mueble"
-            name="tipo-mueble-buscador"
-            label="Tipo de mueble (opcional)"
-            :options="tiposLocales.map((x) => ({ label: x.nombre, value: String(x.id) }))"
-            placeholder="Buscar un tipo existente..."
-            allow-create
-            create-label="Crear nuevo tipo"
-            :busy="creatingType"
-            @create="crearTipoDesdeBuscador"
-          />
-          <template v-else>
-            <Select
-              v-model="form.tipo_mueble"
-              name="tipo-mueble"
-              label="Tipo de mueble"
-              :options="[
-                { label: 'Sin especificar', value: '' },
-                ...tiposLocales.map((x) => ({ label: x.nombre, value: String(x.id) })),
-              ]"
+            <TextField
+              v-model="comercial.nombre"
+              name="mueble-nombre-comercial"
+              label="Nombre comercial del mueble *"
+              :max-length="200"
+              :error="errorCampo('general', 0, touched.nombre)"
+              @blur="touched.nombre = true"
             />
-            <div class="inline">
-              <TextField
-                v-model="nuevoTipo"
-                name="nuevo-tipo"
-                label="Buscar o crear tipo de mueble"
-              /><Button variant="secondary" :processing="creatingType" @click="createType"
-                >Crear tipo</Button
+            <MuebleOptionPicker
+              v-if="studio"
+              v-model="form.tipo_mueble"
+              name="tipo-mueble-buscador"
+              label="Tipo de mueble (opcional)"
+              :options="tiposLocales.map((x) => ({ label: x.nombre, value: String(x.id) }))"
+              placeholder="Buscar un tipo existente..."
+              allow-create
+              create-label="Crear nuevo tipo"
+              :busy="creatingType"
+              @create="crearTipoDesdeBuscador"
+            />
+            <template v-else>
+              <Select
+                v-model="form.tipo_mueble"
+                name="tipo-mueble"
+                label="Tipo de mueble"
+                :options="[
+                  { label: 'Sin especificar', value: '' },
+                  ...tiposLocales.map((x) => ({ label: x.nombre, value: String(x.id) })),
+                ]"
+              />
+              <div class="inline">
+                <TextField
+                  v-model="nuevoTipo"
+                  name="nuevo-tipo"
+                  label="Buscar o crear tipo de mueble"
+                /><Button variant="secondary" :processing="creatingType" @click="createType"
+                  >Crear tipo</Button
+                >
+              </div>
+              <div
+                v-if="tiposParecidos.length"
+                class="suggestions"
+                role="group"
+                aria-label="Tipos de mueble similares existentes"
               >
-            </div>
-            <div
-              v-if="tiposParecidos.length"
-              class="suggestions"
-              role="group"
-              aria-label="Tipos de mueble similares existentes"
-            >
-              <p>Tipos existentes similares; selecciónalos para evitar duplicados:</p>
-              <button
-                v-for="tipo in tiposParecidos"
-                :key="tipo.id"
-                type="button"
-                @click="elegirTipoSimilar(tipo.id)"
-              >
-                {{ tipo.nombre }}
-              </button>
-            </div>
-          </template>
+                <p>Tipos existentes similares; selecciónalos para evitar duplicados:</p>
+                <button
+                  v-for="tipo in tiposParecidos"
+                  :key="tipo.id"
+                  type="button"
+                  @click="elegirTipoSimilar(tipo.id)"
+                >
+                  {{ tipo.nombre }}
+                </button>
+              </div>
+            </template>
           </div>
         </section>
         <section
@@ -1158,28 +1202,34 @@ onMounted(loadCatalog)
           </div>
           <p v-if="catalogError" role="status">{{ catalogError }}</p>
           <div class="studio-attributes-grid">
-          <div v-for="(a, i) in atributosGenerales" :key="a.codigo || a.nombre" class="inline studio-attribute-row">
-            <p v-if="errorAtributo(a)" class="studio-attribute-error" role="alert">{{ errorAtributo(a) }}</p>
-            <label v-if="a.tipo_entrada === 'entero'">
-              {{ a.nombre }}
-              <input v-model="a.valor" :name="`general-${i}`" type="number" step="1" />
-            </label>
-            <label v-else-if="a.tipo_entrada === 'numero_unidad'">
-              {{ a.nombre }}
-              <input v-model="a.valor" :name="`general-${i}`" type="number" step="any" />
-            </label>
-            <TextField v-else v-model="a.valor" :name="`general-${i}`" :label="a.nombre" />
-            <label v-if="a.tipo_entrada === 'numero_unidad'"
-              >Unidad de {{ a.nombre }}
-              <select v-model="a.unidad">
-                <option value="">No especificada</option>
-                <option v-for="unidad in unidadesPermitidas" :key="unidad" :value="unidad">
-                  {{ unidad }}
-                </option>
-              </select>
-            </label>
-            <Button variant="secondary" @click="atributosGenerales.splice(i, 1)">Quitar</Button>
-          </div>
+            <div
+              v-for="(a, i) in atributosGenerales"
+              :key="a.codigo || a.nombre"
+              class="inline studio-attribute-row"
+            >
+              <p v-if="errorAtributo(a)" class="studio-attribute-error" role="alert">
+                {{ errorAtributo(a) }}
+              </p>
+              <label v-if="a.tipo_entrada === 'entero'">
+                {{ a.nombre }}
+                <input v-model="a.valor" :name="`general-${i}`" type="number" step="1" />
+              </label>
+              <label v-else-if="a.tipo_entrada === 'numero_unidad'">
+                {{ a.nombre }}
+                <input v-model="a.valor" :name="`general-${i}`" type="number" step="any" />
+              </label>
+              <TextField v-else v-model="a.valor" :name="`general-${i}`" :label="a.nombre" />
+              <label v-if="a.tipo_entrada === 'numero_unidad'"
+                >Unidad de {{ a.nombre }}
+                <select v-model="a.unidad">
+                  <option value="">No especificada</option>
+                  <option v-for="unidad in unidadesPermitidas" :key="unidad" :value="unidad">
+                    {{ unidad }}
+                  </option>
+                </select>
+              </label>
+              <Button variant="secondary" @click="atributosGenerales.splice(i, 1)">Quitar</Button>
+            </div>
           </div>
         </section>
         <section
@@ -1191,8 +1241,9 @@ onMounted(loadCatalog)
             <Button
               variant="secondary"
               :disabled="
-                !studio && (conjuntos.length >= limites.max_conjuntos ||
-                conjuntos.some((g) => !componentes.some((c) => c.conjunto_uid === g.uid)))
+                !studio &&
+                (conjuntos.length >= limites.max_conjuntos ||
+                  conjuntos.some((g) => !componentes.some((c) => c.conjunto_uid === g.uid)))
               "
               @click="addConjunto"
               >Añadir conjunto</Button
@@ -1244,8 +1295,9 @@ onMounted(loadCatalog)
             <Button
               variant="secondary"
               :disabled="
-                !studio && (componentes.length >= limites.max_componentes ||
-                componentes.some((c) => !c.nombre.trim()))
+                !studio &&
+                (componentes.length >= limites.max_componentes ||
+                  componentes.some((c) => !c.nombre.trim()))
               "
               @click="addComponente()"
               >Agregar componente</Button
@@ -1374,7 +1426,9 @@ onMounted(loadCatalog)
                   </div>
                 </div>
                 <div v-for="(a, ai) in c.atributos" :key="a.codigo || a.nombre" class="inline">
-                  <p v-if="errorAtributo(a)" class="studio-attribute-error" role="alert">{{ errorAtributo(a) }}</p>
+                  <p v-if="errorAtributo(a)" class="studio-attribute-error" role="alert">
+                    {{ errorAtributo(a) }}
+                  </p>
                   <label v-if="a.tipo_entrada === 'entero'">
                     {{ a.nombre }}
                     <input v-model="a.valor" :name="`atributo-${i}-${ai}`" type="number" step="1" />
@@ -1578,8 +1632,7 @@ onMounted(loadCatalog)
             <div>
               <span>Subtotal</span
               ><strong>{{
-                cantidadValida &&
-                precioValido
+                cantidadValida && precioValido
                   ? (Number(comercial.cantidad) * Number(comercial.precio_unitario)).toFixed(2) +
                     ' ' +
                     (moneda ?? 'BOB')
@@ -1589,9 +1642,7 @@ onMounted(loadCatalog)
             <div>
               <span>Descuento</span
               ><strong>{{
-                descuentoValido
-                  ? comercial.descuento + ' ' + (moneda ?? 'BOB')
-                  : 'Pendiente'
+                descuentoValido ? comercial.descuento + ' ' + (moneda ?? 'BOB') : 'Pendiente'
               }}</strong>
             </div>
             <div class="commercial-total-main">
@@ -1798,13 +1849,15 @@ onMounted(loadCatalog)
               </div>
               <div>
                 <span>Precio unitario</span
-                ><strong
-                  >{{ precioValido ? comercial.precio_unitario + ' ' + (moneda ?? 'BOB') : 'Pendiente' }}</strong
-                >
+                ><strong>{{
+                  precioValido ? comercial.precio_unitario + ' ' + (moneda ?? 'BOB') : 'Pendiente'
+                }}</strong>
               </div>
               <div>
                 <span>Descuento</span
-                ><strong>{{ descuentoValido ? comercial.descuento + ' ' + (moneda ?? 'BOB') : 'Pendiente' }}</strong>
+                ><strong>{{
+                  descuentoValido ? comercial.descuento + ' ' + (moneda ?? 'BOB') : 'Pendiente'
+                }}</strong>
               </div>
             </div>
             <p v-if="comercial.descripcion">Descripción comercial: {{ comercial.descripcion }}</p>
@@ -2605,14 +2658,69 @@ details.card[open] > summary {
     padding: var(--space-3);
   }
 }
-.configurator--studio .studio-identification-fields { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:1.1rem; align-items:start; }
-.configurator--studio .studio-identification-fields > * { min-width:0; max-width:none; }
-.configurator--studio .studio-attributes-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; margin-top:1rem; }
-.configurator--studio .studio-attribute-row { display:grid; grid-template-columns:minmax(0,1fr); align-items:end; gap:.45rem; padding:.8rem; background:var(--color-surface-muted); border:1px solid var(--color-border); border-radius:var(--radius-control); min-width:0; }
-.configurator--studio .studio-attribute-row > label, .configurator--studio .studio-attribute-row > .field { min-width:0; width:100%; display:grid; gap:.35rem; }
-.configurator--studio .studio-attribute-row input,.configurator--studio .studio-attribute-row select { width:100%; min-width:0; min-height:2.75rem; border:1px solid var(--color-border-strong); border-radius:var(--radius-control); padding:.6rem; color:var(--color-text); background:var(--color-surface); font:inherit; }
-.configurator--studio .studio-attribute-row > button { justify-self:start; }
-@media(max-width:72rem) { .configurator--studio .studio-attributes-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-@media(max-width:48rem) { .configurator--studio .studio-identification-fields,.configurator--studio .studio-attributes-grid { grid-template-columns:1fr; } }
-.configurator--studio .studio-attribute-error { color:var(--color-danger); margin:0; font-size:.78rem; }
+.configurator--studio .studio-identification-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 1.1rem;
+  align-items: start;
+}
+.configurator--studio .studio-identification-fields > * {
+  min-width: 0;
+  max-width: none;
+}
+.configurator--studio .studio-attributes-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.configurator--studio .studio-attribute-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: end;
+  gap: 0.45rem;
+  padding: 0.8rem;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  min-width: 0;
+}
+.configurator--studio .studio-attribute-row > label,
+.configurator--studio .studio-attribute-row > .field {
+  min-width: 0;
+  width: 100%;
+  display: grid;
+  gap: 0.35rem;
+}
+.configurator--studio .studio-attribute-row input,
+.configurator--studio .studio-attribute-row select {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.75rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  padding: 0.6rem;
+  color: var(--color-text);
+  background: var(--color-surface);
+  font: inherit;
+}
+.configurator--studio .studio-attribute-row > button {
+  justify-self: start;
+}
+@media (max-width: 72rem) {
+  .configurator--studio .studio-attributes-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 48rem) {
+  .configurator--studio .studio-identification-fields,
+  .configurator--studio .studio-attributes-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.configurator--studio .studio-attribute-error {
+  color: var(--color-danger);
+  margin: 0;
+  font-size: 0.78rem;
+}
 </style>

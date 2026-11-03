@@ -1021,9 +1021,8 @@ for (const width of [360, 768, 1440]) {
       .setInputFiles({ name: '24.wav', mimeType: 'audio/wav', buffer: Buffer.from('fixture') })
     await expect(page.getByRole('heading', { name: 'Propuesta obtenida por voz' })).toBeVisible()
     await expect(page.getByText('unidad del ancho', { exact: false }).first()).toBeVisible()
-    await studioStep(page, 'General')
-    await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Mueble previo')
-    await studioStep(page, 'Revisar')
+    // El rediseño oculta la ficha anterior mientras se revisa la propuesta.
+    await expect(page.getByLabel('Nombre comercial del mueble')).toHaveCount(0)
     await page.getByRole('button', { name: 'Aplicar propuesta al mueble' }).click()
     await studioStep(page, 'General')
     await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Escritorio')

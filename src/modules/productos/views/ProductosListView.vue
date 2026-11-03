@@ -132,7 +132,9 @@ const money = (value: string) =>
       @menu="emit('openMenu')"
     >
       <template #actions>
-        <Button v-if="session.can('comercial.administrar')" @click="router.push('/productos/nuevo')"
+        <Button
+          v-if="session.can('catalogo.crear_producto')"
+          @click="router.push('/productos/nuevo')"
           >Nuevo producto</Button
         >
         <Button

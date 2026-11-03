@@ -122,19 +122,19 @@ const router = createRouter({
           path: 'productos',
           name: 'productos',
           component: () => import('@/modules/productos/views/ProductosListView.vue'),
-          meta: { capability: 'comercial.operar' },
+          meta: { capabilitiesAny: ['comercial.operar', 'catalogo.crear_producto'] },
         },
         {
           path: 'productos/nuevo',
           name: 'producto-create',
           component: () => import('@/modules/productos/views/ProductoCreateView.vue'),
-          meta: { capability: 'comercial.administrar' },
+          meta: { capability: 'catalogo.crear_producto' },
         },
         {
           path: 'productos/:id',
           name: 'producto-detail',
           component: () => import('@/modules/productos/views/ProductoDetailView.vue'),
-          meta: { capability: 'comercial.operar' },
+          meta: { capabilitiesAny: ['comercial.operar', 'catalogo.crear_producto'] },
         },
         {
           path: 'capturas',
