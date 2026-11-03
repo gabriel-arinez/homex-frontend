@@ -174,6 +174,12 @@ export const authGuard: NavigationGuard = async (to) => {
   if (to.meta.public && session.isAuthenticated && to.name === 'login') return { name: 'resumen' }
   if (to.meta.requiresAuth && !session.isAuthenticated)
     return { name: 'login', query: { redirect: to.fullPath } }
+  if (
+    to.name === 'resumen' &&
+    !session.can('comercial.operar') &&
+    session.can('catalogo.crear_producto')
+  )
+    return { name: 'productos' }
   if (to.meta.capability && !session.can(to.meta.capability)) return { name: 'forbidden' }
   if (to.meta.capabilitiesAny && !to.meta.capabilitiesAny.some((value) => session.can(value)))
     return { name: 'forbidden' }
