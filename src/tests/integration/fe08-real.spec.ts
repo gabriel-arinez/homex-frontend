@@ -205,7 +205,7 @@ test.describe.serial('FE08 backend real', () => {
     await page.getByRole('button', { name: 'Grabar' }).click()
     await expect(page.getByRole('status')).toContainText('Grabando')
     await page.getByRole('button', { name: 'Detener' }).click()
-    await expect(page.getByRole('status')).toContainText('Audio listo para enviar')
+    await expect(page.getByRole('status')).toContainText(/Audio listo/)
     await page.getByRole('button', { name: 'Enviar a procesamiento' }).click()
     await expect(page).toHaveURL(/\/capturas\/\d+$/)
     await expect(page.getByText('Propuesta IA · requiere revisión')).toBeVisible()

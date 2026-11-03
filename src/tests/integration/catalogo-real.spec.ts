@@ -41,7 +41,9 @@ for (const [category, file] of samples) {
           await page.getByLabel('Contraseña').fill(password!)
           await page.getByRole('button', { name: 'Ingresar' }).click()
           await page.waitForURL((url) => !url.pathname.endsWith('/login'))
-          await page.goto(`/productos/nuevo?categoria=${category}`)
+          await page.goto('/productos')
+          await page.getByRole('combobox', { name: 'Categoría para crear' }).selectOption(category)
+          await page.getByRole('button', { name: 'Nuevo producto', exact: true }).click()
           await expect(page.getByRole('heading', { name: 'Descripción por voz' })).toBeVisible()
           if (mode === 'upload') {
             await page
