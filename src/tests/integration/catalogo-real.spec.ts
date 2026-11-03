@@ -133,11 +133,23 @@ for (const [category, file] of samples) {
             acabado: 'Acabado',
           }
           expect(Object.keys(fields).some((field) => field in controls)).toBe(true)
+          const selects = new Set([
+            'unidad_stock',
+            'marca',
+            'color_primario',
+            'color_secundario',
+            'material',
+            'tipo',
+            'diseno',
+            'acabado',
+          ])
           for (const field of Object.keys(controls) as (keyof typeof controls)[]) {
-            if (fields[field] != null)
-              await expect(page.getByLabel(controls[field], { exact: true })).toHaveValue(
-                String(fields[field]),
-              )
+            if (fields[field] != null) {
+              const control = selects.has(field)
+                ? page.getByRole('combobox', { name: controls[field] })
+                : page.getByLabel(controls[field], { exact: true })
+              await expect(control).toHaveValue(String(fields[field]))
+            }
           }
           expect(fields).not.toHaveProperty('sku')
           expect(fields).not.toHaveProperty('stock')
