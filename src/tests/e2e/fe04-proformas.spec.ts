@@ -302,11 +302,21 @@ async function mockBackend(page: Page) {
   return { quote: () => quote }
 }
 async function noOverflow(page: Page) {
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
-    ),
-  ).toBe(true)
+  const result = await page.evaluate(() => {
+    const width = document.documentElement.clientWidth
+    const scrollWidth = document.documentElement.scrollWidth
+    const offenders = Array.from(document.querySelectorAll<HTMLElement>('body *'))
+      .filter((node) => node.getBoundingClientRect().right > width + 1)
+      .slice(0, 12)
+      .map((node) => ({
+        tag: node.tagName.toLowerCase(),
+        className: typeof node.className === 'string' ? node.className : '',
+        right: Math.round(node.getBoundingClientRect().right),
+        width: Math.round(node.getBoundingClientRect().width),
+      }))
+    return { width, scrollWidth, offenders }
+  })
+  expect(result.scrollWidth, JSON.stringify(result)).toBeLessThanOrEqual(result.width + 1)
 }
 
 test('FE04 crea con unitario y descuento, revisa y aprueba', async ({ page }) => {
