@@ -100,7 +100,7 @@ describe('Bandeja de proformas HOMEX', () => {
     const wrapper = mount(ProformasListView, { global: { plugins: [router] } })
     try {
       await flushPromises()
-      await wrapper.get('[aria-controls="proforma-filtros-avanzados"]').trigger('click')
+      await wrapper.get('button.proforma-more-filters').trigger('click')
       await wrapper.get('#estado-proforma').setValue('BORRADOR')
       await wrapper.get('#moneda-proforma-filtro').setValue('USD')
       await wrapper.get('input[name="fecha-desde-proforma"]').setValue('2026-10-01')
