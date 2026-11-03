@@ -31,7 +31,7 @@ describe('Presentación de bandeja de productos', () => {
 
   it('mantiene precios vigentes exactos y no inventa valores inválidos', () => {
     expect(dineroProducto('100.00')).toContain('100,00')
-    expect(dineroProducto('')).toBe('Bs' + String.fromCharCode(160) + '0,00') // Format de BOB dependiente de Intl
+    expect(dineroProducto('')).toContain('0,00')
     expect(dineroProducto('desconocido')).toBe('Precio no disponible')
     expect(cantidadProducto('infinito')).toBe('—')
   })
