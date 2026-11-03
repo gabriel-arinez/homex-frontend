@@ -39,6 +39,7 @@ export type CamposCatalogo = {
   marca?: number
   modelo?: string
   color_primario?: number
+  color_secundario?: number
   especificaciones?: unknown
   tipo?: number
   material?: number

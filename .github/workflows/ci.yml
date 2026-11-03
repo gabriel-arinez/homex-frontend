@@ -3,6 +3,12 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
+    inputs:
+      integration_peer_ref:
+        description: 'Exact backend revision for final cross-repository verification'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -103,8 +109,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: gabriel-arinez/homex-backend
-          # Backend PR #50: contexto de catálogo y contrato coordinado.
-          ref: 31a928a1599d3b54da60f75ae2693e6bbdb25c69
+          # Contrato y consumidor de catálogo 0.1.21 coordinados.
+          ref: 6df4fcf6e81334e5e080f78c161e311fc526cc99
           path: backend-prf04-contract
       - name: Verificar snapshot OpenAPI idéntico al backend coordinado
         run: cmp contracts/backend-openapi.yaml backend-prf04-contract/docs/openapi.yaml
@@ -196,8 +202,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: gabriel-arinez/homex-backend
-          ref: 31a928a1599d3b54da60f75ae2693e6bbdb25c69
+          ref: ${{ inputs.integration_peer_ref || '6df4fcf6e81334e5e080f78c161e311fc526cc99' }}
           path: backend
+      - name: Record exact frontend and backend revisions
+        run: |
+          printf 'frontend=%s\nbackend=%s\n' "$(git rev-parse HEAD)" "$(git -C backend rev-parse HEAD)" > "$RUNNER_TEMP/catalog-revisions.txt"
+          cat "$RUNNER_TEMP/catalog-revisions.txt"
       - uses: actions/setup-node@v4
         with: { node-version: 24.18.1, cache: npm }
       - uses: astral-sh/setup-uv@v6
@@ -222,11 +232,13 @@ jobs:
           HOMEX_ASR_MODEL_PATH: ${{ github.workspace }}/.cache/fe08-asr
           FE08_AUDIO_FIXTURE: ${{ runner.temp }}/cotizacion-fe08.wav
           HOMEX_PRF04_AUDIO: ${{ runner.temp }}/dictado-prf04.wav
+          HOMEX_CATALOGO_AUDIO_DIR: ${{ runner.temp }}/catalog-audio
         run: |
           cd backend
           uv run python ../scripts/download-fe08-asr-model.py "$HOMEX_ASR_MODEL_PATH"
           espeak-ng -v es-la -s 115 -g 10 -w "$FE08_AUDIO_FIXTURE" "tres mesas, total cien bolivianos"
           uv run python scripts/generar_audio_sintetico_prf04.py --output "$HOMEX_PRF04_AUDIO"
+          uv run python scripts/generar_audio_catalogo.py --output-dir "$HOMEX_CATALOGO_AUDIO_DIR"
       - name: Start API, worker and outbox publisher
         env:
           HOMEX_ASR_MODEL_PATH: ${{ github.workspace }}/.cache/fe08-asr
@@ -253,6 +265,9 @@ jobs:
         env:
           FE08_AUDIO_FIXTURE: ${{ runner.temp }}/cotizacion-fe08.wav
           HOMEX_PRF04_AUDIO: ${{ runner.temp }}/dictado-prf04.wav
+          HOMEX_CATALOGO_AUDIO_DIR: ${{ runner.temp }}/catalog-audio
+          HOMEX_CATALOGO_USERNAME: fe08-admin
+          HOMEX_CATALOGO_PASSWORD: fe08-integration-only
         run: npm run test:integration
       - name: Verify PostgreSQL evidence and audio deletion
         env:
@@ -261,13 +276,14 @@ jobs:
         run: |
           cd backend
           uv run python ../scripts/verify-fe08-backend.py
-      - name: Upload integration evidence on failure
-        if: failure()
+      - name: Upload integration evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: fe08-real-integration-evidence
           path: |
             test-results/playwright-integration/
+            ${{ runner.temp }}/catalog-revisions.txt
             ${{ runner.temp }}/fe08-api.log
             ${{ runner.temp }}/fe08-worker.log
             ${{ runner.temp }}/fe08-beat.log

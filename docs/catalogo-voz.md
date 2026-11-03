@@ -29,9 +29,21 @@ El directorio requiere `silla.wav`, `piso.wav`, `otro.wav`. Las pruebas verifica
 subida y MediaRecorder real con fuente de audio controlada, transcripción,
 propuesta, ausencia de escrituras prematuras y guardado manual en cada categoría.
 Por defecto apuntan al stack local `http://127.0.0.1:18080`; se puede cambiar con
-`HOMEX_CATALOGO_BASE_URL`. Sin credenciales y audios las pruebas se omiten.
+`HOMEX_CATALOGO_BASE_URL`. La falta de credenciales o audios hace fallar las pruebas; no se omiten.
 
 Ejemplos recomendados: «Nombre silla ergonómica. Color negro. Apoyo lumbar
 regulable.»; «Nombre piso flotante. Modelo NA9118. Espesor ocho milímetros.»;
 «Nombre zócalo. Descripción zócalo de alto tráfico. Unidad barra.». Revisar los
 códigos alfanuméricos y completar manualmente campos que ASR no reconozca.
+
+La integración completa usa `playwright.integration.config.ts` con PostgreSQL,
+Redis y Celery reales. Ambos CI generan los WAV mediante
+`backend/scripts/generar_audio_catalogo.py` (libespeak-ng, español, 135 palabras/minuto),
+configuran `HOMEX_CATALOGO_AUDIO_DIR`, usuario y contraseña efímeros, y ejecutan
+los once flujos. Cada caso de catálogo adjunta JSON de transcripción, propuesta,
+inventario antes de guardar y producto guardado con stock cero. El reporte JSON
+permite distinguir aprobadas, fallidas y omitidas. No usar credenciales reales.
+
+El color secundario usa el mismo catálogo activo que el primario y la misma
+confirmación de reemplazo. Los códigos o palabras mal transcritos requieren
+corrección explícita y reinterpretación; el TTS no demuestra precisión con voz humana.
