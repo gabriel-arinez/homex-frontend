@@ -1,6 +1,6 @@
 import type { CapturaAceptada, CrearCatalogoWritable, ResultadoCatalogo } from '@/generated/api'
 import { apiRequest } from '@/shared/api'
-import { audioExtension } from '@/modules/capturas/services/capturasService'
+import { appendCaptureAudio } from '@/modules/capturas/services/capturasService'
 
 export const catalogoCapturaService = {
   async create(data: CrearCatalogoWritable, signal: AbortSignal) {
@@ -10,11 +10,7 @@ export const catalogoCapturaService = {
       for (const [key, value] of Object.entries(data)) {
         if (key !== 'audio' && value != null) form.append(key, String(value))
       }
-      form.append(
-        'audio',
-        data.audio,
-        data.audio instanceof File ? data.audio.name : `dictado.${audioExtension(data.audio.type)}`,
-      )
+      appendCaptureAudio(form, data.audio)
       body = form
     }
     return apiRequest<CapturaAceptada>('/api/v1/capturas/catalogo/', {
