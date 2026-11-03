@@ -13,6 +13,24 @@ export function audioExtension(mime: string) {
   if (mime.includes('wav')) return 'wav'
   return 'webm'
 }
+export function appendCaptureAudio(form: FormData, audio: Blob) {
+  if (audio instanceof File) {
+    const extension = audio.name.split('.').pop()?.toLowerCase() ?? ''
+    const mimeByExtension: Record<string, string> = {
+      wav: 'audio/wav',
+      mp3: 'audio/mpeg',
+      m4a: 'audio/mp4',
+      ogg: 'audio/ogg',
+      webm: 'audio/webm',
+    }
+    const mime = mimeByExtension[extension]
+    const content =
+      mime && !audio.type.startsWith('audio/') ? new Blob([audio], { type: mime }) : audio
+    form.append('audio', content, audio.name)
+  } else {
+    form.append('audio', audio, `dictado.${audioExtension(audio.type)}`)
+  }
+}
 export const capturasService = {
   createText: (body: CrearCapturaTexto) =>
     apiRequest<CapturaAceptada>('/api/v1/capturas/', { method: 'POST', body }),
