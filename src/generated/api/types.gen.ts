@@ -790,6 +790,7 @@ export type ProformaListado = {
   estado_info: ValorCatalogoResumen
   titulo?: string | null
   readonly fecha: string
+  readonly creado_en: string | null
   plazo_entrega?: string | null
   validez_oferta?: number | null
   porcentaje_adelanto?: string | null

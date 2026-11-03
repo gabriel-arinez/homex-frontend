@@ -1299,3 +1299,57 @@ test('@a11y FE04 bandeja de proformas usa menú único y visualización de solo 
   await noOverflow(page)
   await expect(page.getByRole('button', { name: 'Acciones de la proforma #101' })).toBeVisible()
 })
+
+test('FE04 muestra creación real y alinea totales; histórico sin hora inventada', async ({
+  page,
+}) => {
+  await mockBackend(page)
+  const nueva = {
+    ...makeQuote(),
+    total: '7300.00',
+    creado_en: new Date(Date.now() - 5 * 60_000 - 15_000).toISOString(),
+  }
+  const historica = {
+    ...makeQuote(),
+    id: 2,
+    numero: 102,
+    creado_en: null,
+    fecha: '2026-10-15',
+    titulo: 'Proforma histórica',
+  }
+  await page.route(/\/api\/v1\/proformas\/(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        count: 2,
+        next: null,
+        previous: null,
+        results: [nueva, historica],
+      }),
+    }),
+  )
+  await page.goto('/proformas')
+  await expect(page.getByRole('columnheader', { name: 'Creación' })).toBeVisible()
+  const primera = page.getByRole('row').filter({ hasText: '#101' })
+  const segunda = page.getByRole('row').filter({ hasText: '#102' })
+  await expect(primera.locator('.creation-primary')).toContainText(/Hace [56] minutos/)
+  await expect(primera.locator('.creation-hour')).toContainText(/\d{2}:\d{2} (?:a|p)\. m\./)
+  await expect(primera.locator('.creation-date')).toBeVisible()
+  await expect(segunda.locator('.creation-hour')).toHaveText('Hora no registrada')
+  await expect(segunda.locator('.creation-primary')).toHaveText(/15 de oct de 2026/)
+
+  const alineacion = await page.evaluate(() => {
+    const encabezado = document.querySelector<HTMLElement>('.proforma-table th.numeric')
+    const importe = document.querySelector<HTMLElement>('.proforma-table td.total-cell strong')
+    if (!encabezado || !importe) return Infinity
+    const padding = parseFloat(getComputedStyle(encabezado).paddingRight) || 0
+    return Math.abs(
+      encabezado.getBoundingClientRect().right - padding - importe.getBoundingClientRect().right,
+    )
+  })
+  expect(alineacion).toBeLessThanOrEqual(2)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(primera.locator('.creation-primary')).toBeVisible()
+  await expect(primera.locator('.creation-hour')).toBeVisible()
+})
