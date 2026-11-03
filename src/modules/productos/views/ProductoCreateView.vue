@@ -20,6 +20,7 @@ const dirty = ref(false)
 const confirmCancel = ref(false)
 const confirmLeave = ref(false)
 let resolveLeave: ((answer: boolean) => void) | null = null
+let allowNavigationAfterSave = false
 
 function destination(producto?: number, mediaError = false) {
   const requested = route.query.returnTo
@@ -55,6 +56,7 @@ async function save(body: ProductoWritable, file: File | null) {
       }
     }
     dirty.value = false
+    allowNavigationAfterSave = true
     await router.push(destination(product.id, mediaError))
   } catch (cause) {
     if (cause instanceof ApiError) {
@@ -62,6 +64,7 @@ async function save(body: ProductoWritable, file: File | null) {
       serverErrors.value = cause.fields
     } else error.value = 'No se pudo registrar el producto.'
   } finally {
+    allowNavigationAfterSave = false
     saving.value = false
   }
 }
@@ -82,6 +85,9 @@ function answerLeave(answer: boolean) {
   resolve?.(answer)
 }
 function confirmNavigation(): boolean | Promise<boolean> {
+  // Allow the redirect caused by a successfully persisted product,
+  // while preventing unrelated navigation during a pending save.
+  if (allowNavigationAfterSave) return true
   if (saving.value) return false
   if (!dirty.value) return true
   return new Promise<boolean>((resolve) => {
