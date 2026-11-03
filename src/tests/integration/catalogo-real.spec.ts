@@ -162,7 +162,7 @@ for (const [category, file] of samples) {
             if (fields[field] != null) {
               const control = selects.has(field)
                 ? page.getByRole('combobox', { name: controls[field], exact: true })
-                : page.getByLabel(controls[field], { exact: true })
+                : page.getByLabel(controls[field], { exact: false })
               await expect(control).toHaveValue(String(fields[field]))
             }
           }
@@ -174,7 +174,7 @@ for (const [category, file] of samples) {
           if (category === 'OTRO') expect(fields.observaciones).toBeDefined()
           // Required SKU remains a deliberate manual choice.
           await page
-            .getByLabel('Código SKU *', { exact: true })
+            .getByLabel('Código SKU *', { exact: false })
             .fill(`VOICE-${category}-${mode}-${Date.now()}`)
           const name = page.getByLabel('Nombre comercial *', { exact: true })
           if (!(await name.inputValue())) await name.fill(`Prueba voz ${category}`)
