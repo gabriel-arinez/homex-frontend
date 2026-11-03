@@ -196,7 +196,7 @@ for (const width of [360, 390, 768, 1024, 1440])
 
     await page.goto('/productos')
     await expect(page.getByRole('heading', { name: 'Productos' })).toBeVisible()
-    await expect(page.getByText('8 productos')).toBeVisible()
+    await expect(page.getByText('8 productos encontrados')).toBeVisible()
     await expect(page.getByText('Categoría #1').first()).toBeVisible()
     await expect(page.getByRole('columnheader', { name: 'Existencias' })).toBeVisible()
     await page.getByRole('button', { name: 'Cuadrícula' }).click()
