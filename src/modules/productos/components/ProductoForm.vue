@@ -146,7 +146,7 @@ function applyVoice(fields: CamposCatalogo) {
     'precio_lista',
     'unidad_stock',
     ...(categoria.value === 'SILLA'
-      ? ['marca', 'modelo', 'color_primario', 'especificaciones']
+      ? ['marca', 'modelo', 'color_primario', 'color_secundario', 'especificaciones']
       : []),
     ...(categoria.value === 'PISO_FLOTANTE'
       ? [
@@ -167,6 +167,7 @@ function applyVoice(fields: CamposCatalogo) {
     unidad_stock: 'UNIDAD_MEDIDA',
     marca: 'MARCA',
     color_primario: 'COLOR',
+    color_secundario: 'COLOR',
     tipo: 'TIPO_PISO',
     material: 'MATERIAL_PISO',
     diseno: 'DISENO_PISO',

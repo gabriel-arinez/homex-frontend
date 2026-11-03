@@ -1,5 +1,6 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type APIResponse } from '@playwright/test'
 import { join } from 'node:path'
+import { existsSync } from 'node:fs'
 import type { ResultadoCatalogo } from '@/generated/api'
 
 const directory = process.env.HOMEX_CATALOGO_AUDIO_DIR
@@ -15,7 +16,10 @@ for (const [category, file] of samples) {
       test(`${mode}: ASR → propuesta → formulario → guardado manual`, async ({
         playwright,
       }, testInfo) => {
-        test.skip(!directory || !password, 'Requiere stack local, credenciales y audios de prueba.')
+        if (!directory || !password || !existsSync(join(directory, file + '.wav')))
+          throw new Error(
+            'Faltan HOMEX_CATALOGO_AUDIO_DIR, HOMEX_CATALOGO_PASSWORD o fixtures WAV.',
+          )
         const browser = await playwright.chromium.launch({
           args: [
             '--use-fake-ui-for-media-stream',
@@ -43,7 +47,41 @@ for (const [category, file] of samples) {
           await page.getByLabel('Contraseña').fill(password!)
           await page.getByRole('button', { name: 'Ingresar' }).click()
           await page.waitForURL((url) => !url.pathname.endsWith('/login'))
+          const inventoryResponse = page.waitForResponse(
+            (r) =>
+              r.request().method() === 'GET' &&
+              new URL(r.url()).pathname.endsWith('/catalogo/productos/') &&
+              r.status() === 200,
+          )
           await page.goto('/productos')
+          const inventory = await inventoryResponse
+          const headers = { authorization: inventory.request().headers()['authorization']! }
+          const readInventory = async () => {
+            let url: string | null = inventory.url()
+            let count = 0
+            const stocks: [number, string | number][] = []
+            while (url) {
+              const response: APIResponse = await context.request.get(url, { headers })
+              expect(response.status()).toBe(200)
+              const data: {
+                count: number
+                next: string | null
+                results: { id: number; stock: string | number }[]
+              } = await response.json()
+              count = data.count
+              stocks.push(
+                ...data.results.map(
+                  (p: { id: number; stock: string | number }): [number, string | number] => [
+                    p.id,
+                    p.stock,
+                  ],
+                ),
+              )
+              url = data.next
+            }
+            return { count, stocks: stocks.sort((a, b) => a[0] - b[0]) }
+          }
+          const before = await readInventory()
           await page.getByRole('combobox', { name: 'Categoría para crear' }).selectOption(category)
           await page.getByRole('button', { name: 'Nuevo producto', exact: true }).click()
           await expect(page.getByRole('heading', { name: 'Descripción por voz' })).toBeVisible()
@@ -74,19 +112,39 @@ for (const [category, file] of samples) {
           expect(writes).toEqual([])
           await page.getByRole('button', { name: 'Aplicar al formulario', exact: true }).click()
           expect(writes).toEqual([])
+          expect(await readInventory()).toEqual(before)
           const fields = proposal.propuesta!.fields
           const controls = {
             nombre: 'Nombre comercial',
             precio_lista: 'Precio de lista (BOB)',
             unidad_stock: 'Unidad comercial',
+            observaciones: 'Observaciones',
+            modelo: 'Modelo',
+            marca: 'Marca',
+            color_primario: 'Color primario',
+            color_secundario: 'Color secundario',
+            espesor_mm: 'Espesor (mm)',
+            largo_mm: 'Largo descriptivo (mm)',
+            ancho_mm: 'Ancho descriptivo (mm)',
+            m2_por_caja: 'm² por caja (informativo)',
+            material: 'Material',
+            tipo: 'Tipo',
+            diseno: 'Diseño',
+            acabado: 'Acabado',
           }
           expect(Object.keys(fields).some((field) => field in controls)).toBe(true)
-          for (const field of ['nombre', 'precio_lista', 'unidad_stock'] as const) {
+          for (const field of Object.keys(controls) as (keyof typeof controls)[]) {
             if (fields[field] != null)
               await expect(page.getByLabel(controls[field], { exact: true })).toHaveValue(
                 String(fields[field]),
               )
           }
+          expect(fields).not.toHaveProperty('sku')
+          expect(fields).not.toHaveProperty('stock')
+          expect(fields.precio_lista).toBeDefined()
+          if (category === 'SILLA') expect(fields.especificaciones).toBeDefined()
+          if (category === 'PISO_FLOTANTE') expect(fields.espesor_mm).toBeDefined()
+          if (category === 'OTRO') expect(fields.observaciones).toBeDefined()
           // Required SKU remains a deliberate manual choice.
           await page
             .getByLabel('SKU', { exact: true })
@@ -94,9 +152,41 @@ for (const [category, file] of samples) {
           const name = page.getByLabel('Nombre comercial', { exact: true })
           if (!(await name.inputValue())) await name.fill(`Prueba voz ${category}`)
           await page.getByLabel('Precio de lista (BOB)', { exact: true }).fill('100')
+          const savedResponse = page.waitForResponse(
+            (r) =>
+              r.request().method() === 'POST' &&
+              new URL(r.url()).pathname.endsWith('/catalogo/productos/'),
+          )
           await page.getByRole('button', { name: 'Guardar producto', exact: true }).click()
           await expect(page).toHaveURL(/\/productos(?:\?|$)/)
           expect(writes).toHaveLength(1)
+          const saved = await (await savedResponse).json()
+          expect(Number(saved.stock)).toBe(0)
+          if (category === 'SILLA')
+            expect(saved.silla.especificaciones).toEqual(fields.especificaciones)
+          if (category === 'PISO_FLOTANTE')
+            expect(Number(saved.piso.espesor_mm)).toBe(Number(fields.espesor_mm))
+          if (category === 'OTRO') expect(saved.observaciones).toBe(fields.observaciones)
+          const after = await readInventory()
+          expect(after.count).toBe(before.count + 1)
+          expect(after.stocks.filter(([id]) => id !== saved.id)).toEqual(before.stocks)
+          await testInfo.attach('catalog-evidence', {
+            body: JSON.stringify(
+              {
+                category,
+                mode,
+                transcription: proposal.texto_transcrito_original,
+                fields,
+                inventoryBefore: before,
+                inventoryBeforeSave: 'unchanged',
+                saved: { id: saved.id, sku: saved.sku, stock: saved.stock },
+                automaticProductWrites: 0,
+              },
+              null,
+              2,
+            ),
+            contentType: 'application/json',
+          })
         } finally {
           await browser.close()
         }

@@ -6,7 +6,10 @@ export default defineConfig({
   workers: 1,
   timeout: 180_000,
   expect: { timeout: 120_000 },
-  reporter: 'list',
+  reporter: [
+    ['list'],
+    ['json', { outputFile: 'test-results/playwright-integration/results.json' }],
+  ],
   outputDir: 'test-results/playwright-integration',
   use: {
     baseURL: 'http://127.0.0.1:4174',

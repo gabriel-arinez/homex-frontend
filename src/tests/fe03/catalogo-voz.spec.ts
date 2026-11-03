@@ -133,3 +133,43 @@ describe('Voz en creación de catálogo', () => {
     w.unmount()
   })
 })
+
+it('aplica el color secundario activo, confirma conflictos y descarta referencias ajenas', async () => {
+  vi.spyOn(proformasService, 'families').mockResolvedValue({
+    count: 0,
+    next: null,
+    previous: null,
+    results: [],
+  })
+  vi.spyOn(proformasService, 'options').mockImplementation(async (key) =>
+    key === 'CATEGORIA_PRODUCTO'
+      ? [{ id: 10, codigo: 'SILLA', nombre: 'Silla', concepto_codigo: key }]
+      : key === 'COLOR'
+        ? [
+            { id: 11, codigo: 'NEGRO', nombre: 'Negro', concepto_codigo: key },
+            { id: 12, codigo: 'AZUL', nombre: 'Azul', concepto_codigo: key },
+          ]
+        : [],
+  )
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+  const w = mount(ProductoForm, {
+    props: { preselectCategory: 'SILLA' },
+    global: { stubs: { CapturaCatalogo: true } },
+  })
+  await flushPromises()
+  await w.get('select[name="color2"]').setValue('11')
+  const voice = w.findComponent({ name: 'CapturaCatalogo' })
+  voice.vm.$emit('apply', { color_secundario: 12 })
+  await flushPromises()
+  expect(confirm).toHaveBeenCalled()
+  expect((w.get('select[name="color2"]').element as HTMLSelectElement).value).toBe('11')
+  confirm.mockReturnValue(true)
+  voice.vm.$emit('apply', { color_secundario: 12 })
+  await flushPromises()
+  expect((w.get('select[name="color2"]').element as HTMLSelectElement).value).toBe('12')
+  voice.vm.$emit('apply', { color_secundario: 999 })
+  await flushPromises()
+  expect((w.get('select[name="color2"]').element as HTMLSelectElement).value).toBe('12')
+  expect(w.emitted('save')).toBeUndefined()
+  w.unmount()
+})

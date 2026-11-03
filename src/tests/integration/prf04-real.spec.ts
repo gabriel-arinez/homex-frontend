@@ -1,10 +1,8 @@
 import { expect, test } from '@playwright/test'
 
 test('PRF-04 voz real hasta guardado integral sin escrituras prematuras', async ({ page }) => {
-  test.skip(
-    !process.env.HOMEX_PRF04_AUDIO,
-    'Requiere audio autorizado de prueba y stack real PRF-04.',
-  )
+  if (!process.env.HOMEX_PRF04_AUDIO)
+    throw new Error('Falta HOMEX_PRF04_AUDIO para integración real.')
   const comerciales: string[] = []
   page.on('request', (r) => {
     if (['POST', 'PUT', 'PATCH'].includes(r.method()) && /\/proformas\//.test(r.url()))
