@@ -48,6 +48,7 @@ async function save(body: ProductoWritable, images: LocalImage[]) {
   saving.value = true
   error.value = ''
   serverErrors.value = {}
+  let phase: 'product' | 'images' | 'navigation' = 'product'
   try {
     const retrying = createdId.value !== null
     let product
@@ -56,6 +57,7 @@ async function save(body: ProductoWritable, images: LocalImage[]) {
       product = await productosService.update(previous.id, body, previous.revision)
     } else product = await productosService.create(body)
     createdId.value = product.id
+    phase = 'images'
     if (images.length || uploaded.size || retrying) {
       const path = `/api/v1/catalogo/productos/${product.id}/imagenes/`
       const current = await galleryService.list(path)
@@ -81,11 +83,21 @@ async function save(body: ProductoWritable, images: LocalImage[]) {
         if (id) await galleryService.change(path, { principal: id })
       }
     }
+    phase = 'navigation'
     dirty.value = false
     allowNavigationAfterSave = true
     await router.push(destination(product.id))
   } catch (cause) {
-    if (cause instanceof ApiError) {
+    if (createdId.value !== null) {
+      const id = createdId.value
+      error.value =
+        phase === 'images'
+          ? `El producto #${id} ya está registrado, pero algunas imágenes no se guardaron. Reintenta la carga o completa la galería desde su ficha.`
+          : phase === 'navigation'
+            ? `El producto #${id} está guardado. No se pudo completar la navegación; puedes abrir su ficha.`
+            : `El producto #${id} ya existe, pero no se pudieron actualizar sus datos. Reintenta la operación.`
+      if (cause instanceof ApiError) serverErrors.value = cause.fields
+    } else if (cause instanceof ApiError) {
       error.value = cause.message
       serverErrors.value = cause.fields
     } else error.value = 'No se pudo registrar el producto.'
