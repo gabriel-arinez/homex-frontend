@@ -2511,7 +2511,9 @@ export type V1GaleriasImagenesCreateResponse =
 export type V1ImagenesPrivadasListData = {
   body?: never
   path?: never
-  query?: never
+  query: {
+    detalle: number
+  }
   url: '/api/v1/imagenes-privadas/'
 }
 
@@ -2532,7 +2534,7 @@ export type V1ImagenesPrivadasRetrieveData = {
 }
 
 export type V1ImagenesPrivadasRetrieveResponses = {
-  200: CrearGaleria
+  200: Blob | File
 }
 
 export type V1ImagenesPrivadasRetrieveResponse =
