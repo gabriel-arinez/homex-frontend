@@ -110,6 +110,12 @@ function selectProduct(product: Producto) {
 const page = ref(props.initialState?.page ?? 1)
 const products = ref<Producto[]>([])
 const preview = ref<Producto | null>(null)
+function selectPreviewProduct() {
+  const selected = preview.value
+  if (!selected) return
+  selectProduct(selected)
+  preview.value = null
+}
 const total = ref(0)
 const loading = ref(false)
 const error = ref('')
@@ -571,12 +577,7 @@ onBeforeUnmount(() => {
         </p>
         <div class="preview-actions">
           <Button variant="secondary" @click="preview = null">Cerrar ficha</Button>
-          <Button
-            @click="
-              selectProduct(preview)
-              preview = null
-            "
-          >
+          <Button @click="selectPreviewProduct">
             <ArrowRight :size="16" aria-hidden="true" />
             {{
               existingProductIds.includes(preview.id) ? 'Ir a línea' : 'Seleccionar para cotizar'
