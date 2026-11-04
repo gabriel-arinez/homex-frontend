@@ -63,6 +63,8 @@ import { proformasService } from '../services/proformasService'
 import { retornoAProformas } from '../utils/navegacionProformas'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { productosService } from '@/modules/productos/services/productosService'
+import ProductImage from '@/modules/productos/components/ProductImage.vue'
+import { useQuoteProductImages } from '../composables/useQuoteProductImages'
 import {
   cloneEditorData,
   consumeEditorDraft,
@@ -262,6 +264,13 @@ const canShareWhatsApp = computed(() => {
 const existingProductIds = computed(() =>
   lineas.value.flatMap((line) => (line.producto ? [line.producto] : [])),
 )
+const { images: quoteImages, ensure: ensureQuoteImages, remember: rememberQuoteImage } =
+  useQuoteProductImages()
+watch(existingProductIds, (ids) => void ensureQuoteImages(ids), { immediate: true })
+function canEditCatalogProduct(product: Producto): boolean {
+  return session.can('comercial.administrar') ||
+    (session.can('catalogo.crear_producto') && product.created_by === session.identity?.id)
+}
 const totalPreview = computed(() => totalEstimadoCompleto(lineas.value))
 type EmissionIssue = {
   id: string
@@ -642,6 +651,11 @@ function saveLine(body: DetalleProformaWritable) {
   editingLine.value = null
   additionMode.value = 'none'
   markDirty()
+  if (body.producto) {
+    success.value = wasNew
+      ? 'Producto añadido a la proforma. Configura los demás ítems o guarda el borrador.'
+      : 'Datos de la línea comercial actualizados. Guarda la proforma para confirmar.'
+  }
   const isFurniture =
     tipos.value.find((x) => x.id === Number(body.tipo_item))?.codigo === 'MUEBLE_MEDIDA'
   if (wasNew && isFurniture && duplicateSource) {
@@ -787,13 +801,17 @@ async function closeSpec() {
 function removeLine(index: number) {
   const result = removeLocalLine(lineas.value, index)
   lineas.value = result.lines
-  if (result.removed) removedLines.value.push(result.removed)
+  if (result.removed) {
+    removedLines.value.push(result.removed)
+    success.value = 'Línea retirada provisionalmente. Puedes deshacer antes de guardar.'
+  }
   markDirty()
 }
 function undoRemove() {
   const removed = removedLines.value.pop()
   if (!removed) return
   lineas.value = restoreLocalLine(lineas.value, removed)
+  success.value = 'Línea restaurada. Guarda los cambios para confirmar.'
   markDirty()
 }
 function openFurnitureDraft(source?: LineaLocal) {
@@ -912,7 +930,7 @@ function createProductFromCategory(categoryCode: string) {
   void createProductContextually({ tipo_item: String(tipo.id) })
 }
 async function editProductContextually(productId: number) {
-  if (!session.can('comercial.administrar')) return
+  if (!session.can('catalogo.crear_producto') && !session.can('comercial.administrar')) return
   const token = crypto.randomUUID()
   saveEditorDraft(token, editorSnapshot())
   contextualNavigation.value = true
@@ -1019,6 +1037,7 @@ function chooseCatalog() {
   additionMode.value = 'catalog'
 }
 function selectCatalogProduct(product: Producto) {
+  rememberQuoteImage(product)
   if (existingProductIds.value.includes(product.id)) {
     void focusDuplicateProduct(product.id)
     return
@@ -1229,6 +1248,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 <template>
   <div class="quote-workspace" @input="markDirty" @change="markDirty">
     <Toast :visible="Boolean(success)" :message="success" tone="success" @close="success = ''" />
+    <Toast :visible="Boolean(error) && !loading && !referenceLoading" :message="error" tone="danger" @close="error = ''" />
     <ConfirmDialog
       :open="Boolean(confirmation)"
       :title="confirmation?.title || 'Confirmar'"
@@ -1365,7 +1385,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               :categorias="catalogCategories"
               :familias="familias"
               :existing-product-ids="existingProductIds"
-              :can-admin="session.can('comercial.administrar')"
+              :can-create="session.can('catalogo.crear_producto')"
+              :can-edit-product="canEditCatalogProduct"
               :initial-state="catalogState ?? undefined"
               @state-change="catalogState = $event"
               @create="createProductFromCategory"
@@ -1390,7 +1411,12 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               @keydown.enter.prevent="openLineRead(line.localId)"
               @keydown.space.prevent="openLineRead(line.localId)"
             >
-              <strong>{{ line.nombre }}</strong>
+              <div class="line-heading">
+                <div v-if="line.producto" class="line-thumbnail">
+                  <ProductImage :image="quoteImages[line.producto] ?? null" :alt="line.nombre" sizes="64px" />
+                </div>
+                <strong>{{ line.nombre }}</strong>
+              </div>
               <p v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
                 Importe histórico negociado: {{ money(Number(line.importe_negociado || 0)) }}
               </p>
@@ -1701,8 +1727,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <p class="brand">HOMEX · VISTA PREVIA</p>
             </div>
             <h3>{{ header.titulo || 'Cotización comercial' }}</h3>
-            <p v-for="line in lineas" :key="line.localId" class="review-line">
-              <strong>{{ line.nombre }}</strong> —
+            <div v-for="line in lineas" :key="line.localId" class="review-line">
+              <div v-if="line.producto" class="review-thumbnail">
+                <ProductImage :image="quoteImages[line.producto] ?? null" :alt="line.nombre" sizes="48px" />
+              </div>
+              <span><strong>{{ line.nombre }}</strong> —
               <template v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
                 importe negociado {{ money(Number(line.importe_negociado || 0)) }}
               </template>
@@ -1710,8 +1739,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 cantidad {{ line.cantidad }}, precio {{ money(Number(line.precio_unitario)) }}
               </template>
               <template v-else>precio pendiente</template>
-              <span v-if="line.descripcion"><br />{{ line.descripcion }}</span>
-            </p>
+              <span v-if="line.descripcion"><br />{{ line.descripcion }}</span></span>
+            </div>
             <p v-if="header.plazo_entrega"><strong>Plazo:</strong> {{ header.plazo_entrega }}</p>
             <p v-if="header.validez_oferta">
               <strong>Validez:</strong> {{ header.validez_oferta }} días
@@ -3238,4 +3267,14 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     margin-left: auto;
   }
 }
+.line-heading { display: flex; gap: .8rem; align-items: center; min-width: 0; }
+.line-heading strong { overflow-wrap: anywhere; }
+.line-thumbnail { width: 4rem; height: 4rem; flex: none; overflow: hidden;
+  border: 1px solid var(--color-border); border-radius: var(--radius-control); }
+.line-thumbnail :deep(.product-image) { width: 100%; height: 100%; min-height: 0; aspect-ratio: 1 !important; }
+.line-thumbnail :deep(.fallback span) { display: none; }
+.review-thumbnail { flex: none; width: 3rem; height: 3rem; border-radius: var(--radius-control); overflow: hidden; }
+.review-thumbnail :deep(.product-image) { width: 100%; height: 100%; min-height: 0; aspect-ratio: 1 !important; }
+.review-thumbnail :deep(.fallback span) { display: none; }
+.review-line { display: flex; align-items: center; gap: .6rem; }
 </style>
