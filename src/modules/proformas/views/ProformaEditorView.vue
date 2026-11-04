@@ -93,6 +93,16 @@ const saving = ref(false)
 const referenceLoading = ref(true)
 const error = ref('')
 const success = ref('')
+const errorToast = ref('')
+watch(error, (message) => {
+  if (message) {
+    success.value = ''
+    errorToast.value = message
+  }
+})
+watch(success, (message) => {
+  if (message) errorToast.value = ''
+})
 const fields = ref<Record<string, string[]>>({})
 const validationAttempted = ref(false)
 const localErrors = ref<Record<string, string>>({})
@@ -1248,7 +1258,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 <template>
   <div class="quote-workspace" @input="markDirty" @change="markDirty">
     <Toast :visible="Boolean(success)" :message="success" tone="success" @close="success = ''" />
-    <Toast :visible="Boolean(error) && !loading && !referenceLoading" :message="error" tone="danger" @close="error = ''" />
+    <Toast :visible="Boolean(errorToast) && !loading && !referenceLoading" :message="errorToast" tone="danger" @close="errorToast = ''" />
     <ConfirmDialog
       :open="Boolean(confirmation)"
       :title="confirmation?.title || 'Confirmar'"
