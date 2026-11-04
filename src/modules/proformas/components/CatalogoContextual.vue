@@ -78,7 +78,9 @@ const filters = reactive<Record<Field, string>>({
 })
 const options = ref<Record<string, ValorCatalogoPublico[]>>({})
 const view = ref<'grid' | 'lista'>(props.initialState?.view ?? 'grid')
-const filtersExpanded = ref(false)
+const filtersExpanded = ref(
+  Object.values(props.initialState?.filters ?? {}).some(Boolean),
+)
 const showImages = ref(readCatalogImagesVisible())
 const notification = ref('')
 watch(showImages, writeCatalogImagesVisible)
@@ -97,6 +99,13 @@ const preview = ref<Producto | null>(null)
 const total = ref(0)
 const loading = ref(false)
 const error = ref('')
+const errorToast = ref('')
+watch(error, (message) => {
+  if (message) {
+    notification.value = ''
+    errorToast.value = message
+  }
+})
 const pageSize = 12
 let requestId = 0
 let optionsId = 0
@@ -243,7 +252,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="catalogo-contextual">
     <Toast :visible="Boolean(notification)" :message="notification" tone="info" @close="notification = ''" />
-    <Toast :visible="Boolean(error)" :message="error" tone="danger" @close="error = ''" />
+    <Toast :visible="Boolean(errorToast)" :message="errorToast" tone="danger" @close="errorToast = ''" />
     <div class="head">
       <div>
         <h3><PackageOpen :size="20" aria-hidden="true" /> Seleccionar producto del catálogo</h3>
