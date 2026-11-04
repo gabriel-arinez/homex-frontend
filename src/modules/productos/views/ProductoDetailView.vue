@@ -165,7 +165,12 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         <Card
           ><ImageGallery
             :endpoint="`/api/v1/catalogo/productos/${product.id}/imagenes/`"
-            :editable="canEdit" /></Card
+            :editable="canEdit"
+          />
+          <p v-if="canEdit" class="gallery-note">
+            Las imágenes se guardan al instante. Para modificar los datos comerciales utiliza
+            «Editar datos comerciales».
+          </p></Card
         ><Card
           ><dl>
             <div>

@@ -48,6 +48,7 @@ async function save(body: ProductoWritable, images: LocalImage[]) {
   saving.value = true
   error.value = ''
   serverErrors.value = {}
+  let phase: 'product' | 'images' | 'navigation' = 'product'
   try {
     const retrying = createdId.value !== null
     let product
@@ -56,6 +57,7 @@ async function save(body: ProductoWritable, images: LocalImage[]) {
       product = await productosService.update(previous.id, body, previous.revision)
     } else product = await productosService.create(body)
     createdId.value = product.id
+    phase = 'images'
     if (images.length || uploaded.size || retrying) {
       const path = `/api/v1/catalogo/productos/${product.id}/imagenes/`
       const current = await galleryService.list(path)
@@ -81,11 +83,21 @@ async function save(body: ProductoWritable, images: LocalImage[]) {
         if (id) await galleryService.change(path, { principal: id })
       }
     }
+    phase = 'navigation'
     dirty.value = false
     allowNavigationAfterSave = true
     await router.push(destination(product.id))
   } catch (cause) {
-    if (cause instanceof ApiError) {
+    if (createdId.value !== null) {
+      const id = createdId.value
+      error.value =
+        phase === 'images'
+          ? `El producto #${id} ya está registrado, pero algunas imágenes no se guardaron. Reintenta la carga o completa la galería desde su ficha.`
+          : phase === 'navigation'
+            ? `El producto #${id} está guardado. No se pudo completar la navegación; puedes abrir su ficha.`
+            : `El producto #${id} ya existe, pero no se pudieron actualizar sus datos. Reintenta la operación.`
+      if (cause instanceof ApiError) serverErrors.value = cause.fields
+    } else if (cause instanceof ApiError) {
       error.value = cause.message
       serverErrors.value = cause.fields
     } else error.value = 'No se pudo registrar el producto.'
@@ -96,13 +108,32 @@ async function save(body: ProductoWritable, images: LocalImage[]) {
 }
 function cancel() {
   if (saving.value) return
-  if (dirty.value) confirmCancel.value = true
+  if (createdId.value !== null || dirty.value) confirmCancel.value = true
   else void router.push(destination())
 }
 function discard() {
   confirmCancel.value = false
+  if (createdId.value !== null) {
+    // El producto ya existe: abandonar la carga no equivale a descartar el registro.
+    allowNavigationAfterSave = true
+    void router.push({
+      name: 'producto-detail',
+      params: { id: createdId.value },
+      query: { returnTo: route.query.returnTo, draft: route.query.draft },
+    })
+    return
+  }
   dirty.value = false
   void router.push(destination())
+}
+function cancelDescription() {
+  if (createdId.value === null) return 'Los datos que ingresaste no se guardarán.'
+  return `El producto #${createdId.value} ya está registrado. Salir no lo elimina. Puedes reintentar la carga de imágenes o ir a su ficha para completarlas.`
+}
+function leaveDescription() {
+  if (createdId.value === null)
+    return 'Hay cambios sin guardar en este producto. Si sales, se descartarán.'
+  return `El producto #${createdId.value} ya existe en HOMEX. Salir no lo elimina y algunas imágenes podrían seguir pendientes de cargar.`
 }
 function answerLeave(answer: boolean) {
   confirmLeave.value = false
@@ -151,17 +182,17 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     />
     <ConfirmDialog
       :open="confirmCancel"
-      title="Descartar producto"
-      description="Los datos que ingresaste no se guardarán."
-      confirm-label="Descartar y salir"
+      :title="createdId !== null ? 'Producto ya registrado' : 'Descartar producto'"
+      :description="cancelDescription()"
+      :confirm-label="createdId !== null ? 'Ir a su ficha' : 'Descartar y salir'"
       @close="confirmCancel = false"
       @confirm="discard"
     />
     <ConfirmDialog
       :open="confirmLeave"
-      title="Salir sin guardar"
-      description="Hay cambios sin guardar en este producto. Si sales, se descartarán."
-      confirm-label="Salir sin guardar"
+      :title="createdId !== null ? 'Producto ya registrado' : 'Salir sin guardar'"
+      :description="leaveDescription()"
+      :confirm-label="createdId !== null ? 'Salir y conservar producto' : 'Salir sin guardar'"
       @close="answerLeave(false)"
       @confirm="answerLeave(true)"
     />

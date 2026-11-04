@@ -74,6 +74,34 @@ describe('Galería reutilizable', () => {
     expect(wrapper.vm.count).toBe(2)
     wrapper.unmount()
   })
+  it('reordena pendientes localmente y no cruza el límite con las imágenes persistidas', async () => {
+    vi.spyOn(galleryService, 'list').mockResolvedValue(gallery([image(1, true)]))
+    const change = vi.spyOn(galleryService, 'change')
+    const wrapper = mount(ImageGallery, { props: { endpoint: '/gallery/' }, global: { stubs } })
+    await flushPromises()
+    const files = [
+      new File(['red'], 'first.png', { type: 'image/png' }),
+      new File(['blue'], 'second.png', { type: 'image/png' }),
+    ]
+    Object.defineProperty(wrapper.get('input[type=file]').element, 'files', { value: files })
+    await wrapper.get('input[type=file]').trigger('change')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('3/8'))
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text() === 'Gestionar imágenes')!
+      .trigger('click')
+    const pendingFirst = wrapper.findAll('article')[1]!
+    expect(pendingFirst.get('[aria-label="Mover antes"]').attributes('disabled')).toBeDefined()
+    await wrapper.findAll('article')[2]!.get('[aria-label="Mover antes"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.findAll('article').map((a) => a.get('p').text())).toEqual([
+      'Foto 1',
+      'second.png',
+      'first.png',
+    ])
+    expect(change).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
   it('rechaza archivos grandes y formatos no admitidos antes de subir', async () => {
     vi.spyOn(galleryService, 'list').mockResolvedValue(gallery([]))
     const upload = vi.spyOn(galleryService, 'upload')

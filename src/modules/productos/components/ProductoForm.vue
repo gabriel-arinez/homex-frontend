@@ -877,9 +877,13 @@ onMounted(load)
           <ImageGallery
             v-model="images"
             :endpoint="initial ? `/api/v1/catalogo/productos/${initial.id}/imagenes/` : undefined"
-            :editable="canUploadImage !== false"
+            :editable="!initial && canUploadImage !== false"
             @changed="emit('change')"
           />
+          <p v-if="initial && canUploadImage !== false" class="muted tiny">
+            Gestiona las imágenes desde la ficha del producto. Los cambios de la galería se guardan
+            al instante, independientemente de los datos comerciales.
+          </p>
         </section>
         <section class="catalog-section aside-card" aria-labelledby="status-title">
           <div class="aside-heading">

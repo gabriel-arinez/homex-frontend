@@ -209,21 +209,28 @@ function primary(index: number) {
   if (index < images.value.length) void change({ principal: images.value[index]!.id })
   else if (!props.endpoint) setLocal(local.value.map((i, n) => ({ ...i, principal: n === index })))
 }
+function canMove(index: number, offset: number) {
+  const target = index + offset
+  if (target < 0 || target >= all.value.length) return false
+  if (!props.endpoint) return true
+  // La API sólo acepta ordenar imágenes persistidas; no mezclar ambos grupos todavía.
+  const saved = images.value.length
+  return index < saved === target < saved
+}
 function move(index: number, offset: number) {
-  if (!props.editable) return
-  if (props.endpoint) {
-    const ids = images.value.map((i) => i.id),
-      next = index + offset
-    if (next < 0 || next >= ids.length) return
-    ;[ids[index], ids[next]] = [ids[next]!, ids[index]!]
+  if (!props.editable || busy.value || !canMove(index, offset)) return
+  const target = index + offset
+  if (props.endpoint && index < images.value.length) {
+    const ids = images.value.map((i) => i.id)
+    ;[ids[index], ids[target]] = [ids[target]!, ids[index]!]
     void change({ orden: ids })
-  } else {
-    const next = [...local.value],
-      target = index + offset
-    if (target < 0 || target >= next.length) return
-    ;[next[index], next[target]] = [next[target]!, next[index]!]
-    setLocal(next)
+    return
   }
+  const first = props.endpoint ? index - images.value.length : index
+  const second = props.endpoint ? target - images.value.length : target
+  const next = [...local.value]
+  ;[next[first], next[second]] = [next[second]!, next[first]!]
+  setLocal(next)
 }
 function remove() {
   if (!props.editable) return
@@ -364,14 +371,14 @@ defineExpose({ flush: upload, count: computed(() => all.value.length) })
             ><Button
               type="button"
               variant="secondary"
-              :disabled="busy || index === 0"
+              :disabled="busy || !canMove(index, -1)"
               aria-label="Mover antes"
               @click="move(index, -1)"
               >←</Button
             ><Button
               type="button"
               variant="secondary"
-              :disabled="busy || index === all.length - 1"
+              :disabled="busy || !canMove(index, 1)"
               aria-label="Mover después"
               @click="move(index, 1)"
               >→</Button
@@ -385,6 +392,10 @@ defineExpose({ flush: upload, count: computed(() => all.value.length) })
           </div>
         </article>
       </div>
+      <p v-if="endpoint && pending.length" class="hint">
+        Puedes ordenar las imágenes pendientes entre sí. Confirma su carga para mezclarlas con las
+        ya guardadas y cambiar la portada.
+      </p>
       <p v-if="!all.length">Sin imágenes.</p></Modal
     >
     <Modal :open="viewing" title="Visor de imágenes" wide @close="viewing = false"
