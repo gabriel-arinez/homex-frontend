@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, ClipboardCheck, Download, FileText, Pencil, Paperclip } from '@lucide/vue'
 import type { DetalleProforma, Proforma } from '@/generated/api'
 import { ApiError } from '@/shared/api'
@@ -45,7 +45,7 @@ const approvalIssue = computed(() => {
   if (!quote.value?.detalles.length) return 'Para aprobar se necesita al menos un producto.'
   return 'La proforma debe tener un importe positivo para aprobarse.'
 })
-const tone = computed(() => {
+const tone = computed<'neutral' | 'success' | 'warning' | 'danger' | 'info'>(() => {
   if (stateCode.value === 'APROBADA') return 'success'
   if (stateCode.value === 'EN_REVISION') return 'warning'
   if (stateCode.value === 'ENVIADA') return 'info'
