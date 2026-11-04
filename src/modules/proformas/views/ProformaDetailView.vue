@@ -183,7 +183,7 @@ onMounted(() => void load())
           >Aprobar y crear pedido</Button
         >
         <Button
-          v-if="stateCode === 'EN_REVISION'"
+          v-if="inReview"
           variant="secondary"
           :disabled="processing"
           @click="confirmAction = 'not-completed'"
@@ -203,6 +203,9 @@ onMounted(() => void load())
       <button type="button" @click="load">Reintentar</button>
     </ErrorState>
     <template v-else-if="quote">
+      <div v-if="route.query.enviada === '1' && inReview && !success" class="notice notice--success" role="status">
+        Proforma enviada correctamente a revisión. Puedes consultar sus documentos y, cuando corresponda, aprobar para crear el pedido.
+      </div>
       <div v-if="success" class="notice notice--success" role="status">
         {{ success }}
         <RouterLink v-if="lastPedidoId" :to="`/pedidos/${lastPedidoId}`"
