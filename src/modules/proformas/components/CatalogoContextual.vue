@@ -360,7 +360,7 @@ onBeforeUnmount(() => {
       <strong>{{ activeChips.length ? 'Sin coincidencias' : 'No hay productos activos disponibles' }}</strong>
       <p>{{ activeChips.length ? 'No se encontraron productos con estos filtros.' : 'El catálogo no contiene productos activos para cotizar.' }}</p>
       <Button v-if="activeChips.length" variant="secondary" @click="clearAllFilters">Limpiar filtros</Button>
-      <Button v-if="canCreate" @click="emit('create', categoryCode)">
+      <Button v-if="canCreate && category" @click="emit('create', categoryCode)">
         <Plus :size="16" aria-hidden="true" /> Crear producto
       </Button>
     </div>
