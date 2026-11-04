@@ -3,7 +3,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { ClipboardList, MoreHorizontal, Pencil } from '@lucide/vue'
 
-const props = defineProps<{ id: number; numero: number }>()
+const props = defineProps<{ id: number; numero: number; returnTo?: string }>()
 const open = ref(false)
 const trigger = ref<HTMLButtonElement | null>(null)
 const menu = ref<HTMLElement | null>(null)
@@ -105,13 +105,13 @@ onBeforeUnmount(() => {
         :aria-label="`Acciones de la proforma #${numero}`"
         :style="menuPosition"
       >
-        <RouterLink role="menuitem" :to="`/proformas/${id}/editar`" @click="close(false)">
+        <RouterLink role="menuitem" :to="{ path: `/proformas/${id}/editar`, query: props.returnTo ? { returnTo: props.returnTo } : {} }" @click="close(false)">
           <Pencil :size="17" aria-hidden="true" />
           Continuar edición
         </RouterLink>
-        <RouterLink role="menuitem" :to="`/proformas/${id}`" @click="close(false)">
+        <RouterLink role="menuitem" :to="{ path: `/proformas/${id}`, query: props.returnTo ? { returnTo: props.returnTo } : {} }" @click="close(false)">
           <ClipboardList :size="17" aria-hidden="true" />
-          Ver detalle y acciones
+          Ver resumen y gestión
         </RouterLink>
       </div>
     </Teleport>
