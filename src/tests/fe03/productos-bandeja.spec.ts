@@ -171,4 +171,24 @@ describe('Bandeja administrativa de productos', () => {
       wrapper.unmount()
     }
   })
+  it('oculta las miniaturas en la tabla sin ocultar identidad, SKU o precio', async () => {
+    const key = 'homex.catalogo.imagenes-visibles.v1'
+    localStorage.removeItem(key)
+    mockServices()
+    const { wrapper } = await makeMounted()
+    try {
+      expect(wrapper.find('.thumbnail').exists()).toBe(true)
+      await wrapper.get('.table-image-toggle').trigger('click')
+      expect(wrapper.find('.thumbnail').exists()).toBe(false)
+      expect(wrapper.text()).toContain('SILLA-0001')
+      expect(wrapper.text()).toContain('590')
+      expect(localStorage.getItem(key)).toBe('false')
+      await wrapper.get('.table-image-toggle').trigger('click')
+      expect(wrapper.find('.thumbnail').exists()).toBe(true)
+    } finally {
+      wrapper.unmount()
+      localStorage.removeItem(key)
+    }
+  })
+
 })
