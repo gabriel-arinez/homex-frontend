@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ChevronDown, Eye, LayoutGrid, List, Plus, SlidersHorizontal } from '@lucide/vue'
+import { ChevronDown, Eye, EyeOff, LayoutGrid, List, Plus, SlidersHorizontal } from '@lucide/vue'
 import type { FamiliaProducto, Producto, ValorCatalogoPublico } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { proformasService } from '@/modules/proformas/services/proformasService'
@@ -15,6 +15,7 @@ import {
   unidadesProducto,
 } from '../utils/presentacionCatalogo'
 import ProductImage from '../components/ProductImage.vue'
+import { readCatalogImagesVisible, writeCatalogImagesVisible } from '@/shared/media/catalogImageVisibility'
 import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
@@ -30,6 +31,8 @@ const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
 const canCreate = computed(() => session.can('catalogo.crear_producto'))
+const showImages = ref(readCatalogImagesVisible())
+watch(showImages, writeCatalogImagesVisible)
 const products = ref<Producto[]>([])
 const total = ref(0)
 const loading = ref(true)
@@ -499,6 +502,17 @@ onBeforeUnmount(() => {
 
     <div class="product-toolbar">
       <strong>Catálogo de productos</strong>
+      <button
+        v-if="view === 'lista'"
+        type="button"
+        class="table-image-toggle"
+        :aria-pressed="showImages"
+        @click="showImages = !showImages"
+      >
+        <EyeOff v-if="showImages" :size="17" aria-hidden="true" />
+        <Eye v-else :size="17" aria-hidden="true" />
+        {{ showImages ? 'Ocultar imágenes' : 'Mostrar imágenes' }}
+      </button>
       <div class="view-switch" role="group" aria-label="Vista del catálogo">
         <button
           type="button"
@@ -738,8 +752,8 @@ onBeforeUnmount(() => {
             <tr v-for="product in products" :key="product.id">
               <td class="identity" data-label="Producto">
                 <div class="identity-content">
-                  <div class="thumbnail">
-                    <ProductImage :image="product.imagen_principal" :alt="product.nombre" />
+                  <div v-if="showImages" class="thumbnail">
+                    <ProductImage :image="product.imagen_principal" :alt="product.nombre" sizes="52px" />
                   </div>
                   <div class="identity-copy">
                     <RouterLink
@@ -862,6 +876,11 @@ onBeforeUnmount(() => {
 .product-toolbar {
   margin-bottom: var(--space-4);
 }
+.table-image-toggle { display: inline-flex; align-items: center; gap: .5rem; margin-left: auto;
+  min-height: 2.5rem; padding: .4rem .7rem; color: var(--color-text);
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius-control); cursor: pointer; }
+.table-image-toggle:hover { background: var(--color-surface-hover); }
 .view-switch {
   display: flex;
   gap: 0.25rem;
