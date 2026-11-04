@@ -308,6 +308,25 @@ describe('FE04 proformas manuales', () => {
     await flushPromises()
     expect(r.currentRoute.value.path).toBe('/proformas/1/editar')
   })
+  it('conserva adjuntos de líneas de catálogo, no sólo muebles a medida', async () => {
+    const current = quote()
+    current.detalles = [
+      {
+        ...detail,
+        tipo_item_info: { id: 1, codigo: 'SILLA', nombre: 'Silla' },
+        nombre: 'Silla de catálogo',
+      },
+    ]
+    common(current)
+    const r = await router()
+    const wrapper = mount(ProformaDetailView, {
+      global: { plugins: [createPinia(), r], stubs: { Teleport: true } },
+    })
+    await flushPromises()
+    expect(wrapper.text()).toContain('Silla de catálogo')
+    expect(wrapper.text()).toContain('Imágenes de referencia')
+    expect(wrapper.find('input[type=file]').exists()).toBe(true)
+  })
   it('revoca y elimina previews pendientes cuando la proforma deja de ser editable', async () => {
     const create = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:freeze'),
       revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
