@@ -1,0 +1,40 @@
+name: Formatear flujo proformas (temporal)
+on:
+  push:
+    branches: [feat/proformas-flujo-unificado-20261104]
+permissions:
+  contents: write
+jobs:
+  format:
+    if: "github.event.head_commit.message == 'chore(ci): ejecutar formato de flujo de proformas'"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/proformas-flujo-unificado-20261104
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.12.0'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: |
+          npx prettier --write \
+            src/modules/proformas/views/ProformaDetailView.vue \
+            src/modules/proformas/views/ProformaEditorView.vue \
+            src/modules/proformas/views/ProformasListView.vue \
+            src/modules/proformas/components/ProformaActionsMenu.vue \
+            src/modules/proformas/utils/navegacionProformas.ts \
+            src/modules/proformas/utils/navegacionProformas.test.ts \
+            src/tests/fe04/proformas.spec.ts \
+            src/tests/e2e/fe04-proformas.spec.ts \
+            src/tests/fe04/proformas-bandeja.spec.ts
+      - name: Guardar el formato
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/modules/proformas src/tests/fe04/proformas.spec.ts src/tests/fe04/proformas-bandeja.spec.ts src/tests/e2e/fe04-proformas.spec.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "style(proformas): aplicar formato de la implementación"
+            git push origin HEAD:feat/proformas-flujo-unificado-20261104
+          fi
