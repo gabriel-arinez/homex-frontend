@@ -51,14 +51,20 @@ async function addCatalogLine(page: Page) {
 }
 
 async function approveCurrentQuote(page: Page) {
-  await page.getByRole('button', { name: 'Emitir proforma' }).click()
-  await expect(page.locator('.quote-save-reference')).toContainText('En revisión')
+  await page.getByRole('button', { name: 'Enviar a revisión' }).click()
+  const sendDialog = page.getByRole('dialog', { name: 'Enviar proforma a revisión' })
+  await expect(sendDialog).toBeVisible()
+  await sendDialog.getByRole('button', { name: 'Enviar a revisión' }).click()
+  await expect(page).toHaveURL(/\/proformas\/\d+(?:\?|$)/)
+  await expect(page.getByText('Proforma enviada correctamente a revisión.')).toBeVisible()
   const segments = new URL(page.url()).pathname.split('/').filter(Boolean)
-  const proformaId = Number(segments[segments.length - 2])
-  await page.goto(`/proformas/${proformaId}`)
-  await expect(page.getByRole('button', { name: 'Aprobar' })).toBeVisible()
-  await page.getByRole('button', { name: 'Aprobar' }).click()
-  await page.getByRole('dialog').getByRole('button', { name: 'Aprobar' }).click()
+  const proformaId = Number(segments[segments.length - 1])
+  expect(proformaId).toBeGreaterThan(0)
+  await expect(page.getByRole('button', { name: 'Aprobar y crear pedido' })).toBeEnabled()
+  await page.getByRole('button', { name: 'Aprobar y crear pedido' }).click()
+  const approvalDialog = page.getByRole('dialog', { name: 'Aprobar y crear pedido' })
+  await expect(approvalDialog).toBeVisible()
+  await approvalDialog.getByRole('button', { name: 'Aprobar y crear pedido' }).click()
   const status = page.getByRole('status').filter({ hasText: /Pedido #\d+/ })
   await expect(status).toBeVisible()
   const text = (await status.textContent()) ?? ''

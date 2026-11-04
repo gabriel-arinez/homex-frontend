@@ -135,6 +135,7 @@ function router(path = '/proformas/1') {
     routes: [
       { path: '/proformas', component: ProformasListView },
       { path: '/proformas/:id', component: ProformaDetailView },
+      { path: '/proformas/:id/editar', component: { template: '<p>Editor</p>' } },
     ],
   })
   return r.push(path).then(() => r)
@@ -207,7 +208,8 @@ describe('FE04 proformas manuales', () => {
       global: { plugins: [createPinia(), r], stubs: { Teleport: true } },
     })
     await flushPromises()
-    expect(wrapper.text()).toContain('modo lectura')
+    expect(wrapper.text()).toContain('Enviada')
+    expect(wrapper.text()).not.toContain('Continuar edición')
     expect(wrapper.text()).toContain('Bs 100,00')
     expect(wrapper.findAll('button').map((x) => x.text())).not.toContain('Agregar línea')
     expect(wrapper.text()).toContain('Aprobar')
@@ -226,10 +228,12 @@ describe('FE04 proformas manuales', () => {
     await flushPromises()
     await wrapper
       .findAll('button')
-      .find((x) => x.text() === 'Aprobar')!
+      .find((x) => x.text() === 'Aprobar y crear pedido')!
       .trigger('click')
     await flushPromises()
-    const approveButtons = wrapper.findAll('button').filter((x) => x.text() === 'Aprobar')
+    const approveButtons = wrapper
+      .findAll('button')
+      .filter((x) => x.text() === 'Aprobar y crear pedido')
     await approveButtons[approveButtons.length - 1]!.trigger('click')
     await flushPromises()
     expect(wrapper.text()).toContain('Stock insuficiente')
@@ -285,29 +289,45 @@ describe('FE04 proformas manuales', () => {
     expect(create).toHaveBeenCalled()
     expect(revoke).toHaveBeenCalledWith('blob:preview')
   })
-  it('recarga la autoridad backend después de un 409 de edición y congela la UI', async () => {
-    const current = quote()
-    common(current)
-    server.use(
-      http.patch('http://localhost:8000/api/v1/proformas/1/', () => {
-        current.estado_info = { id: 3, codigo: 'ENVIADA', nombre: 'Enviada' }
-        return HttpResponse.json({ detail: 'La proforma ya fue enviada.' }, { status: 409 })
-      }),
-    )
+  it('unifica edición en el editor y no presenta un segundo formulario comercial', async () => {
+    common()
     const r = await router()
     const wrapper = mount(ProformaDetailView, {
       global: { plugins: [createPinia(), r], stubs: { Teleport: true } },
     })
     await flushPromises()
-    const edit = wrapper.findAll('button').find((button) => button.text() === 'Editar cabecera')
-    expect(edit).toBeDefined()
-    await edit!.trigger('click')
-    await wrapper.get('#titulo-proforma').setValue('Cambio concurrente')
-    await wrapper.get('.header-form').trigger('submit')
-    await flushPromises()
-    expect(wrapper.text()).toContain('La proforma ya fue enviada')
-    expect(wrapper.text()).toContain('modo lectura')
+    expect(wrapper.find('#titulo-proforma').exists()).toBe(false)
     expect(wrapper.find('.header-form').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Continuar edición')
+    expect(wrapper.text()).not.toContain('Agregar línea')
+    const action = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Continuar edición'))
+    expect(action).toBeDefined()
+    await action!.trigger('click')
+    await flushPromises()
+    expect(r.currentRoute.value.path).toBe('/proformas/1/editar')
+  })
+  it('conserva adjuntos de líneas de catálogo, no sólo muebles a medida', async () => {
+    const current = {
+      ...quote(),
+      detalles: [
+        {
+          ...detail,
+          tipo_item_info: { id: 1, codigo: 'SILLA', nombre: 'Silla' },
+          nombre: 'Silla de catálogo',
+        },
+      ],
+    }
+    common(current)
+    const r = await router()
+    const wrapper = mount(ProformaDetailView, {
+      global: { plugins: [createPinia(), r], stubs: { Teleport: true } },
+    })
+    await flushPromises()
+    expect(wrapper.text()).toContain('Silla de catálogo')
+    expect(wrapper.text()).toContain('Imágenes de referencia')
+    expect(wrapper.find('input[type=file]').exists()).toBe(true)
   })
   it('revoca y elimina previews pendientes cuando la proforma deja de ser editable', async () => {
     const create = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:freeze'),
