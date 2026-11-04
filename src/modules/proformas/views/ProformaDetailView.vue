@@ -109,7 +109,7 @@ async function transition() {
       if (!canApprove.value) return
       const result = await proformasService.approve(id)
       lastPedidoId.value = result.pedido_id
-      success.value = `Proforma aprobada y pedido #${result.pedido_id} confirmado.`
+      success.value = `Proforma aprobada. Pedido #${result.pedido_id} confirmado.`
     } else if (action === 'not-completed') {
       await proformasService.markNotCompleted(id)
       success.value = 'Proforma marcada como no concretada.'
