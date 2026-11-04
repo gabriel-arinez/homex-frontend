@@ -190,5 +190,4 @@ describe('Bandeja administrativa de productos', () => {
       localStorage.removeItem(key)
     }
   })
-
 })

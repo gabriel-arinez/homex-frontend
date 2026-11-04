@@ -15,7 +15,10 @@ import {
   unidadesProducto,
 } from '../utils/presentacionCatalogo'
 import ProductImage from '../components/ProductImage.vue'
-import { readCatalogImagesVisible, writeCatalogImagesVisible } from '@/shared/media/catalogImageVisibility'
+import {
+  readCatalogImagesVisible,
+  writeCatalogImagesVisible,
+} from '@/shared/media/catalogImageVisibility'
 import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
@@ -753,7 +756,11 @@ onBeforeUnmount(() => {
               <td class="identity" data-label="Producto">
                 <div class="identity-content">
                   <div v-if="showImages" class="thumbnail">
-                    <ProductImage :image="product.imagen_principal" :alt="product.nombre" sizes="52px" />
+                    <ProductImage
+                      :image="product.imagen_principal"
+                      :alt="product.nombre"
+                      sizes="52px"
+                    />
                   </div>
                   <div class="identity-copy">
                     <RouterLink
@@ -876,11 +883,22 @@ onBeforeUnmount(() => {
 .product-toolbar {
   margin-bottom: var(--space-4);
 }
-.table-image-toggle { display: inline-flex; align-items: center; gap: .5rem; margin-left: auto;
-  min-height: 2.5rem; padding: .4rem .7rem; color: var(--color-text);
-  background: var(--color-surface); border: 1px solid var(--color-border);
-  border-radius: var(--radius-control); cursor: pointer; }
-.table-image-toggle:hover { background: var(--color-surface-hover); }
+.table-image-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+  min-height: 2.5rem;
+  padding: 0.4rem 0.7rem;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+.table-image-toggle:hover {
+  background: var(--color-surface-hover);
+}
 .view-switch {
   display: flex;
   gap: 0.25rem;

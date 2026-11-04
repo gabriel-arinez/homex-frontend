@@ -278,12 +278,17 @@ const canShareWhatsApp = computed(() => {
 const existingProductIds = computed(() =>
   lineas.value.flatMap((line) => (line.producto ? [line.producto] : [])),
 )
-const { images: quoteImages, ensure: ensureQuoteImages, remember: rememberQuoteImage } =
-  useQuoteProductImages()
+const {
+  images: quoteImages,
+  ensure: ensureQuoteImages,
+  remember: rememberQuoteImage,
+} = useQuoteProductImages()
 watch(existingProductIds, (ids) => void ensureQuoteImages(ids), { immediate: true })
 function canEditCatalogProduct(product: Producto): boolean {
-  return session.can('comercial.administrar') ||
+  return (
+    session.can('comercial.administrar') ||
     (session.can('catalogo.crear_producto') && product.created_by === session.identity?.id)
+  )
 }
 const totalPreview = computed(() => totalEstimadoCompleto(lineas.value))
 type EmissionIssue = {
@@ -1262,7 +1267,12 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 <template>
   <div class="quote-workspace" @input="markDirty" @change="markDirty">
     <Toast :visible="Boolean(success)" :message="success" tone="success" @close="success = ''" />
-    <Toast :visible="Boolean(errorToast) && !loading && !referenceLoading" :message="errorToast" tone="danger" @close="errorToast = ''" />
+    <Toast
+      :visible="Boolean(errorToast) && !loading && !referenceLoading"
+      :message="errorToast"
+      tone="danger"
+      @close="errorToast = ''"
+    />
     <ConfirmDialog
       :open="Boolean(confirmation)"
       :title="confirmation?.title || 'Confirmar'"
@@ -1427,7 +1437,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             >
               <div class="line-heading">
                 <div v-if="line.producto" class="line-thumbnail">
-                  <ProductImage :image="quoteImages[line.producto] ?? null" :alt="line.nombre" sizes="64px" />
+                  <ProductImage
+                    :image="quoteImages[line.producto] ?? null"
+                    :alt="line.nombre"
+                    sizes="64px"
+                  />
                 </div>
                 <strong>{{ line.nombre }}</strong>
               </div>
@@ -1743,17 +1757,23 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <h3>{{ header.titulo || 'Cotización comercial' }}</h3>
             <div v-for="line in lineas" :key="line.localId" class="review-line">
               <div v-if="line.producto" class="review-thumbnail">
-                <ProductImage :image="quoteImages[line.producto] ?? null" :alt="line.nombre" sizes="48px" />
+                <ProductImage
+                  :image="quoteImages[line.producto] ?? null"
+                  :alt="line.nombre"
+                  sizes="48px"
+                />
               </div>
-              <span><strong>{{ line.nombre }}</strong> —
-              <template v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
-                importe negociado {{ money(Number(line.importe_negociado || 0)) }}
-              </template>
-              <template v-else-if="totalEstimadoLinea(line) !== null">
-                cantidad {{ line.cantidad }}, precio {{ money(Number(line.precio_unitario)) }}
-              </template>
-              <template v-else>precio pendiente</template>
-              <span v-if="line.descripcion"><br />{{ line.descripcion }}</span></span>
+              <span
+                ><strong>{{ line.nombre }}</strong> —
+                <template v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
+                  importe negociado {{ money(Number(line.importe_negociado || 0)) }}
+                </template>
+                <template v-else-if="totalEstimadoLinea(line) !== null">
+                  cantidad {{ line.cantidad }}, precio {{ money(Number(line.precio_unitario)) }}
+                </template>
+                <template v-else>precio pendiente</template>
+                <span v-if="line.descripcion"><br />{{ line.descripcion }}</span></span
+              >
             </div>
             <p v-if="header.plazo_entrega"><strong>Plazo:</strong> {{ header.plazo_entrega }}</p>
             <p v-if="header.validez_oferta">
@@ -3281,15 +3301,56 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     margin-left: auto;
   }
 }
-.line-heading { display: flex; gap: .8rem; align-items: center; min-width: 0; }
-.line-heading strong { overflow-wrap: anywhere; }
-.line-thumbnail { width: 4rem; height: 4rem; flex: none; overflow: hidden;
-  border: 1px solid var(--color-border); border-radius: var(--radius-control); }
-.line-thumbnail :deep(.product-image) { width: 100%; height: 100%; min-height: 0; aspect-ratio: 1 !important; }
-.line-thumbnail :deep(.fallback span) { display: none; }
-.review-thumbnail { flex: none; width: 3rem; height: 3rem; border-radius: var(--radius-control); overflow: hidden; }
-.review-thumbnail :deep(.product-image) { width: 100%; height: 100%; min-height: 0; aspect-ratio: 1 !important; }
-.review-thumbnail :deep(.fallback span) { display: none; }
-.review-line { display: flex; align-items: center; gap: .6rem; }
-.menu-panel [role='menuitem'] { display: flex; align-items: center; gap: .65rem; }
+.line-heading {
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+  min-width: 0;
+}
+.line-heading strong {
+  overflow-wrap: anywhere;
+}
+.line-thumbnail {
+  width: 4rem;
+  height: 4rem;
+  flex: none;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+.line-thumbnail :deep(.product-image) {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  aspect-ratio: 1 !important;
+}
+.line-thumbnail :deep(.fallback span) {
+  display: none;
+}
+.review-thumbnail {
+  flex: none;
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+.review-thumbnail :deep(.product-image) {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  aspect-ratio: 1 !important;
+}
+.review-thumbnail :deep(.fallback span) {
+  display: none;
+}
+.review-line {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.menu-panel [role='menuitem'] {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
 </style>

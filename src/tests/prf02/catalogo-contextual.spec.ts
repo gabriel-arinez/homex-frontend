@@ -189,7 +189,10 @@ describe('PRF-02 catálogo contextual', () => {
     try {
       await flushPromises()
       expect(wrapper.findAll('.producto')).toHaveLength(1)
-      await wrapper.findAll('button').find((b) => b.text().includes('Lista'))!.trigger('click')
+      await wrapper
+        .findAll('button')
+        .find((b) => b.text().includes('Lista'))!
+        .trigger('click')
       expect(wrapper.find('table.catalog-table').exists()).toBe(true)
       expect(wrapper.find('.thumbnail').exists()).toBe(true)
       await wrapper.get('button.image-toggle').trigger('click')
@@ -217,14 +220,19 @@ describe('PRF-02 catálogo contextual', () => {
     try {
       await flushPromises()
       expect(wrapper.text()).not.toContain('Crear nuevo producto')
-      await wrapper.findAll('button').find((b) => b.text().includes('Sillas'))!.trigger('click')
+      await wrapper
+        .findAll('button')
+        .find((b) => b.text().includes('Sillas'))!
+        .trigger('click')
       await flushPromises()
-      await wrapper.findAll('button').find((b) => b.text().includes('Crear nuevo producto'))!.trigger('click')
+      await wrapper
+        .findAll('button')
+        .find((b) => b.text().includes('Crear nuevo producto'))!
+        .trigger('click')
       expect(wrapper.emitted('create')?.[0]).toEqual(['SILLA'])
       expect(wrapper.get('.empty-results').text()).toContain('Sin coincidencias')
     } finally {
       wrapper.unmount()
     }
   })
-
 })
