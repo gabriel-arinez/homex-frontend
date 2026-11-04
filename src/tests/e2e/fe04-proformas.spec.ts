@@ -441,12 +441,11 @@ test('FE04 crea con unitario y descuento, revisa y aprueba', async ({ page }) =>
   await page.getByRole('button', { name: /Condiciones$/ }).click()
   await page.getByLabel('Título').fill('Oficina nueva')
   await page.getByRole('button', { name: /Revisar$/ }).click()
-  await page.getByRole('button', { name: 'Emitir proforma' }).click()
-  await expect(page.locator('.quote-save-reference')).toContainText('En revisión')
-  await page.getByRole('button', { name: 'Ver detalle, aprobar y gestionar adjuntos' }).click()
-  await expect(page).toHaveURL(/\/proformas\/1$/)
-  await page.getByRole('button', { name: 'Aprobar' }).click()
-  await page.getByRole('dialog').getByRole('button', { name: 'Aprobar' }).click()
+  await page.getByRole('button', { name: 'Enviar a revisión' }).click()
+  await expect(page).toHaveURL(/\/proformas\/1(?:\?|$)/)
+  await expect(page.getByText('En revisión').first()).toBeVisible()
+  await page.getByRole('button', { name: 'Aprobar y crear pedido' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Aprobar y crear pedido' }).click()
   await expect(page.getByRole('status')).toContainText('Pedido #55')
 })
 
@@ -484,11 +483,10 @@ test('FE04 representa conflicto de stock y doble aprobación sin éxito aparente
       body: JSON.stringify({ detail: 'Stock insuficiente para confirmar el pedido.' }),
     }),
   )
+  state.quote().estado_info = { id: 3, codigo: 'EN_REVISION', nombre: 'En revisión' }
   await page.goto('/proformas/1')
-  await page.getByRole('button', { name: 'Enviar' }).click()
-  await page.getByRole('dialog').getByRole('button', { name: 'Enviar' }).click()
-  await page.getByRole('button', { name: 'Aprobar' }).click()
-  await page.getByRole('dialog').getByRole('button', { name: 'Aprobar' }).click()
+  await page.getByRole('button', { name: 'Aprobar y crear pedido' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Aprobar y crear pedido' }).click()
   await expect(page.getByRole('alert')).toContainText('Stock insuficiente')
   await expect(page.getByText(/Pedido #/)).toHaveCount(0)
 })
@@ -518,6 +516,7 @@ test('FE04 mantiene adjuntos editables en revisión y los congela al aprobar', a
     },
   ]
   state.quote().total = '100.00'
+  state.quote().estado_info = { id: 3, codigo: 'EN_REVISION', nombre: 'En revisión' }
   await page.goto('/proformas/1')
   const input = page.getByLabel('Seleccionar imágenes')
   await input.setInputFiles({
@@ -553,11 +552,9 @@ test('FE04 mantiene adjuntos editables en revisión y los congela al aprobar', a
   })
   await page.getByRole('button', { name: 'Subir' }).click()
   await expect(page.getByText('La imagen supera el máximo de 10 MiB.')).toBeVisible()
-  await page.getByRole('button', { name: 'Enviar' }).click()
-  await page.getByRole('dialog').getByRole('button', { name: 'Enviar' }).click()
   await expect(page.getByRole('button', { name: 'Eliminar' })).toHaveCount(2)
-  await page.getByRole('button', { name: 'Aprobar' }).click()
-  await page.getByRole('dialog').getByRole('button', { name: 'Aprobar' }).click()
+  await page.getByRole('button', { name: 'Aprobar y crear pedido' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Aprobar y crear pedido' }).click()
   await expect(page.getByRole('button', { name: 'Eliminar' })).toHaveCount(0)
   await expect(page.getByAltText('Preview de grande.png')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Subir' })).toHaveCount(0)
@@ -607,50 +604,27 @@ test('FE04 representa acceso directo a proforma de otro vendedor como 404', asyn
   await expect(page.getByRole('alert')).toContainText('No encontrado')
 })
 
-test('FE04 refresca autoridad tras 409 y congela la edición', async ({ page }) => {
-  const state = await mockBackend(page)
-  await page.goto('/proformas/1')
-  await expect(page.getByRole('button', { name: 'Editar cabecera' })).toBeEnabled()
-  await page.getByRole('button', { name: 'Editar cabecera' }).click()
-  await page.getByLabel('Título').fill('Cambio concurrente')
-  await page.route('**/api/v1/proformas/1/', async (route) => {
-    if (route.request().method() !== 'PATCH') return route.fallback()
-    state.quote().estado = 3
-    state.quote().estado_info = { id: 3, codigo: 'ENVIADA', nombre: 'Enviada' }
-    return route.fulfill({
-      status: 409,
-      contentType: 'application/json',
-      body: JSON.stringify({ detail: 'La proforma ya fue enviada por otra operación.' }),
-    })
-  })
-  await page.getByRole('button', { name: 'Guardar cambios' }).click()
-  await expect(page.getByRole('alert')).toContainText('La proforma ya fue enviada')
-  await expect(page.getByText(/modo lectura/)).toBeVisible()
+test('FE04 detalle sólo consulta y centraliza la edición comercial', async ({ page }) => {
+  await mockBackend(page)
+  await page.goto('/proformas/1?returnTo=%2Fproformas%3Festado%3DBORRADOR')
+  await expect(page.getByRole('heading', { name: 'Proforma #101' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Editar cabecera' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Agregar línea' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Continuar edición' }).click()
+  await expect(page).toHaveURL(/\/proformas\/1\/editar\?returnTo=/)
+  await page.getByRole('button', { name: 'Volver a proformas' }).click()
+  await expect(page).toHaveURL(/\/proformas\?estado=BORRADOR$/)
 })
 
-test('FE04 conserva detalle si fallan catálogos y permite reintentar', async ({ page }) => {
+test('FE04 detalle funciona sin cargar catálogos auxiliares de edición', async ({ page }) => {
   await mockBackend(page)
-  let failed = false
-  await page.route('**/api/v1/catalogo/opciones/**', (route) => {
-    const concepto = new URL(route.request().url()).searchParams.get('concepto')
-    if (concepto === 'TIPO_ITEM' && !failed) {
-      failed = true
-      return route.fulfill({
-        status: 500,
-        contentType: 'application/json',
-        body: JSON.stringify({ detail: 'Catálogo temporalmente no disponible.' }),
-      })
-    }
-    return route.fallback()
-  })
+  await page.route('**/api/v1/catalogo/opciones/**', (route) =>
+    route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ detail: 'Servicio no disponible' }) }),
+  )
   await page.goto('/proformas/1')
   await expect(page.getByRole('heading', { name: 'Proforma #101' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Reintentar datos auxiliares' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Agregar línea' })).toBeDisabled()
-  await page.getByRole('button', { name: 'Reintentar datos auxiliares' }).click()
+  await expect(page.getByRole('heading', { name: 'Información comercial' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Reintentar datos auxiliares' })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Agregar línea' })).toBeEnabled()
 })
 
 test('FE04 selecciona cliente y producto fuera de la primera página', async ({ page }) => {
