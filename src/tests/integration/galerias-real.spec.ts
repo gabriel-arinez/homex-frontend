@@ -28,6 +28,7 @@ for (const width of [360, 1280]) {
     await page.locator('input[name=sku]').fill(`GAL-${width}-${Date.now()}`)
     await page.locator('select[name=unidad]').selectOption({ label: 'Pieza' })
     await page.locator('input[name=precio]').fill('150')
+    await expect(page.getByLabel('Agregar imágenes', { exact: true })).toBeEnabled()
     await page
       .getByLabel('Agregar imágenes', { exact: true })
       .setInputFiles([file('red'), file('blue')])
@@ -78,6 +79,7 @@ test('Galería real de mueble: borrador restaurado y vinculación integral', asy
   await page.getByRole('button', { name: 'Mueble a pedido' }).click()
   await page.getByLabel('Nombre comercial del mueble').fill('Mueble con referencias E2E')
   await step(page, 'Imágenes')
+  await expect(page.getByLabel('Agregar imágenes', { exact: true })).toBeEnabled()
   await page
     .getByLabel('Agregar imágenes', { exact: true })
     .setInputFiles([file('red'), file('green')])
