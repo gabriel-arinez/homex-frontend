@@ -10,12 +10,20 @@ import Button from '@/shared/ui/Button.vue'
 import SearchField from '@/shared/ui/SearchField.vue'
 import Select from '@/shared/ui/Select.vue'
 import Pagination from '@/shared/ui/Pagination.vue'
+import Toast from '@/shared/ui/Toast.vue'
+import { readCatalogImagesVisible, writeCatalogImagesVisible } from '@/shared/media/catalogImageVisibility'
+import {
+  ArrowLeft, ArrowRight, Check, ChevronDown, CircleAlert, Eye,
+  EyeOff, LayoutGrid, Layers, List, Package, PackageOpen, Plus,
+  SearchX, SlidersHorizontal, Sofa,
+} from '@lucide/vue'
 
 const props = defineProps<{
   categorias: ValorCatalogoPublico[]
   familias: FamiliaProducto[]
   existingProductIds: number[]
-  canAdmin?: boolean
+  canCreate?: boolean
+  canEditProduct?: (producto: Producto) => boolean
   initialState?: CatalogoContextState
 }>()
 const emit = defineEmits<{
@@ -70,7 +78,19 @@ const filters = reactive<Record<Field, string>>({
 })
 const options = ref<Record<string, ValorCatalogoPublico[]>>({})
 const view = ref<'grid' | 'lista'>(props.initialState?.view ?? 'grid')
-const filtersExpanded = ref(true)
+const filtersExpanded = ref(false)
+const showImages = ref(readCatalogImagesVisible())
+const notification = ref('')
+watch(showImages, writeCatalogImagesVisible)
+function categoryIcon(code: string) {
+  if (code === 'SILLA') return Sofa
+  if (code === 'PISO_FLOTANTE') return Layers
+  return Package
+}
+function selectProduct(product: Producto) {
+  if (props.existingProductIds.includes(product.id)) emit('duplicate', product.id)
+  else emit('select', product)
+}
 const page = ref(props.initialState?.page ?? 1)
 const products = ref<Producto[]>([])
 const preview = ref<Producto | null>(null)
@@ -114,6 +134,7 @@ function clearFilter(key: string) {
   else if (key in filters) filters[key as Field] = ''
 }
 function clearAllFilters() {
+  notification.value = 'Filtros eliminados. Se muestra el catálogo disponible.'
   search.value = ''
   category.value = ''
   family.value = ''
@@ -209,7 +230,6 @@ watch(
   { deep: true },
 )
 onMounted(() => {
-  filtersExpanded.value = window.innerWidth >= 640
   if (category.value) void loadOptions()
   void load()
 })
