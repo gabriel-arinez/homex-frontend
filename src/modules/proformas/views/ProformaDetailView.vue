@@ -322,7 +322,7 @@ onMounted(() => void load())
             </div>
             <strong>{{ money(line.total) }}</strong>
           </div>
-          <div v-if="line.tipo_item_info.codigo === 'MUEBLE_MEDIDA'" class="media">
+          <div class="media">
             <h4><Paperclip :size="16" aria-hidden="true" /> Imágenes de referencia</h4>
             <p>Adjuntos asociados a esta línea y conservados en el servidor.</p>
             <AdjuntosDetalle :proforma-id="quote.id" :detalle-id="line.id" :editable="editable" />
