@@ -187,11 +187,15 @@ describe('PRF-02 catálogo contextual', () => {
     })
     try {
       await flushPromises()
-      const openPreview = wrapper.findAll('button').find((button) => button.text().includes('Ver ficha'))
+      const openPreview = wrapper
+        .findAll('button')
+        .find((button) => button.text().includes('Ver ficha'))
       expect(openPreview).toBeDefined()
       await openPreview!.trigger('click')
       await flushPromises()
-      const select = document.body.querySelector<HTMLButtonElement>('.preview-actions button:last-child')
+      const select = document.body.querySelector<HTMLButtonElement>(
+        '.preview-actions button:last-child',
+      )
       expect(select).not.toBeNull()
       select!.click()
       await flushPromises()
