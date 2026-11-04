@@ -245,6 +245,11 @@ function askLeaveConfirmation(): Promise<boolean> {
     leaveResolver = resolve
   })
 }
+function discardLeave() {
+  if (leaveSaving.value) return
+  sessionStorage.removeItem(`homex:ap5:draft:${autosaveToken()}`)
+  answerLeave(true)
+}
 function answerLeave(allowed: boolean) {
   if (leaveSaving.value) return
   leaveDialog.value = false
@@ -1341,7 +1346,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       :error="leaveSaveError"
       :in-review="isReview"
       @cancel="answerLeave(false)"
-      @discard="answerLeave(true)"
+      @discard="discardLeave"
       @save="saveAndLeave"
     />
     <div v-if="!furnitureOpen" class="quote-main">
