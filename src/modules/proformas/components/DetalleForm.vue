@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type {
   DetalleProforma,
   DetalleProformaWritable,
@@ -10,6 +10,7 @@ import type {
 import ProductoSelector from './ProductoSelector.vue'
 import ProductImage from '@/modules/productos/components/ProductImage.vue'
 import Button from '@/shared/ui/Button.vue'
+import Toast from '@/shared/ui/Toast.vue'
 import Select from '@/shared/ui/Select.vue'
 import TextField from '@/shared/ui/TextField.vue'
 import { ApiError } from '@/shared/api'
@@ -41,6 +42,10 @@ const saving = ref(false),
   error = ref(''),
   fields = ref<Record<string, string[]>>({})
 const session = getActivePinia() ? useSessionStore() : null
+const errorToast = ref('')
+watch(error, (message) => {
+  if (message) errorToast.value = message
+})
 const form = reactive({
   tipo_item: String(props.detail?.tipo_item ?? props.tipos[0]?.id ?? ''),
   producto: String(props.detail?.producto ?? ''),
@@ -207,6 +212,7 @@ async function submit() {
     @change="emit('changed')"
     @submit.prevent="submit"
   >
+    <Toast :visible="Boolean(errorToast)" :message="errorToast" tone="danger" @close="errorToast = ''" />
     <Select
       v-model="form.tipo_item"
       name="tipo-item"
