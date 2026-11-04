@@ -323,7 +323,7 @@ onBeforeUnmount(() => {
     <div class="toolbar results-toolbar">
       <p role="status">{{ total }} {{ total === 1 ? 'producto encontrado' : 'productos encontrados' }}</p>
       <div class="results-tools">
-        <Button v-if="canCreate" variant="secondary" @click="emit('create', categoryCode)">
+        <Button v-if="canCreate && category" variant="secondary" @click="emit('create', categoryCode)">
           <Plus :size="16" aria-hidden="true" /> Crear nuevo producto
         </Button>
         <button
