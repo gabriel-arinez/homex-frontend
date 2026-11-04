@@ -41,7 +41,9 @@ export function useQuoteFurnitureCovers() {
         let fromGallery: GalleryImage[] = []
         if (line.galeria_id) {
           try {
-            fromGallery = (await galleryService.list(`/api/v1/galerias/${line.galeria_id}/imagenes/`)).imagenes
+            fromGallery = (
+              await galleryService.list(`/api/v1/galerias/${line.galeria_id}/imagenes/`)
+            ).imagenes
           } catch {
             // Las proformas históricas pueden conservar archivos sin galería operativa.
             // El endpoint de adjuntos también valida los permisos de acceso.

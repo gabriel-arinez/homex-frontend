@@ -1512,7 +1512,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   />
                 </div>
                 <div v-else-if="furnitureCoverSource(line)" class="line-thumbnail">
-                  <GalleryPhoto :src="furnitureCoverSource(line)" :alt="'Imagen principal de ' + line.nombre" />
+                  <GalleryPhoto
+                    :src="furnitureCoverSource(line)"
+                    :alt="'Imagen principal de ' + line.nombre"
+                  />
                 </div>
                 <strong>{{ line.nombre }}</strong>
               </div>
@@ -1835,7 +1838,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 />
               </div>
               <div v-else-if="furnitureCoverSource(line)" class="review-thumbnail">
-                <GalleryPhoto :src="furnitureCoverSource(line)" :alt="'Imagen principal de ' + line.nombre" />
+                <GalleryPhoto
+                    :src="furnitureCoverSource(line)"
+                    :alt="'Imagen principal de ' + line.nombre"
+                  />
               </div>
               <span
                 ><strong>{{ line.nombre }}</strong> —

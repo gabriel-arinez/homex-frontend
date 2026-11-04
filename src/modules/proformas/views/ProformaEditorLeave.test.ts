@@ -21,7 +21,10 @@ async function editor() {
     Promise.resolve(options[code] as never),
   )
   vi.spyOn(proformasService, 'families').mockResolvedValue({
-    count: 0, next: null, previous: null, results: [],
+    count: 0,
+    next: null,
+    previous: null,
+    results: [],
   })
   const router = createRouter({
     history: createMemoryHistory(),

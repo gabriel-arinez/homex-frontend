@@ -330,7 +330,10 @@ onMounted(() => void load())
                 />
               </div>
               <div v-else-if="furnitureCoverSource(line)" class="line-thumbnail">
-                <GalleryPhoto :src="furnitureCoverSource(line)" :alt="'Imagen principal de ' + line.nombre" />
+                <GalleryPhoto
+                  :src="furnitureCoverSource(line)"
+                  :alt="'Imagen principal de ' + line.nombre"
+                />
               </div>
               <div>
                 <small
