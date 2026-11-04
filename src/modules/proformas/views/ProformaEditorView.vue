@@ -39,6 +39,10 @@ import {
   SlidersHorizontal,
   Sofa,
   UserRound,
+  Pencil,
+  Copy,
+  Trash2,
+  Wrench,
 } from '@lucide/vue'
 import Button from '@/shared/ui/Button.vue'
 import Card from '@/shared/ui/Card.vue'
@@ -1458,7 +1462,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   :disabled="line.modo_calculo === 'TOTAL_NEGOCIADO'"
                   @click="selectMenuAction('edit', index)"
                 >
-                  Editar
+                  <Pencil :size="16" aria-hidden="true" /> Editar
                 </button>
                 <button
                   v-if="tipos.find((x) => x.id === line.tipo_item)?.codigo === 'MUEBLE_MEDIDA'"
@@ -1466,7 +1470,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   role="menuitem"
                   @click="selectMenuAction('spec', index)"
                 >
-                  Ficha técnica
+                  <Wrench :size="16" aria-hidden="true" /> Ficha técnica
                 </button>
                 <button
                   v-if="tipos.find((x) => x.id === line.tipo_item)?.codigo === 'MUEBLE_MEDIDA'"
@@ -1474,10 +1478,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   role="menuitem"
                   @click="selectMenuAction('duplicate', index)"
                 >
-                  Duplicar mueble
+                  <Copy :size="16" aria-hidden="true" /> Duplicar mueble
                 </button>
                 <button type="button" role="menuitem" @click="selectMenuAction('remove', index)">
-                  Eliminar
+                  <Trash2 :size="16" aria-hidden="true" /> Eliminar
                 </button>
               </div>
             </div>
@@ -3287,4 +3291,5 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 .review-thumbnail :deep(.product-image) { width: 100%; height: 100%; min-height: 0; aspect-ratio: 1 !important; }
 .review-thumbnail :deep(.fallback span) { display: none; }
 .review-line { display: flex; align-items: center; gap: .6rem; }
+.menu-panel [role='menuitem'] { display: flex; align-items: center; gap: .65rem; }
 </style>
