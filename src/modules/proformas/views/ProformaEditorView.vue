@@ -1065,6 +1065,15 @@ function body(emitir: boolean): ProformaIntegralWritable {
     detalles,
   }
 }
+async function requestReview() {
+  if (!canEmit.value || saving.value) return
+  const confirmed = await askConfirmation(
+    'La proforma se guardará y pasará a revisión. Todavía no se creará un pedido; la aprobación es una acción posterior.',
+    'Enviar proforma a revisión',
+    'Enviar a revisión',
+  )
+  if (confirmed) await persist(true)
+}
 async function persist(emitir: boolean) {
   if (saving.value || (emitir && (isReview.value || !canEmit.value))) return
   validationAttempted.value = true
@@ -1108,7 +1117,7 @@ async function persist(emitir: boolean) {
     if (emitir) {
       await router.replace({
         path: `/proformas/${result.id}`,
-        query: listQuery.value,
+        query: { ...listQuery.value, enviada: '1' },
       })
     } else if (!proformaId.value) {
       await router.replace({
@@ -1787,7 +1796,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 v-if="!isReview"
                 :disabled="!canEmit"
                 :processing="saving"
-                @click="persist(true)"
+                @click="requestReview"
                 >Enviar a revisión</Button
               >
               <Button
