@@ -242,18 +242,19 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="catalogo-contextual">
+    <Toast :visible="Boolean(notification)" :message="notification" tone="info" @close="notification = ''" />
+    <Toast :visible="Boolean(error)" :message="error" tone="danger" @close="error = ''" />
     <div class="head">
       <div>
-        <h3>Catálogo de productos</h3>
+        <h3><PackageOpen :size="20" aria-hidden="true" /> Seleccionar producto del catálogo</h3>
         <p>
-          Selecciona un SKU real para preparar su línea. Consultar no guarda la proforma ni reserva
-          stock.
+          Busca un SKU existente y configura su cantidad y precio para cotizar. Consultar el catálogo no reserva stock.
         </p>
       </div>
-      <Button variant="secondary" @click="emit('cancel')">Volver a la proforma</Button>
+      <Button variant="secondary" @click="emit('cancel')"><ArrowLeft :size="16" aria-hidden="true" /> Cerrar catálogo</Button>
     </div>
     <nav class="categorias" aria-label="Categorías de catálogo">
-      <button type="button" :aria-pressed="!category" @click="category = ''">Todos</button>
+      <button type="button" :aria-pressed="!category" @click="category = ''"><LayoutGrid :size="17" aria-hidden="true" /> Todos</button>
       <button
         v-for="item in categorias"
         :key="item.id"
@@ -261,24 +262,25 @@ onBeforeUnmount(() => {
         :aria-pressed="category === String(item.id)"
         @click="category = String(item.id)"
       >
+        <component :is="categoryIcon(item.codigo)" :size="17" aria-hidden="true" />
         {{ item.nombre }}
       </button>
     </nav>
-    <details class="filtros-panel" :open="filtersExpanded" @toggle="setFiltersOpen">
-      <summary>Filtros del catálogo</summary>
+    <div class="filters-primary">
+      <SearchField v-model="search" label="Buscar SKU o nombre" />
+      <Select
+        v-model="family"
+        name="familia-catalogo"
+        label="Familia"
+        :options="[
+          { label: 'Todas las familias', value: '' },
+          ...familias.filter((x) => x.activo).map((x) => ({ label: x.nombre, value: String(x.id) })),
+        ]"
+      />
+    </div>
+    <details v-if="activeFields.length" class="filtros-panel" :open="filtersExpanded" @toggle="setFiltersOpen">
+      <summary><SlidersHorizontal :size="17" aria-hidden="true" /> Más filtros <ChevronDown :size="16" aria-hidden="true" /></summary>
       <div class="filtros">
-        <SearchField v-model="search" label="Buscar SKU o nombre" />
-        <Select
-          v-model="family"
-          name="familia-catalogo"
-          label="Familia"
-          :options="[
-            { label: 'Todas las familias', value: '' },
-            ...familias
-              .filter((x) => x.activo)
-              .map((x) => ({ label: x.nombre, value: String(x.id) })),
-          ]"
-        />
         <template v-for="item in activeFields" :key="item.field">
           <Select
             v-if="item.concepto"
@@ -318,25 +320,34 @@ onBeforeUnmount(() => {
       </button>
       <Button variant="secondary" @click="clearAllFilters">Limpiar filtros</Button>
     </div>
-    <div v-if="canAdmin && category" class="toolbar">
-      <Button variant="secondary" @click="emit('create', categoryCode)"
-        >Crear producto maestro en esta categoría</Button
-      >
-    </div>
-    <div class="toolbar">
-      <p role="status">{{ total }} SKU encontrados</p>
-      <div>
+    <div class="toolbar results-toolbar">
+      <p role="status">{{ total }} {{ total === 1 ? 'producto encontrado' : 'productos encontrados' }}</p>
+      <div class="results-tools">
+        <Button v-if="canCreate" variant="secondary" @click="emit('create', categoryCode)">
+          <Plus :size="16" aria-hidden="true" /> Crear nuevo producto
+        </Button>
+        <button
+          v-if="view === 'lista'"
+          type="button"
+          class="image-toggle"
+          :aria-pressed="showImages"
+          @click="showImages = !showImages"
+        >
+          <EyeOff v-if="showImages" :size="16" aria-hidden="true" />
+          <Eye v-else :size="16" aria-hidden="true" />
+          {{ showImages ? 'Ocultar imágenes' : 'Mostrar imágenes' }}
+        </button>
         <Button
           :variant="view === 'grid' ? 'primary' : 'secondary'"
           :aria-pressed="view === 'grid'"
           @click="view = 'grid'"
-          >Cuadrícula</Button
+          ><LayoutGrid :size="16" aria-hidden="true" /> Cuadrícula</Button
         >
         <Button
           :variant="view === 'lista' ? 'primary' : 'secondary'"
           :aria-pressed="view === 'lista'"
           @click="view = 'lista'"
-          >Lista</Button
+          ><List :size="16" aria-hidden="true" /> Lista</Button
         >
       </div>
     </div>
@@ -344,10 +355,20 @@ onBeforeUnmount(() => {
       {{ error }} <button type="button" @click="load">Reintentar</button>
     </p>
     <p v-else-if="loading" role="status">Consultando catálogo…</p>
-    <p v-else-if="products.length === 0" role="status">No se encontraron SKU para estos filtros.</p>
-    <div v-else :class="view === 'grid' ? 'resultados-grid' : 'resultados-lista'">
+    <div v-else-if="products.length === 0" class="empty-results" role="status">
+      <SearchX :size="28" aria-hidden="true" />
+      <strong>{{ activeChips.length ? 'Sin coincidencias' : 'No hay productos activos disponibles' }}</strong>
+      <p>{{ activeChips.length ? 'No se encontraron productos con estos filtros.' : 'El catálogo no contiene productos activos para cotizar.' }}</p>
+      <Button v-if="activeChips.length" variant="secondary" @click="clearAllFilters">Limpiar filtros</Button>
+      <Button v-if="canCreate" @click="emit('create', categoryCode)">
+        <Plus :size="16" aria-hidden="true" /> Crear producto
+      </Button>
+    </div>
+    <div v-else-if="view === 'grid'" class="resultados-grid">
       <article v-for="producto in products" :key="producto.id" class="producto">
-        <ProductImage :image="producto.imagen_principal" :alt="producto.nombre" />
+        <div class="product-visual">
+          <ProductImage :image="producto.imagen_principal" :alt="producto.nombre" />
+        </div>
         <div class="detalle">
           <small>{{ producto.sku || 'Sin SKU' }} · {{ producto.categoria_info?.nombre }}</small>
           <h4>{{ producto.nombre }}</h4>
@@ -358,25 +379,69 @@ onBeforeUnmount(() => {
           >
           <small>Disponibilidad referencial: {{ producto.disponibilidad_referencial }}</small>
           <div class="card-actions">
-            <Button variant="secondary" @click="preview = producto">Ver ficha</Button>
-            <Button v-if="canAdmin" variant="secondary" @click="emit('edit', producto.id)"
-              >Editar ficha de catálogo</Button
+            <Button variant="secondary" @click="preview = producto"><Eye :size="16" aria-hidden="true" /> Ver ficha</Button>
+            <Button v-if="canEditProduct?.(producto)" variant="secondary" @click="emit('edit', producto.id)"
+              >Editar ficha</Button
             >
           </div>
           <Button
             variant="primary"
-            @click="
-              existingProductIds.includes(producto.id)
-                ? emit('duplicate', producto.id)
-                : emit('select', producto)
-            "
+            @click="selectProduct(producto)"
           >
-            {{
-              existingProductIds.includes(producto.id) ? 'Ir a línea' : 'Seleccionar para cotizar'
-            }}
+            <Check v-if="existingProductIds.includes(producto.id)" :size="16" aria-hidden="true" />
+            <Plus v-else :size="16" aria-hidden="true" />
+            {{ existingProductIds.includes(producto.id) ? 'Ir a línea' : 'Seleccionar para cotizar' }}
           </Button>
         </div>
       </article>
+    </div>
+    <div v-else class="table-wrap">
+      <table class="catalog-table">
+        <caption class="sr-only">Catálogo de productos disponibles para cotizar</caption>
+        <thead>
+          <tr>
+            <th scope="col">Producto</th><th scope="col">Categoría y familia</th>
+            <th scope="col" class="numeric">Precio vigente</th><th scope="col">Disponibilidad ref.</th>
+            <th scope="col" class="actions">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="producto in products" :key="producto.id">
+            <td data-label="Producto">
+              <div class="product-identity">
+                <div v-if="showImages" class="thumbnail">
+                  <ProductImage :image="producto.imagen_principal" :alt="producto.nombre" sizes="56px" />
+                </div>
+                <div class="product-identity__copy">
+                  <strong>{{ producto.nombre }}</strong>
+                  <small>{{ producto.sku || 'Sin SKU' }}</small>
+                </div>
+              </div>
+            </td>
+            <td data-label="Categoría y familia">
+              {{ producto.categoria_info?.nombre }}
+              <small v-if="producto.familia_info" class="table-secondary">{{ producto.familia_info.nombre }}</small>
+            </td>
+            <td data-label="Precio vigente" class="numeric"><strong>{{ money(producto.precio_vigente) }}</strong></td>
+            <td data-label="Disponibilidad ref.">{{ producto.disponibilidad_referencial }} {{ producto.unidad_stock_info?.nombre }}</td>
+            <td data-label="Acciones">
+              <div class="table-actions">
+                <Button variant="secondary" :aria-label="'Ver ficha de ' + producto.nombre" @click="preview = producto">
+                  <Eye :size="16" aria-hidden="true" />
+                </Button>
+                <Button v-if="canEditProduct?.(producto)" variant="secondary" @click="emit('edit', producto.id)">
+                  Editar
+                </Button>
+                <Button @click="selectProduct(producto)">
+                  <Check v-if="existingProductIds.includes(producto.id)" :size="16" aria-hidden="true" />
+                  <Plus v-else :size="16" aria-hidden="true" />
+                  {{ existingProductIds.includes(producto.id) ? 'Ir a línea' : 'Añadir' }}
+                </Button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
     <Pagination
       v-if="!error && totalPages > 1"
@@ -409,7 +474,13 @@ onBeforeUnmount(() => {
         <p v-if="preview.piso">
           Modelo: {{ preview.piso.modelo }} · Espesor: {{ preview.piso.espesor_mm }} mm
         </p>
-        <Button variant="secondary" @click="preview = null">Cerrar ficha</Button>
+        <div class="preview-actions">
+          <Button variant="secondary" @click="preview = null">Cerrar ficha</Button>
+          <Button @click="selectProduct(preview); preview = null">
+            <ArrowRight :size="16" aria-hidden="true" />
+            {{ existingProductIds.includes(preview.id) ? 'Ir a línea' : 'Seleccionar para cotizar' }}
+          </Button>
+        </div>
       </div>
     </Modal>
     <div v-if="category && family" class="pendiente">
