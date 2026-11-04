@@ -96,11 +96,21 @@ async function save(body: ProductoWritable, images: LocalImage[]) {
 }
 function cancel() {
   if (saving.value) return
-  if (dirty.value) confirmCancel.value = true
+  if (createdId.value !== null || dirty.value) confirmCancel.value = true
   else void router.push(destination())
 }
 function discard() {
   confirmCancel.value = false
+  if (createdId.value !== null) {
+    // El producto ya existe: abandonar la carga no equivale a descartar el registro.
+    allowNavigationAfterSave = true
+    void router.push({
+      name: 'producto-detail',
+      params: { id: createdId.value },
+      query: { returnTo: route.query.returnTo, draft: route.query.draft },
+    })
+    return
+  }
   dirty.value = false
   void router.push(destination())
 }
@@ -151,17 +161,21 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     />
     <ConfirmDialog
       :open="confirmCancel"
-      title="Descartar producto"
-      description="Los datos que ingresaste no se guardarán."
-      confirm-label="Descartar y salir"
+      :title="createdId !== null ? 'Producto ya registrado' : 'Descartar producto'"
+      :description="createdId !== null
+        ? `El producto #${createdId} ya está registrado. Salir no lo elimina. Puedes reintentar la carga de imágenes o ir a su ficha para completarlas.`
+        : 'Los datos que ingresaste no se guardarán.'"
+      :confirm-label="createdId !== null ? 'Ir a su ficha' : 'Descartar y salir'"
       @close="confirmCancel = false"
       @confirm="discard"
     />
     <ConfirmDialog
       :open="confirmLeave"
-      title="Salir sin guardar"
-      description="Hay cambios sin guardar en este producto. Si sales, se descartarán."
-      confirm-label="Salir sin guardar"
+      :title="createdId !== null ? 'Producto ya registrado' : 'Salir sin guardar'"
+      :description="createdId !== null
+        ? `El producto #${createdId} ya existe en HOMEX. Salir no lo elimina y algunas imágenes podrían seguir pendientes de cargar.`
+        : 'Hay cambios sin guardar en este producto. Si sales, se descartarán.'"
+      :confirm-label="createdId !== null ? 'Salir y conservar producto' : 'Salir sin guardar'"
       @close="answerLeave(false)"
       @confirm="answerLeave(true)"
     />
