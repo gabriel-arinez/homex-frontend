@@ -53,6 +53,7 @@ import Modal from '@/shared/ui/Modal.vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
 import Toast from '@/shared/ui/Toast.vue'
 import ConfirmDialog from '@/shared/ui/ConfirmDialog.vue'
+import UnsavedChangesDialog from '../components/UnsavedChangesDialog.vue'
 import TextField from '@/shared/ui/TextField.vue'
 import ClienteSelector from '../components/ClienteSelector.vue'
 import ClienteFormFields from '@/modules/clientes/components/ClienteFormFields.vue'
@@ -231,6 +232,44 @@ function answerConfirmation(answer: boolean) {
   const resolver = confirmResolver
   confirmResolver = null
   resolver?.(answer)
+}
+const leaveDialog = ref(false)
+const leaveSaving = ref(false)
+const leaveSaveError = ref('')
+let leaveResolver: ((allowed: boolean) => void) | null = null
+function askLeaveConfirmation(): Promise<boolean> {
+  if (leaveResolver) leaveResolver(false)
+  leaveDialog.value = true
+  leaveSaveError.value = ''
+  return new Promise<boolean>((resolve) => {
+    leaveResolver = resolve
+  })
+}
+function answerLeave(allowed: boolean) {
+  if (leaveSaving.value) return
+  leaveDialog.value = false
+  leaveSaveError.value = ''
+  const resolve = leaveResolver
+  leaveResolver = null
+  resolve?.(allowed)
+}
+async function saveAndLeave() {
+  if (leaveSaving.value || saving.value) return
+  leaveSaving.value = true
+  leaveSaveError.value = ''
+  try {
+    const saved = await persist(false, true)
+    if (!saved) {
+      leaveSaveError.value = error.value || 'No se pudieron guardar los cambios.'
+      return
+    }
+  } catch (cause) {
+    leaveSaveError.value = cause instanceof Error ? cause.message : 'No se pudo guardar la proforma.'
+    return
+  } finally {
+    leaveSaving.value = false
+  }
+  answerLeave(true)
 }
 const whatsappExpanded = ref(false)
 const whatsappEdited = ref(false)
@@ -1170,8 +1209,8 @@ async function requestReview() {
   )
   if (confirmed) await persist(true)
 }
-async function persist(emitir: boolean) {
-  if (saving.value || (emitir && (isReview.value || !canEmit.value))) return
+async function persist(emitir: boolean, skipNavigation = false): Promise<boolean> {
+  if (saving.value || (emitir && (isReview.value || !canEmit.value))) return false
   validationAttempted.value = true
   localErrors.value = validateQuoteConditions(header)
   if (clienteMode.value === 'nuevo') {
@@ -1190,13 +1229,14 @@ async function persist(emitir: boolean) {
     )
       ? 1
       : 2
-    return
+    return false
   }
   saving.value = true
   error.value = ''
   success.value = ''
   conflicted.value = false
   fields.value = {}
+  let completed = false
   try {
     for (const line of lineas.value) {
       if (!line.galeria_id) continue
@@ -1223,17 +1263,20 @@ async function persist(emitir: boolean) {
         ? 'Cambios guardados en la proforma en revisión.'
         : 'Borrador guardado.'
     allowNavigationAfterSave = true
-    if (emitir) {
-      await router.replace({
-        path: `/proformas/${result.id}`,
-        query: { ...listQuery.value, enviada: '1' },
-      })
-    } else if (!proformaId.value) {
-      await router.replace({
-        path: `/proformas/${result.id}/editar`,
-        query: listQuery.value,
-      })
+    if (!skipNavigation) {
+      if (emitir) {
+        await router.replace({
+          path: `/proformas/${result.id}`,
+          query: { ...listQuery.value, enviada: '1' },
+        })
+      } else if (!proformaId.value) {
+        await router.replace({
+          path: `/proformas/${result.id}/editar`,
+          query: listQuery.value,
+        })
+      }
     }
+    completed = true
   } catch (cause) {
     if (cause instanceof ApiError) fields.value = cause.fields
     error.value = cause instanceof Error ? cause.message : 'No se pudo guardar la proforma.'
@@ -1250,6 +1293,7 @@ async function persist(emitir: boolean) {
     allowNavigationAfterSave = false
     saving.value = false
   }
+  return completed
 }
 function beforeUnload(event: BeforeUnloadEvent) {
   if (!dirty.value && !lineModalDirty.value && !specModalDirty.value) return
@@ -1263,11 +1307,7 @@ onBeforeRouteLeave(async () => {
     (!dirty.value && !lineModalDirty.value && !specModalDirty.value)
   )
     return true
-  return askConfirmation(
-    'Hay cambios sin guardar. Si sales, podrías perder los datos introducidos.',
-    'Salir sin guardar',
-    'Salir sin guardar',
-  )
+  return askLeaveConfirmation()
 })
 onMounted(async () => {
   window.addEventListener('beforeunload', beforeUnload)
@@ -1294,6 +1334,15 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       :confirm-label="confirmation?.confirmLabel"
       @close="answerConfirmation(false)"
       @confirm="answerConfirmation(true)"
+    />
+    <UnsavedChangesDialog
+      :open="leaveDialog"
+      :saving="leaveSaving"
+      :error="leaveSaveError"
+      :in-review="isReview"
+      @cancel="answerLeave(false)"
+      @discard="answerLeave(true)"
+      @save="saveAndLeave"
     />
     <div v-if="!furnitureOpen" class="quote-main">
       <div class="quote-topline" aria-label="Ubicación en el proceso">
@@ -1930,9 +1979,15 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               /></Button>
             </div>
             <div class="editor-actions__operations">
-              <Button variant="secondary" :processing="saving" @click="persist(false)">{{
-                isReview ? 'Guardar cambios' : 'Guardar borrador'
-              }}</Button>
+              <Button
+                variant="secondary"
+                class="editor-save-draft"
+                :processing="saving"
+                @click="persist(false)"
+              >
+                <Save :size="17" aria-hidden="true" />
+                {{ isReview ? 'Guardar cambios' : 'Guardar borrador' }}
+              </Button>
               <Button
                 v-if="!isReview"
                 :disabled="!canEmit"
@@ -3320,6 +3375,17 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   .emission-checklist li button {
     margin-left: auto;
   }
+}
+.editor-actions :deep(.button.editor-save-draft) {
+  color: #fff;
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  box-shadow: 0 2px 8px rgb(29 78 216 / 15%);
+}
+.editor-actions :deep(.button.editor-save-draft:hover:not(:disabled)) {
+  color: #fff;
+  background: #1e40af;
+  border-color: #1e40af;
 }
 .line-heading {
   display: flex;
