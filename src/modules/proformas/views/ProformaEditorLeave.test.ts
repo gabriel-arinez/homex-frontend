@@ -66,7 +66,12 @@ const draft = {
   detalles: [],
 } as unknown as Proforma
 
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => {
+  vi.restoreAllMocks()
+  for (const key of Object.keys(sessionStorage)) {
+    if (key.startsWith('homex:ap5:draft:gallery:')) sessionStorage.removeItem(key)
+  }
+})
 
 describe('salida protegida del editor de proformas', () => {
   it('ofrece las tres acciones y permite seguir editando sin perder el borrador', async () => {
@@ -120,12 +125,15 @@ describe('salida protegida del editor de proformas', () => {
   it('permite salir sin guardar únicamente tras confirmación expresa', async () => {
     const save = vi.spyOn(proformasService, 'saveIntegral')
     const { wrapper, router } = await editor()
+    const key = 'homex:ap5:draft:gallery:unknown:/proformas/nueva'
+    sessionStorage.setItem(key, JSON.stringify({ titulo: 'No guardar' }))
     const navigation = router.push('/proformas')
     await flushPromises()
     wrapper.getComponent(UnsavedChangesDialog).vm.$emit('discard')
     await navigation
     expect(router.currentRoute.value.path).toBe('/proformas')
     expect(save).not.toHaveBeenCalled()
+    expect(sessionStorage.getItem(key)).toBeNull()
     wrapper.unmount()
   })
 })
