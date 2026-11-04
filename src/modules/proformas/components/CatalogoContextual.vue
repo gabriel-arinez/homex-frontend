@@ -360,7 +360,8 @@ onBeforeUnmount(() => {
         >
       </div>
     </div>
-    <p v-if="error" role="alert">
+    <p v-if="error" role="alert" class="catalog-error">
+      <CircleAlert :size="18" aria-hidden="true" />
       {{ error }} <button type="button" @click="load">Reintentar</button>
     </p>
     <p v-else-if="loading" role="status">Consultando catálogo…</p>
@@ -502,6 +503,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.catalog-error { display: flex; align-items: center; gap: .55rem; color: var(--color-danger); }
 .catalogo-contextual {
   display: grid;
   gap: var(--space-4);
