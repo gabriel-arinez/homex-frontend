@@ -10,11 +10,20 @@ export type AprobarProformaRespuesta = {
 }
 
 export type ArchivoAdjunto = {
+  readonly sha256: string
   readonly id: number
   readonly nombre: string
   readonly mime_type: string
   readonly tamano_bytes: number
   readonly url: string
+  readonly posicion: number
+  readonly principal: boolean
+  readonly variantes: {
+    [key: string]: string
+  }
+  readonly dimensiones: {
+    [key: string]: number
+  }
 }
 
 export type AtributoMueble = {
@@ -72,6 +81,10 @@ export type CapturaRevision = {
 }
 
 export type CargaArchivoImagen = {
+  archivo: string
+}
+
+export type CargaGaleria = {
   archivo: string
 }
 
@@ -191,6 +204,13 @@ export type CrearCatalogo = {
   categoria: CategoriaEnum
 }
 
+export type CrearGaleria = {
+  id?: string
+  origen?: string
+  sesion: string
+  detalle?: number
+}
+
 export type CrearProforma = {
   cliente?: number | null
   titulo?: string | null
@@ -282,6 +302,7 @@ export type DetalleProforma = {
   readonly precio_ahora_snapshot: string | null
   readonly total: string
   especificacion: EspecificacionMueble
+  readonly galeria_id: string | null
 }
 
 export type EmitirRecibo = {
@@ -341,11 +362,35 @@ export type FamiliaProductoResumen = {
   readonly nombre: string
 }
 
+export type GaleriaRespuesta = {
+  readonly imagenes: Array<ImagenGaleria>
+  readonly limite: number
+}
+
 export type IdentidadActual = {
   readonly id: number
   readonly username: string
   readonly display_name: string
   readonly capabilities: Array<string>
+}
+
+export type IdentificadorGaleria = {
+  readonly id: string
+}
+
+export type ImagenGaleria = {
+  readonly id: number
+  readonly sha256: string
+  readonly nombre: string
+  readonly posicion: number
+  readonly principal: boolean
+  readonly url: string
+  readonly variantes: {
+    [key: string]: string
+  }
+  readonly dimensiones: {
+    [key: string]: number
+  }
 }
 
 export type ImagenPrincipal = {
@@ -554,6 +599,7 @@ export type PatchedDetalleProforma = {
   readonly precio_ahora_snapshot?: string | null
   readonly total?: string
   especificacion?: EspecificacionMueble
+  readonly galeria_id?: string | null
 }
 
 export type PatchedEspecificacionMueble = {
@@ -571,6 +617,12 @@ export type PatchedFamiliaProducto = {
   nombre?: string
   descripcion?: string | null
   activo?: boolean
+}
+
+export type PatchedModificarGaleria = {
+  orden?: Array<number>
+  principal?: number
+  eliminar?: number
 }
 
 export type PatchedProducto = {
@@ -1024,6 +1076,7 @@ export type DetalleIntegralWritable = {
   importe_negociado?: string | null
   descuento?: string
   especificacion?: EspecificacionMuebleWritable | null
+  galeria_id?: string
   captura_asistida_id?: number
 }
 
@@ -2069,6 +2122,63 @@ export type V1CatalogoProductosImagenPrincipalCreateResponses = {
 export type V1CatalogoProductosImagenPrincipalCreateResponse =
   V1CatalogoProductosImagenPrincipalCreateResponses[keyof V1CatalogoProductosImagenPrincipalCreateResponses]
 
+export type V1CatalogoProductosImagenesRetrieveData = {
+  body?: never
+  path: {
+    /**
+     * Un valor de entero único que identifique este producto.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/catalogo/productos/{id}/imagenes/'
+}
+
+export type V1CatalogoProductosImagenesRetrieveResponses = {
+  200: GaleriaRespuesta
+}
+
+export type V1CatalogoProductosImagenesRetrieveResponse =
+  V1CatalogoProductosImagenesRetrieveResponses[keyof V1CatalogoProductosImagenesRetrieveResponses]
+
+export type V1CatalogoProductosImagenesPartialUpdateData = {
+  body?: PatchedModificarGaleria
+  path: {
+    /**
+     * Un valor de entero único que identifique este producto.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/catalogo/productos/{id}/imagenes/'
+}
+
+export type V1CatalogoProductosImagenesPartialUpdateResponses = {
+  200: GaleriaRespuesta
+}
+
+export type V1CatalogoProductosImagenesPartialUpdateResponse =
+  V1CatalogoProductosImagenesPartialUpdateResponses[keyof V1CatalogoProductosImagenesPartialUpdateResponses]
+
+export type V1CatalogoProductosImagenesCreateData = {
+  body: CargaGaleria
+  path: {
+    /**
+     * Un valor de entero único que identifique este producto.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/catalogo/productos/{id}/imagenes/'
+}
+
+export type V1CatalogoProductosImagenesCreateResponses = {
+  200: GaleriaRespuesta
+}
+
+export type V1CatalogoProductosImagenesCreateResponse =
+  V1CatalogoProductosImagenesCreateResponses[keyof V1CatalogoProductosImagenesCreateResponses]
+
 export type V1CatalogoSillasListData = {
   body?: never
   path?: never
@@ -2336,6 +2446,97 @@ export type V1ClientesUpdateResponses = {
 }
 
 export type V1ClientesUpdateResponse = V1ClientesUpdateResponses[keyof V1ClientesUpdateResponses]
+
+export type V1GaleriasCreateData = {
+  body: CrearGaleria
+  path?: never
+  query?: never
+  url: '/api/v1/galerias/'
+}
+
+export type V1GaleriasCreateResponses = {
+  201: IdentificadorGaleria
+}
+
+export type V1GaleriasCreateResponse = V1GaleriasCreateResponses[keyof V1GaleriasCreateResponses]
+
+export type V1GaleriasImagenesRetrieveData = {
+  body?: never
+  path: {
+    id: string
+  }
+  query?: never
+  url: '/api/v1/galerias/{id}/imagenes/'
+}
+
+export type V1GaleriasImagenesRetrieveResponses = {
+  200: GaleriaRespuesta
+}
+
+export type V1GaleriasImagenesRetrieveResponse =
+  V1GaleriasImagenesRetrieveResponses[keyof V1GaleriasImagenesRetrieveResponses]
+
+export type V1GaleriasImagenesPartialUpdateData = {
+  body?: PatchedModificarGaleria
+  path: {
+    id: string
+  }
+  query?: never
+  url: '/api/v1/galerias/{id}/imagenes/'
+}
+
+export type V1GaleriasImagenesPartialUpdateResponses = {
+  200: GaleriaRespuesta
+}
+
+export type V1GaleriasImagenesPartialUpdateResponse =
+  V1GaleriasImagenesPartialUpdateResponses[keyof V1GaleriasImagenesPartialUpdateResponses]
+
+export type V1GaleriasImagenesCreateData = {
+  body: CargaGaleria
+  path: {
+    id: string
+  }
+  query?: never
+  url: '/api/v1/galerias/{id}/imagenes/'
+}
+
+export type V1GaleriasImagenesCreateResponses = {
+  200: GaleriaRespuesta
+}
+
+export type V1GaleriasImagenesCreateResponse =
+  V1GaleriasImagenesCreateResponses[keyof V1GaleriasImagenesCreateResponses]
+
+export type V1ImagenesPrivadasListData = {
+  body?: never
+  path?: never
+  query?: never
+  url: '/api/v1/imagenes-privadas/'
+}
+
+export type V1ImagenesPrivadasListResponses = {
+  200: Array<GaleriaRespuesta>
+}
+
+export type V1ImagenesPrivadasListResponse =
+  V1ImagenesPrivadasListResponses[keyof V1ImagenesPrivadasListResponses]
+
+export type V1ImagenesPrivadasRetrieveData = {
+  body?: never
+  path: {
+    id: string
+  }
+  query?: never
+  url: '/api/v1/imagenes-privadas/{id}/'
+}
+
+export type V1ImagenesPrivadasRetrieveResponses = {
+  200: CrearGaleria
+}
+
+export type V1ImagenesPrivadasRetrieveResponse =
+  V1ImagenesPrivadasRetrieveResponses[keyof V1ImagenesPrivadasRetrieveResponses]
 
 export type V1MovimientosStockListData = {
   body?: never
@@ -2888,6 +3089,26 @@ export type V1ProformasDetallesArchivosListResponses = {
 
 export type V1ProformasDetallesArchivosListResponse =
   V1ProformasDetallesArchivosListResponses[keyof V1ProformasDetallesArchivosListResponses]
+
+export type V1ProformasDetallesArchivosPartialUpdateData = {
+  body?: PatchedModificarGaleria
+  path: {
+    detalle_id: number
+    /**
+     * Un valor de entero único que identifique este proforma.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/proformas/{id}/detalles/{detalle_id}/archivos/'
+}
+
+export type V1ProformasDetallesArchivosPartialUpdateResponses = {
+  200: Array<ArchivoAdjunto>
+}
+
+export type V1ProformasDetallesArchivosPartialUpdateResponse =
+  V1ProformasDetallesArchivosPartialUpdateResponses[keyof V1ProformasDetallesArchivosPartialUpdateResponses]
 
 export type V1ProformasDetallesArchivosCreateData = {
   body: CargaArchivoImagen

@@ -58,3 +58,12 @@ if creado:
         created_by=usuario,
     )
 print(f"fe08-seed-ok user={usuario.id} product={producto.id}")
+
+# Gallery integration must exercise a seller with no administrative privileges.
+from django.contrib.auth.models import Group
+vendedor_galerias, _ = get_user_model().objects.get_or_create(username="gallery-e2e-seller")
+vendedor_galerias.is_staff = False
+vendedor_galerias.is_superuser = False
+vendedor_galerias.set_password("gallery-integration-only")
+vendedor_galerias.save()
+vendedor_galerias.groups.add(Group.objects.get_or_create(name="VENDEDOR")[0])

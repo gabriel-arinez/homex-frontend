@@ -9,6 +9,7 @@ import {
   Ruler,
   Settings2,
   Wallet,
+  ImagePlus,
 } from '@lucide/vue'
 import type {
   EspecificacionMueble,
@@ -20,9 +21,11 @@ import type {
 import Button from '@/shared/ui/Button.vue'
 import CapturaAsistida from './CapturaAsistida.vue'
 import EspecificacionForm from './EspecificacionForm.vue'
+import ImageGallery from '@/shared/media/ImageGallery.vue'
+import { galleryService } from '@/shared/media/gallery'
 import { leerDatosTecnicos } from '../services/muebleTecnico'
 
-type Seccion = 'general' | 'estructura' | 'accesorios' | 'comercial' | 'revision'
+type Seccion = 'general' | 'estructura' | 'accesorios' | 'imagenes' | 'comercial' | 'revision'
 type DatosComerciales = {
   nombre: string
   descripcion: string
@@ -32,6 +35,8 @@ type DatosComerciales = {
   descuento: string
 }
 const props = defineProps<{
+  galeriaId?: string
+  detalleId?: number
   nueva: boolean
   formVersion: number
   dirty: boolean
@@ -56,6 +61,7 @@ const props = defineProps<{
   externalError?: string
 }>()
 const emit = defineEmits<{
+  gallery: [id: string]
   save: [body: EspecificacionMuebleWritable, comercial: DatosComerciales]
   cancel: []
   changed: []
@@ -63,19 +69,52 @@ const emit = defineEmits<{
   processing: [value: boolean]
   typeCreated: [tipo: ValorCatalogoPublico]
 }>()
+const galleryId = ref(props.galeriaId ?? '')
+const galleryError = ref('')
+const galleryRef = ref<InstanceType<typeof ImageGallery> | null>(null)
+const galleryBusy = ref(false)
+async function ensureGallery() {
+  if (galleryId.value) return
+  try {
+    const result = await galleryService.create(props.sesion, props.detalleId)
+    galleryId.value = result.id
+    emit('gallery', result.id)
+  } catch (e) {
+    galleryError.value = e instanceof Error ? e.message : 'No se pudo preparar la galería.'
+  }
+}
+watch(
+  () => props.galeriaId,
+  (id) => {
+    if (id) galleryId.value = id
+  },
+)
+async function saveWithGallery(body: EspecificacionMuebleWritable, comercial: DatosComerciales) {
+  if (galleryBusy.value) return
+  if (galleryRef.value && !(await galleryRef.value.flush())) {
+    seccion.value = 'imagenes'
+    return
+  }
+  emit('save', body, comercial)
+}
 const secciones = [
   { id: 'general', titulo: 'General', icono: Ruler },
   { id: 'estructura', titulo: 'Estructura', icono: Layers3 },
   { id: 'accesorios', titulo: 'Accesorios', icono: Settings2 },
+  { id: 'imagenes', titulo: 'Imágenes', icono: ImagePlus },
   { id: 'comercial', titulo: 'Precio', icono: Wallet },
   { id: 'revision', titulo: 'Revisar', icono: ClipboardCheck },
 ] as const
 const seccion = ref<Seccion>('general')
+watch(seccion, (value) => {
+  if (value === 'imagenes') void ensureGallery()
+})
 const tituloSeccion = ref<HTMLElement | null>(null)
 const estadoApartados = ref<Record<Seccion, 'pending' | 'complete' | 'issues'>>({
   general: 'pending',
   estructura: 'pending',
   accesorios: 'pending',
+  imagenes: 'pending',
   comercial: 'pending',
   revision: 'pending',
 })
@@ -109,7 +148,8 @@ watch(seccion, async () => {
   tituloSeccion.value?.focus({ preventScroll: true })
   tituloSeccion.value?.scrollIntoView?.({ behavior: 'auto', block: 'start' })
 })
-function avanzar() {
+async function avanzar() {
+  if (seccion.value === 'imagenes' && galleryRef.value && !(await galleryRef.value.flush())) return
   if (volverARevision.value) {
     seccion.value = 'revision'
     volverARevision.value = false
@@ -134,7 +174,8 @@ function confirmarCaptura() {
 function retroceder() {
   if (indice.value > 0) seccion.value = secciones[indice.value - 1]!.id
 }
-function seleccionarApartado(id: typeof seccion.value) {
+async function seleccionarApartado(id: typeof seccion.value) {
+  if (seccion.value === 'imagenes' && galleryRef.value && !(await galleryRef.value.flush())) return
   seccion.value = id
   volverARevision.value = false
 }
@@ -193,13 +234,14 @@ function seleccionarApartado(id: typeof seccion.value) {
     </nav>
     <div class="studio-section-heading">
       <div>
-        <p class="studio-index">PASO {{ String(indice + 1).padStart(2, '0') }} DE 05</p>
+        <p class="studio-index">PASO {{ String(indice + 1).padStart(2, '0') }} DE 06</p>
         <h2 ref="tituloSeccion" tabindex="-1">
           {{
             {
               general: 'Información general',
               estructura: 'Estructura y componentes',
               accesorios: 'Accesorios y observaciones',
+              imagenes: 'Imágenes de referencia',
               comercial: 'Datos comerciales',
               revision: 'Revisión del mueble',
             }[seccion]
@@ -315,6 +357,33 @@ function seleccionarApartado(id: typeof seccion.value) {
       </div>
     </section>
     <!-- La ficha anterior no debe mostrar validaciones mientras se revisa una propuesta sin aplicar. -->
+    <section
+      v-if="!propuestaPorConfirmar"
+      v-show="seccion === 'imagenes' || seccion === 'revision'"
+    >
+      <p v-if="galleryError" role="alert">
+        {{ galleryError }}
+        <Button type="button" variant="secondary" @click="ensureGallery">Reintentar</Button>
+      </p>
+      <ImageGallery
+        v-if="galleryId"
+        ref="galleryRef"
+        preserve-pending
+        :endpoint="`/api/v1/galerias/${galleryId}/imagenes/`"
+        :editable="seccion === 'imagenes'"
+        title="Imágenes del mueble"
+        @changed="emit('changed')"
+        @busy="galleryBusy = $event"
+      />
+      <p v-else>Sin imágenes de referencia.</p>
+      <Button
+        v-if="seccion === 'revision'"
+        type="button"
+        variant="secondary"
+        @click="seccion = 'imagenes'"
+        >Gestionar imágenes</Button
+      >
+    </section>
     <fieldset v-if="!propuestaPorConfirmar" class="studio-content" :disabled="processing">
       <EspecificacionForm
         :key="formVersion"
@@ -327,12 +396,14 @@ function seleccionarApartado(id: typeof seccion.value) {
         :processing="processing"
         :external-error="externalError"
         studio
-        :active-section="seccion"
-        @save="(body, comercial) => emit('save', body, comercial)"
+        :active-section="seccion === 'imagenes' ? 'imagenes' : seccion"
+        @save="saveWithGallery"
         @changed="emit('changed')"
         @cancel="emit('cancel')"
         @request-section="editarDesdeRevision($event)"
-        @section-status="estadoApartados = $event"
+        @section-status="
+          estadoApartados = { ...$event, imagenes: galleryId ? 'complete' : 'pending' }
+        "
         @type-created="emit('typeCreated', $event)"
       />
     </fieldset>
@@ -383,7 +454,7 @@ function seleccionarApartado(id: typeof seccion.value) {
 }
 .studio-steps {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 0.5rem;
 }
 .studio-steps button {

@@ -33,7 +33,7 @@ import { calcularUnitarioExacto, totalComercialCoincide } from '../services/prec
 const props = defineProps<{
   tipos: ValorCatalogoPublico[]
   studio?: boolean
-  activeSection?: 'general' | 'estructura' | 'accesorios' | 'comercial' | 'revision'
+  activeSection?: 'general' | 'estructura' | 'accesorios' | 'imagenes' | 'comercial' | 'revision'
   especificacion?: EspecificacionMueble | null
   pendientesAsistencia?: PendienteAsistida[]
   processing?: boolean

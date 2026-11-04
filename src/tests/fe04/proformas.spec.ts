@@ -20,6 +20,7 @@ const option = (id: number, codigo: string, nombre: string, concepto_codigo = 'T
   concepto_codigo,
 })
 const detail: DetalleProforma = {
+  galeria_id: null,
   id: 10,
   proforma: 1,
   tipo_item: 1,
@@ -284,7 +285,7 @@ describe('FE04 proformas manuales', () => {
       value: [new File(['x'], 'a.png', { type: 'image/png' })],
     })
     await input.trigger('change')
-    expect(wrapper.html()).toContain('blob:preview')
+    await vi.waitFor(() => expect(wrapper.html()).toContain('blob:preview'))
     wrapper.unmount()
     expect(create).toHaveBeenCalled()
     expect(revoke).toHaveBeenCalledWith('blob:preview')
@@ -343,7 +344,7 @@ describe('FE04 proformas manuales', () => {
       value: [new File(['x'], 'pendiente.png', { type: 'image/png' })],
     })
     await input.trigger('change')
-    expect(wrapper.html()).toContain('blob:freeze')
+    await vi.waitFor(() => expect(wrapper.html()).toContain('blob:freeze'))
     await wrapper.setProps({ editable: false })
     await flushPromises()
     expect(wrapper.html()).not.toContain('blob:freeze')

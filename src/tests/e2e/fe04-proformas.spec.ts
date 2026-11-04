@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 const access = 'eyJhbGciOiJub25lIn0.eyJ1c2VyX2lkIjo3fQ.signature'
@@ -266,7 +267,7 @@ async function mockBackend(page: Page) {
         nombre: 'referencia.png',
         mime_type: 'image/png',
         tamano_bytes: 4,
-        url: 'https://media.example/reference.webp',
+        url: '/api/v1/imagenes-privadas/9/',
       }
       files = [file]
       return r.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(file) })
@@ -288,9 +289,17 @@ async function mockBackend(page: Page) {
       body: JSON.stringify({ detail: 'Sin permiso.' }),
     }),
   )
-  await page.route('https://media.example/reference.webp', (r) =>
-    r.fulfill({ status: 200, contentType: 'image/webp', body: 'image' }),
+  await page.route('**/api/v1/imagenes-privadas/9/', (r) =>
+    r.request().headers().authorization
+      ? r.fulfill({
+          status: 200,
+          contentType: 'image/png',
+          body: readFileSync('src/tests/fixtures/galerias/red.png'),
+        })
+      : r.fulfill({ status: 401, contentType: 'application/json', body: '{}' }),
   )
+  await page.route('https://media.example/reference.webp', (r) => r.fulfill({ status: 404 }))
+
   await page.addInitScript(
     ({ token }) =>
       sessionStorage.setItem(
@@ -524,18 +533,20 @@ test('FE04 mantiene adjuntos editables en revisión y los congela al aprobar', a
   state.quote().total = '100.00'
   state.quote().estado_info = { id: 3, codigo: 'EN_REVISION', nombre: 'En revisión' }
   await page.goto('/proformas/1')
-  const input = page.getByLabel('Seleccionar imágenes')
+  const input = page.getByLabel('Agregar imágenes', { exact: true })
   await input.setInputFiles({
     name: 'referencia.png',
     mimeType: 'image/png',
-    buffer: Buffer.from('test'),
+    buffer: readFileSync('src/tests/fixtures/galerias/red.png'),
   })
-  await expect(page.getByAltText('Preview de referencia.png')).toHaveAttribute('src', /^blob:/)
-  await page.getByRole('button', { name: 'Subir' }).click()
-  await expect(page.getByAltText('referencia.png')).toHaveAttribute(
-    'src',
-    'https://media.example/reference.webp',
+  await expect(page.getByAltText('referencia.png').first()).toHaveAttribute('src', /^blob:/)
+  const loaded = page.waitForResponse(
+    (r) => r.url().endsWith('/imagenes-privadas/9/') && r.status() === 200,
   )
+  await page.getByRole('button', { name: 'Confirmar carga / Reintentar' }).click()
+  await loaded
+  await expect(page.getByText('imágenes listas para confirmar.')).toHaveCount(0)
+  await expect(page.getByAltText('referencia.png').first()).toHaveAttribute('src', /^blob:/)
   await input.setInputFiles({
     name: 'referencia.svg',
     mimeType: 'image/svg+xml',
@@ -554,18 +565,27 @@ test('FE04 mantiene adjuntos editables en revisión y los congela al aprobar', a
   await input.setInputFiles({
     name: 'grande.png',
     mimeType: 'image/png',
-    buffer: Buffer.from('test'),
+    buffer: readFileSync('src/tests/fixtures/galerias/green.png'),
   })
-  await page.getByRole('button', { name: 'Subir' }).click()
+  await page.getByRole('button', { name: 'Confirmar carga / Reintentar' }).click()
   await expect(page.getByText('La imagen supera el máximo de 10 MiB.')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Eliminar' })).toHaveCount(1)
+  await page.getByRole('button', { name: 'Gestionar imágenes', exact: true }).click()
+  await expect(
+    page
+      .getByRole('dialog', { name: 'Gestionar imágenes', exact: true })
+      .getByRole('button', { name: 'Eliminar', exact: true }),
+  ).toHaveCount(2)
+  await page
+    .getByRole('dialog', { name: 'Gestionar imágenes', exact: true })
+    .getByRole('button', { name: 'Cerrar', exact: true })
+    .click()
   await page.getByRole('button', { name: 'Aprobar y crear pedido' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Aprobar y crear pedido' }).click()
   await expect(page.getByRole('button', { name: 'Eliminar' })).toHaveCount(0)
-  await expect(page.getByAltText('Preview de grande.png')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Subir' })).toHaveCount(0)
+  await expect(page.getByAltText('grande.png')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Confirmar carga / Reintentar' })).toHaveCount(0)
   await page.reload()
-  await expect(page.getByAltText('Preview de grande.png')).toHaveCount(0)
+  await expect(page.getByAltText('grande.png')).toHaveCount(0)
   expect(
     await page.evaluate(async () =>
       fetch('http://localhost:8000/api/v1/proformas/999/detalles/10/archivos/9/', {
@@ -575,7 +595,9 @@ test('FE04 mantiene adjuntos editables en revisión y los congela al aprobar', a
     ),
   ).toBe(403)
   const publicMedia = await page.goto('https://media.example/reference.webp')
-  expect(publicMedia?.status()).toBe(200)
+  expect(publicMedia?.status()).toBe(404)
+  const unauthorized = await page.goto('http://localhost:8000/api/v1/imagenes-privadas/9/')
+  expect(unauthorized?.status()).toBe(401)
 })
 
 test('FE04 protege ruta por capacidad y recurso ajeno como 404', async ({ page }) => {

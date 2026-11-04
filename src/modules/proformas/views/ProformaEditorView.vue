@@ -54,6 +54,8 @@ import ClienteFormFields from '@/modules/clientes/components/ClienteFormFields.v
 import DetalleForm from '../components/DetalleForm.vue'
 import CatalogoContextual from '../components/CatalogoContextual.vue'
 import type { CatalogoContextState } from '../services/catalogoContext'
+import { loadPending, savePending } from '@/shared/media/pending'
+import { galleryService } from '@/shared/media/gallery'
 import MuebleStudio from '../components/MuebleStudio.vue'
 import { mapearCapturaAsistida } from '../services/capturaAsistidaMapper'
 import { leerDatosTecnicos, tecnicaIgual } from '../services/muebleTecnico'
@@ -70,7 +72,7 @@ import {
 } from '../services/editorLocal'
 import { totalEstimadoCompleto, totalEstimadoLinea } from '../services/presentacionComercial'
 
-type LineaLocal = DetalleIntegralWritable & { localId: string }
+type LineaLocal = DetalleIntegralWritable & { localId: string; galeria_id?: string }
 const emit = defineEmits<{ openMenu: [] }>()
 const route = useRoute()
 const router = useRouter()
@@ -140,7 +142,12 @@ function aplicarCaptura(result: ResultadoAsistida) {
     return
   try {
     const linea = mapearCapturaAsistida(result.propuesta_configurador, tipos.value, unidades.value)
-    draftingFurniture.value = { ...linea, localId: localId(), captura_asistida_id: result.id }
+    draftingFurniture.value = {
+      ...linea,
+      localId: draftingFurniture.value.localId,
+      galeria_id: draftingFurniture.value.galeria_id,
+      captura_asistida_id: result.id,
+    }
     pendientesAsistencia.value = result.pendientes
     specRenderVersion.value++
     specModalDirty.value = true
@@ -527,6 +534,7 @@ function localId() {
 function normalizeLine(line: Proforma['detalles'][number]): LineaLocal {
   return {
     id: line.id,
+    galeria_id: line.galeria_id ?? undefined,
     localId: localId(),
     tipo_item: line.tipo_item,
     producto: line.producto,
@@ -625,6 +633,7 @@ function saveLine(body: DetalleProformaWritable) {
       ...line,
       id: previous.id,
       localId: previous.localId,
+      galeria_id: previous.galeria_id,
       especificacion: previous.especificacion,
     }
   }
@@ -684,7 +693,7 @@ async function saveSpec(
         (existingSpec?.tipo_mueble ?? null) === (body.tipo_mueble ?? null) &&
         (existingSpec?.observaciones ?? null) === (body.observaciones ?? null) &&
         tecnicaIgual(existingSpec?.datos_tecnicos ?? {}, body.datos_tecnicos ?? {})
-      if (sameCommercial && sameSpec) {
+      if (sameCommercial && sameSpec && !candidate.galeria_id) {
         if (
           !(await askConfirmation(
             'La copia es idéntica. ¿Aumentar la cantidad de la línea original?',
@@ -818,14 +827,47 @@ function openFurnitureDraft(source?: LineaLocal) {
   lineModal.value = false
   specModalDirty.value = Boolean(source)
 }
-function duplicateFurniture(index: number) {
+async function duplicateFurniture(index: number) {
   const original = lineas.value[index]
   if (!original || tipos.value.find((x) => x.id === original.tipo_item)?.codigo !== 'MUEBLE_MEDIDA')
     return
-  duplicateOrigin.value = original.localId
-  openFurnitureDraft(original)
+  try {
+    const source =
+      original.galeria_id ??
+      (original.id
+        ? (await galleryService.create(sesionBorrador.value, original.id)).id
+        : undefined)
+    const copy = cloneEditorData(original)
+    delete copy.galeria_id
+    if (source)
+      copy.galeria_id = (
+        await galleryService.create(sesionBorrador.value, undefined, source, crypto.randomUUID())
+      ).id
+    duplicateOrigin.value = original.localId
+    openFurnitureDraft(copy)
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : 'No se pudieron duplicar las imágenes.'
+    return
+  }
   success.value = 'Revisa la copia y su ficha técnica antes de incorporarla.'
 }
+const editorReady = ref(false)
+function autosaveToken() {
+  return `gallery:${session.identity?.id ?? 'unknown'}:${route.path}`
+}
+watch(
+  [lineas, draftingFurniture, header, currentStep, sesionBorrador, specLine],
+  () => {
+    if (editorReady.value && !saving.value && (dirty.value || specModalDirty.value)) {
+      try {
+        saveEditorDraft(autosaveToken(), editorSnapshot())
+      } catch {
+        error.value = 'No se pudo conservar el borrador local; guarda la proforma antes de salir.'
+      }
+    }
+  },
+  { deep: true, flush: 'post' },
+)
 function editorSnapshot() {
   return {
     userId: session.identity?.id ?? null,
@@ -846,6 +888,7 @@ function editorSnapshot() {
     sesionBorrador: sesionBorrador.value,
     lineDraft: cloneEditorData(pendingLineDraft.value),
     editingLine: editingLine.value,
+    specLine: specLine.value,
   }
 }
 async function createProductContextually(draft: Record<string, string>) {
@@ -880,7 +923,7 @@ async function editProductContextually(productId: number) {
   })
 }
 function restoreContextualDraft() {
-  const token = typeof route.query.draft === 'string' ? route.query.draft : ''
+  const token = typeof route.query.draft === 'string' ? route.query.draft : autosaveToken()
   if (!token) return
   const snapshot = consumeEditorDraft<ReturnType<typeof editorSnapshot>>(token)
   if (!snapshot) return
@@ -899,6 +942,7 @@ function restoreContextualDraft() {
     snapshot.clienteSeleccionado ?? persisted.value?.cliente_resumen ?? null
   lineas.value = snapshot.lineas
   draftingFurniture.value = snapshot.draftingFurniture ?? null
+  specLine.value = snapshot.specLine ?? null
   removedLines.value = snapshot.removedLines ?? []
   additionMode.value = snapshot.additionMode ?? 'none'
   catalogInitialized.value = snapshot.catalogInitialized ?? false
@@ -1102,9 +1146,22 @@ async function persist(emitir: boolean) {
   conflicted.value = false
   fields.value = {}
   try {
+    for (const line of lineas.value) {
+      if (!line.galeria_id) continue
+      const path = `/api/v1/galerias/${line.galeria_id}/imagenes/`
+      const pending = await loadPending(path)
+      while (pending.length) {
+        const image = pending[0]!
+        await galleryService.upload(path, image.file, image.digest)
+        pending.splice(0, 1)
+        await savePending(path, pending)
+        URL.revokeObjectURL(image.url)
+      }
+    }
     const result = proformaId.value
       ? await proformasService.updateIntegral(proformaId.value, body(emitir))
       : await proformasService.saveIntegral(body(emitir))
+    sessionStorage.removeItem(`homex:ap5:draft:${autosaveToken()}`)
     fill(result)
     removedLines.value = []
     key.value = crypto.randomUUID()
@@ -1164,6 +1221,7 @@ onMounted(async () => {
   window.addEventListener('beforeunload', beforeUnload)
   await Promise.all([loadReferences(), load()])
   restoreContextualDraft()
+  editorReady.value = true
 })
 onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 </script>
@@ -1948,7 +2006,18 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     </div>
     <MuebleStudio
       v-if="furnitureOpen"
+      :key="editableSpecDetail?.localId"
       :form-version="specRenderVersion"
+      :galeria-id="editableSpecDetail?.galeria_id"
+      :detalle-id="editableSpecDetail?.id"
+      @gallery="
+        (id) => {
+          if (editableSpecDetail) {
+            editableSpecDetail.galeria_id = id
+            markDirty()
+          }
+        }
+      "
       :nueva="Boolean(draftingFurniture)"
       :dirty="specModalDirty"
       :sesion="sesionBorrador"

@@ -67,14 +67,14 @@ describe('Formulario comercial de productos', () => {
     expect(w.emitted('save')).toBeUndefined()
     w.unmount()
   })
-  it('oculta la carga de imágenes cuando no existe permiso administrativo', async () => {
+  it('oculta la carga de imágenes cuando no existe permiso comercial', async () => {
     catalog()
     const w = mount(ProductoForm, {
       props: { preselectCategory: 'OTRO', canUploadImage: false },
       global: { stubs: { CapturaCatalogo: true } },
     })
     await flushPromises()
-    expect(w.text()).toContain('requiere un usuario con permisos administrativos')
+    expect(w.text()).toContain('requiere permiso comercial')
     expect(w.find('input[type="file"]').exists()).toBe(false)
     w.unmount()
   })

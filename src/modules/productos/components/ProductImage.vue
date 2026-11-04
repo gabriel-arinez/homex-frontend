@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { mediaUrl } from '@/shared/media/gallery'
 import { ImageOff } from '@lucide/vue'
 import type { ImagenPrincipal } from '@/generated/api'
 
@@ -14,13 +15,15 @@ watch(
 )
 const variants = computed(() =>
   Object.entries(props.image?.variantes ?? {})
-    .map(([width, url]) => ({ width: Number.parseInt(width, 10), url }))
+    .map(([width, url]) => ({ width: Number.parseInt(width, 10), url: mediaUrl(url) }))
     .filter(
       (item) => Number.isFinite(item.width) && item.width > 0 && /^https?:\/\//.test(item.url),
     )
     .sort((a, b) => a.width - b.width),
 )
-const source = computed(() => variants.value[0]?.url ?? null)
+const source = computed(
+  () => variants.value[0]?.url ?? (props.image?.original ? mediaUrl(props.image.original) : null),
+)
 const srcset = computed(() => variants.value.map((item) => `${item.url} ${item.width}w`).join(', '))
 </script>
 <template>
