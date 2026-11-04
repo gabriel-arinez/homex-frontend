@@ -52,16 +52,14 @@ describe('Reintentos de creación con galería', () => {
         stubs: { ProductoForm: { name: 'ProductoForm', template: '<div />' }, Teleport: true },
       },
     })
-    wrapper
-      .findComponent({ name: 'ProductoForm' })
-      .vm.$emit('save', body, [
-        {
-          file: new File(['x'], 'red.png', { type: 'image/png' }),
-          digest: 'digest',
-          url: 'blob:preview',
-          principal: true,
-        },
-      ])
+    wrapper.findComponent({ name: 'ProductoForm' }).vm.$emit('save', body, [
+      {
+        file: new File(['x'], 'red.png', { type: 'image/png' }),
+        digest: 'digest',
+        url: 'blob:preview',
+        principal: true,
+      },
+    ])
     await flushPromises()
     wrapper.findComponent({ name: 'ProductoForm' }).vm.$emit('save', body, [])
     await flushPromises()
