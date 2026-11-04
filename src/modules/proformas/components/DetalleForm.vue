@@ -220,7 +220,7 @@ async function submit() {
       :familia="form.familia_producto ? Number(form.familia_producto) : undefined"
       @select="selectProduct"
     /><Button
-      v-if="catalogItem && session?.can('comercial.administrar')"
+      v-if="catalogItem && (session?.can('catalogo.crear_producto') || session?.can('comercial.administrar'))"
       type="button"
       variant="secondary"
       @click="emit('createProduct', { ...form })"
