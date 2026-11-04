@@ -77,6 +77,7 @@ const router = useRouter()
 const session = useSessionStore()
 const proformaId = computed(() => (route.params.id ? Number(route.params.id) : null))
 const listPath = computed(() => retornoAProformas(route.query.returnTo))
+const listQuery = computed(() => listPath.value === '/proformas' ? {} : { returnTo: listPath.value })
 const isReview = computed(() => persisted.value?.estado_info.codigo === 'EN_REVISION')
 let allowNavigationAfterSave = false
 const steps = ['Productos', 'Cliente', 'Condiciones', 'Revisar'] as const
@@ -1104,15 +1105,13 @@ async function persist(emitir: boolean) {
     allowNavigationAfterSave = true
     if (emitir) {
       await router.replace({
-        name: 'proforma-readonly',
-        params: { id: result.id },
-        query: { returnTo: listPath.value },
+        path: `/proformas/${result.id}`,
+        query: listQuery.value,
       })
     } else if (!proformaId.value) {
       await router.replace({
-        name: 'proforma-edit',
-        params: { id: result.id },
-        query: { returnTo: listPath.value },
+        path: `/proformas/${result.id}/editar`,
+        query: listQuery.value,
       })
     }
   } catch (cause) {
@@ -1786,11 +1785,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <Button
                 v-if="persisted"
                 variant="secondary"
-                @click="router.push({
-                  name: 'proforma-readonly',
-                  params: { id: persisted.id },
-                  query: { returnTo: listPath },
-                })"
+                @click="router.push({ path: `/proformas/${persisted.id}`, query: listQuery })"
                 >Ver resumen y documentos</Button
               >
             </div>
