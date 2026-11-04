@@ -58,6 +58,7 @@ import MuebleStudio from '../components/MuebleStudio.vue'
 import { mapearCapturaAsistida } from '../services/capturaAsistidaMapper'
 import { leerDatosTecnicos, tecnicaIgual } from '../services/muebleTecnico'
 import { proformasService } from '../services/proformasService'
+import { retornoAProformas } from '../utils/navegacionProformas'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { productosService } from '@/modules/productos/services/productosService'
 import {
@@ -75,6 +76,9 @@ const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
 const proformaId = computed(() => (route.params.id ? Number(route.params.id) : null))
+const listPath = computed(() => retornoAProformas(route.query.returnTo))
+const isReview = computed(() => persisted.value?.estado_info.codigo === 'EN_REVISION')
+let allowNavigationAfterSave = false
 const steps = ['Productos', 'Cliente', 'Condiciones', 'Revisar'] as const
 const currentStep = ref(0)
 const loading = ref(Boolean(proformaId.value))
@@ -307,6 +311,30 @@ const emissionIssues = computed<EmissionIssue[]>(() => {
         action: 'Ir a cliente',
       })
   }
+  if (lineas.value.length && (totalPreview.value === null || totalPreview.value <= 0)) {
+    issues.push({
+      id: 'importe',
+      step: 0,
+      title: 'Importe',
+      description: 'Revisa cantidades, precios y descuentos. El total debe ser mayor que cero.',
+      action: 'Corregir productos',
+    })
+  }
+  if (
+    lineas.value.some(
+      (line) =>
+        tipos.value.find((tipo) => tipo.id === Number(line.tipo_item))?.codigo ===
+          'MUEBLE_MEDIDA' && !line.especificacion,
+    )
+  ) {
+    issues.push({
+      id: 'ficha',
+      step: 0,
+      title: 'Ficha técnica',
+      description: 'Los muebles a medida necesitan una ficha técnica antes de enviar.',
+      action: 'Completar ficha',
+    })
+  }
   const errors = validateQuoteConditions(header)
   const firstError = Object.entries(errors)[0]
   if (firstError) {
@@ -427,17 +455,12 @@ const editableSpec = computed(() => {
   if (specLine.value === null) return null
   return (lineas.value[specLine.value]?.especificacion ?? null) as EspecificacionMueble | null
 })
-const canEmit = computed(() => {
-  if (Object.keys(validateQuoteConditions(header)).length) return false
-  if (!lineas.value.length) return false
-  if (clienteMode.value === 'existente') return Boolean(header.cliente)
-  if (clienteMode.value !== 'nuevo' || !nuevoCliente.tipo_cliente) return false
-  const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
-  const esEmpresa = /EMPRESA|JURID/.test(tipo?.codigo ?? '')
-  const contacto = Boolean(nuevoCliente.nombres.trim() && nuevoCliente.apellidos.trim())
-  if (Object.keys(validateClient(nuevoCliente, esEmpresa)).length) return false
-  return esEmpresa ? contacto && Boolean(nuevoCliente.empresa.trim()) : contacto
-})
+const canEmit = computed(
+  () =>
+    !saving.value &&
+    !emissionIssues.value.length &&
+    (persisted.value?.estado_info.codigo ?? 'BORRADOR') === 'BORRADOR',
+)
 
 function markDirty() {
   dirty.value = true
@@ -1040,7 +1063,7 @@ function body(emitir: boolean): ProformaIntegralWritable {
   }
 }
 async function persist(emitir: boolean) {
-  if (saving.value) return
+  if (saving.value || (emitir && (isReview.value || !canEmit.value))) return
   validationAttempted.value = true
   localErrors.value = validateQuoteConditions(header)
   if (clienteMode.value === 'nuevo') {
@@ -1073,16 +1096,39 @@ async function persist(emitir: boolean) {
     fill(result)
     removedLines.value = []
     key.value = crypto.randomUUID()
-    success.value = emitir ? 'Proforma emitida para revisión.' : 'Borrador guardado.'
-    if (!proformaId.value) await router.replace(`/proformas/${result.id}/editar`)
+    success.value = emitir
+      ? 'Proforma enviada a revisión.'
+      : result.estado_info.codigo === 'EN_REVISION'
+        ? 'Cambios guardados en la proforma en revisión.'
+        : 'Borrador guardado.'
+    allowNavigationAfterSave = true
+    if (emitir) {
+      await router.replace({
+        name: 'proforma-readonly',
+        params: { id: result.id },
+        query: { returnTo: listPath.value },
+      })
+    } else if (!proformaId.value) {
+      await router.replace({
+        name: 'proforma-edit',
+        params: { id: result.id },
+        query: { returnTo: listPath.value },
+      })
+    }
   } catch (cause) {
     if (cause instanceof ApiError) fields.value = cause.fields
     error.value = cause instanceof Error ? cause.message : 'No se pudo guardar la proforma.'
+    if (emitir && error.value.includes('ESTADO_PROFORMA.EN_REVISION')) {
+      error.value =
+        'No se pudo enviar: el estado «En revisión» no está activo en la base de datos. ' +
+        'Un administrador debe revisar el catálogo de estados del entorno. Tus cambios permanecen en el editor.'
+    }
     if (cause instanceof ApiError && cause.status === 409 && proformaId.value) {
       conflicted.value = true
       error.value = `${error.value} Se conservaron tus cambios locales. Puedes copiarlos o descartarlos y recargar.`
     }
   } finally {
+    allowNavigationAfterSave = false
     saving.value = false
   }
 }
@@ -1091,6 +1137,8 @@ function beforeUnload(event: BeforeUnloadEvent) {
   event.preventDefault()
 }
 onBeforeRouteLeave(async () => {
+  if (allowNavigationAfterSave) return true
+  if (saving.value) return false
   if (
     contextualNavigation.value ||
     (!dirty.value && !lineModalDirty.value && !specModalDirty.value)
@@ -1154,7 +1202,13 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         description="Prepara productos, cliente y condiciones antes de guardar."
         show-menu
         @menu="emit('openMenu')"
-      />
+      >
+        <template #actions>
+          <Button variant="secondary" @click="router.push(listPath)">
+            <ArrowLeft :size="17" aria-hidden="true" /> Volver a proformas
+          </Button>
+        </template>
+      </PageHeader>
       <LoadingSkeleton v-if="loading || referenceLoading" :lines="8" />
       <ErrorState v-else-if="error && !tipos.length" :description="error">
         <button @click="loadReferences">Reintentar</button>
@@ -1675,7 +1729,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               </small>
             </template>
           </div>
-          <div v-if="!canEmit" class="emission-checklist">
+          <div v-if="emissionIssues.length" class="emission-checklist">
             <div class="emission-checklist__header">
               <span class="emission-checklist__icon"
                 ><ClipboardCheck :size="22" aria-hidden="true"
@@ -1704,7 +1758,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           </div>
           <div v-else class="emission-ready" role="status">
             <CheckCircle2 :size="19" aria-hidden="true" />
-            <span>Información completa. La proforma está lista para emitir.</span>
+            <span>
+              {{ isReview
+                ? 'Esta proforma ya está en revisión. Puedes guardar correcciones o consultar su resumen.'
+                : 'Información completa. La proforma está lista para enviar a revisión.' }}
+            </span>
           </div>
         </section>
 
@@ -1720,16 +1778,20 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             </div>
             <div class="editor-actions__operations">
               <Button variant="secondary" :processing="saving" @click="persist(false)"
-                >Guardar borrador</Button
+                >{{ isReview ? 'Guardar cambios' : 'Guardar borrador' }}</Button
               >
-              <Button :disabled="!canEmit" :processing="saving" @click="persist(true)"
-                >Emitir proforma</Button
+              <Button v-if="!isReview" :disabled="!canEmit" :processing="saving" @click="persist(true)"
+                >Enviar a revisión</Button
               >
               <Button
                 v-if="persisted"
                 variant="secondary"
-                @click="router.push(`/proformas/${persisted.id}`)"
-                >Ver detalle, aprobar y gestionar adjuntos</Button
+                @click="router.push({
+                  name: 'proforma-readonly',
+                  params: { id: persisted.id },
+                  query: { returnTo: listPath },
+                })"
+                >Ver resumen y documentos</Button
               >
             </div>
           </div>
