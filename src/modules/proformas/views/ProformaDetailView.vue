@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, ClipboardCheck, Download, FileText, Pencil, Paperclip } from '@lucide/vue'
 import type { DetalleProforma, Proforma } from '@/generated/api'
@@ -30,16 +30,7 @@ const processing = ref(false)
 const downloading = ref(false)
 const error = ref('')
 const success = ref('')
-const errorToast = ref('')
-watch(error, (message) => {
-  if (message) {
-    success.value = ''
-    errorToast.value = message
-  }
-})
-watch(success, (message) => {
-  if (message) errorToast.value = ''
-})
+const downloadNotice = ref('')
 const lastPedidoId = ref<number | null>(null)
 const confirmAction = ref<'approve' | 'not-completed' | 'reopen' | null>(null)
 const listPath = computed(() => retornoAProformas(route.query.returnTo))
@@ -160,6 +151,7 @@ async function downloadDocument() {
     const blob = await proformasService.documentPdf(id)
     const prefix = stateCode.value === 'BORRADOR' ? 'proforma-borrador' : 'proforma'
     downloadBlob(blob, `${prefix}-${quote.value.numero}.pdf`)
+    downloadNotice.value = 'Documento descargado correctamente.'
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : 'No se pudo descargar el documento.'
   } finally {
@@ -171,12 +163,11 @@ onMounted(() => void load())
 
 <template>
   <div class="proforma-detail">
-    <Toast :visible="Boolean(success)" :message="success" tone="success" @close="success = ''" />
     <Toast
-      :visible="Boolean(errorToast) && !loading"
-      :message="errorToast"
-      tone="danger"
-      @close="errorToast = ''"
+      :visible="Boolean(downloadNotice)"
+      :message="downloadNotice"
+      tone="success"
+      @close="downloadNotice = ''"
     />
     <PageHeader
       :title="quote ? `Proforma #${quote.numero}` : 'Proforma'"
