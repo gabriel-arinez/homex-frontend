@@ -14,6 +14,8 @@ import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
 import AdjuntosDetalle from '../components/AdjuntosDetalle.vue'
 import ProductImage from '@/modules/productos/components/ProductImage.vue'
+import GalleryPhoto from '@/shared/media/GalleryPhoto.vue'
+import { useQuoteFurnitureCovers } from '../composables/useQuoteFurnitureCovers'
 import Toast from '@/shared/ui/Toast.vue'
 import { useQuoteProductImages } from '../composables/useQuoteProductImages'
 import { proformasService } from '../services/proformasService'
@@ -25,6 +27,12 @@ const router = useRouter()
 const id = Number(route.params.id)
 const quote = ref<Proforma | null>(null)
 const { images: quoteImages, ensure: ensureQuoteImages } = useQuoteProductImages()
+const { coverFor: furnitureCoverFor, ensureLines: ensureFurnitureCovers } =
+  useQuoteFurnitureCovers()
+function furnitureCoverSource(line: DetalleProforma) {
+  const cover = furnitureCoverFor(line, quote.value?.id)
+  return cover?.variantes?.['320'] ?? cover?.url ?? ''
+}
 const loading = ref(true)
 const processing = ref(false)
 const downloading = ref(false)
@@ -88,6 +96,7 @@ async function refreshQuote() {
   void ensureQuoteImages(
     quote.value.detalles.flatMap((line) => (line.producto ? [line.producto] : [])),
   )
+  void ensureFurnitureCovers(quote.value.detalles, quote.value.id)
 }
 async function load() {
   loading.value = true
@@ -319,6 +328,9 @@ onMounted(() => void load())
                   :alt="line.nombre"
                   sizes="64px"
                 />
+              </div>
+              <div v-else-if="furnitureCoverSource(line)" class="line-thumbnail">
+                <GalleryPhoto :src="furnitureCoverSource(line)" :alt="'Imagen principal de ' + line.nombre" />
               </div>
               <div>
                 <small
@@ -623,6 +635,11 @@ onMounted(() => void load())
   height: 100%;
   min-height: 0;
   aspect-ratio: 1 !important;
+}
+.line-thumbnail :deep(img) {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 .line-thumbnail :deep(.fallback span) {
   display: none;
