@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import ProductoForm from '@/modules/productos/components/ProductoForm.vue'
+import type { Producto } from '@/generated/api'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 
 afterEach(() => vi.restoreAllMocks())
@@ -65,6 +66,35 @@ describe('Formulario comercial de productos', () => {
     // Los errores sólo se deben a los valores promocionales obligatorios.
     await w.get('form').trigger('submit')
     expect(w.emitted('save')).toBeUndefined()
+    w.unmount()
+  })
+  it('en edición comercial muestra la galería sin permitir acciones inmediatas', async () => {
+    catalog()
+    const initial = {
+      id: 12,
+      categoria: 3,
+      unidad_stock: 4,
+      nombre: 'Artículo existente',
+      sku: 'TEST-12',
+      precio_lista: '120.00',
+      activo: true,
+    } as Producto
+    const w = mount(ProductoForm, {
+      props: { initial, canUploadImage: true },
+      global: {
+        stubs: {
+          CapturaCatalogo: true,
+          ImageGallery: {
+            name: 'ImageGallery',
+            props: ['editable', 'endpoint'],
+            template: '<div data-test="galeria" />',
+          },
+        },
+      },
+    })
+    await flushPromises()
+    expect(w.findComponent({ name: 'ImageGallery' }).props('editable')).toBe(false)
+    expect(w.text()).toContain('Gestiona las imágenes desde la ficha del producto')
     w.unmount()
   })
   it('oculta la carga de imágenes cuando no existe permiso comercial', async () => {
