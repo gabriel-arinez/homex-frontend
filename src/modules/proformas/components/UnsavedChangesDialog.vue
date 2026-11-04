@@ -39,7 +39,7 @@ const titleId = useId()
     </div>
     <div v-if="error" class="save-error" role="alert">
       <CircleAlert :size="18" aria-hidden="true" />
-      <p>{{ error }} Revisa los campos indicados y vuelve a intentarlo.</p>
+      <p>{{ error }} Permanecerás en la proforma hasta confirmar cómo continuar.</p>
     </div>
     <template #footer>
       <div class="leave-actions">

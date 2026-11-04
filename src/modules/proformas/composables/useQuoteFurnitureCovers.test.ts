@@ -41,6 +41,18 @@ describe('portada privada de muebles a pedido', () => {
     expect(spy).toHaveBeenCalledWith(578, 22)
   })
 
+  it('recupera la portada histórica cuando una galería antigua no puede consultarse', async () => {
+    vi.spyOn(galleryService, 'list').mockRejectedValue(new Error('Galería no encontrada'))
+    vi.spyOn(proformasService, 'attachments').mockResolvedValue([
+      photo(71, false),
+      photo(72, true),
+    ] as Awaited<ReturnType<typeof proformasService.attachments>>)
+    const covers = useQuoteFurnitureCovers()
+    const line = { id: 28, producto: null, galeria_id: 'historical-gallery' }
+    await covers.ensureLines([line], 578)
+    expect(covers.coverFor(line, 578)?.id).toBe(72)
+  })
+
   it('no solicita galerías privadas cuando la línea es un producto de catálogo', async () => {
     const gallery = vi.spyOn(galleryService, 'list')
     const attachments = vi.spyOn(proformasService, 'attachments')
