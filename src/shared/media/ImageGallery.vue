@@ -215,7 +215,7 @@ function canMove(index: number, offset: number) {
   if (!props.endpoint) return true
   // La API sólo acepta ordenar imágenes persistidas; no mezclar ambos grupos todavía.
   const saved = images.value.length
-  return (index < saved) === (target < saved)
+  return index < saved === target < saved
 }
 function move(index: number, offset: number) {
   if (!props.editable || busy.value || !canMove(index, offset)) return
