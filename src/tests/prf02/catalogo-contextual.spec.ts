@@ -175,6 +175,34 @@ describe('PRF-02 catálogo contextual', () => {
     expect(wrapper.emitted('select')).toBeUndefined()
     wrapper.unmount()
   })
+  it('selecciona desde la ficha previa y la cierra sin duplicar operaciones comerciales', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/catalogo/productos/', () =>
+        HttpResponse.json({ count: 1, next: null, previous: null, results: [sku] }),
+      ),
+    )
+    const wrapper = mount(CatalogoContextual, {
+      props: { categorias: [silla], familias: [], existingProductIds: [] },
+      attachTo: document.body,
+    })
+    try {
+      await flushPromises()
+      const openPreview = wrapper.findAll('button').find((button) => button.text().includes('Ver ficha'))
+      expect(openPreview).toBeDefined()
+      await openPreview!.trigger('click')
+      await flushPromises()
+      const select = document.body.querySelector<HTMLButtonElement>('.preview-actions button:last-child')
+      expect(select).not.toBeNull()
+      select!.click()
+      await flushPromises()
+      expect(wrapper.emitted('select')).toHaveLength(1)
+      expect(wrapper.emitted('select')?.[0]?.[0]).toMatchObject({ id: 41 })
+      expect(document.body.querySelector('.preview-actions')).toBeNull()
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
   it('alterna entre cuadrícula y tabla, muestra miniaturas y respeta la opción de ocultarlas', async () => {
     const key = 'homex.catalogo.imagenes-visibles.v1'
     localStorage.removeItem(key)
