@@ -43,6 +43,7 @@ import {
   Copy,
   Trash2,
   Wrench,
+  Save,
 } from '@lucide/vue'
 import Button from '@/shared/ui/Button.vue'
 import Card from '@/shared/ui/Card.vue'
@@ -68,6 +69,8 @@ import { retornoAProformas } from '../utils/navegacionProformas'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { productosService } from '@/modules/productos/services/productosService'
 import ProductImage from '@/modules/productos/components/ProductImage.vue'
+import GalleryPhoto from '@/shared/media/GalleryPhoto.vue'
+import { useQuoteFurnitureCovers } from '../composables/useQuoteFurnitureCovers'
 import { useQuoteProductImages } from '../composables/useQuoteProductImages'
 import {
   cloneEditorData,
@@ -284,6 +287,17 @@ const {
   remember: rememberQuoteImage,
 } = useQuoteProductImages()
 watch(existingProductIds, (ids) => void ensureQuoteImages(ids), { immediate: true })
+const { coverFor: furnitureCoverFor, ensureLines: ensureFurnitureCovers } =
+  useQuoteFurnitureCovers()
+watch(
+  () => lineas.value.map((line) => `${line.id ?? ''}:${line.galeria_id ?? ''}`).join('|'),
+  () => void ensureFurnitureCovers(lineas.value, proformaId.value),
+  { immediate: true },
+)
+function furnitureCoverSource(line: LineaLocal) {
+  const cover = furnitureCoverFor(line, proformaId.value)
+  return cover?.variantes?.['320'] ?? cover?.url ?? ''
+}
 function canEditCatalogProduct(product: Producto): boolean {
   return (
     session.can('comercial.administrar') ||
@@ -1443,6 +1457,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                     sizes="64px"
                   />
                 </div>
+                <div v-else-if="furnitureCoverSource(line)" class="line-thumbnail">
+                  <GalleryPhoto :src="furnitureCoverSource(line)" :alt="'Imagen principal de ' + line.nombre" />
+                </div>
                 <strong>{{ line.nombre }}</strong>
               </div>
               <p v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
@@ -1762,6 +1779,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   :alt="line.nombre"
                   sizes="48px"
                 />
+              </div>
+              <div v-else-if="furnitureCoverSource(line)" class="review-thumbnail">
+                <GalleryPhoto :src="furnitureCoverSource(line)" :alt="'Imagen principal de ' + line.nombre" />
               </div>
               <span
                 ><strong>{{ line.nombre }}</strong> —
@@ -3323,6 +3343,12 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   height: 100%;
   min-height: 0;
   aspect-ratio: 1 !important;
+}
+.line-thumbnail :deep(img),
+.review-thumbnail :deep(img) {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 .line-thumbnail :deep(.fallback span) {
   display: none;
