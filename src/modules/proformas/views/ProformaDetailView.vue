@@ -93,9 +93,8 @@ async function load() {
 function edit() {
   if (!quote.value || !editable.value) return
   void router.push({
-    name: 'proforma-edit',
-    params: { id: quote.value.id },
-    query: { returnTo: listPath.value },
+    path: `/proformas/${quote.value.id}/editar`,
+    query: listPath.value === '/proformas' ? {} : { returnTo: listPath.value },
   })
 }
 async function transition() {
