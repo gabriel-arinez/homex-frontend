@@ -442,7 +442,13 @@ test('FE04 crea con unitario y descuento, revisa y aprueba', async ({ page }) =>
   await page.getByLabel('Título').fill('Oficina nueva')
   await page.getByRole('button', { name: /Revisar$/ }).click()
   await page.getByRole('button', { name: 'Enviar a revisión' }).click()
+  await expect(page.getByRole('dialog', { name: 'Enviar proforma a revisión' })).toBeVisible()
+  await page
+    .getByRole('dialog', { name: 'Enviar proforma a revisión' })
+    .getByRole('button', { name: 'Enviar a revisión' })
+    .click()
   await expect(page).toHaveURL(/\/proformas\/1(?:\?|$)/)
+  await expect(page.getByText('Proforma enviada correctamente a revisión.')).toBeVisible()
   await expect(page.getByText('En revisión').first()).toBeVisible()
   await page.getByRole('button', { name: 'Aprobar y crear pedido' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Aprobar y crear pedido' }).click()
