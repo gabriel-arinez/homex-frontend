@@ -231,7 +231,9 @@ describe('FE04 proformas manuales', () => {
       .find((x) => x.text() === 'Aprobar y crear pedido')!
       .trigger('click')
     await flushPromises()
-    const approveButtons = wrapper.findAll('button').filter((x) => x.text() === 'Aprobar y crear pedido')
+    const approveButtons = wrapper
+      .findAll('button')
+      .filter((x) => x.text() === 'Aprobar y crear pedido')
     await approveButtons[approveButtons.length - 1]!.trigger('click')
     await flushPromises()
     expect(wrapper.text()).toContain('Stock insuficiente')
@@ -298,7 +300,9 @@ describe('FE04 proformas manuales', () => {
     expect(wrapper.find('.header-form').exists()).toBe(false)
     expect(wrapper.text()).toContain('Continuar edición')
     expect(wrapper.text()).not.toContain('Agregar línea')
-    const action = wrapper.findAll('button').find((button) => button.text().includes('Continuar edición'))
+    const action = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Continuar edición'))
     expect(action).toBeDefined()
     await action!.trigger('click')
     await flushPromises()

@@ -77,7 +77,9 @@ const router = useRouter()
 const session = useSessionStore()
 const proformaId = computed(() => (route.params.id ? Number(route.params.id) : null))
 const listPath = computed(() => retornoAProformas(route.query.returnTo))
-const listQuery = computed(() => listPath.value === '/proformas' ? {} : { returnTo: listPath.value })
+const listQuery = computed(() =>
+  listPath.value === '/proformas' ? {} : { returnTo: listPath.value },
+)
 const isReview = computed(() => persisted.value?.estado_info.codigo === 'EN_REVISION')
 let allowNavigationAfterSave = false
 const steps = ['Productos', 'Cliente', 'Condiciones', 'Revisar'] as const
@@ -1758,9 +1760,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           <div v-else class="emission-ready" role="status">
             <CheckCircle2 :size="19" aria-hidden="true" />
             <span>
-              {{ isReview
-                ? 'Esta proforma ya está en revisión. Puedes guardar correcciones o consultar su resumen.'
-                : 'Información completa. La proforma está lista para enviar a revisión.' }}
+              {{
+                isReview
+                  ? 'Esta proforma ya está en revisión. Puedes guardar correcciones o consultar su resumen.'
+                  : 'Información completa. La proforma está lista para enviar a revisión.'
+              }}
             </span>
           </div>
         </section>
@@ -1776,10 +1780,14 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               /></Button>
             </div>
             <div class="editor-actions__operations">
-              <Button variant="secondary" :processing="saving" @click="persist(false)"
-                >{{ isReview ? 'Guardar cambios' : 'Guardar borrador' }}</Button
-              >
-              <Button v-if="!isReview" :disabled="!canEmit" :processing="saving" @click="persist(true)"
+              <Button variant="secondary" :processing="saving" @click="persist(false)">{{
+                isReview ? 'Guardar cambios' : 'Guardar borrador'
+              }}</Button>
+              <Button
+                v-if="!isReview"
+                :disabled="!canEmit"
+                :processing="saving"
+                @click="persist(true)"
                 >Enviar a revisión</Button
               >
               <Button

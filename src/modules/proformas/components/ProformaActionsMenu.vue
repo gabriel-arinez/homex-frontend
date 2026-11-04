@@ -105,11 +105,25 @@ onBeforeUnmount(() => {
         :aria-label="`Acciones de la proforma #${numero}`"
         :style="menuPosition"
       >
-        <RouterLink role="menuitem" :to="{ path: `/proformas/${id}/editar`, query: props.returnTo ? { returnTo: props.returnTo } : {} }" @click="close(false)">
+        <RouterLink
+          role="menuitem"
+          :to="{
+            path: `/proformas/${id}/editar`,
+            query: props.returnTo ? { returnTo: props.returnTo } : {},
+          }"
+          @click="close(false)"
+        >
           <Pencil :size="17" aria-hidden="true" />
           Continuar edición
         </RouterLink>
-        <RouterLink role="menuitem" :to="{ path: `/proformas/${id}`, query: props.returnTo ? { returnTo: props.returnTo } : {} }" @click="close(false)">
+        <RouterLink
+          role="menuitem"
+          :to="{
+            path: `/proformas/${id}`,
+            query: props.returnTo ? { returnTo: props.returnTo } : {},
+          }"
+          @click="close(false)"
+        >
           <ClipboardList :size="17" aria-hidden="true" />
           Ver resumen y gestión
         </RouterLink>

@@ -55,7 +55,9 @@ const tone = computed<'neutral' | 'success' | 'warning' | 'danger' | 'info'>(() 
 const money = (value: string | number) => {
   const code = quote.value?.moneda_info.codigo || 'BOB'
   try {
-    return new Intl.NumberFormat('es-BO', { style: 'currency', currency: code }).format(Number(value))
+    return new Intl.NumberFormat('es-BO', { style: 'currency', currency: code }).format(
+      Number(value),
+    )
   } catch {
     return `${code} ${Number(value).toFixed(2)}`
   }
@@ -120,9 +122,10 @@ async function transition() {
     await refreshQuote()
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : 'No se pudo completar la acción.'
-    error.value = cause instanceof ApiError && cause.status === 409
-      ? `${message} Se actualizará el estado para que puedas revisar la proforma.`
-      : message
+    error.value =
+      cause instanceof ApiError && cause.status === 409
+        ? `${message} Se actualizará el estado para que puedas revisar la proforma.`
+        : message
     try {
       await refreshQuote()
     } catch {
@@ -161,7 +164,12 @@ onMounted(() => void load())
         <Button variant="secondary" @click="router.push(listPath)">
           <ArrowLeft :size="17" aria-hidden="true" /> Volver a proformas
         </Button>
-        <Button v-if="quote" variant="secondary" :processing="downloading" @click="downloadDocument">
+        <Button
+          v-if="quote"
+          variant="secondary"
+          :processing="downloading"
+          @click="downloadDocument"
+        >
           <Download :size="17" aria-hidden="true" />
           {{ stateCode === 'BORRADOR' ? 'Descargar borrador (PDF)' : 'Descargar PDF' }}
         </Button>
@@ -172,18 +180,21 @@ onMounted(() => void load())
           v-if="inReview"
           :disabled="processing || !canApprove"
           @click="confirmAction = 'approve'"
-        >Aprobar y crear pedido</Button>
+          >Aprobar y crear pedido</Button
+        >
         <Button
           v-if="stateCode === 'EN_REVISION'"
           variant="secondary"
           :disabled="processing"
           @click="confirmAction = 'not-completed'"
-        >Marcar no concretada</Button>
+          >Marcar no concretada</Button
+        >
         <Button
           v-if="stateCode === 'NO_CONCRETADA'"
           :disabled="processing"
           @click="confirmAction = 'reopen'"
-        >Reabrir en revisión</Button>
+          >Reabrir en revisión</Button
+        >
       </template>
     </PageHeader>
 
@@ -194,7 +205,9 @@ onMounted(() => void load())
     <template v-else-if="quote">
       <div v-if="success" class="notice notice--success" role="status">
         {{ success }}
-        <RouterLink v-if="lastPedidoId" :to="`/pedidos/${lastPedidoId}`">Consultar pedido #{{ lastPedidoId }}</RouterLink>
+        <RouterLink v-if="lastPedidoId" :to="`/pedidos/${lastPedidoId}`"
+          >Consultar pedido #{{ lastPedidoId }}</RouterLink
+        >
       </div>
       <div v-if="error" class="notice notice--error" role="alert">{{ error }}</div>
       <div v-if="approvalIssue" class="notice" role="status">{{ approvalIssue }}</div>
@@ -210,7 +223,12 @@ onMounted(() => void load())
         </div>
         <div class="stat">
           <span>Cliente</span>
-          <strong>{{ quote.cliente_resumen?.nombre || quote.cliente_resumen?.empresa || quote.prospecto_nombre || 'Sin definir' }}</strong>
+          <strong>{{
+            quote.cliente_resumen?.nombre ||
+            quote.cliente_resumen?.empresa ||
+            quote.prospecto_nombre ||
+            'Sin definir'
+          }}</strong>
         </div>
         <div class="stat">
           <span>Moneda</span>
@@ -225,36 +243,66 @@ onMounted(() => void load())
       <section class="panel" aria-labelledby="conditions-title">
         <div class="section-heading">
           <div>
-            <h2 id="conditions-title"><FileText :size="20" aria-hidden="true" /> Información comercial</h2>
+            <h2 id="conditions-title">
+              <FileText :size="20" aria-hidden="true" /> Información comercial
+            </h2>
             <p>Datos guardados en HOMEX. Para modificarlos, utiliza el editor de proformas.</p>
           </div>
         </div>
         <dl class="facts">
-          <div><dt>Fecha</dt><dd>{{ fechaCalendario(quote.fecha) }}</dd></div>
-          <div><dt>Plazo de entrega</dt><dd>{{ quote.plazo_entrega || 'No definido' }}</dd></div>
-          <div><dt>Validez</dt><dd>{{ quote.validez_oferta ? `${quote.validez_oferta} días` : 'No definida' }}</dd></div>
-          <div><dt>Adelanto</dt><dd>{{ quote.porcentaje_adelanto ? `${quote.porcentaje_adelanto}%` : 'No definido' }}</dd></div>
-          <div v-if="quote.observaciones" class="wide"><dt>Observaciones</dt><dd>{{ quote.observaciones }}</dd></div>
+          <div>
+            <dt>Fecha</dt>
+            <dd>{{ fechaCalendario(quote.fecha) }}</dd>
+          </div>
+          <div>
+            <dt>Plazo de entrega</dt>
+            <dd>{{ quote.plazo_entrega || 'No definido' }}</dd>
+          </div>
+          <div>
+            <dt>Validez</dt>
+            <dd>{{ quote.validez_oferta ? `${quote.validez_oferta} días` : 'No definida' }}</dd>
+          </div>
+          <div>
+            <dt>Adelanto</dt>
+            <dd>
+              {{ quote.porcentaje_adelanto ? `${quote.porcentaje_adelanto}%` : 'No definido' }}
+            </dd>
+          </div>
+          <div v-if="quote.observaciones" class="wide">
+            <dt>Observaciones</dt>
+            <dd>{{ quote.observaciones }}</dd>
+          </div>
         </dl>
       </section>
 
       <section class="lines" aria-labelledby="lines-title">
         <div class="section-heading">
           <div>
-            <h2 id="lines-title"><ClipboardCheck :size="20" aria-hidden="true" /> Productos y especificaciones</h2>
+            <h2 id="lines-title">
+              <ClipboardCheck :size="20" aria-hidden="true" /> Productos y especificaciones
+            </h2>
             <p>Importes guardados y calculados por el servidor.</p>
           </div>
-          <span class="counter">{{ quote.detalles.length }} {{ quote.detalles.length === 1 ? 'ítem' : 'ítems' }}</span>
+          <span class="counter"
+            >{{ quote.detalles.length }} {{ quote.detalles.length === 1 ? 'ítem' : 'ítems' }}</span
+          >
         </div>
         <article v-for="(line, index) in quote.detalles" :key="line.id" class="line">
           <div class="line-main">
             <div>
-              <small>{{ String(index + 1).padStart(2, '0') }} · {{ line.tipo_item_info.nombre }} · {{ line.unidad_info.nombre }}</small>
+              <small
+                >{{ String(index + 1).padStart(2, '0') }} · {{ line.tipo_item_info.nombre }} ·
+                {{ line.unidad_info.nombre }}</small
+              >
               <h3>{{ line.nombre }}</h3>
               <p v-if="line.descripcion">{{ line.descripcion }}</p>
               <p class="secondary">
                 {{ line.cantidad }} ×
-                {{ line.modo_calculo === 'TOTAL_NEGOCIADO' ? 'total negociado' : money(line.precio_unitario ?? '0') }}
+                {{
+                  line.modo_calculo === 'TOTAL_NEGOCIADO'
+                    ? 'total negociado'
+                    : money(line.precio_unitario ?? '0')
+                }}
               </p>
               <p v-if="line.especificacion" class="secondary">
                 {{ line.especificacion.tipo_mueble_info?.nombre || 'Mueble a medida' }} ·
@@ -280,14 +328,25 @@ onMounted(() => void load())
       </section>
 
       <section class="totals" aria-label="Totales de la proforma">
-        <div><span>Subtotal</span><strong>{{ money(quote.subtotal) }}</strong></div>
-        <div><span>Descuentos</span><strong>{{ money(quote.descuento_total) }}</strong></div>
-        <div><strong>Total comercial</strong><strong>{{ money(quote.total) }}</strong></div>
+        <div>
+          <span>Subtotal</span><strong>{{ money(quote.subtotal) }}</strong>
+        </div>
+        <div>
+          <span>Descuentos</span><strong>{{ money(quote.descuento_total) }}</strong>
+        </div>
+        <div>
+          <strong>Total comercial</strong><strong>{{ money(quote.total) }}</strong>
+        </div>
       </section>
 
       <div v-if="editable" class="resume-editing">
-        <p>¿Necesitas corregir productos, cliente o condiciones? Todos los cambios comerciales se realizan desde el editor.</p>
-        <Button variant="secondary" @click="edit"><Pencil :size="17" aria-hidden="true" /> Abrir editor</Button>
+        <p>
+          ¿Necesitas corregir productos, cliente o condiciones? Todos los cambios comerciales se
+          realizan desde el editor.
+        </p>
+        <Button variant="secondary" @click="edit"
+          ><Pencil :size="17" aria-hidden="true" /> Abrir editor</Button
+        >
       </div>
     </template>
 
@@ -315,45 +374,196 @@ onMounted(() => void load())
 </template>
 
 <style scoped>
-.proforma-detail { display: grid; gap: var(--space-4); min-width: 0; }
-.summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); }
-.stat, .panel, .line, .totals, .resume-editing { padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface); min-width: 0; }
-.stat { display: grid; gap: var(--space-2); align-content: start; }
-.stat span, .facts dt, .section-heading p, .line small, .secondary, .media > p, .resume-editing p { color: var(--color-text-secondary); font-size: .85rem; }
-.stat strong, .line strong, .totals strong { overflow-wrap: anywhere; }
-.main-amount { font-size: 1.15rem; }
-.notice { padding: var(--space-3) var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-surface); font-size: .9rem; }
-.notice--error { color: var(--color-danger); border-color: var(--color-danger); }
-.notice--success { color: var(--color-success); }
-.notice a { display: inline-block; margin-left: var(--space-3); color: inherit; font-weight: 700; }
-.section-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-3); }
-.section-heading h2 { display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: 1.12rem; }
-.section-heading p { margin: var(--space-1) 0 0; }
-.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); margin: 0; }
-.facts dt { margin-bottom: var(--space-1); }
-.facts dd { margin: 0; overflow-wrap: anywhere; }
-.facts .wide { grid-column: 1 / -1; }
-.lines { min-width: 0; }
-.counter { font-size: .8rem; color: var(--color-text-secondary); }
-.line { margin-bottom: var(--space-3); }
-.line-main { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-4); }
-.line-main > div { min-width: 0; }
-.line-main h3 { margin: var(--space-1) 0; font-size: 1rem; }
-.line-main p { margin: var(--space-2) 0 0; overflow-wrap: anywhere; }
-.line-main > strong { text-align: right; white-space: nowrap; }
-.media { border-top: 1px solid var(--color-border); margin-top: var(--space-4); padding-top: var(--space-3); }
-.media h4 { display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: .9rem; }
-.media > p { margin: var(--space-1) 0; }
-.totals { display: grid; gap: var(--space-2); width: min(100%, 26rem); margin-left: auto; }
-.totals > div { display: flex; justify-content: space-between; gap: var(--space-4); }
-.totals > div:last-child { border-top: 1px solid var(--color-border); padding-top: var(--space-3); font-size: 1.1rem; }
-.resume-editing { display: flex; justify-content: space-between; gap: var(--space-4); align-items: center; flex-wrap: wrap; }
-.resume-editing p { margin: 0; }
-@media (max-width: 64rem) { .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.proforma-detail {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.stat,
+.panel,
+.line,
+.totals,
+.resume-editing {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  min-width: 0;
+}
+.stat {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+}
+.stat span,
+.facts dt,
+.section-heading p,
+.line small,
+.secondary,
+.media > p,
+.resume-editing p {
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+}
+.stat strong,
+.line strong,
+.totals strong {
+  overflow-wrap: anywhere;
+}
+.main-amount {
+  font-size: 1.15rem;
+}
+.notice {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  font-size: 0.9rem;
+}
+.notice--error {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+.notice--success {
+  color: var(--color-success);
+}
+.notice a {
+  display: inline-block;
+  margin-left: var(--space-3);
+  color: inherit;
+  font-weight: 700;
+}
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.section-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 1.12rem;
+}
+.section-heading p {
+  margin: var(--space-1) 0 0;
+}
+.facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+}
+.facts dt {
+  margin-bottom: var(--space-1);
+}
+.facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.facts .wide {
+  grid-column: 1 / -1;
+}
+.lines {
+  min-width: 0;
+}
+.counter {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+.line {
+  margin-bottom: var(--space-3);
+}
+.line-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+.line-main > div {
+  min-width: 0;
+}
+.line-main h3 {
+  margin: var(--space-1) 0;
+  font-size: 1rem;
+}
+.line-main p {
+  margin: var(--space-2) 0 0;
+  overflow-wrap: anywhere;
+}
+.line-main > strong {
+  text-align: right;
+  white-space: nowrap;
+}
+.media {
+  border-top: 1px solid var(--color-border);
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+}
+.media h4 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 0.9rem;
+}
+.media > p {
+  margin: var(--space-1) 0;
+}
+.totals {
+  display: grid;
+  gap: var(--space-2);
+  width: min(100%, 26rem);
+  margin-left: auto;
+}
+.totals > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.totals > div:last-child {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-3);
+  font-size: 1.1rem;
+}
+.resume-editing {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.resume-editing p {
+  margin: 0;
+}
+@media (max-width: 64rem) {
+  .summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 @media (max-width: 38rem) {
-  .summary, .facts { grid-template-columns: minmax(0, 1fr); }
-  .line-main { flex-direction: column; gap: var(--space-2); }
-  .line-main > strong { text-align: left; }
-  .notice a { display: block; margin: var(--space-2) 0 0; }
+  .summary,
+  .facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .line-main {
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .line-main > strong {
+    text-align: left;
+  }
+  .notice a {
+    display: block;
+    margin: var(--space-2) 0 0;
+  }
 }
 </style>

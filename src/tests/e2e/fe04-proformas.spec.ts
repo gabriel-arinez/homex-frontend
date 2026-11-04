@@ -619,7 +619,11 @@ test('FE04 detalle sólo consulta y centraliza la edición comercial', async ({ 
 test('FE04 detalle funciona sin cargar catálogos auxiliares de edición', async ({ page }) => {
   await mockBackend(page)
   await page.route('**/api/v1/catalogo/opciones/**', (route) =>
-    route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ detail: 'Servicio no disponible' }) }),
+    route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ detail: 'Servicio no disponible' }),
+    }),
   )
   await page.goto('/proformas/1')
   await expect(page.getByRole('heading', { name: 'Proforma #101' })).toBeVisible()
