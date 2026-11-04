@@ -330,7 +330,7 @@ onBeforeUnmount(() => {
       @menu="emit('openMenu')"
     >
       <template #actions>
-        <Button @click="router.push('/proformas/nueva')">
+        <Button @click="router.push(route.fullPath === '/proformas' ? '/proformas/nueva' : { path: '/proformas/nueva', query: { returnTo: route.fullPath } })">
           <Plus :size="18" aria-hidden="true" /> Nueva proforma
         </Button>
       </template>
@@ -496,10 +496,10 @@ onBeforeUnmount(() => {
                 <strong>{{ money(row.total, row.moneda_info.codigo) }}</strong>
               </td>
               <td class="actions-cell">
-                <ProformaActionsMenu v-if="editable(row)" :id="row.id" :numero="row.numero" />
+                <ProformaActionsMenu v-if="editable(row)" :id="row.id" :numero="row.numero" :return-to="route.fullPath === '/proformas' ? undefined : route.fullPath" />
                 <RouterLink
                   v-else
-                  :to="`/proformas/${row.id}`"
+                  :to="route.fullPath === '/proformas' ? `/proformas/${row.id}` : { path: `/proformas/${row.id}`, query: { returnTo: route.fullPath } }"
                   class="proforma-view-link"
                   :aria-label="`Ver proforma #${row.numero}`"
                   :title="`Ver proforma #${row.numero}`"
