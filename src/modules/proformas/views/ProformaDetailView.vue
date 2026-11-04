@@ -203,8 +203,13 @@ onMounted(() => void load())
       <button type="button" @click="load">Reintentar</button>
     </ErrorState>
     <template v-else-if="quote">
-      <div v-if="route.query.enviada === '1' && inReview && !success" class="notice notice--success" role="status">
-        Proforma enviada correctamente a revisión. Puedes consultar sus documentos y, cuando corresponda, aprobar para crear el pedido.
+      <div
+        v-if="route.query.enviada === '1' && inReview && !success"
+        class="notice notice--success"
+        role="status"
+      >
+        Proforma enviada correctamente a revisión. Puedes consultar sus documentos y, cuando
+        corresponda, aprobar para crear el pedido.
       </div>
       <div v-if="success" class="notice notice--success" role="status">
         {{ success }}
