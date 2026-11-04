@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type {
   CamposCatalogo,
   FamiliaProducto,
@@ -13,7 +13,6 @@ import {
   Armchair,
   Check,
   FileText,
-  ImagePlus,
   Layers,
   Mic,
   Package,
@@ -25,7 +24,8 @@ import {
 } from '@lucide/vue'
 import { useFocusTrap } from '@/shared/composables/useFocusTrap'
 import Modal from '@/shared/ui/Modal.vue'
-import ProductImage from './ProductImage.vue'
+import ImageGallery from '@/shared/media/ImageGallery.vue'
+import type { LocalImage } from '@/shared/media/gallery'
 import Button from '@/shared/ui/Button.vue'
 import Select from '@/shared/ui/Select.vue'
 import TextField from '@/shared/ui/TextField.vue'
@@ -37,7 +37,7 @@ const props = defineProps<{
   canUploadImage?: boolean
 }>()
 const emit = defineEmits<{
-  save: [body: ProductoWritable, file: File | null]
+  save: [body: ProductoWritable, images: LocalImage[]]
   cancel: []
   change: []
 }>()
@@ -46,10 +46,7 @@ const familias = ref<FamiliaProducto[]>([])
 const loading = ref(true)
 const error = ref('')
 const fields = ref<Record<string, string[]>>({})
-const image = ref<File | null>(null)
-const imagePreview = ref('')
-const imageError = ref('')
-const imageInput = ref<HTMLInputElement | null>(null)
+const images = ref<LocalImage[]>([])
 const voiceOpen = ref(false)
 const voicePanel = ref<HTMLElement | null>(null)
 const advancedOpen = ref(false)
@@ -78,35 +75,6 @@ const voiceLabels: Record<string, string> = {
   m2_por_caja: 'm² por caja',
 }
 const fieldError = (name: string) => fields.value[name]?.[0] ?? props.serverErrors?.[name]?.[0]
-const canUpload = computed(() => props.canUploadImage !== false)
-function selectImage(event: Event) {
-  imageError.value = ''
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
-  if (
-    !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) ||
-    file.size > 10 * 1024 * 1024
-  ) {
-    imageError.value = 'Elige una imagen JPG, PNG o WebP de hasta 10 MiB.'
-    input.value = ''
-    return
-  }
-  if (imagePreview.value) URL.revokeObjectURL(imagePreview.value)
-  image.value = file
-  imagePreview.value = URL.createObjectURL(file)
-  emit('change')
-}
-function removeImage() {
-  if (imagePreview.value) URL.revokeObjectURL(imagePreview.value)
-  imagePreview.value = ''
-  image.value = null
-  if (imageInput.value) imageInput.value.value = ''
-  emit('change')
-}
-onBeforeUnmount(() => {
-  if (imagePreview.value) URL.revokeObjectURL(imagePreview.value)
-})
 const money = (value: string | number) =>
   new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(Number(value) || 0)
 const discountPercent = computed(() => {
@@ -474,7 +442,7 @@ function submit() {
       fecha_fin: form.fecha_fin || null,
       activo: form.promo_enabled,
     }
-  emit('save', body, image.value)
+  emit('save', body, images.value)
 }
 onMounted(load)
 </script>
@@ -903,55 +871,15 @@ onMounted(load)
 
       <aside class="form-aside" aria-label="Imagen y disponibilidad">
         <section class="catalog-section aside-card" aria-labelledby="image-title">
-          <div class="aside-heading">
-            <ImagePlus :size="19" aria-hidden="true" />
-            <h3 id="image-title">Imagen principal</h3>
-          </div>
-          <div class="image-preview">
-            <img
-              v-if="imagePreview"
-              :src="imagePreview"
-              alt="Vista previa de la imagen seleccionada"
-            />
-            <ProductImage
-              v-else-if="initial?.imagen_principal"
-              :image="initial.imagen_principal"
-              :alt="initial.nombre"
-              eager
-            />
-            <div v-else class="image-empty">
-              <ImagePlus :size="34" aria-hidden="true" />
-              <p>Sin imagen seleccionada</p>
-            </div>
-          </div>
-          <template v-if="!initial && canUpload">
-            <input
-              ref="imageInput"
-              class="file-hidden"
-              type="file"
-              aria-label="Imagen principal (opcional)"
-              accept="image/jpeg,image/png,image/webp"
-              @change="selectImage"
-            />
-            <Button
-              type="button"
-              variant="secondary"
-              class="image-button"
-              @click="imageInput?.click()"
-              >{{ image ? 'Cambiar imagen' : 'Seleccionar imagen' }}</Button
-            >
-            <button v-if="image" type="button" class="text-action" @click="removeImage">
-              Quitar imagen
-            </button>
-            <p class="muted tiny">JPG, PNG o WebP · Máximo 10 MiB.</p>
-          </template>
-          <p v-else-if="!initial" class="muted tiny">
-            La imagen principal requiere un usuario con permisos administrativos.
+          <p v-if="canUploadImage === false" class="muted tiny">
+            La gestión de imágenes requiere permiso comercial.
           </p>
-          <p v-else class="muted tiny">
-            La imagen principal se administra desde las operaciones autorizadas.
-          </p>
-          <p v-if="imageError" class="field-error" role="alert">{{ imageError }}</p>
+          <ImageGallery
+            v-model="images"
+            :endpoint="initial ? `/api/v1/catalogo/productos/${initial.id}/imagenes/` : undefined"
+            :editable="canUploadImage !== false"
+            @changed="emit('change')"
+          />
         </section>
         <section class="catalog-section aside-card" aria-labelledby="status-title">
           <div class="aside-heading">

@@ -5,6 +5,7 @@ import type { OrdenTrabajo } from '@/generated/api'
 import { ordenesTrabajoService } from '../services/ordenesTrabajoService'
 import { downloadBlob } from '@/shared/download/downloadBlob'
 import Button from '@/shared/ui/Button.vue'
+import ImageGallery from '@/shared/media/ImageGallery.vue'
 import Card from '@/shared/ui/Card.vue'
 import DataTable from '@/shared/ui/DataTable.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
@@ -147,6 +148,11 @@ const columns = [
           <template #cell-detalle="{ row }">
             <details v-if="row.fichaLegible" class="ficha-ot">
               <summary>{{ row.detalleLabel }}</summary>
+              <ImageGallery
+                :endpoint="`/api/v1/imagenes-privadas/?detalle=${row.id}`"
+                :editable="false"
+                title="Referencias de fabricación"
+              />
               <pre>{{ row.fichaLegible }}</pre>
               <p v-if="row.observacionesTecnicas">{{ row.observacionesTecnicas }}</p>
             </details>

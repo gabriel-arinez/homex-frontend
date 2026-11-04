@@ -4,7 +4,7 @@ import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vu
 import type { Producto, ProductoWritable } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { ApiError } from '@/shared/api'
-import ProductImage from '../components/ProductImage.vue'
+import ImageGallery from '@/shared/media/ImageGallery.vue'
 import ProductoForm from '../components/ProductoForm.vue'
 import { productosService } from '../services/productosService'
 import Button from '@/shared/ui/Button.vue'
@@ -27,7 +27,11 @@ const confirmCancel = ref(false)
 const dirty = ref(false)
 const conflicted = ref(false)
 let requestId = 0
-const canEdit = computed(() => session.can('comercial.administrar'))
+const canEdit = computed(
+  () =>
+    session.can('comercial.administrar') ||
+    (session.can('catalogo.crear_producto') && product.value?.created_by === session.identity?.id),
+)
 const contextualDestination = computed(() => {
   const path = route.query.returnTo
   const draft = route.query.draft
@@ -159,11 +163,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       </div>
       <div v-else-if="!editing" class="layout">
         <Card
-          ><ProductImage
-            :image="product.imagen_principal"
-            :alt="product.nombre"
-            sizes="(max-width: 768px) 100vw, 50vw"
-            eager /></Card
+          ><ImageGallery
+            :endpoint="`/api/v1/catalogo/productos/${product.id}/imagenes/`"
+            :editable="canEdit" /></Card
         ><Card
           ><dl>
             <div>
