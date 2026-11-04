@@ -49,13 +49,14 @@ async function save(body: ProductoWritable, images: LocalImage[]) {
   error.value = ''
   serverErrors.value = {}
   try {
+    const retrying = createdId.value !== null
     let product
     if (createdId.value) {
       const previous = await productosService.get(createdId.value)
       product = await productosService.update(previous.id, body, previous.revision)
     } else product = await productosService.create(body)
     createdId.value = product.id
-    if (images.length || uploaded.size) {
+    if (images.length || uploaded.size || retrying) {
       const path = `/api/v1/catalogo/productos/${product.id}/imagenes/`
       const current = await galleryService.list(path)
       for (const existing of current.imagenes) {
