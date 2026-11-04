@@ -126,6 +126,15 @@ function discard() {
   dirty.value = false
   void router.push(destination())
 }
+function cancelDescription() {
+  if (createdId.value === null) return 'Los datos que ingresaste no se guardarán.'
+  return `El producto #${createdId.value} ya está registrado. Salir no lo elimina. Puedes reintentar la carga de imágenes o ir a su ficha para completarlas.`
+}
+function leaveDescription() {
+  if (createdId.value === null)
+    return 'Hay cambios sin guardar en este producto. Si sales, se descartarán.'
+  return `El producto #${createdId.value} ya existe en HOMEX. Salir no lo elimina y algunas imágenes podrían seguir pendientes de cargar.`
+}
 function answerLeave(answer: boolean) {
   confirmLeave.value = false
   const resolve = resolveLeave
@@ -174,9 +183,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     <ConfirmDialog
       :open="confirmCancel"
       :title="createdId !== null ? 'Producto ya registrado' : 'Descartar producto'"
-      :description="createdId !== null
-        ? `El producto #${createdId} ya está registrado. Salir no lo elimina. Puedes reintentar la carga de imágenes o ir a su ficha para completarlas.`
-        : 'Los datos que ingresaste no se guardarán.'"
+      :description="cancelDescription()"
       :confirm-label="createdId !== null ? 'Ir a su ficha' : 'Descartar y salir'"
       @close="confirmCancel = false"
       @confirm="discard"
@@ -184,9 +191,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     <ConfirmDialog
       :open="confirmLeave"
       :title="createdId !== null ? 'Producto ya registrado' : 'Salir sin guardar'"
-      :description="createdId !== null
-        ? `El producto #${createdId} ya existe en HOMEX. Salir no lo elimina y algunas imágenes podrían seguir pendientes de cargar.`
-        : 'Hay cambios sin guardar en este producto. Si sales, se descartarán.'"
+      :description="leaveDescription()"
       :confirm-label="createdId !== null ? 'Salir y conservar producto' : 'Salir sin guardar'"
       @close="answerLeave(false)"
       @confirm="answerLeave(true)"
