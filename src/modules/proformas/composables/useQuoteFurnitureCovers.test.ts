@@ -53,6 +53,20 @@ describe('portada privada de muebles a pedido', () => {
     expect(covers.coverFor(line, 578)?.id).toBe(72)
   })
 
+  it('actualiza la miniatura al cambiar la portada sin recargar la proforma', async () => {
+    const list = vi.spyOn(galleryService, 'list')
+    list
+      .mockResolvedValueOnce({ limite: 8, imagenes: [photo(81, true), photo(82, false)] })
+      .mockResolvedValueOnce({ limite: 8, imagenes: [photo(81, false), photo(82, true)] })
+    const covers = useQuoteFurnitureCovers()
+    const line = { id: 40, producto: null, galeria_id: 'updated-gallery' }
+    await covers.ensureLines([line], 578)
+    expect(covers.coverFor(line, 578)?.id).toBe(81)
+    await covers.refreshLine(line, 578)
+    expect(covers.coverFor(line, 578)?.id).toBe(82)
+    expect(list).toHaveBeenCalledTimes(2)
+  })
+
   it('no solicita galerías privadas cuando la línea es un producto de catálogo', async () => {
     const gallery = vi.spyOn(galleryService, 'list')
     const attachments = vi.spyOn(proformasService, 'attachments')

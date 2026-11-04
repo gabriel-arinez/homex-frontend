@@ -69,6 +69,15 @@ export function useQuoteFurnitureCovers() {
     return request
   }
 
+  async function refreshLine(line: ReferenciaMueble, quoteId?: number | null) {
+    const key = keyOf(line, quoteId)
+    if (!key) return
+    const running = inFlight.get(key)
+    if (running) await running
+    loaded.delete(key)
+    await fetchCover(line, quoteId)
+  }
+
   async function ensureLines(lines: ReferenciaMueble[], quoteId?: number | null) {
     const eligible = lines.filter((line) => !line.producto && keyOf(line, quoteId))
     // Lotes limitados para evitar una petición por línea simultáneamente.
@@ -77,5 +86,5 @@ export function useQuoteFurnitureCovers() {
     }
   }
 
-  return { coverFor, ensureLines }
+  return { coverFor, ensureLines, refreshLine }
 }

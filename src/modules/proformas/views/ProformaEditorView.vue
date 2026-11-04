@@ -331,8 +331,16 @@ const {
   remember: rememberQuoteImage,
 } = useQuoteProductImages()
 watch(existingProductIds, (ids) => void ensureQuoteImages(ids), { immediate: true })
-const { coverFor: furnitureCoverFor, ensureLines: ensureFurnitureCovers } =
-  useQuoteFurnitureCovers()
+const {
+  coverFor: furnitureCoverFor,
+  ensureLines: ensureFurnitureCovers,
+  refreshLine: refreshFurnitureCover,
+} = useQuoteFurnitureCovers()
+function onFurnitureGalleryChanged() {
+  specModalDirty.value = true
+  const line = editableSpecDetail.value
+  if (line) void refreshFurnitureCover(line, proformaId.value)
+}
 watch(
   () => lineas.value.map((line) => `${line.id ?? ''}:${line.galeria_id ?? ''}`).join('|'),
   () => void ensureFurnitureCovers(lineas.value, proformaId.value),
@@ -2182,6 +2190,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       @save="saveSpec"
       @type-created="registrarTipoMueble"
       @changed="specModalDirty = true"
+      @gallery-changed="onFurnitureGalleryChanged"
       @cancel="closeSpec"
       @applied="aplicarCaptura"
       @processing="voiceProcessing = $event"
