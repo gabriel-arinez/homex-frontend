@@ -309,14 +309,16 @@ describe('FE04 proformas manuales', () => {
     expect(r.currentRoute.value.path).toBe('/proformas/1/editar')
   })
   it('conserva adjuntos de líneas de catálogo, no sólo muebles a medida', async () => {
-    const current = quote()
-    current.detalles = [
-      {
-        ...detail,
-        tipo_item_info: { id: 1, codigo: 'SILLA', nombre: 'Silla' },
-        nombre: 'Silla de catálogo',
-      },
-    ]
+    const current = {
+      ...quote(),
+      detalles: [
+        {
+          ...detail,
+          tipo_item_info: { id: 1, codigo: 'SILLA', nombre: 'Silla' },
+          nombre: 'Silla de catálogo',
+        },
+      ],
+    }
     common(current)
     const r = await router()
     const wrapper = mount(ProformaDetailView, {
