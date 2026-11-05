@@ -53,11 +53,6 @@ jobs:
         with: { node-version: 24.18.1, cache: npm }
       - run: npm ci
       - run: npm run format:check
-      - name: Diagnóstico temporal del formato
-        if: always()
-        run: |
-          npx prettier --write src/modules/capturas/components/AudioRecorder.vue src/modules/productos/components/CapturaCatalogo.vue src/modules/productos/components/ProductExitDialog.vue src/modules/productos/components/ProductoForm.vue src/modules/productos/views/ProductoCreateView.vue src/modules/productos/views/ProductosListView.vue src/tests/fe03/productos-bandeja.spec.ts src/tests/fe03/catalogo-voz.spec.ts src/tests/e2e/productos-bandeja-ux.spec.ts src/modules/productos/views/ProductoCreateView.test.ts src/tests/fe03/producto-form-ux.spec.ts src/modules/proformas/composables/useQuoteFurnitureCovers.test.ts src/modules/proformas/composables/useQuoteFurnitureCovers.ts src/modules/proformas/views/ProformaEditorView.vue
-          git diff -- src/modules src/tests
 
   unit-component:
     runs-on: ubuntu-latest
