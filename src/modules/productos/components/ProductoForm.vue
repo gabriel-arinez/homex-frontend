@@ -101,6 +101,13 @@ const form = reactive({
   fecha_inicio: props.initial?.promocion?.fecha_inicio ?? '',
   fecha_fin: props.initial?.promocion?.fecha_fin ?? '',
 })
+const promoStatus = computed(() => {
+  if (!form.promo_activa || !form.promo_enabled) return 'Desactivada'
+  const today = new Date().toLocaleDateString('sv-SE')
+  if (form.fecha_inicio && form.fecha_inicio > today) return 'Programada'
+  if (form.fecha_fin && form.fecha_fin < today) return 'Finalizada'
+  return 'Vigente'
+})
 const promoUnchanged = computed(() => {
   const previous = props.initial?.promocion
   if (!previous || !form.promo_activa) return false
@@ -804,9 +811,10 @@ onMounted(load)
                 <strong>{{ discountPercent }} % de descuento</strong>
                 <span>{{ money(form.precio_lista) }} → {{ money(form.precio_ahora) }}</span>
               </div>
+              <p class="promotion-status" role="status">Estado de la promoción: <strong>{{ promoStatus }}</strong></p>
               <label class="toggle-row">
                 <span class="toggle-copy"
-                  ><strong>Promoción activa</strong>
+                  ><strong>Promoción habilitada</strong>
                   <small
                     >La promoción se aplica solo si está habilitada y dentro del período
                     indicado.</small
@@ -1138,6 +1146,14 @@ textarea {
 .extras-empty {
   color: var(--color-text-secondary);
   font-size: 0.83rem;
+}
+.promotion-status {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--color-text-secondary);
+}
+.promotion-status strong {
+  color: var(--color-text);
 }
 .promotion-legacy {
   padding: var(--space-3);
