@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, ref } from 'vue'
+import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { AlertTriangle, CheckCircle2, FileAudio, Mic, RotateCcw, Square, Pause, Play, X } from '@lucide/vue'
 import { ALLOWED_AUDIO_EXTENSIONS, MAX_AUDIO_BYTES, MAX_UPLOAD_SECONDS, readAudioDuration } from '@/modules/capturas/audioLimits'
 import type {
@@ -19,6 +19,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   apply: [fields: CamposCatalogo]
   'recording-state': [active: boolean, paused: boolean, elapsed: number]
+  'processing-state': [active: boolean]
 }>()
 const recorder = ref<InstanceType<typeof AudioRecorder> | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -27,6 +28,7 @@ const recording = ref(false)
 const paused = ref(false)
 const recordingElapsed = ref(0)
 const processing = ref(false)
+watch(processing, (active) => emit('processing-state', active))
 const text = ref('')
 const original = ref('')
 const audio = ref<Blob | null>(null)

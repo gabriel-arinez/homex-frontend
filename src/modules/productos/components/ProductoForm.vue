@@ -36,6 +36,7 @@ const error = ref('')
 const fields = ref<Record<string, string[]>>({})
 const images = ref<LocalImage[]>([])
 const voiceOpen = ref(false)
+const assistantProcessing = ref(false)
 const recordingActive = ref(false)
 const recordingPaused = ref(false)
 const recordingElapsed = ref(0)
@@ -483,15 +484,17 @@ onMounted(load)
       </Button>
     </header>
     <button
-      v-if="recordingActive && !voiceOpen"
+      v-if="(recordingActive || assistantProcessing) && !voiceOpen"
       type="button"
       class="voice-mini"
       aria-label="Volver al asistente de voz mientras se graba"
       @click="voiceOpen = true"
     >
       <Mic :size="17" aria-hidden="true" />
-      {{ recordingPaused ? 'Grabación pausada' : 'Grabación en curso' }}
-      · {{ String(Math.floor(recordingElapsed / 60)).padStart(2, '0') }}:{{ String(recordingElapsed % 60).padStart(2, '0') }}
+      {{ assistantProcessing ? 'Interpretando audio' : recordingPaused ? 'Grabación pausada' : 'Grabación en curso' }}
+      <template v-if="recordingActive">
+        · {{ String(Math.floor(recordingElapsed / 60)).padStart(2, '0') }}:{{ String(recordingElapsed % 60).padStart(2, '0') }}
+      </template>
       · Volver al asistente
     </button>
     <p v-if="error" class="error-summary" role="alert">{{ error }}</p>
@@ -966,6 +969,7 @@ onMounted(load)
           :opciones="opciones"
           @apply="applyVoice"
           @recording-state="updateRecording"
+          @processing-state="assistantProcessing = $event"
         />
       </aside>
     </div>

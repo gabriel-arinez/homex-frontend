@@ -85,9 +85,14 @@ function requestCloseStudio() {
 }
 const voicePanel = ref<HTMLElement | null>(null)
 const voiceActive = ref(false)
+const voiceProcessing = ref(false)
 const voicePaused = ref(false)
 const voiceElapsed = ref(0)
 useFocusTrap(voicePanel, voiceOpen)
+function onVoiceProcessing(value: boolean) {
+  voiceProcessing.value = value
+  emit('processing', value)
+}
 function onVoiceState(active: boolean, paused: boolean, elapsed: number) {
   voiceActive.value = active
   voicePaused.value = paused
@@ -240,15 +245,17 @@ async function seleccionarApartado(id: typeof seccion.value) {
       </div>
     </header>
     <button
-      v-if="voiceActive && !voiceOpen"
+      v-if="(voiceActive || voiceProcessing) && !voiceOpen"
       type="button"
       class="studio-voice-mini"
       aria-label="Reabrir asistente de voz del mueble"
       @click="voiceOpen = true"
     >
       <Mic :size="17" aria-hidden="true" />
-      {{ voicePaused ? 'Grabación pausada' : 'Grabación en curso' }}
-      · {{ String(Math.floor(voiceElapsed / 60)).padStart(2, '0') }}:{{ String(voiceElapsed % 60).padStart(2, '0') }}
+      {{ voiceProcessing ? 'Interpretando audio' : voicePaused ? 'Grabación pausada' : 'Grabación en curso' }}
+      <template v-if="voiceActive">
+        · {{ String(Math.floor(voiceElapsed / 60)).padStart(2, '0') }}:{{ String(voiceElapsed % 60).padStart(2, '0') }}
+      </template>
       · Volver al asistente
     </button>
     <Teleport to="body">
@@ -280,7 +287,7 @@ async function seleccionarApartado(id: typeof seccion.value) {
             :proforma="proforma"
             review-before-apply
             @proposed="recibirCaptura"
-            @processing="emit('processing', $event)"
+            @processing="onVoiceProcessing"
             @recording-state="onVoiceState"
           />
         </aside>
