@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref } from 'vue'
-import { AlertTriangle, CheckCircle2, FileAudio, Mic, RotateCcw, Sparkles } from '@lucide/vue'
+import { AlertTriangle, CheckCircle2, FileAudio, Mic, RotateCcw, Square } from '@lucide/vue'
 import type {
   CamposCatalogo,
   CategoriaEnum,
@@ -17,6 +17,8 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ apply: [fields: CamposCatalogo] }>()
 const recorder = ref<InstanceType<typeof AudioRecorder> | null>(null)
+const fileInput = ref<HTMLInputElement | null>(null)
+const requesting = ref(false)
 const recording = ref(false)
 const processing = ref(false)
 const text = ref('')
@@ -34,12 +36,35 @@ function cancel() {
 }
 onBeforeUnmount(cancel)
 async function startRecording() {
+  if (processing.value || requesting.value) return
   result.value = null
   error.value = ''
+  if (recording.value) {
+    recorder.value?.stopRecording()
+    return
+  }
+  requesting.value = true
   recording.value = true
-  // The existing recorder owns permission, recording, stop, cancel and cleanup.
   await nextTick()
-  await recorder.value?.startRecording()
+  try {
+    const started = await recorder.value?.startRecording()
+    if (!started) {
+      error.value = recorder.value?.getError() || 'No fue posible iniciar la grabación.'
+      recording.value = false
+    }
+  } finally {
+    requesting.value = false
+  }
+}
+function onRecorded(blob: Blob | null) {
+  if (!blob) return
+  audio.value = blob
+  recording.value = false
+  void interpret(true)
+}
+function chooseAudio() {
+  if (processing.value || requesting.value || recording.value) return
+  fileInput.value?.click()
 }
 async function interpret(useAudio = false) {
   cancel()
@@ -137,8 +162,17 @@ function displayValue(field: string, value: unknown) {
   return value
 }
 function upload(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  target.value = ''
+  if (!file) return
+  if (!/\.(wav|mp3|m4a|ogg|webm)$/i.test(file.name) || file.size === 0) {
+    error.value = 'Selecciona un audio válido en formato WAV, MP3, M4A, OGG o WebM.'
+    return
+  }
   result.value = null
-  audio.value = (event.target as HTMLInputElement).files?.[0] ?? null
+  audio.value = file
+  void interpret(true)
 }
 </script>
 <template>
@@ -155,28 +189,39 @@ function upload(event: Event) {
           <p>Dicta nombre, marca, colores o características del producto.</p>
         </div>
       </div>
-      <Button class="record-button" :disabled="processing" @click="startRecording">
-        <Mic :size="18" aria-hidden="true" /> Grabar descripción
-      </Button>
-      <AudioRecorder v-if="recording && !processing" ref="recorder" @ready="audio = $event" />
-      <label class="upload-label"
-        >O subir un archivo de audio
-        <span class="upload-control"
-          ><FileAudio :size="18" aria-hidden="true" />
-          <input
-            type="file"
-            accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm"
-            :disabled="processing"
-            @change="upload"
-          />
-        </span>
-      </label>
-      <div class="voice-action">
-        <Button :disabled="!audio || processing" variant="secondary" @click="interpret(true)">
-          <Sparkles :size="17" aria-hidden="true" /> Procesar audio
+      <div class="voice-source-actions" role="group" aria-label="Origen del audio">
+        <Button class="source-action source-record" :disabled="processing || requesting" @click="startRecording">
+          <Square v-if="recording" :size="28" aria-hidden="true" />
+          <Mic v-else :size="28" aria-hidden="true" />
+          <strong>{{ recording ? 'Detener grabación' : 'Grabar descripción' }}</strong>
+          <small>{{ recording ? 'Terminar e interpretar' : 'Usar micrófono' }}</small>
         </Button>
-        <p v-if="audio && !processing" class="hint">Audio listo para interpretar.</p>
+        <Button
+          variant="secondary"
+          class="source-action"
+          :disabled="processing || recording || requesting"
+          @click="chooseAudio"
+        >
+          <FileAudio :size="28" aria-hidden="true" />
+          <strong>Seleccionar archivo</strong>
+          <small>WAV, MP3, M4A, OGG o WebM</small>
+        </Button>
+        <input
+          ref="fileInput"
+          class="visually-hidden"
+          type="file"
+          accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm"
+          :disabled="processing || recording || requesting"
+          aria-label="Seleccionar audio del dispositivo"
+          @change="upload"
+        />
       </div>
+      <AudioRecorder
+        v-if="recording"
+        ref="recorder"
+        compact
+        @ready="onRecorded"
+      />
     </div>
 
     <div v-if="processing" class="processing-note" role="status">
@@ -299,29 +344,38 @@ function upload(event: Event) {
   color: var(--color-text-secondary);
   line-height: 1.5;
 }
-.record-button {
-  width: 100%;
+ .voice-source-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  position: relative;
 }
-.upload-label,
+.voice-source-actions :deep(.source-action) {
+  min-width: 0;
+  min-height: 7.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 0.45rem;
+  white-space: normal;
+  text-align: center;
+}
+.voice-source-actions :deep(.source-action strong) { font-size: 0.93rem; }
+.voice-source-actions :deep(.source-action small) { font-size: 0.76rem; font-weight: 400; opacity: 0.9; }
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
 .transcript-label {
   display: grid;
   gap: 0.55rem;
   font-size: 0.85rem;
   font-weight: 600;
-}
-.upload-control {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  min-width: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  padding: 0.7rem;
-}
-.upload-control input {
-  max-width: 100%;
-  min-width: 0;
-  font-size: 0.8rem;
 }
 .transcript-label textarea {
   min-height: 7rem;
@@ -331,13 +385,6 @@ function upload(event: Event) {
   background: var(--color-surface);
   color: var(--color-text);
   resize: vertical;
-}
-.voice-action {
-  display: grid;
-  gap: var(--space-2);
-}
-.voice-action > :deep(button) {
-  width: 100%;
 }
 .hint {
   margin: 0;
@@ -445,6 +492,10 @@ function upload(event: Event) {
 @media (max-width: 36rem) {
   .voice-catalog {
     padding: var(--space-4);
+  }
+  .voice-source-actions :deep(.source-action) {
+    min-height: 7rem;
+    padding: 0.65rem;
   }
 }
 @media (prefers-reduced-motion: reduce) {
