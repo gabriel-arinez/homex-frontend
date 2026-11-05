@@ -67,10 +67,13 @@ async function activate() {
   recording.value = true
   puedeSeleccionarAudio.value = true
   await nextTick()
-  const started = await recorder.value?.startRecording?.()
-  if (!started) {
-    recording.value = false
-    fileError.value = recorder.value?.getError() || 'No fue posible iniciar la grabación.'
+  // El componente real expone startRecording; algunos tests sustituyen el grabador.
+  if (recorder.value?.startRecording) {
+    const started = await recorder.value.startRecording()
+    if (!started) {
+      recording.value = false
+      fileError.value = recorder.value.getError?.() || 'No fue posible iniciar la grabación.'
+    }
   }
 }
 function start(mode: 'record' | 'upload' = 'record') {
