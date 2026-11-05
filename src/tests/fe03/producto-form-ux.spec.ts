@@ -125,6 +125,38 @@ describe('Formulario comercial de productos', () => {
     w.unmount()
   })
 
+  it('no modifica referencias promocionales históricas al cambiar otra información', async () => {
+    catalog()
+    const initial = {
+      id: 94,
+      categoria: 3,
+      unidad_stock: 4,
+      nombre: 'Accesorio existente',
+      sku: 'OTR-94',
+      precio_lista: '100.00',
+      activo: true,
+      promocion: {
+        precio_antes: '130.00',
+        precio_ahora: '80.00',
+        fecha_inicio: null,
+        fecha_fin: null,
+        activo: true,
+      },
+    } as unknown as Producto
+    const w = mount(ProductoForm, {
+      props: { initial },
+      global: { stubs: { CapturaCatalogo: true } },
+    })
+    await flushPromises()
+    expect(w.text()).toContain('precio anterior histórico')
+    await w.get('input[name="nombre"]').setValue('Accesorio editado')
+    await w.get('form').trigger('submit')
+    const body = w.emitted('save')?.[0]?.[0] as Record<string, unknown>
+    expect(body.nombre).toBe('Accesorio editado')
+    expect(body).not.toHaveProperty('promocion')
+    w.unmount()
+  })
+
   it('en edición comercial muestra la galería sin permitir acciones inmediatas', async () => {
     catalog()
     const initial = {
