@@ -89,6 +89,40 @@ describe('Formulario comercial de productos', () => {
     w.unmount()
   })
 
+  it('mantiene las propiedades complejas anteriores al editar características guiadas', async () => {
+    catalog()
+    const initial = {
+      id: 81,
+      categoria: 1,
+      unidad_stock: 4,
+      nombre: 'Silla existente',
+      sku: 'SIL-81',
+      precio_lista: '150.00',
+      silla: {
+        especificaciones: {
+          Apoyabrazos: 'Fijos',
+          estructura: { material: 'Acero', uniones: ['A', 'B'] },
+        },
+      },
+    } as unknown as Producto
+    const w = mount(ProductoForm, {
+      props: { initial },
+      global: { stubs: { CapturaCatalogo: true } },
+    })
+    await flushPromises()
+    expect(w.text()).not.toContain('JSON')
+    await w.get('input[aria-label="Valor 1"]').setValue('Ajustables')
+    await w.get('form').trigger('submit')
+    const result = w.emitted('save')?.[0]?.[0] as {
+      silla: { especificaciones: Record<string, unknown> }
+    }
+    expect(result.silla.especificaciones).toEqual({
+      Apoyabrazos: 'Ajustables',
+      estructura: { material: 'Acero', uniones: ['A', 'B'] },
+    })
+    w.unmount()
+  })
+
   it('en edición comercial muestra la galería sin permitir acciones inmediatas', async () => {
     catalog()
     const initial = {
