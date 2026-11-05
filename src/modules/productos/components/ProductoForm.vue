@@ -811,7 +811,9 @@ onMounted(load)
                 <strong>{{ discountPercent }} % de descuento</strong>
                 <span>{{ money(form.precio_lista) }} → {{ money(form.precio_ahora) }}</span>
               </div>
-              <p class="promotion-status" role="status">Estado de la promoción: <strong>{{ promoStatus }}</strong></p>
+              <p class="promotion-status" role="status">
+                Estado de la promoción: <strong>{{ promoStatus }}</strong>
+              </p>
               <label class="toggle-row">
                 <span class="toggle-copy"
                   ><strong>Promoción habilitada</strong>
