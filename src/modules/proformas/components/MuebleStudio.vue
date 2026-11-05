@@ -62,6 +62,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   gallery: [id: string]
+  galleryChanged: []
   save: [body: EspecificacionMuebleWritable, comercial: DatosComerciales]
   cancel: []
   changed: []
@@ -73,6 +74,10 @@ const galleryId = ref(props.galeriaId ?? '')
 const galleryError = ref('')
 const galleryRef = ref<InstanceType<typeof ImageGallery> | null>(null)
 const galleryBusy = ref(false)
+function onGalleryChanged() {
+  emit('changed')
+  emit('galleryChanged')
+}
 async function ensureGallery() {
   if (galleryId.value) return
   try {
@@ -372,7 +377,7 @@ async function seleccionarApartado(id: typeof seccion.value) {
         :endpoint="`/api/v1/galerias/${galleryId}/imagenes/`"
         :editable="seccion === 'imagenes'"
         title="Imágenes del mueble"
-        @changed="emit('changed')"
+        @changed="onGalleryChanged"
         @busy="galleryBusy = $event"
       />
       <p v-else>Sin imágenes de referencia.</p>

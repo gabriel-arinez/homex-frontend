@@ -39,6 +39,11 @@ import {
   SlidersHorizontal,
   Sofa,
   UserRound,
+  Pencil,
+  Copy,
+  Trash2,
+  Wrench,
+  Save,
 } from '@lucide/vue'
 import Button from '@/shared/ui/Button.vue'
 import Card from '@/shared/ui/Card.vue'
@@ -48,6 +53,7 @@ import Modal from '@/shared/ui/Modal.vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
 import Toast from '@/shared/ui/Toast.vue'
 import ConfirmDialog from '@/shared/ui/ConfirmDialog.vue'
+import UnsavedChangesDialog from '../components/UnsavedChangesDialog.vue'
 import TextField from '@/shared/ui/TextField.vue'
 import ClienteSelector from '../components/ClienteSelector.vue'
 import ClienteFormFields from '@/modules/clientes/components/ClienteFormFields.vue'
@@ -63,6 +69,10 @@ import { proformasService } from '../services/proformasService'
 import { retornoAProformas } from '../utils/navegacionProformas'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { productosService } from '@/modules/productos/services/productosService'
+import ProductImage from '@/modules/productos/components/ProductImage.vue'
+import GalleryPhoto from '@/shared/media/GalleryPhoto.vue'
+import { useQuoteFurnitureCovers } from '../composables/useQuoteFurnitureCovers'
+import { useQuoteProductImages } from '../composables/useQuoteProductImages'
 import {
   cloneEditorData,
   consumeEditorDraft,
@@ -91,6 +101,16 @@ const saving = ref(false)
 const referenceLoading = ref(true)
 const error = ref('')
 const success = ref('')
+const errorToast = ref('')
+watch(error, (message) => {
+  if (message) {
+    success.value = ''
+    errorToast.value = message
+  }
+})
+watch(success, (message) => {
+  if (message) errorToast.value = ''
+})
 const fields = ref<Record<string, string[]>>({})
 const validationAttempted = ref(false)
 const localErrors = ref<Record<string, string>>({})
@@ -213,6 +233,50 @@ function answerConfirmation(answer: boolean) {
   confirmResolver = null
   resolver?.(answer)
 }
+const leaveDialog = ref(false)
+const leaveSaving = ref(false)
+const leaveSaveError = ref('')
+let leaveResolver: ((allowed: boolean) => void) | null = null
+function askLeaveConfirmation(): Promise<boolean> {
+  if (leaveResolver) leaveResolver(false)
+  leaveDialog.value = true
+  leaveSaveError.value = ''
+  return new Promise<boolean>((resolve) => {
+    leaveResolver = resolve
+  })
+}
+function discardLeave() {
+  if (leaveSaving.value) return
+  sessionStorage.removeItem(`homex:ap5:draft:${autosaveToken()}`)
+  answerLeave(true)
+}
+function answerLeave(allowed: boolean) {
+  if (leaveSaving.value) return
+  leaveDialog.value = false
+  leaveSaveError.value = ''
+  const resolve = leaveResolver
+  leaveResolver = null
+  resolve?.(allowed)
+}
+async function saveAndLeave() {
+  if (leaveSaving.value || saving.value) return
+  leaveSaving.value = true
+  leaveSaveError.value = ''
+  try {
+    const saved = await persist(false, true)
+    if (!saved) {
+      leaveSaveError.value = error.value || 'No se pudieron guardar los cambios.'
+      return
+    }
+  } catch (cause) {
+    leaveSaveError.value =
+      cause instanceof Error ? cause.message : 'No se pudo guardar la proforma.'
+    return
+  } finally {
+    leaveSaving.value = false
+  }
+  answerLeave(true)
+}
 const whatsappExpanded = ref(false)
 const whatsappEdited = ref(false)
 const whatsappDraft = ref('')
@@ -262,6 +326,37 @@ const canShareWhatsApp = computed(() => {
 const existingProductIds = computed(() =>
   lineas.value.flatMap((line) => (line.producto ? [line.producto] : [])),
 )
+const {
+  images: quoteImages,
+  ensure: ensureQuoteImages,
+  remember: rememberQuoteImage,
+} = useQuoteProductImages()
+watch(existingProductIds, (ids) => void ensureQuoteImages(ids), { immediate: true })
+const {
+  coverFor: furnitureCoverFor,
+  ensureLines: ensureFurnitureCovers,
+  refreshLine: refreshFurnitureCover,
+} = useQuoteFurnitureCovers()
+function onFurnitureGalleryChanged() {
+  specModalDirty.value = true
+  const line = editableSpecDetail.value
+  if (line) void refreshFurnitureCover(line, proformaId.value)
+}
+watch(
+  () => lineas.value.map((line) => `${line.id ?? ''}:${line.galeria_id ?? ''}`).join('|'),
+  () => void ensureFurnitureCovers(lineas.value, proformaId.value),
+  { immediate: true },
+)
+function furnitureCoverSource(line: LineaLocal) {
+  const cover = furnitureCoverFor(line, proformaId.value)
+  return cover?.variantes?.['320'] ?? cover?.url ?? ''
+}
+function canEditCatalogProduct(product: Producto): boolean {
+  return (
+    session.can('comercial.administrar') ||
+    (session.can('catalogo.crear_producto') && product.created_by === session.identity?.id)
+  )
+}
 const totalPreview = computed(() => totalEstimadoCompleto(lineas.value))
 type EmissionIssue = {
   id: string
@@ -642,6 +737,11 @@ function saveLine(body: DetalleProformaWritable) {
   editingLine.value = null
   additionMode.value = 'none'
   markDirty()
+  if (body.producto) {
+    success.value = wasNew
+      ? 'Producto añadido a la proforma. Configura los demás ítems o guarda el borrador.'
+      : 'Datos de la línea comercial actualizados. Guarda la proforma para confirmar.'
+  }
   const isFurniture =
     tipos.value.find((x) => x.id === Number(body.tipo_item))?.codigo === 'MUEBLE_MEDIDA'
   if (wasNew && isFurniture && duplicateSource) {
@@ -787,13 +887,17 @@ async function closeSpec() {
 function removeLine(index: number) {
   const result = removeLocalLine(lineas.value, index)
   lineas.value = result.lines
-  if (result.removed) removedLines.value.push(result.removed)
+  if (result.removed) {
+    removedLines.value.push(result.removed)
+    success.value = 'Línea retirada provisionalmente. Puedes deshacer antes de guardar.'
+  }
   markDirty()
 }
 function undoRemove() {
   const removed = removedLines.value.pop()
   if (!removed) return
   lineas.value = restoreLocalLine(lineas.value, removed)
+  success.value = 'Línea restaurada. Guarda los cambios para confirmar.'
   markDirty()
 }
 function openFurnitureDraft(source?: LineaLocal) {
@@ -912,7 +1016,7 @@ function createProductFromCategory(categoryCode: string) {
   void createProductContextually({ tipo_item: String(tipo.id) })
 }
 async function editProductContextually(productId: number) {
-  if (!session.can('comercial.administrar')) return
+  if (!session.can('catalogo.crear_producto') && !session.can('comercial.administrar')) return
   const token = crypto.randomUUID()
   saveEditorDraft(token, editorSnapshot())
   contextualNavigation.value = true
@@ -1019,6 +1123,7 @@ function chooseCatalog() {
   additionMode.value = 'catalog'
 }
 function selectCatalogProduct(product: Producto) {
+  rememberQuoteImage(product)
   if (existingProductIds.value.includes(product.id)) {
     void focusDuplicateProduct(product.id)
     return
@@ -1118,8 +1223,8 @@ async function requestReview() {
   )
   if (confirmed) await persist(true)
 }
-async function persist(emitir: boolean) {
-  if (saving.value || (emitir && (isReview.value || !canEmit.value))) return
+async function persist(emitir: boolean, skipNavigation = false): Promise<boolean> {
+  if (saving.value || (emitir && (isReview.value || !canEmit.value))) return false
   validationAttempted.value = true
   localErrors.value = validateQuoteConditions(header)
   if (clienteMode.value === 'nuevo') {
@@ -1138,13 +1243,14 @@ async function persist(emitir: boolean) {
     )
       ? 1
       : 2
-    return
+    return false
   }
   saving.value = true
   error.value = ''
   success.value = ''
   conflicted.value = false
   fields.value = {}
+  let completed = false
   try {
     for (const line of lineas.value) {
       if (!line.galeria_id) continue
@@ -1171,17 +1277,20 @@ async function persist(emitir: boolean) {
         ? 'Cambios guardados en la proforma en revisión.'
         : 'Borrador guardado.'
     allowNavigationAfterSave = true
-    if (emitir) {
-      await router.replace({
-        path: `/proformas/${result.id}`,
-        query: { ...listQuery.value, enviada: '1' },
-      })
-    } else if (!proformaId.value) {
-      await router.replace({
-        path: `/proformas/${result.id}/editar`,
-        query: listQuery.value,
-      })
+    if (!skipNavigation) {
+      if (emitir) {
+        await router.replace({
+          path: `/proformas/${result.id}`,
+          query: { ...listQuery.value, enviada: '1' },
+        })
+      } else if (!proformaId.value) {
+        await router.replace({
+          path: `/proformas/${result.id}/editar`,
+          query: listQuery.value,
+        })
+      }
     }
+    completed = true
   } catch (cause) {
     if (cause instanceof ApiError) fields.value = cause.fields
     error.value = cause instanceof Error ? cause.message : 'No se pudo guardar la proforma.'
@@ -1198,6 +1307,7 @@ async function persist(emitir: boolean) {
     allowNavigationAfterSave = false
     saving.value = false
   }
+  return completed
 }
 function beforeUnload(event: BeforeUnloadEvent) {
   if (!dirty.value && !lineModalDirty.value && !specModalDirty.value) return
@@ -1211,11 +1321,7 @@ onBeforeRouteLeave(async () => {
     (!dirty.value && !lineModalDirty.value && !specModalDirty.value)
   )
     return true
-  return askConfirmation(
-    'Hay cambios sin guardar. Si sales, podrías perder los datos introducidos.',
-    'Salir sin guardar',
-    'Salir sin guardar',
-  )
+  return askLeaveConfirmation()
 })
 onMounted(async () => {
   window.addEventListener('beforeunload', beforeUnload)
@@ -1229,6 +1335,12 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 <template>
   <div class="quote-workspace" @input="markDirty" @change="markDirty">
     <Toast :visible="Boolean(success)" :message="success" tone="success" @close="success = ''" />
+    <Toast
+      :visible="Boolean(errorToast) && !loading && !referenceLoading"
+      :message="errorToast"
+      tone="danger"
+      @close="errorToast = ''"
+    />
     <ConfirmDialog
       :open="Boolean(confirmation)"
       :title="confirmation?.title || 'Confirmar'"
@@ -1236,6 +1348,15 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       :confirm-label="confirmation?.confirmLabel"
       @close="answerConfirmation(false)"
       @confirm="answerConfirmation(true)"
+    />
+    <UnsavedChangesDialog
+      :open="leaveDialog"
+      :saving="leaveSaving"
+      :error="leaveSaveError"
+      :in-review="isReview"
+      @cancel="answerLeave(false)"
+      @discard="discardLeave"
+      @save="saveAndLeave"
     />
     <div v-if="!furnitureOpen" class="quote-main">
       <div class="quote-topline" aria-label="Ubicación en el proceso">
@@ -1365,7 +1486,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               :categorias="catalogCategories"
               :familias="familias"
               :existing-product-ids="existingProductIds"
-              :can-admin="session.can('comercial.administrar')"
+              :can-create="session.can('catalogo.crear_producto')"
+              :can-edit-product="canEditCatalogProduct"
               :initial-state="catalogState ?? undefined"
               @state-change="catalogState = $event"
               @create="createProductFromCategory"
@@ -1390,7 +1512,22 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               @keydown.enter.prevent="openLineRead(line.localId)"
               @keydown.space.prevent="openLineRead(line.localId)"
             >
-              <strong>{{ line.nombre }}</strong>
+              <div class="line-heading">
+                <div v-if="line.producto" class="line-thumbnail">
+                  <ProductImage
+                    :image="quoteImages[line.producto] ?? null"
+                    :alt="line.nombre"
+                    sizes="64px"
+                  />
+                </div>
+                <div v-else-if="furnitureCoverSource(line)" class="line-thumbnail">
+                  <GalleryPhoto
+                    :src="furnitureCoverSource(line)"
+                    :alt="'Imagen principal de ' + line.nombre"
+                  />
+                </div>
+                <strong>{{ line.nombre }}</strong>
+              </div>
               <p v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
                 Importe histórico negociado: {{ money(Number(line.importe_negociado || 0)) }}
               </p>
@@ -1422,7 +1559,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   :disabled="line.modo_calculo === 'TOTAL_NEGOCIADO'"
                   @click="selectMenuAction('edit', index)"
                 >
-                  Editar
+                  <Pencil :size="16" aria-hidden="true" /> Editar
                 </button>
                 <button
                   v-if="tipos.find((x) => x.id === line.tipo_item)?.codigo === 'MUEBLE_MEDIDA'"
@@ -1430,7 +1567,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   role="menuitem"
                   @click="selectMenuAction('spec', index)"
                 >
-                  Ficha técnica
+                  <Wrench :size="16" aria-hidden="true" /> Ficha técnica
                 </button>
                 <button
                   v-if="tipos.find((x) => x.id === line.tipo_item)?.codigo === 'MUEBLE_MEDIDA'"
@@ -1438,10 +1575,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   role="menuitem"
                   @click="selectMenuAction('duplicate', index)"
                 >
-                  Duplicar mueble
+                  <Copy :size="16" aria-hidden="true" /> Duplicar mueble
                 </button>
                 <button type="button" role="menuitem" @click="selectMenuAction('remove', index)">
-                  Eliminar
+                  <Trash2 :size="16" aria-hidden="true" /> Eliminar
                 </button>
               </div>
             </div>
@@ -1701,17 +1838,32 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <p class="brand">HOMEX · VISTA PREVIA</p>
             </div>
             <h3>{{ header.titulo || 'Cotización comercial' }}</h3>
-            <p v-for="line in lineas" :key="line.localId" class="review-line">
-              <strong>{{ line.nombre }}</strong> —
-              <template v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
-                importe negociado {{ money(Number(line.importe_negociado || 0)) }}
-              </template>
-              <template v-else-if="totalEstimadoLinea(line) !== null">
-                cantidad {{ line.cantidad }}, precio {{ money(Number(line.precio_unitario)) }}
-              </template>
-              <template v-else>precio pendiente</template>
-              <span v-if="line.descripcion"><br />{{ line.descripcion }}</span>
-            </p>
+            <div v-for="line in lineas" :key="line.localId" class="review-line">
+              <div v-if="line.producto" class="review-thumbnail">
+                <ProductImage
+                  :image="quoteImages[line.producto] ?? null"
+                  :alt="line.nombre"
+                  sizes="48px"
+                />
+              </div>
+              <div v-else-if="furnitureCoverSource(line)" class="review-thumbnail">
+                <GalleryPhoto
+                  :src="furnitureCoverSource(line)"
+                  :alt="'Imagen principal de ' + line.nombre"
+                />
+              </div>
+              <span
+                ><strong>{{ line.nombre }}</strong> —
+                <template v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
+                  importe negociado {{ money(Number(line.importe_negociado || 0)) }}
+                </template>
+                <template v-else-if="totalEstimadoLinea(line) !== null">
+                  cantidad {{ line.cantidad }}, precio {{ money(Number(line.precio_unitario)) }}
+                </template>
+                <template v-else>precio pendiente</template>
+                <span v-if="line.descripcion"><br />{{ line.descripcion }}</span></span
+              >
+            </div>
             <p v-if="header.plazo_entrega"><strong>Plazo:</strong> {{ header.plazo_entrega }}</p>
             <p v-if="header.validez_oferta">
               <strong>Validez:</strong> {{ header.validez_oferta }} días
@@ -1847,9 +1999,15 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               /></Button>
             </div>
             <div class="editor-actions__operations">
-              <Button variant="secondary" :processing="saving" @click="persist(false)">{{
-                isReview ? 'Guardar cambios' : 'Guardar borrador'
-              }}</Button>
+              <Button
+                variant="secondary"
+                class="editor-save-draft"
+                :processing="saving"
+                @click="persist(false)"
+              >
+                <Save :size="17" aria-hidden="true" />
+                {{ isReview ? 'Guardar cambios' : 'Guardar borrador' }}
+              </Button>
               <Button
                 v-if="!isReview"
                 :disabled="!canEmit"
@@ -2033,6 +2191,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       @save="saveSpec"
       @type-created="registrarTipoMueble"
       @changed="specModalDirty = true"
+      @gallery-changed="onFurnitureGalleryChanged"
       @cancel="closeSpec"
       @applied="aplicarCaptura"
       @processing="voiceProcessing = $event"
@@ -3237,5 +3396,74 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   .emission-checklist li button {
     margin-left: auto;
   }
+}
+.editor-actions :deep(.button.editor-save-draft) {
+  color: #fff;
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  box-shadow: 0 2px 8px rgb(29 78 216 / 15%);
+}
+.editor-actions :deep(.button.editor-save-draft:hover:not(:disabled)) {
+  color: #fff;
+  background: #1e40af;
+  border-color: #1e40af;
+}
+.line-heading {
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+  min-width: 0;
+}
+.line-heading strong {
+  overflow-wrap: anywhere;
+}
+.line-thumbnail {
+  width: 4rem;
+  height: 4rem;
+  flex: none;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+.line-thumbnail :deep(.product-image) {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  aspect-ratio: 1 !important;
+}
+.line-thumbnail :deep(img),
+.review-thumbnail :deep(img) {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.line-thumbnail :deep(.fallback span) {
+  display: none;
+}
+.review-thumbnail {
+  flex: none;
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+.review-thumbnail :deep(.product-image) {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  aspect-ratio: 1 !important;
+}
+.review-thumbnail :deep(.fallback span) {
+  display: none;
+}
+.review-line {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.menu-panel [role='menuitem'] {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
 }
 </style>

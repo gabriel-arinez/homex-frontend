@@ -13,6 +13,11 @@ import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
 import AdjuntosDetalle from '../components/AdjuntosDetalle.vue'
+import ProductImage from '@/modules/productos/components/ProductImage.vue'
+import GalleryPhoto from '@/shared/media/GalleryPhoto.vue'
+import { useQuoteFurnitureCovers } from '../composables/useQuoteFurnitureCovers'
+import Toast from '@/shared/ui/Toast.vue'
+import { useQuoteProductImages } from '../composables/useQuoteProductImages'
 import { proformasService } from '../services/proformasService'
 import { retornoAProformas } from '../utils/navegacionProformas'
 
@@ -21,11 +26,19 @@ const route = useRoute()
 const router = useRouter()
 const id = Number(route.params.id)
 const quote = ref<Proforma | null>(null)
+const { images: quoteImages, ensure: ensureQuoteImages } = useQuoteProductImages()
+const { coverFor: furnitureCoverFor, ensureLines: ensureFurnitureCovers } =
+  useQuoteFurnitureCovers()
+function furnitureCoverSource(line: DetalleProforma) {
+  const cover = furnitureCoverFor(line, quote.value?.id)
+  return cover?.variantes?.['320'] ?? cover?.url ?? ''
+}
 const loading = ref(true)
 const processing = ref(false)
 const downloading = ref(false)
 const error = ref('')
 const success = ref('')
+const downloadNotice = ref('')
 const lastPedidoId = ref<number | null>(null)
 const confirmAction = ref<'approve' | 'not-completed' | 'reopen' | null>(null)
 const listPath = computed(() => retornoAProformas(route.query.returnTo))
@@ -80,6 +93,10 @@ function fechaCalendario(fecha: string) {
 }
 async function refreshQuote() {
   quote.value = await proformasService.get(id)
+  void ensureQuoteImages(
+    quote.value.detalles.flatMap((line) => (line.producto ? [line.producto] : [])),
+  )
+  void ensureFurnitureCovers(quote.value.detalles, quote.value.id)
 }
 async function load() {
   loading.value = true
@@ -143,6 +160,7 @@ async function downloadDocument() {
     const blob = await proformasService.documentPdf(id)
     const prefix = stateCode.value === 'BORRADOR' ? 'proforma-borrador' : 'proforma'
     downloadBlob(blob, `${prefix}-${quote.value.numero}.pdf`)
+    downloadNotice.value = 'Documento descargado correctamente.'
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : 'No se pudo descargar el documento.'
   } finally {
@@ -154,6 +172,12 @@ onMounted(() => void load())
 
 <template>
   <div class="proforma-detail">
+    <Toast
+      :visible="Boolean(downloadNotice)"
+      :message="downloadNotice"
+      tone="success"
+      @close="downloadNotice = ''"
+    />
     <PageHeader
       :title="quote ? `Proforma #${quote.numero}` : 'Proforma'"
       :description="quote?.titulo || 'Resumen comercial y seguimiento'"
@@ -297,33 +321,51 @@ onMounted(() => void load())
         </div>
         <article v-for="(line, index) in quote.detalles" :key="line.id" class="line">
           <div class="line-main">
-            <div>
-              <small
-                >{{ String(index + 1).padStart(2, '0') }} · {{ line.tipo_item_info.nombre }} ·
-                {{ line.unidad_info.nombre }}</small
-              >
-              <h3>{{ line.nombre }}</h3>
-              <p v-if="line.descripcion">{{ line.descripcion }}</p>
-              <p class="secondary">
-                {{ line.cantidad }} ×
-                {{
-                  line.modo_calculo === 'TOTAL_NEGOCIADO'
-                    ? 'total negociado'
-                    : money(line.precio_unitario ?? '0')
-                }}
-              </p>
-              <p v-if="line.especificacion" class="secondary">
-                {{ line.especificacion.tipo_mueble_info?.nombre || 'Mueble a medida' }} ·
-                {{ resumenEspecificacion(line) }}
-              </p>
-              <p v-if="line.familia_producto && !line.producto" class="secondary">
-                Variante pendiente de selección antes de aprobar.
-              </p>
+            <div class="line-identity">
+              <div v-if="line.producto" class="line-thumbnail">
+                <ProductImage
+                  :image="quoteImages[line.producto] ?? null"
+                  :alt="line.nombre"
+                  sizes="64px"
+                />
+              </div>
+              <div v-else-if="furnitureCoverSource(line)" class="line-thumbnail">
+                <GalleryPhoto
+                  :src="furnitureCoverSource(line)"
+                  :alt="'Imagen principal de ' + line.nombre"
+                />
+              </div>
+              <div>
+                <small
+                  >{{ String(index + 1).padStart(2, '0') }} · {{ line.tipo_item_info.nombre }} ·
+                  {{ line.unidad_info.nombre }}</small
+                >
+                <h3>{{ line.nombre }}</h3>
+                <p v-if="line.descripcion">{{ line.descripcion }}</p>
+                <p class="secondary">
+                  {{ line.cantidad }} ×
+                  {{
+                    line.modo_calculo === 'TOTAL_NEGOCIADO'
+                      ? 'total negociado'
+                      : money(line.precio_unitario ?? '0')
+                  }}
+                </p>
+                <p v-if="line.especificacion" class="secondary">
+                  {{ line.especificacion.tipo_mueble_info?.nombre || 'Mueble a medida' }} ·
+                  {{ resumenEspecificacion(line) }}
+                </p>
+                <p v-if="line.familia_producto && !line.producto" class="secondary">
+                  Variante pendiente de selección antes de aprobar.
+                </p>
+              </div>
             </div>
             <strong>{{ money(line.total) }}</strong>
           </div>
           <div class="media">
-            <h4><Paperclip :size="16" aria-hidden="true" /> Imágenes de referencia</h4>
+            <h4>
+              <Paperclip :size="16" aria-hidden="true" />
+              {{ line.producto ? 'Archivos adjuntos' : 'Imágenes de referencia' }}
+            </h4>
             <p>Adjuntos asociados a esta línea y conservados en el servidor.</p>
             <AdjuntosDetalle :proforma-id="quote.id" :detalle-id="line.id" :editable="editable" />
           </div>
@@ -573,5 +615,36 @@ onMounted(() => void load())
     display: block;
     margin: var(--space-2) 0 0;
   }
+}
+.line-identity {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.line-identity > div:last-child {
+  min-width: 0;
+}
+.line-thumbnail {
+  width: 4rem;
+  height: 4rem;
+  flex: none;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+.line-thumbnail :deep(.product-image) {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  aspect-ratio: 1 !important;
+}
+.line-thumbnail :deep(img) {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.line-thumbnail :deep(.fallback span) {
+  display: none;
 }
 </style>

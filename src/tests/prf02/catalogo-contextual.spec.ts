@@ -175,4 +175,96 @@ describe('PRF-02 catálogo contextual', () => {
     expect(wrapper.emitted('select')).toBeUndefined()
     wrapper.unmount()
   })
+  it('selecciona desde la ficha previa y la cierra sin duplicar operaciones comerciales', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/catalogo/productos/', () =>
+        HttpResponse.json({ count: 1, next: null, previous: null, results: [sku] }),
+      ),
+    )
+    const wrapper = mount(CatalogoContextual, {
+      props: { categorias: [silla], familias: [], existingProductIds: [] },
+      attachTo: document.body,
+    })
+    try {
+      await flushPromises()
+      const openPreview = wrapper
+        .findAll('button')
+        .find((button) => button.text().includes('Ver ficha'))
+      expect(openPreview).toBeDefined()
+      await openPreview!.trigger('click')
+      await flushPromises()
+      const select = document.body.querySelector<HTMLButtonElement>(
+        '.preview-actions button:last-child',
+      )
+      expect(select).not.toBeNull()
+      select!.click()
+      await flushPromises()
+      expect(wrapper.emitted('select')).toHaveLength(1)
+      expect(wrapper.emitted('select')?.[0]?.[0]).toMatchObject({ id: 41 })
+      expect(document.body.querySelector('.preview-actions')).toBeNull()
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('alterna entre cuadrícula y tabla, muestra miniaturas y respeta la opción de ocultarlas', async () => {
+    const key = 'homex.catalogo.imagenes-visibles.v1'
+    localStorage.removeItem(key)
+    server.use(
+      http.get('http://localhost:8000/api/v1/catalogo/productos/', () =>
+        HttpResponse.json({ count: 1, next: null, previous: null, results: [sku] }),
+      ),
+    )
+    const wrapper = mount(CatalogoContextual, {
+      props: { categorias: [silla], familias: [], existingProductIds: [] },
+    })
+    try {
+      await flushPromises()
+      expect(wrapper.findAll('.producto')).toHaveLength(1)
+      await wrapper
+        .findAll('button')
+        .find((b) => b.text().includes('Lista'))!
+        .trigger('click')
+      expect(wrapper.find('table.catalog-table').exists()).toBe(true)
+      expect(wrapper.find('.thumbnail').exists()).toBe(true)
+      await wrapper.get('button.image-toggle').trigger('click')
+      expect(wrapper.find('.thumbnail').exists()).toBe(false)
+      expect(wrapper.text()).toContain('Silla de prueba')
+      expect(localStorage.getItem(key)).toBe('false')
+      await wrapper.get('button.image-toggle').trigger('click')
+      expect(wrapper.find('.thumbnail').exists()).toBe(true)
+    } finally {
+      wrapper.unmount()
+      localStorage.removeItem(key)
+    }
+  })
+
+  it('permite crear productos al vendedor desde una categoría sin exigir administración', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/catalogo/productos/', () =>
+        HttpResponse.json({ count: 0, next: null, previous: null, results: [] }),
+      ),
+      http.get('http://localhost:8000/api/v1/catalogo/opciones/', () => HttpResponse.json([])),
+    )
+    const wrapper = mount(CatalogoContextual, {
+      props: { categorias: [silla], familias: [], existingProductIds: [], canCreate: true },
+    })
+    try {
+      await flushPromises()
+      expect(wrapper.text()).not.toContain('Crear nuevo producto')
+      await wrapper
+        .findAll('button')
+        .find((b) => b.text().includes('Sillas'))!
+        .trigger('click')
+      await flushPromises()
+      await wrapper
+        .findAll('button')
+        .find((b) => b.text().includes('Crear nuevo producto'))!
+        .trigger('click')
+      expect(wrapper.emitted('create')?.[0]).toEqual(['SILLA'])
+      expect(wrapper.get('.empty-results').text()).toContain('Sin coincidencias')
+    } finally {
+      wrapper.unmount()
+    }
+  })
 })
