@@ -130,7 +130,10 @@ describe('Voz en creación de catálogo', () => {
     vi.spyOn(proformasService, 'families').mockResolvedValue({
       count: 0, next: null, previous: null, results: [],
     })
-    const w = mount(ProductoForm, { props: { preselectCategory: 'SILLA' } })
+    const w = mount(ProductoForm, {
+      props: { preselectCategory: 'SILLA' },
+      global: { stubs: { Teleport: true } },
+    })
     await flushPromises()
     await w.get('.voice-trigger').trigger('click')
     const assistant = w.getComponent(CapturaCatalogo)
