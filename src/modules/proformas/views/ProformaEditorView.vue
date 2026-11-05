@@ -1032,11 +1032,11 @@ function restoreContextualDraft() {
   const snapshot = consumeEditorDraft<ReturnType<typeof editorSnapshot>>(token)
   if (!snapshot) return
   if (snapshot.expiresAt && Date.now() > snapshot.expiresAt) {
-    error.value = 'El borrador temporal caducó. Recupera la última proforma guardada.'
+    errorToast.value = 'El borrador temporal caducó. Recupera la última proforma guardada.'
     return
   }
   if (snapshot.userId != null && snapshot.userId !== session.identity?.id) {
-    error.value = 'Este borrador temporal corresponde a otra sesión y no será restaurado.'
+    errorToast.value = 'Este borrador temporal corresponde a otra sesión y no será restaurado.'
     return
   }
   Object.assign(header, snapshot.header)
@@ -1058,8 +1058,14 @@ function restoreContextualDraft() {
   lineModalDirty.value = Boolean(snapshot.lineModalDirty || snapshot.lineDraft)
   editingLine.value = snapshot.editingLine
   dirty.value = true
-  lineModal.value = Boolean(pendingLineDraft.value)
   const created = Number(route.query.productoCreado)
+  // Cancelar la creación contextual no debe reabrir el editor antiguo de líneas.
+  lineModal.value = Boolean(created && pendingLineDraft.value)
+  if (!created) {
+    pendingLineDraft.value = null
+    lineModalDirty.value = false
+    editingLine.value = null
+  }
   if (created) {
     preferredProductId.value = created
     lineModal.value = true
@@ -1418,7 +1424,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           </button>
         </nav>
 
-        <div v-if="error" role="alert" class="error error-summary">
+        <div v-if="error && conflicted" role="alert" class="error error-summary">
           <strong>{{ error }}</strong>
           <ul v-if="fieldErrorMessages.length">
             <li v-for="message in fieldErrorMessages" :key="message">{{ message }}</li>
@@ -3398,15 +3404,14 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   }
 }
 .editor-actions :deep(.button.editor-save-draft) {
-  color: #fff;
-  background: #1d4ed8;
-  border-color: #1d4ed8;
-  box-shadow: 0 2px 8px rgb(29 78 216 / 15%);
+  color: var(--color-primary-accent);
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+  box-shadow: none;
 }
 .editor-actions :deep(.button.editor-save-draft:hover:not(:disabled)) {
-  color: #fff;
-  background: #1e40af;
-  border-color: #1e40af;
+  background: var(--color-surface-hover);
+  border-color: var(--color-primary);
 }
 .line-heading {
   display: flex;
