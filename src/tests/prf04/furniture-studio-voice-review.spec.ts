@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import CapturaAsistida from '@/modules/proformas/components/CapturaAsistida.vue'
+vi.mock('@/modules/capturas/audioLimits', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@/modules/capturas/audioLimits')>()
+  return { ...original, readAudioDuration: vi.fn().mockResolvedValue(30) }
+})
 import { asistidasService } from '@/modules/capturas/services/asistidasService'
 import { captura24 } from '../fixtures/captura24'
 
@@ -23,7 +27,7 @@ describe('Furniture Studio: consentimiento antes de aplicar propuesta PRF04', ()
     try {
       const upload = wrapper
         .findAll('button')
-        .find((button) => button.text().includes('Subir audio'))
+        .find((button) => button.text().includes('Seleccionar archivo'))
       expect(upload).toBeDefined()
       await upload!.trigger('click')
       expect(wrapper.text()).not.toContain('reemplazará toda la información')
