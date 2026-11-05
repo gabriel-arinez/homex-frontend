@@ -196,7 +196,7 @@ function cancel() {
         :disabled="voice.processing.value || recording"
         @click="start('record')"
       >
-        <Mic :size="19" aria-hidden="true" /> Grabar descripción
+        <Mic :size="28" aria-hidden="true" /> Grabar descripción
       </button>
       <button
         type="button"
@@ -204,7 +204,7 @@ function cancel() {
         :disabled="voice.processing.value || recording"
         @click="start('upload')"
       >
-        <Upload :size="19" aria-hidden="true" /> Subir audio
+        <Upload :size="28" aria-hidden="true" /> Seleccionar archivo
       </button>
       <p>Describe tu mueble. Graba hasta 3 minutos o sube audio de hasta 20 MB y 5 minutos.</p>
     </div>
@@ -295,6 +295,7 @@ function cancel() {
   display: inline-flex;
   justify-content: center;
   align-items: center;
+  flex-direction: column;
   gap: 0.65rem;
   min-height: 5.6rem;
   padding: 1rem;
@@ -324,6 +325,7 @@ function cancel() {
   border: 1px solid var(--color-border-strong);
 }
 .voice-shortcuts p {
+  grid-column: 1 / -1;
   width: 100%;
   order: 3;
   margin: 0;
