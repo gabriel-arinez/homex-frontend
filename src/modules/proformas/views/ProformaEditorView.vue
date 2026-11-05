@@ -1062,6 +1062,11 @@ function restoreContextualDraft() {
   // Cancelar la creación contextual no debe reabrir el editor antiguo de líneas.
   lineModal.value = Boolean(created && pendingLineDraft.value)
   if (!created) {
+    if (snapshot.lineDraft) {
+      currentStep.value = 0
+      additionMode.value = 'catalog'
+      catalogInitialized.value = true
+    }
     pendingLineDraft.value = null
     lineModalDirty.value = false
     editingLine.value = null
