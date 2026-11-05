@@ -1,7 +1,8 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
+import { MAX_RECORD_SECONDS, MAX_AUDIO_BYTES } from '../audioLimits'
 export function useAudioRecorder() {
   const state = ref<
-      'IDLE' | 'REQUESTING' | 'RECORDING' | 'READY' | 'DENIED' | 'UNSUPPORTED' | 'ERROR'
+      'IDLE' | 'REQUESTING' | 'RECORDING' | 'PAUSED' | 'READY' | 'DENIED' | 'UNSUPPORTED' | 'ERROR'
     >('IDLE'),
     elapsed = ref(0),
     blob = ref<Blob | null>(null),
@@ -14,6 +15,7 @@ export function useAudioRecorder() {
   let audioContext: AudioContext | null = null
   let animationFrame: number | null = null
   let generation = 0
+  let drawWaveform: (() => void) | null = null
   let unmounted = false
   const supported = computed(
     () =>
@@ -26,6 +28,7 @@ export function useAudioRecorder() {
     animationFrame = null
     if (audioContext) void audioContext.close().catch(() => undefined)
     audioContext = null
+    drawWaveform = null
     levels.value = Array(28).fill(0)
     if (timer) window.clearInterval(timer)
     timer = undefined
@@ -74,6 +77,7 @@ export function useAudioRecorder() {
             })
             animationFrame = requestAnimationFrame(draw)
           }
+          drawWaveform = draw
           animationFrame = requestAnimationFrame(draw)
         }
       } catch {
@@ -88,13 +92,24 @@ export function useAudioRecorder() {
         if (e.data.size) chunks.push(e.data)
       }
       recorder.onstop = () => {
-        blob.value = new Blob(chunks, { type: recorder?.mimeType || 'audio/webm' })
-        state.value = 'READY'
+        const captured = new Blob(chunks, { type: recorder?.mimeType || 'audio/webm' })
+        if (captured.size > MAX_AUDIO_BYTES) {
+          error.value = 'La grabación supera el límite de 20 MB. Graba una descripción más corta.'
+          blob.value = null
+          state.value = 'ERROR'
+        } else {
+          blob.value = captured
+          state.value = 'READY'
+        }
         cleanup()
       }
       recorder.start()
       state.value = 'RECORDING'
-      timer = window.setInterval(() => elapsed.value++, 1000)
+      timer = window.setInterval(() => {
+        if (state.value !== 'RECORDING') return
+        elapsed.value++
+        if (elapsed.value >= MAX_RECORD_SECONDS) stop()
+      }, 1000)
     } catch (e) {
       if (request !== generation || unmounted) return
       cleanup()
@@ -108,14 +123,28 @@ export function useAudioRecorder() {
           : 'No fue posible iniciar la grabación.'
     }
   }
+  function pause() {
+    if (recorder?.state !== 'recording') return
+    recorder.pause()
+    state.value = 'PAUSED'
+    if (animationFrame !== null) cancelAnimationFrame(animationFrame)
+    animationFrame = null
+    levels.value = Array(28).fill(0)
+  }
+  function resume() {
+    if (recorder?.state !== 'paused') return
+    recorder.resume()
+    state.value = 'RECORDING'
+    drawWaveform?.()
+  }
   function stop() {
-    if (recorder?.state === 'recording') recorder.stop()
+    if (recorder?.state === 'recording' || recorder?.state === 'paused') recorder.stop()
   }
   function cancel() {
     generation++
     if (recorder) {
       recorder.onstop = null
-      if (recorder.state === 'recording') recorder.stop()
+      if (recorder.state === 'recording' || recorder.state === 'paused') recorder.stop()
     }
     cleanup()
     recorder = null
@@ -129,5 +158,5 @@ export function useAudioRecorder() {
     unmounted = true
     cancel()
   })
-  return { state, elapsed, blob, error, levels, supported, start, stop, cancel }
+  return { state, elapsed, blob, error, levels, supported, start, pause, resume, stop, cancel }
 }
