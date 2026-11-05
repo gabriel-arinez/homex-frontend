@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import type {
   CamposCatalogo,
   FamiliaProducto,
@@ -17,7 +17,6 @@ import {
   Mic,
   Package,
   Save,
-  Settings2,
   Tag,
   Trash2,
   X,
@@ -49,7 +48,6 @@ const fields = ref<Record<string, string[]>>({})
 const images = ref<LocalImage[]>([])
 const voiceOpen = ref(false)
 const voicePanel = ref<HTMLElement | null>(null)
-const advancedOpen = ref(false)
 useFocusTrap(voicePanel, voiceOpen)
 const voiceCandidates = ref<Array<[string, unknown]>>([])
 const voiceConflicts = ref<
@@ -78,7 +76,7 @@ const fieldError = (name: string) => fields.value[name]?.[0] ?? props.serverErro
 const money = (value: string | number) =>
   new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(Number(value) || 0)
 const discountPercent = computed(() => {
-  const before = Number(form.precio_antes)
+  const before = Number(form.precio_lista)
   const after = Number(form.precio_ahora)
   return before > 0 && after >= 0 && after <= before
     ? Math.round(((before - after) / before) * 100)
@@ -110,7 +108,6 @@ const form = reactive({
   m2_por_caja: props.initial?.piso?.m2_por_caja ?? '',
   promo_activa: Boolean(props.initial?.promocion),
   promo_enabled: props.initial?.promocion?.activo ?? true,
-  precio_antes: props.initial?.promocion?.precio_antes ?? '',
   precio_ahora: props.initial?.promocion?.precio_ahora ?? '',
   fecha_inicio: props.initial?.promocion?.fecha_inicio ?? '',
   fecha_fin: props.initial?.promocion?.fecha_fin ?? '',
@@ -138,12 +135,10 @@ function camposSimples(value: unknown): CampoSilla[] {
     }))
 }
 const camposSilla = ref<CampoSilla[]>(camposSimples(props.initial?.silla?.especificaciones))
-const modoJson = ref(false)
 function objetoEspecificaciones(): unknown {
   const datos: unknown = form.especificaciones.trim() ? JSON.parse(form.especificaciones) : {}
   if (!esObjeto(datos)) {
-    if (!camposSilla.value.length) return datos
-    throw new Error('Para añadir características, utiliza un objeto JSON en la edición avanzada.')
+    throw new Error('Las características guardadas requieren revisión técnica para conservarlas.')
   }
   const combinado: Record<string, unknown> = { ...datos }
   for (const campo of camposSimples(datos)) delete combinado[campo.clave]
@@ -164,21 +159,6 @@ function objetoEspecificaciones(): unknown {
     else combinado[clave] = campo.valor
   }
   return combinado
-}
-function editarJsonAvanzado() {
-  error.value = ''
-  try {
-    if (!modoJson.value) {
-      form.especificaciones = JSON.stringify(objetoEspecificaciones(), null, 2)
-      modoJson.value = true
-    } else {
-      const datos: unknown = form.especificaciones.trim() ? JSON.parse(form.especificaciones) : {}
-      camposSilla.value = camposSimples(datos)
-      modoJson.value = false
-    }
-  } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : 'La ficha contiene JSON inválido.'
-  }
 }
 function agregarCampoSilla() {
   camposSilla.value.push({ clave: '', valor: '', tipo: 'texto' })
@@ -346,6 +326,11 @@ watch(
     form.unidad_stock = match ? String(match.id) : ''
   },
 )
+function focusInvalidField() {
+  void nextTick(() => {
+    document.querySelector<HTMLInputElement>('.product-form [aria-invalid="true"]')?.focus()
+  })
+}
 function nullable(value: string) {
   return value ? Number(value) : null
 }
@@ -364,10 +349,9 @@ function submit() {
   )
     fields.value.precio_lista = ['Ingresa un precio válido.']
   if (form.promo_activa) {
-    const before = Number(form.precio_antes)
+    const before = Number(form.precio_lista)
     const after = Number(form.precio_ahora)
     if (
-      form.precio_antes === '' ||
       form.precio_ahora === '' ||
       !Number.isFinite(before) ||
       !Number.isFinite(after) ||
@@ -384,22 +368,19 @@ function submit() {
   }
   if (Object.keys(fields.value).length) {
     error.value = 'Revisa los campos señalados antes de guardar.'
+    focusInvalidField()
     return
   }
   let especificaciones: unknown = null
   try {
     if (categoria.value === 'SILLA') {
-      especificaciones = modoJson.value
-        ? form.especificaciones.trim()
-          ? JSON.parse(form.especificaciones)
-          : {}
-        : objetoEspecificaciones()
+      especificaciones = objetoEspecificaciones()
     }
   } catch (cause) {
     error.value =
       cause instanceof Error
         ? cause.message
-        : 'Las especificaciones de la silla deben ser JSON válido.'
+        : 'Revisa las características adicionales de la silla.'
     return
   }
   const body: ProductoWritable = {
@@ -436,7 +417,7 @@ function submit() {
   if (!form.promo_activa && props.initial?.promocion) body.promocion = null
   if (form.promo_activa)
     body.promocion = {
-      precio_antes: form.precio_antes,
+      precio_antes: form.precio_lista,
       precio_ahora: form.precio_ahora,
       fecha_inicio: form.fecha_inicio || null,
       fecha_fin: form.fecha_fin || null,
