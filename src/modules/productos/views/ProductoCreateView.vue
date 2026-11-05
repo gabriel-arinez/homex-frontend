@@ -121,7 +121,7 @@ async function save(body: ProductoWritable, images: LocalImage[]) {
 function cancel() {
   if (saving.value) return
   exitError.value = ''
-  if (createdId.value !== null || dirty.value) confirmCancel.value = true
+  if (createdId.value !== null || dirty.value || productForm.value?.hasRecording()) confirmCancel.value = true
   else void router.push(destination())
 }
 function stay() {
@@ -176,7 +176,7 @@ function confirmNavigation(): boolean | Promise<boolean> {
   // while preventing unrelated navigation during a pending save.
   if (allowNavigationAfterSave) return true
   if (saving.value) return false
-  if (!dirty.value) return true
+  if (!dirty.value && !productForm.value?.hasRecording()) return true
   return new Promise<boolean>((resolve) => {
     if (resolveLeave) resolveLeave(false)
     resolveLeave = resolve
@@ -185,7 +185,7 @@ function confirmNavigation(): boolean | Promise<boolean> {
   })
 }
 function beforeUnload(event: BeforeUnloadEvent) {
-  if (dirty.value) event.preventDefault()
+  if (dirty.value || productForm.value?.hasRecording()) event.preventDefault()
 }
 onBeforeRouteLeave(confirmNavigation)
 onMounted(() => window.addEventListener('beforeunload', beforeUnload))
