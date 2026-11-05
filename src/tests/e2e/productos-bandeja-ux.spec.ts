@@ -284,6 +284,26 @@ for (const width of [390, 1440]) {
   )
 }
 
+test('FE03 ofrece tres opciones y solo sale tras guardar un producto válido', async ({ page }) => {
+  await mockBackend(page, true)
+  await page.goto('/productos/nuevo?categoria=SILLA')
+  await page.getByRole('textbox', { name: 'Nombre comercial *' }).fill('Silla con guardado seguro')
+  await page.getByRole('button', { name: 'Cancelar', exact: true }).click()
+  const exit = page.getByRole('dialog', { name: '¿Deseas salir del producto?' })
+  await expect(exit).toBeVisible()
+  await expect(exit.getByRole('button', { name: 'Seguir editando' })).toBeVisible()
+  await expect(exit.getByRole('button', { name: 'Descartar y salir' })).toBeVisible()
+  await exit.getByRole('button', { name: 'Guardar producto y salir' }).click()
+  await expect(exit.getByRole('alert')).toContainText('Revisa los campos obligatorios')
+  await expect(page).toHaveURL(/\/productos\/nuevo/)
+  await exit.getByRole('button', { name: 'Seguir editando' }).click()
+  await page.getByLabel('Código SKU *').fill('E2E-SAVE-EXIT')
+  await page.getByRole('spinbutton', { name: 'Precio normal de venta (Bs) *' }).fill('150')
+  await page.getByRole('button', { name: 'Cancelar', exact: true }).click()
+  await exit.getByRole('button', { name: 'Guardar producto y salir' }).click()
+  await expect(page).toHaveURL(/\/productos(?:\?|$)/)
+})
+
 test('FE03 guardado confirmado redirige sin pedir descartar ni crear un duplicado', async ({
   page,
 }) => {
