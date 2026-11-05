@@ -91,7 +91,7 @@ describe('Formulario comercial de productos', () => {
     w.unmount()
   })
 
-  it('mantiene las propiedades complejas anteriores al editar características guiadas', async () => {
+  it('conserva propiedades complejas al editar características guiadas', async () => {
     catalog()
     const initial = {
       id: 81,
