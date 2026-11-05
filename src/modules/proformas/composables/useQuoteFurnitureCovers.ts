@@ -27,7 +27,7 @@ export function useQuoteFurnitureCovers() {
 
   function coverFor(line: ReferenciaMueble, quoteId?: number | null): GalleryImage | null {
     const key = keyOf(line, quoteId)
-    return key ? covers.value[key] ?? null : null
+    return key ? (covers.value[key] ?? null) : null
   }
 
   async function fetchCover(line: ReferenciaMueble, quoteId?: number | null) {
