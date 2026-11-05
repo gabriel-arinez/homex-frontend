@@ -74,6 +74,16 @@ const galleryId = ref(props.galeriaId ?? '')
 const galleryError = ref('')
 const galleryRef = ref<InstanceType<typeof ImageGallery> | null>(null)
 const galleryBusy = ref(false)
+const galleryStatus = ref({ confirmed: 0, pending: 0, busy: false, error: false })
+function onGalleryStatus(value: { confirmed: number; pending: number; busy: boolean; error: boolean }) {
+  galleryStatus.value = value
+}
+const imageStepStatus = computed(() => {
+  if (galleryError.value || galleryStatus.value.error) return 'issues' as const
+  if (galleryStatus.value.pending > 0 || galleryStatus.value.busy || galleryBusy.value)
+    return 'pending' as const
+  return galleryStatus.value.confirmed > 0 ? ('complete' as const) : ('pending' as const)
+})
 function onGalleryChanged() {
   emit('changed')
   emit('galleryChanged')
@@ -122,6 +132,9 @@ const estadoApartados = ref<Record<Seccion, 'pending' | 'complete' | 'issues'>>(
   imagenes: 'pending',
   comercial: 'pending',
   revision: 'pending',
+})
+watch(imageStepStatus, (state) => {
+  estadoApartados.value = { ...estadoApartados.value, imagenes: state }
 })
 const volverARevision = ref(false)
 const propuestaPorConfirmar = ref<ResultadoAsistida | null>(null)
@@ -221,7 +234,7 @@ async function seleccionarApartado(id: typeof seccion.value) {
         /></span>
         <span class="studio-step-label"
           ><small>{{ String(i + 1).padStart(2, '0') }}</small
-          >{{ item.titulo }}</span
+          >{{ item.titulo }}<small v-if="item.id === 'imagenes' && imageStepStatus === 'pending'"> · Opcional</small></span
         >
         <AlertCircle
           v-if="estadoApartados[item.id] === 'issues'"
@@ -378,6 +391,7 @@ async function seleccionarApartado(id: typeof seccion.value) {
         :editable="seccion === 'imagenes'"
         title="Imágenes del mueble"
         @changed="onGalleryChanged"
+        @status="onGalleryStatus"
         @busy="galleryBusy = $event"
       />
       <p v-else>Sin imágenes de referencia.</p>
@@ -407,7 +421,7 @@ async function seleccionarApartado(id: typeof seccion.value) {
         @cancel="emit('cancel')"
         @request-section="editarDesdeRevision($event)"
         @section-status="
-          estadoApartados = { ...$event, imagenes: galleryId ? 'complete' : 'pending' }
+          estadoApartados = { ...$event, imagenes: imageStepStatus }
         "
         @type-created="emit('typeCreated', $event)"
       />
