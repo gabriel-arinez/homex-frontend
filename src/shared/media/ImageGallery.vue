@@ -20,6 +20,7 @@ const emit = defineEmits<{
   'update:modelValue': [images: LocalImage[]]
   changed: []
   busy: [value: boolean]
+  status: [value: { confirmed: number; pending: number; busy: boolean; error: boolean }]
 }>()
 const images = ref<GalleryImage[]>([]),
   pending = ref<LocalImage[]>([]),
@@ -32,6 +33,17 @@ const images = ref<GalleryImage[]>([]),
   zoom = ref(1),
   selected = ref(0),
   deleting = ref<number | null>(null)
+watch(
+  [() => images.value.length, () => local.value.length, busy, error],
+  () =>
+    emit('status', {
+      confirmed: images.value.length,
+      pending: local.value.length,
+      busy: busy.value,
+      error: Boolean(error.value),
+    }),
+  { immediate: true },
+)
 const totalUploads = ref(0)
 const selecting = ref(false)
 let loadVersion = 0
