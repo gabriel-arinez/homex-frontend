@@ -190,7 +190,11 @@ function upload(event: Event) {
         </div>
       </div>
       <div class="voice-source-actions" role="group" aria-label="Origen del audio">
-        <Button class="source-action source-record" :disabled="processing || requesting" @click="startRecording">
+        <Button
+          class="source-action source-record"
+          :disabled="processing || requesting"
+          @click="startRecording"
+        >
           <Square v-if="recording" :size="28" aria-hidden="true" />
           <Mic v-else :size="28" aria-hidden="true" />
           <strong>{{ recording ? 'Detener grabación' : 'Grabar descripción' }}</strong>
@@ -216,12 +220,7 @@ function upload(event: Event) {
           @change="upload"
         />
       </div>
-      <AudioRecorder
-        v-if="recording"
-        ref="recorder"
-        compact
-        @ready="onRecorded"
-      />
+      <AudioRecorder v-if="recording" ref="recorder" compact @ready="onRecorded" />
     </div>
 
     <div v-if="processing" class="processing-note" role="status">
@@ -344,7 +343,7 @@ function upload(event: Event) {
   color: var(--color-text-secondary);
   line-height: 1.5;
 }
- .voice-source-actions {
+.voice-source-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
@@ -361,8 +360,14 @@ function upload(event: Event) {
   white-space: normal;
   text-align: center;
 }
-.voice-source-actions :deep(.source-action strong) { font-size: 0.93rem; }
-.voice-source-actions :deep(.source-action small) { font-size: 0.76rem; font-weight: 400; opacity: 0.9; }
+.voice-source-actions :deep(.source-action strong) {
+  font-size: 0.93rem;
+}
+.voice-source-actions :deep(.source-action small) {
+  font-size: 0.76rem;
+  font-weight: 400;
+  opacity: 0.9;
+}
 .visually-hidden {
   position: absolute;
   width: 1px;

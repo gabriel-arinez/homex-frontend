@@ -84,7 +84,9 @@ describe('Formulario comercial de productos', () => {
     await w.get('.promotion input[type="checkbox"]').setValue(true)
     await w.get('input[name="ahora"]').setValue('90')
     await w.get('form').trigger('submit')
-    const result = w.emitted('save')?.[0]?.[0] as { promocion?: { precio_antes: string; precio_ahora: string } }
+    const result = w.emitted('save')?.[0]?.[0] as {
+      promocion?: { precio_antes: string; precio_ahora: string }
+    }
     expect(result.promocion).toMatchObject({ precio_antes: '120', precio_ahora: '90' })
     w.unmount()
   })

@@ -1,7 +1,17 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { Armchair, ChevronDown, Eye, EyeOff, LayoutGrid, Layers, List, Package, SlidersHorizontal } from '@lucide/vue'
+import {
+  Armchair,
+  ChevronDown,
+  Eye,
+  EyeOff,
+  LayoutGrid,
+  Layers,
+  List,
+  Package,
+  SlidersHorizontal,
+} from '@lucide/vue'
 import type { FamiliaProducto, Producto, ValorCatalogoPublico } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { proformasService } from '@/modules/proformas/services/proformasService'
@@ -432,7 +442,12 @@ onBeforeUnmount(() => {
       @menu="emit('openMenu')"
     >
       <template #actions>
-        <div v-if="canCreate" class="create-shortcuts" role="group" aria-label="Crear producto por categoría">
+        <div
+          v-if="canCreate"
+          class="create-shortcuts"
+          role="group"
+          aria-label="Crear producto por categoría"
+        >
           <Button variant="secondary" @click="createProduct('SILLA')">
             <Armchair :size="18" aria-hidden="true" /> Silla
           </Button>
@@ -799,7 +814,9 @@ onBeforeUnmount(() => {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     width: 100%;
   }
-  .create-shortcuts :deep(.button) { min-width: 0; }
+  .create-shortcuts :deep(.button) {
+    min-width: 0;
+  }
 }
 .product-toolbar,
 .results-header {

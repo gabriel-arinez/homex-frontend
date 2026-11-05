@@ -30,10 +30,11 @@ describe('portada privada de muebles a pedido', () => {
   })
 
   it('resuelve las fotografías históricas sin galeria_id y respeta su portada', async () => {
-    const spy = vi.spyOn(proformasService, 'attachments').mockResolvedValue([
-      photo(51, false),
-      photo(52, true),
-    ] as Awaited<ReturnType<typeof proformasService.attachments>>)
+    const spy = vi
+      .spyOn(proformasService, 'attachments')
+      .mockResolvedValue([photo(51, false), photo(52, true)] as Awaited<
+        ReturnType<typeof proformasService.attachments>
+      >)
     const covers = useQuoteFurnitureCovers()
     const line = { id: 22, producto: null }
     await covers.ensureLines([line], 578)

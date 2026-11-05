@@ -269,7 +269,8 @@ async function saveAndLeave() {
       return
     }
   } catch (cause) {
-    leaveSaveError.value = cause instanceof Error ? cause.message : 'No se pudo guardar la proforma.'
+    leaveSaveError.value =
+      cause instanceof Error ? cause.message : 'No se pudo guardar la proforma.'
     return
   } finally {
     leaveSaving.value = false
@@ -1847,9 +1848,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               </div>
               <div v-else-if="furnitureCoverSource(line)" class="review-thumbnail">
                 <GalleryPhoto
-                    :src="furnitureCoverSource(line)"
-                    :alt="'Imagen principal de ' + line.nombre"
-                  />
+                  :src="furnitureCoverSource(line)"
+                  :alt="'Imagen principal de ' + line.nombre"
+                />
               </div>
               <span
                 ><strong>{{ line.nombre }}</strong> —

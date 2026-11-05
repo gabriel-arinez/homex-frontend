@@ -9,18 +9,7 @@ import type {
 } from '@/generated/api'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import CapturaCatalogo from './CapturaCatalogo.vue'
-import {
-  Armchair,
-  Check,
-  FileText,
-  Layers,
-  Mic,
-  Package,
-  Save,
-  Tag,
-  Trash2,
-  X,
-} from '@lucide/vue'
+import { Armchair, Check, FileText, Layers, Mic, Package, Save, Tag, Trash2, X } from '@lucide/vue'
 import { useFocusTrap } from '@/shared/composables/useFocusTrap'
 import Modal from '@/shared/ui/Modal.vue'
 import ImageGallery from '@/shared/media/ImageGallery.vue'
@@ -378,9 +367,7 @@ function submit(): boolean {
     }
   } catch (cause) {
     error.value =
-      cause instanceof Error
-        ? cause.message
-        : 'Revisa las características adicionales de la silla.'
+      cause instanceof Error ? cause.message : 'Revisa las características adicionales de la silla.'
     return false
   }
   const body: ProductoWritable = {
@@ -756,7 +743,9 @@ onMounted(load)
             <label class="toggle-row">
               <span class="toggle-copy"
                 ><strong>Configurar promoción</strong>
-                <small>Ofrece un precio temporal sin cambiar el precio normal de venta.</small></span
+                <small
+                  >Ofrece un precio temporal sin cambiar el precio normal de venta.</small
+                ></span
               >
               <input v-model="form.promo_activa" type="checkbox" class="switch-input" />
               <span class="switch-ui" aria-hidden="true" />
@@ -798,7 +787,10 @@ onMounted(load)
               <label class="toggle-row">
                 <span class="toggle-copy"
                   ><strong>Promoción activa</strong>
-                  <small>La promoción se aplica solo si está habilitada y dentro del período indicado.</small></span
+                  <small
+                    >La promoción se aplica solo si está habilitada y dentro del período
+                    indicado.</small
+                  ></span
                 >
                 <input v-model="form.promo_enabled" type="checkbox" class="switch-input" />
                 <span class="switch-ui" aria-hidden="true" />

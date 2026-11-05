@@ -30,14 +30,16 @@ const titleId = useId()
         <AlertTriangle :size="24" aria-hidden="true" />
       </div>
       <div>
-        <h3>{{ existingProductId ? 'El registro ya existe' : 'Tienes información sin guardar' }}</h3>
+        <h3>
+          {{ existingProductId ? 'El registro ya existe' : 'Tienes información sin guardar' }}
+        </h3>
         <p v-if="existingProductId">
-          El producto #{{ existingProductId }} está registrado. Salir no lo elimina.
-          Puedes completar las imágenes pendientes o abrir su ficha.
+          El producto #{{ existingProductId }} está registrado. Salir no lo elimina. Puedes
+          completar las imágenes pendientes o abrir su ficha.
         </p>
         <p v-else>
-          Puedes guardar el producto y continuar después. Si descartas los cambios,
-          la información introducida se perderá.
+          Puedes guardar el producto y continuar después. Si descartas los cambios, la información
+          introducida se perderá.
         </p>
       </div>
     </div>
@@ -49,7 +51,12 @@ const titleId = useId()
         <Button variant="secondary" :disabled="saving" @click="emit('stay')">
           <ArrowLeft :size="17" aria-hidden="true" /> Seguir editando
         </Button>
-        <Button variant="secondary" class="exit-discard" :disabled="saving" @click="emit('discard')">
+        <Button
+          variant="secondary"
+          class="exit-discard"
+          :disabled="saving"
+          @click="emit('discard')"
+        >
           <LogOut :size="17" aria-hidden="true" />
           {{ existingProductId ? 'Ir a la ficha' : 'Descartar y salir' }}
         </Button>
@@ -96,7 +103,9 @@ const titleId = useId()
   padding: var(--space-3);
   margin: var(--space-4) 0 0;
 }
-.exit-error svg { flex: none; }
+.exit-error svg {
+  flex: none;
+}
 .exit-actions {
   display: flex;
   flex-wrap: wrap;
@@ -119,7 +128,12 @@ const titleId = useId()
   background: var(--color-danger-soft);
 }
 @media (max-width: 40rem) {
-  .exit-actions { display: grid; grid-template-columns: 1fr; }
-  .exit-actions :deep(.button) { width: 100%; }
+  .exit-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .exit-actions :deep(.button) {
+    width: 100%;
+  }
 }
 </style>

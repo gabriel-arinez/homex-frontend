@@ -138,11 +138,15 @@ function discard() {
     if (confirmLeave.value) answerLeave(false)
     else confirmCancel.value = false
     allowNavigationAfterSave = true
-    void router.push({
-      name: 'producto-detail',
-      params: { id: createdId.value },
-      query: { returnTo: route.query.returnTo, draft: route.query.draft },
-    }).finally(() => { allowNavigationAfterSave = false })
+    void router
+      .push({
+        name: 'producto-detail',
+        params: { id: createdId.value },
+        query: { returnTo: route.query.returnTo, draft: route.query.draft },
+      })
+      .finally(() => {
+        allowNavigationAfterSave = false
+      })
     return
   }
   dirty.value = false
