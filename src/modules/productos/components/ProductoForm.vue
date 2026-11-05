@@ -101,6 +101,21 @@ const form = reactive({
   fecha_inicio: props.initial?.promocion?.fecha_inicio ?? '',
   fecha_fin: props.initial?.promocion?.fecha_fin ?? '',
 })
+const promoUnchanged = computed(() => {
+  const previous = props.initial?.promocion
+  if (!previous || !form.promo_activa) return false
+  return (
+    Number(form.precio_lista) === Number(props.initial?.precio_lista) &&
+    Number(form.precio_ahora) === Number(previous.precio_ahora) &&
+    (form.fecha_inicio || null) === (previous.fecha_inicio || null) &&
+    (form.fecha_fin || null) === (previous.fecha_fin || null) &&
+    form.promo_enabled === previous.activo
+  )
+})
+const legacyPromotion = computed(() => {
+  const previous = props.initial?.promocion
+  return Boolean(previous && Number(previous.precio_antes) !== Number(props.initial?.precio_lista))
+})
 type TipoCampo = 'texto' | 'numero' | 'booleano' | 'nulo'
 type CampoSilla = { clave: string; valor: string; tipo: TipoCampo }
 function esObjeto(value: unknown): value is Record<string, unknown> {
@@ -402,7 +417,8 @@ function submit(): boolean {
       m2_por_caja: form.m2_por_caja || null,
     }
   if (!form.promo_activa && props.initial?.promocion) body.promocion = null
-  if (form.promo_activa)
+  // Conservar promociones históricas intactas si no se editaron.
+  if (form.promo_activa && !promoUnchanged.value)
     body.promocion = {
       precio_antes: form.precio_lista,
       precio_ahora: form.precio_ahora,
@@ -751,6 +767,10 @@ onMounted(load)
               <span class="switch-ui" aria-hidden="true" />
             </label>
             <div v-if="form.promo_activa" class="promotion-fields">
+              <p v-if="legacyPromotion && promoUnchanged" class="promotion-legacy">
+                Esta promoción conserva un precio anterior histórico distinto del normal.
+                No cambiará mientras no edites la promoción.
+              </p>
               <p class="promotion-base">
                 Precio de referencia: <strong>{{ money(form.precio_lista) }}</strong>
                 (precio normal de venta).
@@ -1118,6 +1138,14 @@ textarea {
 .extras-empty {
   color: var(--color-text-secondary);
   font-size: 0.83rem;
+}
+.promotion-legacy {
+  padding: var(--space-3);
+  border-left: 3px solid var(--color-warning);
+  background: var(--color-surface-soft);
+  color: var(--color-text-secondary);
+  font-size: 0.84rem;
+  margin: 0;
 }
 .promotion-base {
   margin: 0;
