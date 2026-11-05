@@ -33,17 +33,6 @@ const images = ref<GalleryImage[]>([]),
   zoom = ref(1),
   selected = ref(0),
   deleting = ref<number | null>(null)
-watch(
-  [() => images.value.length, () => local.value.length, busy, error],
-  () =>
-    emit('status', {
-      confirmed: images.value.length,
-      pending: local.value.length,
-      busy: busy.value,
-      error: Boolean(error.value),
-    }),
-  { immediate: true },
-)
 const totalUploads = ref(0)
 const selecting = ref(false)
 let loadVersion = 0
@@ -66,6 +55,17 @@ const all = computed(() => [
 ])
 const cover = computed(() => all.value.find((i) => i.principal) ?? all.value[0])
 const current = computed(() => all.value[selected.value] ?? all.value[0])
+watch(
+  [() => images.value.length, () => local.value.length, busy, error],
+  () =>
+    emit('status', {
+      confirmed: images.value.length,
+      pending: local.value.length,
+      busy: busy.value,
+      error: Boolean(error.value),
+    }),
+  { immediate: true },
+)
 watch(
   () => all.value.length,
   (length) => {
