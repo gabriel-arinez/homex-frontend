@@ -125,7 +125,8 @@ async function seleccionarAudio(event: Event) {
   }
 
   try {
-    if ((await readAudioDuration(archivo)) > MAX_UPLOAD_SECONDS) {
+    const seconds = await readAudioDuration(archivo)
+    if (seconds !== null && seconds > MAX_UPLOAD_SECONDS) {
       fileError.value = 'La duración del audio no puede superar 5 minutos.'
       return
     }

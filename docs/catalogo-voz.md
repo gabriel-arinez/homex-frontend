@@ -5,7 +5,10 @@ seleccionado. Reutiliza `AudioRecorder` y no añade acciones a listados, selecto
 de productos ni líneas de proforma. Cambiar de categoría desmonta el contexto y
 cancela su espera; la categoría nunca procede del NLP.
 
-Grabar descripción → Detener → Procesar audio, o Subir audio → Procesar audio.
+Grabar descripción → Pausar/Reanudar (opcional) → Finalizar → transcribir automáticamente,
+o Seleccionar archivo → transcribir automáticamente. En ambos flujos se mantiene la
+revisión humana antes de aplicar. El asistente lateral se puede minimizar sin
+detener la grabación; al hacerlo aparece un indicador para volver al micrófono.
 Revisar transcripción original y texto editable; si se edita, Reinterpretar texto
 antes de aplicar. La propuesta muestra nombres de catálogos, evidencias y datos
 sin reconocer. Aplicar al formulario sólo admite campos de la categoría y valores
@@ -47,3 +50,22 @@ permite distinguir aprobadas, fallidas y omitidas. No usar credenciales reales.
 El color secundario usa el mismo catálogo activo que el primario y la misma
 confirmación de reemplazo. Los códigos o palabras mal transcritos requieren
 corrección explícita y reinterpretación; el TTS no demuestra precisión con voz humana.
+
+## Cierre de Productos y Proformas (noviembre de 2026)
+
+- Micrófono: máximo 3 minutos de audio efectivo, pausa, reanudación, cancelación
+  y cierre automático. El contador se detiene durante la pausa.
+- Archivo: máximo 20 MB; duración máxima de 5 minutos, comprobada en el worker
+  de ASR mediante decodificación. Si el navegador no puede leer la metadata
+  del archivo, el servidor sigue siendo la autoridad.
+- Los paneles de asistencia comercial en producto y mueble a pedido se pueden
+  minimizar, conservando grabación y texto mientras permanezca abierto el editor.
+- No guardar audio crudo en localStorage. Al abandonar el editor se libera el micrófono.
+- La galería del mueble es opcional: vacía no significa "completada", y las
+  subidas pendientes o fallidas nunca se indican como confirmadas.
+- Tras cancelar la creación contextual de producto, regresar al catálogo con
+  sus filtros, sin volver a abrir el formulario antiguo de líneas.
+- Modales y botones siguen la paleta HOMEX; solo errores que requieren una
+  acción permanente usan avisos persistentes. El resto usan toast contextual.
+- Requisitos de cierre: lint, TypeScript, formato, build, unitarias, E2E,
+  a11y e integración real con backend y worker verificados sin omisiones.

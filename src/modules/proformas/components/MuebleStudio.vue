@@ -22,6 +22,7 @@ import type {
   ValorCatalogoPublico,
 } from '@/generated/api'
 import Button from '@/shared/ui/Button.vue'
+import ConfirmDialog from '@/shared/ui/ConfirmDialog.vue'
 import CapturaAsistida from './CapturaAsistida.vue'
 import EspecificacionForm from './EspecificacionForm.vue'
 import ImageGallery from '@/shared/media/ImageGallery.vue'
@@ -74,6 +75,14 @@ const emit = defineEmits<{
   typeCreated: [tipo: ValorCatalogoPublico]
 }>()
 const voiceOpen = ref(false)
+const leaveVoiceConfirm = ref(false)
+function requestCloseStudio() {
+  if (voiceActive.value) {
+    leaveVoiceConfirm.value = true
+    return
+  }
+  emit('cancel')
+}
 const voicePanel = ref<HTMLElement | null>(null)
 const voiceActive = ref(false)
 const voicePaused = ref(false)
@@ -225,7 +234,7 @@ async function seleccionarApartado(id: typeof seccion.value) {
         <Button v-if="nueva" type="button" class="studio-voice-launch" @click="voiceOpen = true">
           <Mic :size="18" aria-hidden="true" /> Completar por voz
         </Button>
-        <Button type="button" variant="secondary" @click="emit('cancel')">
+        <Button type="button" variant="secondary" @click="requestCloseStudio">
           <ArrowLeft :size="17" aria-hidden="true" /> Volver a proforma
         </Button>
       </div>
@@ -475,7 +484,7 @@ async function seleccionarApartado(id: typeof seccion.value) {
         :active-section="seccion === 'imagenes' ? 'imagenes' : seccion"
         @save="saveWithGallery"
         @changed="emit('changed')"
-        @cancel="emit('cancel')"
+        @cancel="requestCloseStudio"
         @request-section="editarDesdeRevision($event)"
         @section-status="
           estadoApartados = { ...$event, imagenes: imageStepStatus }
@@ -493,6 +502,14 @@ async function seleccionarApartado(id: typeof seccion.value) {
         {{ volverARevision ? 'Volver a revisar' : 'Continuar a ' + secciones[indice + 1]!.titulo }}
       </Button>
     </footer>
+    <ConfirmDialog
+      :open="leaveVoiceConfirm"
+      title="Descartar grabación"
+      description="Hay una grabación activa. Si vuelves a la proforma perderás el audio que todavía no finalizaste."
+      confirm-label="Descartar grabación y volver"
+      @close="leaveVoiceConfirm = false"
+      @confirm="leaveVoiceConfirm = false; emit('cancel')"
+    />
   </section>
 </template>
 

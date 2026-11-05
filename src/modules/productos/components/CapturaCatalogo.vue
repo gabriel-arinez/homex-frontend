@@ -207,7 +207,7 @@ async function upload(event: Event) {
   }
   try {
     const seconds = await readAudioDuration(file)
-    if (seconds > MAX_UPLOAD_SECONDS) {
+    if (seconds !== null && seconds > MAX_UPLOAD_SECONDS) {
       error.value = 'El archivo supera los 5 minutos permitidos.'
       return
     }
