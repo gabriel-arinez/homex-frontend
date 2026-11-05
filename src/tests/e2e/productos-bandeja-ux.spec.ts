@@ -229,12 +229,10 @@ test('FE03 filtros por categoría y atributos conservan búsqueda y vista en URL
 test('FE03 creación por categoría exige capacidad y presenta opciones reales', async ({ page }) => {
   await mockBackend(page, true)
   await page.goto('/productos')
-  await page.getByRole('button', { name: 'Nuevo producto' }).click()
-  await expect(
-    page.getByRole('group', { name: 'Elegir categoría del nuevo producto' }),
-  ).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Piso flotante' })).toBeVisible()
-  await page.getByRole('button', { name: 'Piso flotante' }).click()
+  const shortcuts = page.getByRole('group', { name: 'Crear producto por categoría' })
+  await expect(shortcuts).toBeVisible()
+  await expect(shortcuts.getByRole('button')).toHaveCount(3)
+  await shortcuts.getByRole('button', { name: 'Piso' }).click()
   await expect(page).toHaveURL(/\/productos\/nuevo\?categoria=PISO_FLOTANTE/)
 })
 
@@ -279,7 +277,7 @@ for (const width of [390, 1440]) {
       await expect(page.getByRole('dialog', { name: 'Completar por voz' })).toHaveCount(0)
       await page.getByRole('textbox', { name: 'Nombre comercial *' }).fill('Silla de prueba')
       await page.getByRole('button', { name: 'Cancelar', exact: true }).click()
-      await expect(page.getByRole('dialog', { name: 'Descartar producto' })).toBeVisible()
+      await expect(page.getByRole('dialog', { name: '¿Deseas salir del producto?' })).toBeVisible()
       await page.getByRole('button', { name: 'Descartar y salir' }).click()
       await expect(page).toHaveURL(/\/productos$/)
     },
@@ -302,7 +300,7 @@ test('FE03 guardado confirmado redirige sin pedir descartar ni crear un duplicad
   await expect(page.getByRole('heading', { name: 'Nueva silla' })).toBeVisible()
   await page.getByRole('textbox', { name: 'Nombre comercial *' }).fill('Silla de integración')
   await page.getByLabel('Código SKU *').fill('E2E-VOICE-001')
-  await page.getByRole('spinbutton', { name: 'Precio de lista (BOB) *' }).fill('150')
+  await page.getByRole('spinbutton', { name: 'Precio normal de venta (Bs) *' }).fill('150')
   const created = page.waitForResponse(
     (response) =>
       response.request().method() === 'POST' &&

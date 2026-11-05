@@ -68,6 +68,27 @@ describe('Formulario comercial de productos', () => {
     expect(w.emitted('save')).toBeUndefined()
     w.unmount()
   })
+  it('oculta JSON al vendedor y conserva el precio base al activar una promoción', async () => {
+    catalog()
+    const w = mount(ProductoForm, {
+      props: { preselectCategory: 'SILLA' },
+      global: { stubs: { CapturaCatalogo: true } },
+    })
+    await flushPromises()
+    expect(w.text()).not.toContain('Especificaciones avanzadas JSON')
+    expect(w.text()).not.toContain('Opciones avanzadas')
+    expect(w.text()).toContain('Características adicionales de la silla')
+    await w.get('input[name="nombre"]').setValue('Silla con descuento')
+    await w.get('input[name="sku"]').setValue('SIL-PROMO-TEST')
+    await w.get('input[name="precio"]').setValue('120')
+    await w.get('.promotion input[type="checkbox"]').setValue(true)
+    await w.get('input[name="ahora"]').setValue('90')
+    await w.get('form').trigger('submit')
+    const result = w.emitted('save')?.[0]?.[0] as { promocion?: { precio_antes: string; precio_ahora: string } }
+    expect(result.promocion).toMatchObject({ precio_antes: '120', precio_ahora: '90' })
+    w.unmount()
+  })
+
   it('en edición comercial muestra la galería sin permitir acciones inmediatas', async () => {
     catalog()
     const initial = {

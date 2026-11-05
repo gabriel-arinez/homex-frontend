@@ -44,7 +44,6 @@ describe('Voz en creación de catálogo', () => {
       const input = w.get('input[type="file"]')
       Object.defineProperty(input.element, 'files', { value: [file] })
       await input.trigger('change')
-      await button(w, 'Procesar audio').trigger('click')
       await flushPromises()
       expect(catalogoCapturaService.create).toHaveBeenCalledWith(
         expect.objectContaining({ categoria: category, audio: file }),

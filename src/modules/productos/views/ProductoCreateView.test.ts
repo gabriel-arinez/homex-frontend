@@ -94,9 +94,9 @@ describe('Reintentos de creación con galería', () => {
         plugins: [createPinia(), router],
         stubs: {
           ProductoForm: { name: 'ProductoForm', template: '<div />' },
-          ConfirmDialog: {
-            name: 'ConfirmDialog',
-            props: ['open', 'title', 'description', 'confirmLabel'],
+          ProductExitDialog: {
+            name: 'ProductExitDialog',
+            props: ['open', 'existingProductId', 'error', 'saving'],
             template: '<div />',
           },
           Teleport: true,
@@ -117,11 +117,10 @@ describe('Reintentos de creación con galería', () => {
     expect(router.currentRoute.value.path).toBe('/productos/nuevo')
     wrapper.findComponent({ name: 'ProductoForm' }).vm.$emit('cancel')
     await flushPromises()
-    const dialog = wrapper.findAllComponents({ name: 'ConfirmDialog' })[0]!
+    const dialog = wrapper.getComponent({ name: 'ProductExitDialog' })
     expect(dialog.props('open')).toBe(true)
-    expect(dialog.props('title')).toBe('Producto ya registrado')
-    expect(dialog.props('description')).toContain('Salir no lo elimina')
-    dialog.vm.$emit('confirm')
+    expect(dialog.props('existingProductId')).toBe(42)
+    dialog.vm.$emit('discard')
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/productos/42')
     expect(create).toHaveBeenCalledTimes(1)
