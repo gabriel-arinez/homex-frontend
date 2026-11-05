@@ -334,8 +334,8 @@ function focusInvalidField() {
 function nullable(value: string) {
   return value ? Number(value) : null
 }
-function submit() {
-  if ((loading.value && !props.initial) || props.processing) return
+function submit(): boolean {
+  if ((loading.value && !props.initial) || props.processing) return false
   error.value = ''
   fields.value = {}
   if (!form.categoria) fields.value.categoria = ['Selecciona una categoría.']
@@ -369,7 +369,7 @@ function submit() {
   if (Object.keys(fields.value).length) {
     error.value = 'Revisa los campos señalados antes de guardar.'
     focusInvalidField()
-    return
+    return false
   }
   let especificaciones: unknown = null
   try {
@@ -381,7 +381,7 @@ function submit() {
       cause instanceof Error
         ? cause.message
         : 'Revisa las características adicionales de la silla.'
-    return
+    return false
   }
   const body: ProductoWritable = {
     categoria: Number(form.categoria),
@@ -424,7 +424,9 @@ function submit() {
       activo: form.promo_enabled,
     }
   emit('save', body, images.value)
+  return true
 }
+defineExpose({ submit })
 onMounted(load)
 </script>
 <template>
