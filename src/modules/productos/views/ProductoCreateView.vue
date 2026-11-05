@@ -4,7 +4,7 @@ import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import type { ProductoWritable } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { ApiError } from '@/shared/api'
-import ConfirmDialog from '@/shared/ui/ConfirmDialog.vue'
+import ProductExitDialog from '../components/ProductExitDialog.vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
 import ProductoForm from '../components/ProductoForm.vue'
 import { galleryService, type LocalImage } from '@/shared/media/gallery'
@@ -18,6 +18,9 @@ const saving = ref(false)
 const error = ref('')
 const serverErrors = ref<Record<string, string[]>>({})
 const dirty = ref(false)
+const productForm = ref<InstanceType<typeof ProductoForm> | null>(null)
+const exitError = ref('')
+const saveAndExit = ref(false)
 const confirmCancel = ref(false)
 const confirmLeave = ref(false)
 let resolveLeave: ((answer: boolean) => void) | null = null
@@ -86,7 +89,14 @@ async function save(body: ProductoWritable, images: LocalImage[]) {
     phase = 'navigation'
     dirty.value = false
     allowNavigationAfterSave = true
-    await router.push(destination(product.id))
+    exitError.value = ''
+    if (saveAndExit.value && confirmLeave.value) {
+      // Conservar el destino originalmente solicitado por el usuario.
+      answerLeave(true)
+    } else {
+      confirmCancel.value = false
+      await router.push(destination(product.id))
+    }
   } catch (cause) {
     if (createdId.value !== null) {
       const id = createdId.value
@@ -101,39 +111,55 @@ async function save(body: ProductoWritable, images: LocalImage[]) {
       error.value = cause.message
       serverErrors.value = cause.fields
     } else error.value = 'No se pudo registrar el producto.'
+    if (saveAndExit.value) exitError.value = error.value
   } finally {
+    saveAndExit.value = false
     allowNavigationAfterSave = false
     saving.value = false
   }
 }
 function cancel() {
   if (saving.value) return
+  exitError.value = ''
   if (createdId.value !== null || dirty.value) confirmCancel.value = true
   else void router.push(destination())
 }
+function stay() {
+  if (saving.value) return
+  exitError.value = ''
+  if (confirmLeave.value) answerLeave(false)
+  else confirmCancel.value = false
+}
 function discard() {
-  confirmCancel.value = false
+  if (saving.value) return
+  exitError.value = ''
   if (createdId.value !== null) {
-    // El producto ya existe: abandonar la carga no equivale a descartar el registro.
+    // Un registro ya persistido no puede descartarse desde este diálogo.
+    if (confirmLeave.value) answerLeave(false)
+    else confirmCancel.value = false
     allowNavigationAfterSave = true
     void router.push({
       name: 'producto-detail',
       params: { id: createdId.value },
       query: { returnTo: route.query.returnTo, draft: route.query.draft },
-    })
+    }).finally(() => { allowNavigationAfterSave = false })
     return
   }
   dirty.value = false
-  void router.push(destination())
+  if (confirmLeave.value) answerLeave(true)
+  else {
+    confirmCancel.value = false
+    void router.push(destination())
+  }
 }
-function cancelDescription() {
-  if (createdId.value === null) return 'Los datos que ingresaste no se guardarán.'
-  return `El producto #${createdId.value} ya está registrado. Salir no lo elimina. Puedes reintentar la carga de imágenes o ir a su ficha para completarlas.`
-}
-function leaveDescription() {
-  if (createdId.value === null)
-    return 'Hay cambios sin guardar en este producto. Si sales, se descartarán.'
-  return `El producto #${createdId.value} ya existe en HOMEX. Salir no lo elimina y algunas imágenes podrían seguir pendientes de cargar.`
+function submitAndLeave() {
+  if (saving.value) return
+  exitError.value = ''
+  saveAndExit.value = true
+  if (!productForm.value?.submit()) {
+    saveAndExit.value = false
+    exitError.value = 'Revisa los campos obligatorios del formulario antes de guardar.'
+  }
 }
 function answerLeave(answer: boolean) {
   confirmLeave.value = false
@@ -150,6 +176,7 @@ function confirmNavigation(): boolean | Promise<boolean> {
   return new Promise<boolean>((resolve) => {
     if (resolveLeave) resolveLeave(false)
     resolveLeave = resolve
+    exitError.value = ''
     confirmLeave.value = true
   })
 }
@@ -170,6 +197,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     />
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
     <ProductoForm
+      ref="productForm"
       :processing="saving"
       :server-errors="serverErrors"
       :can-upload-image="session.can('catalogo.crear_producto')"
@@ -180,21 +208,14 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       @save="save"
       @cancel="cancel"
     />
-    <ConfirmDialog
-      :open="confirmCancel"
-      :title="createdId !== null ? 'Producto ya registrado' : 'Descartar producto'"
-      :description="cancelDescription()"
-      :confirm-label="createdId !== null ? 'Ir a su ficha' : 'Descartar y salir'"
-      @close="confirmCancel = false"
-      @confirm="discard"
-    />
-    <ConfirmDialog
-      :open="confirmLeave"
-      :title="createdId !== null ? 'Producto ya registrado' : 'Salir sin guardar'"
-      :description="leaveDescription()"
-      :confirm-label="createdId !== null ? 'Salir y conservar producto' : 'Salir sin guardar'"
-      @close="answerLeave(false)"
-      @confirm="answerLeave(true)"
+    <ProductExitDialog
+      :open="confirmCancel || confirmLeave"
+      :saving="saving"
+      :existing-product-id="createdId"
+      :error="exitError"
+      @stay="stay"
+      @discard="discard"
+      @save="submitAndLeave"
     />
   </div>
 </template>
