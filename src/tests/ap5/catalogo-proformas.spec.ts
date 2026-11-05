@@ -178,14 +178,14 @@ describe('AP5 regresiones de interfaces reactivas y comerciales', () => {
     await flushPromises()
     const activo = wrapper
       .findAll('input[type="checkbox"]')
-      .find((input) => input.element.parentElement?.textContent?.includes('Promoción activa'))
+      .find((input) => input.element.parentElement?.textContent?.includes('Promoción habilitada'))
     expect((activo!.element as HTMLInputElement).checked).toBe(false)
     await wrapper.get('input[name="nombre"]').setValue('Producto renombrado')
     await wrapper.get('form').trigger('submit')
     expect(wrapper.emitted('save')?.[0]?.[0]).toMatchObject({
       nombre: 'Producto renombrado',
-      promocion: { activo: false },
     })
+    expect(wrapper.emitted('save')?.[0]?.[0]).not.toHaveProperty('promocion')
     wrapper.unmount()
   })
 
