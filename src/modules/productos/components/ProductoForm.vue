@@ -455,7 +455,6 @@ onMounted(load)
       </div>
       <Button
         v-if="!initial && categoria"
-        variant="secondary"
         class="voice-trigger"
         :disabled="loading || processing"
         @click="voiceOpen = true"
@@ -662,12 +661,13 @@ onMounted(load)
                 <p class="muted">Añade propiedades particulares de esta silla.</p>
               </div>
             </div>
-            <div v-if="!modoJson" class="extras-list">
+            <div class="extras-list">
               <div v-for="(campo, index) in camposSilla" :key="index" class="extra-row">
                 <label
                   >Característica
                   <input
                     v-model="campo.clave"
+                    list="silla-atributos-sugeridos"
                     :aria-label="'Característica ' + (index + 1)"
                     placeholder="Ej. Apoyabrazos"
                   />
@@ -682,12 +682,12 @@ onMounted(load)
                   />
                 </label>
                 <label
-                  >Tipo de dato
-                  <select v-model="campo.tipo" :aria-label="'Tipo de dato ' + (index + 1)">
+                  >Tipo de respuesta
+                  <select v-model="campo.tipo" :aria-label="'Tipo de respuesta ' + (index + 1)">
                     <option value="texto">Texto</option>
                     <option value="numero">Número</option>
                     <option value="booleano">Sí / No</option>
-                    <option value="nulo">Sin valor</option>
+                    <option v-if="campo.tipo === 'nulo'" value="nulo">Sin valor</option>
                   </select>
                 </label>
                 <label v-if="campo.tipo === 'booleano'"
@@ -706,38 +706,19 @@ onMounted(load)
                   <Trash2 :size="17" aria-hidden="true" />
                 </button>
               </div>
+              <datalist id="silla-atributos-sugeridos">
+                <option value="Apoyabrazos" />
+                <option value="Altura regulable" />
+                <option value="Material del asiento" />
+                <option value="Soporte lumbar" />
+                <option value="Reposacabezas" />
+              </datalist>
+              <p v-if="!camposSilla.length" class="extras-empty">
+                No hay características adicionales. Puedes añadirlas cuando sean necesarias.
+              </p>
               <Button type="button" variant="secondary" class="add-extra" @click="agregarCampoSilla"
                 >+ Añadir característica</Button
               >
-            </div>
-            <div class="advanced">
-              <button
-                class="advanced-toggle"
-                type="button"
-                :aria-expanded="advancedOpen"
-                @click="advancedOpen = !advancedOpen"
-              >
-                <Settings2 :size="16" aria-hidden="true" /> Opciones avanzadas
-                <span aria-hidden="true">{{ advancedOpen ? '−' : '+' }}</span>
-              </button>
-              <div v-if="advancedOpen" class="advanced-content">
-                <p class="muted">
-                  Para especificaciones estructuradas complejas. Se conservan las propiedades
-                  existentes.
-                </p>
-                <label v-if="modoJson" class="json-label"
-                  >Especificaciones avanzadas JSON
-                  <textarea
-                    v-model="form.especificaciones"
-                    rows="6"
-                    aria-label="Especificaciones avanzadas JSON"
-                    placeholder="{}"
-                  />
-                </label>
-                <Button type="button" variant="secondary" @click="editarJsonAvanzado">
-                  {{ modoJson ? 'Volver al formulario guiado' : 'Edición avanzada JSON' }}
-                </Button>
-              </div>
             </div>
             <p
               v-if="fieldError('silla') || fieldError('silla.especificaciones')"
@@ -754,14 +735,14 @@ onMounted(load)
             <Tag :size="20" aria-hidden="true" />
             <div>
               <h3 id="price-title">Precio y promociones</h3>
-              <p>Define el importe de lista y, si corresponde, una oferta temporal.</p>
+              <p>Establece el precio normal de venta y, opcionalmente, una promoción.</p>
             </div>
           </div>
           <div class="price-field">
             <TextField
               v-model="form.precio_lista"
               name="precio"
-              label="Precio de lista (BOB) *"
+              label="Precio normal de venta (Bs) *"
               type="number"
               min="0"
               step="0.01"
@@ -773,21 +754,17 @@ onMounted(load)
             <label class="toggle-row">
               <span class="toggle-copy"
                 ><strong>Configurar promoción</strong>
-                <small>Ofrece un precio especial sin cambiar el de lista.</small></span
+                <small>Ofrece un precio temporal sin cambiar el precio normal de venta.</small></span
               >
               <input v-model="form.promo_activa" type="checkbox" class="switch-input" />
               <span class="switch-ui" aria-hidden="true" />
             </label>
             <div v-if="form.promo_activa" class="promotion-fields">
+              <p class="promotion-base">
+                Precio de referencia: <strong>{{ money(form.precio_lista) }}</strong>
+                (precio normal de venta).
+              </p>
               <div class="fields-grid">
-                <TextField
-                  v-model="form.precio_antes"
-                  name="antes"
-                  label="Precio anterior (Bs)"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                />
                 <TextField
                   v-model="form.precio_ahora"
                   name="ahora"
@@ -814,12 +791,12 @@ onMounted(load)
               </p>
               <div v-if="discountPercent !== null" class="discount-preview">
                 <strong>{{ discountPercent }} % de descuento</strong>
-                <span>{{ money(form.precio_antes) }} → {{ money(form.precio_ahora) }}</span>
+                <span>{{ money(form.precio_lista) }} → {{ money(form.precio_ahora) }}</span>
               </div>
               <label class="toggle-row">
                 <span class="toggle-copy"
                   ><strong>Promoción activa</strong>
-                  <small>El backend determina cuándo está vigente según las fechas.</small></span
+                  <small>La promoción se aplica solo si está habilitada y dentro del período indicado.</small></span
                 >
                 <input v-model="form.promo_enabled" type="checkbox" class="switch-input" />
                 <span class="switch-ui" aria-hidden="true" />
@@ -1136,43 +1113,25 @@ textarea {
   place-items: center;
   background: transparent;
   color: var(--color-danger-text);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-danger);
   border-radius: var(--radius-control);
   cursor: pointer;
 }
+.icon-remove:hover,
+.icon-remove:focus-visible {
+  background: var(--color-danger-soft);
+}
+.extras-empty {
+  color: var(--color-text-secondary);
+  font-size: 0.83rem;
+}
+.promotion-base {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--color-text-secondary);
+}
 .add-extra {
   justify-self: start;
-}
-.advanced {
-  margin-top: var(--space-4);
-}
-.advanced-toggle {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.3rem 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  font-weight: 600;
-}
-.advanced-toggle span {
-  margin-left: 0.4rem;
-}
-.advanced-content {
-  display: grid;
-  gap: var(--space-3);
-  margin-top: var(--space-3);
-}
-.advanced-content p {
-  margin: 0;
-  font-size: 0.85rem;
-}
-.json-label {
-  display: grid;
-  gap: var(--space-2);
-  font-weight: 600;
 }
 .price-field {
   max-width: 22rem;
@@ -1375,7 +1334,7 @@ textarea {
 .voice-drawer {
   display: flex;
   flex-direction: column;
-  width: min(34rem, 100%);
+  width: min(44rem, 100%);
   height: 100dvh;
   overflow-y: auto;
   background: var(--color-surface-raised);
