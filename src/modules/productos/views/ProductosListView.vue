@@ -1,7 +1,17 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ChevronDown, Eye, EyeOff, LayoutGrid, List, Plus, SlidersHorizontal } from '@lucide/vue'
+import {
+  Armchair,
+  ChevronDown,
+  Eye,
+  EyeOff,
+  LayoutGrid,
+  Layers,
+  List,
+  Package,
+  SlidersHorizontal,
+} from '@lucide/vue'
 import type { FamiliaProducto, Producto, ValorCatalogoPublico } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { proformasService } from '@/modules/proformas/services/proformasService'
@@ -50,9 +60,6 @@ const advancedLoading = ref(false)
 const advancedLoaded = ref(false)
 const advancedError = ref('')
 const showAdvanced = ref(false)
-const showCreate = ref(false)
-const createRoot = ref<HTMLElement | null>(null)
-const createFirst = ref<HTMLButtonElement | null>(null)
 
 const routeString = (key: string): string =>
   typeof route.query[key] === 'string' ? String(route.query[key]) : ''
@@ -374,29 +381,9 @@ function toggleAdvanced() {
   showAdvanced.value = !showAdvanced.value
   if (showAdvanced.value) void loadAdvanced()
 }
-function closeCreate() {
-  showCreate.value = false
-}
-async function toggleCreate() {
-  showCreate.value = !showCreate.value
-  if (showCreate.value) {
-    if (categoryError.value) void loadCategories()
-    await nextTick()
-    createFirst.value?.focus({ preventScroll: true })
-  }
-}
-function createProduct(code: string) {
-  closeCreate()
+function createProduct(code: 'SILLA' | 'PISO_FLOTANTE' | 'OTRO') {
+  if (!canCreate.value) return
   void router.push({ path: '/productos/nuevo', query: { categoria: code } })
-}
-function onDocumentPointer(event: PointerEvent) {
-  if (showCreate.value && !createRoot.value?.contains(event.target as Node)) closeCreate()
-}
-function onDocumentKey(event: KeyboardEvent) {
-  if (event.key === 'Escape' && showCreate.value) {
-    closeCreate()
-    createRoot.value?.querySelector<HTMLButtonElement>('.create-trigger')?.focus()
-  }
 }
 function restoreFilters() {
   restoring = true
@@ -435,8 +422,6 @@ watch(
 )
 onMounted(() => {
   mounted = true
-  document.addEventListener('pointerdown', onDocumentPointer)
-  document.addEventListener('keydown', onDocumentKey)
   void load()
   void loadCategories()
   if (showAdvanced.value) void loadAdvanced()
@@ -445,8 +430,6 @@ onBeforeUnmount(() => {
   mounted = false
   ++requestId
   if (debounce) clearTimeout(debounce)
-  document.removeEventListener('pointerdown', onDocumentPointer)
-  document.removeEventListener('keydown', onDocumentKey)
 })
 </script>
 
@@ -459,46 +442,21 @@ onBeforeUnmount(() => {
       @menu="emit('openMenu')"
     >
       <template #actions>
-        <div v-if="canCreate" ref="createRoot" class="create-root">
-          <Button
-            class="create-trigger"
-            :aria-expanded="showCreate"
-            aria-controls="productos-create-options"
-            @click="toggleCreate"
-            ><Plus :size="18" aria-hidden="true" />Nuevo producto</Button
-          >
-          <div
-            v-if="showCreate"
-            id="productos-create-options"
-            class="create-options"
-            role="group"
-            aria-label="Elegir categoría del nuevo producto"
-          >
-            <p>¿Qué producto deseas registrar?</p>
-            <template v-if="categories.length">
-              <button
-                v-for="(item, index) in categories"
-                :key="item.id"
-                :ref="
-                  (element) => {
-                    if (index === 0) createFirst = element as HTMLButtonElement | null
-                  }
-                "
-                type="button"
-                @click="createProduct(item.codigo)"
-              >
-                {{ item.nombre }}
-              </button>
-            </template>
-            <p v-else class="muted">
-              {{
-                categoryLoading
-                  ? 'Cargando categorías…'
-                  : categoryError || 'No hay categorías disponibles.'
-              }}
-            </p>
-            <button v-if="categoryError" type="button" @click="loadCategories">Reintentar</button>
-          </div>
+        <div
+          v-if="canCreate"
+          class="create-shortcuts"
+          role="group"
+          aria-label="Crear producto por categoría"
+        >
+          <Button variant="secondary" @click="createProduct('SILLA')">
+            <Armchair :size="18" aria-hidden="true" /> Silla
+          </Button>
+          <Button variant="secondary" @click="createProduct('PISO_FLOTANTE')">
+            <Layers :size="18" aria-hidden="true" /> Piso
+          </Button>
+          <Button variant="secondary" @click="createProduct('OTRO')">
+            <Package :size="18" aria-hidden="true" /> Otro
+          </Button>
         </div>
       </template>
     </PageHeader>
@@ -688,9 +646,7 @@ onBeforeUnmount(() => {
       <Button v-else-if="status === 'activos'" variant="secondary" @click="status = 'todos'"
         >Ver todos los productos</Button
       >
-      <Button v-else-if="canCreate" variant="secondary" @click="toggleCreate"
-        >Nuevo producto</Button
-      >
+      <p v-else-if="canCreate">Utiliza Silla, Piso u Otro para registrar el primer producto.</p>
     </EmptyState>
     <template v-else>
       <div v-if="view === 'grid'" class="product-grid">
@@ -834,43 +790,33 @@ onBeforeUnmount(() => {
 .productos-bandeja {
   min-width: 0;
 }
-.create-root {
-  position: relative;
+.create-shortcuts {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  align-items: center;
 }
-.create-options {
-  position: absolute;
-  z-index: 15;
-  right: 0;
-  top: calc(100% + 0.5rem);
-  display: grid;
-  gap: 0.3rem;
-  width: min(20rem, calc(100vw - 2rem));
-  padding: 0.6rem;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
-  box-shadow: 0 12px 32px #0004;
-}
-.create-options p {
-  margin: 0.3rem 0.5rem 0.5rem;
-  font-size: 0.84rem;
-}
-.create-options button {
+.create-shortcuts :deep(.button) {
+  min-width: 6.5rem;
   min-height: 2.75rem;
-  padding: 0.6rem 0.75rem;
-  text-align: left;
-  background: transparent;
-  color: var(--color-text);
-  border: 0;
-  border-radius: var(--radius-control);
-  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  white-space: nowrap;
 }
-.create-options button:hover,
-.create-options button:focus-visible {
-  background: var(--color-surface-hover);
+.create-shortcuts :deep(.button svg) {
+  color: var(--color-primary-accent);
 }
-.create-options .muted {
-  color: var(--color-text-secondary);
+@media (max-width: 38rem) {
+  .create-shortcuts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+  .create-shortcuts :deep(.button) {
+    min-width: 0;
+  }
 }
 .product-toolbar,
 .results-header {

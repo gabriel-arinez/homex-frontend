@@ -3,6 +3,7 @@ import { computed, watch } from 'vue'
 import { Mic, Square, X, RotateCcw } from '@lucide/vue'
 import Button from '@/shared/ui/Button.vue'
 import { useAudioRecorder } from '../composables/useAudioRecorder'
+const props = withDefaults(defineProps<{ compact?: boolean }>(), { compact: false })
 const emit = defineEmits<{ ready: [blob: Blob | null] }>()
 const r = useAudioRecorder(),
   time = computed(
@@ -13,8 +14,14 @@ watch(r.blob, (value) => emit('ready', value))
 async function start() {
   await r.start()
   emit('ready', null)
+  return r.state.value === 'RECORDING'
 }
-defineExpose({ startRecording: start })
+defineExpose({
+  startRecording: start,
+  stopRecording: () => r.stop(),
+  cancelRecording: () => r.cancel(),
+  getError: () => r.error.value,
+})
 function stop() {
   r.stop()
 }
@@ -45,7 +52,7 @@ function cancel() {
       Audio listo. Se enviará para su interpretación.
     </p>
     <p v-if="r.error.value" role="alert" class="error">{{ r.error.value }}</p>
-    <div class="actions">
+    <div v-if="!props.compact" class="actions">
       <Button
         v-if="['IDLE', 'DENIED', 'ERROR', 'UNSUPPORTED'].includes(r.state.value)"
         :disabled="!r.supported.value"

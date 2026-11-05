@@ -68,6 +68,95 @@ describe('Formulario comercial de productos', () => {
     expect(w.emitted('save')).toBeUndefined()
     w.unmount()
   })
+  it('oculta JSON al vendedor y conserva el precio base al activar una promoción', async () => {
+    catalog()
+    const w = mount(ProductoForm, {
+      props: { preselectCategory: 'SILLA' },
+      global: { stubs: { CapturaCatalogo: true } },
+    })
+    await flushPromises()
+    expect(w.text()).not.toContain('Especificaciones avanzadas JSON')
+    expect(w.text()).not.toContain('Opciones avanzadas')
+    expect(w.text()).toContain('Características adicionales de la silla')
+    await w.get('input[name="nombre"]').setValue('Silla con descuento')
+    await w.get('input[name="sku"]').setValue('SIL-PROMO-TEST')
+    await w.get('input[name="precio"]').setValue('120')
+    await w.get('.promotion input[type="checkbox"]').setValue(true)
+    await w.get('input[name="ahora"]').setValue('90')
+    await w.get('form').trigger('submit')
+    const result = w.emitted('save')?.[0]?.[0] as {
+      promocion?: { precio_antes: string; precio_ahora: string }
+    }
+    expect(result.promocion).toMatchObject({ precio_antes: '120', precio_ahora: '90' })
+    w.unmount()
+  })
+
+  it('conserva propiedades complejas al editar características guiadas', async () => {
+    catalog()
+    const initial = {
+      id: 81,
+      categoria: 1,
+      unidad_stock: 4,
+      nombre: 'Silla existente',
+      sku: 'SIL-81',
+      precio_lista: '150.00',
+      silla: {
+        especificaciones: {
+          Apoyabrazos: 'Fijos',
+          estructura: { material: 'Acero', uniones: ['A', 'B'] },
+        },
+      },
+    } as unknown as Producto
+    const w = mount(ProductoForm, {
+      props: { initial },
+      global: { stubs: { CapturaCatalogo: true } },
+    })
+    await flushPromises()
+    expect(w.text()).not.toContain('JSON')
+    await w.get('input[aria-label="Valor 1"]').setValue('Ajustables')
+    await w.get('form').trigger('submit')
+    const result = w.emitted('save')?.[0]?.[0] as {
+      silla: { especificaciones: Record<string, unknown> }
+    }
+    expect(result.silla.especificaciones).toEqual({
+      Apoyabrazos: 'Ajustables',
+      estructura: { material: 'Acero', uniones: ['A', 'B'] },
+    })
+    w.unmount()
+  })
+
+  it('no modifica referencias promocionales históricas al cambiar otra información', async () => {
+    catalog()
+    const initial = {
+      id: 94,
+      categoria: 3,
+      unidad_stock: 4,
+      nombre: 'Accesorio existente',
+      sku: 'OTR-94',
+      precio_lista: '100.00',
+      activo: true,
+      promocion: {
+        precio_antes: '130.00',
+        precio_ahora: '80.00',
+        fecha_inicio: null,
+        fecha_fin: null,
+        activo: true,
+      },
+    } as unknown as Producto
+    const w = mount(ProductoForm, {
+      props: { initial },
+      global: { stubs: { CapturaCatalogo: true } },
+    })
+    await flushPromises()
+    expect(w.text()).toContain('precio anterior histórico')
+    await w.get('input[name="nombre"]').setValue('Accesorio editado')
+    await w.get('form').trigger('submit')
+    const body = w.emitted('save')?.[0]?.[0] as Record<string, unknown>
+    expect(body.nombre).toBe('Accesorio editado')
+    expect(body).not.toHaveProperty('promocion')
+    w.unmount()
+  })
+
   it('en edición comercial muestra la galería sin permitir acciones inmediatas', async () => {
     catalog()
     const initial = {

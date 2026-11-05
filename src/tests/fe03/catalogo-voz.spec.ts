@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, h } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import CapturaCatalogo from '@/modules/productos/components/CapturaCatalogo.vue'
 import ProductoForm from '@/modules/productos/components/ProductoForm.vue'
@@ -44,7 +45,6 @@ describe('Voz en creación de catálogo', () => {
       const input = w.get('input[type="file"]')
       Object.defineProperty(input.element, 'files', { value: [file] })
       await input.trigger('change')
-      await button(w, 'Procesar audio').trigger('click')
       await flushPromises()
       expect(catalogoCapturaService.create).toHaveBeenCalledWith(
         expect.objectContaining({ categoria: category, audio: file }),
@@ -65,6 +65,37 @@ describe('Voz en creación de catálogo', () => {
       w.unmount()
     },
   )
+  it('detener la grabación lanza la transcripción automáticamente sin pasos extra', async () => {
+    mockResult('SILLA')
+    const audioRecorder = defineComponent({
+      emits: ['ready'],
+      setup(_, { emit, expose }) {
+        expose({
+          startRecording: async () => true,
+          stopRecording: () => emit('ready', new Blob(['audio'], { type: 'audio/webm' })),
+          getError: () => '',
+        })
+        return () => h('div', { class: 'fake-recorder' })
+      },
+    })
+    const w = mount(CapturaCatalogo, {
+      props: { categoria: 'SILLA' },
+      global: { stubs: { AudioRecorder: audioRecorder } },
+    })
+    await w.get('.source-record').trigger('click')
+    await flushPromises()
+    expect(w.text()).toContain('Detener grabación')
+    await w.get('.source-record').trigger('click')
+    await flushPromises()
+    expect(catalogoCapturaService.create).toHaveBeenCalledTimes(1)
+    expect(catalogoCapturaService.create).toHaveBeenCalledWith(
+      expect.objectContaining({ categoria: 'SILLA', audio: expect.any(Blob) }),
+      expect.anything(),
+    )
+    expect(w.text()).toContain('Campos detectados')
+    w.unmount()
+  })
+
   it('conserva transcripción cuando no hay propuesta y permite corregir', async () => {
     mockResult('OTRO')
     vi.mocked(catalogoCapturaService.get).mockResolvedValue({
