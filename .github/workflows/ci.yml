@@ -10,6 +10,10 @@ on:
         required: false
         type: string
 
+concurrency:
+  group: homex-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 permissions:
   contents: read
 
@@ -53,6 +57,11 @@ jobs:
         with: { node-version: 24.18.1, cache: npm }
       - run: npm ci
       - run: npm run format:check
+      - name: Diagnostic temporaire de Prettier pour cierre UX
+        if: always()
+        run: |
+          npx prettier --write src/modules/capturas src/modules/productos src/modules/proformas src/shared/media/ImageGallery.vue src/shared/ui/ConfirmDialog.vue src/tests/fe03 src/tests/fe06 src/tests/prf04 src/tests/e2e/fe04-proformas.spec.ts src/tests/ap5/catalogo-proformas.spec.ts docs/catalogo-voz.md
+          git diff --no-ext-diff --no-color -- src/modules src/shared/media/ImageGallery.vue src/shared/ui/ConfirmDialog.vue src/tests/fe03 src/tests/fe06 src/tests/prf04 src/tests/e2e/fe04-proformas.spec.ts src/tests/ap5/catalogo-proformas.spec.ts docs/catalogo-voz.md
 
   unit-component:
     runs-on: ubuntu-latest
