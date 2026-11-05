@@ -444,17 +444,6 @@ onBeforeUnmount(() => {
           </Button>
         </div>
       </template>
-            <p v-else class="muted">
-              {{
-                categoryLoading
-                  ? 'Cargando categorías…'
-                  : categoryError || 'No hay categorías disponibles.'
-              }}
-            </p>
-            <button v-if="categoryError" type="button" @click="loadCategories">Reintentar</button>
-          </div>
-        </div>
-      </template>
     </PageHeader>
 
     <div class="product-toolbar">
