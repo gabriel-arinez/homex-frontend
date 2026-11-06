@@ -370,6 +370,32 @@ async function upload(event: Event) {
   gap: var(--space-5);
   padding: var(--space-5);
 }
+/* Las propuestas detectadas conservan su presentación anterior. */
+.results {
+  display: grid;
+  gap: var(--space-3);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border);
+}
+.block-title {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.block-title > svg {
+  flex: 0 0 auto;
+  color: var(--color-primary);
+}
+.block-title h2 {
+  margin: 0;
+  font-size: 1.06rem;
+}
+.block-title p {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
 .visually-hidden {
   position: absolute;
   width: 1px;
