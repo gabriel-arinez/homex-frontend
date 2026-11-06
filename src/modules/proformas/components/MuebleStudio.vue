@@ -83,6 +83,10 @@ function requestCloseStudio() {
   }
   emit('cancel')
 }
+function confirmCloseStudio() {
+  leaveVoiceConfirm.value = false
+  emit('cancel')
+}
 const voicePanel = ref<HTMLElement | null>(null)
 const voiceActive = ref(false)
 const voiceProcessing = ref(false)
@@ -534,10 +538,7 @@ async function seleccionarApartado(id: typeof seccion.value) {
       description="Hay una grabación activa. Si vuelves a la proforma perderás el audio que todavía no finalizaste."
       confirm-label="Descartar grabación y volver"
       @close="leaveVoiceConfirm = false"
-      @confirm="
-        leaveVoiceConfirm = false
-        emit('cancel')
-      "
+      @confirm="confirmCloseStudio"
     />
   </section>
 </template>
