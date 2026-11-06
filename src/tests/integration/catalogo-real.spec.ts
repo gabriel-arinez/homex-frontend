@@ -82,15 +82,10 @@ for (const [category, file] of samples) {
             return { count, stocks: stocks.sort((a, b) => a[0] - b[0]) }
           }
           const before = await readInventory()
-          // El selector de categoría se abrió desde la bandeja; ya no es un combobox.
-          await page.getByRole('button', { name: 'Nuevo producto', exact: true }).click()
-          const labels = {
-            SILLA: 'Silla',
-            PISO_FLOTANTE: 'Piso flotante',
-            OTRO: 'Otro producto',
-          }
+          // Las acciones de creación ya son botones directos, sin menú intermedio.
+          const labels = { SILLA: 'Silla', PISO_FLOTANTE: 'Piso', OTRO: 'Otro' }
           await page
-            .getByRole('group', { name: 'Elegir categoría del nuevo producto' })
+            .getByRole('group', { name: 'Crear producto por categoría' })
             .getByRole('button', { name: labels[category], exact: true })
             .click()
           await expect(page).toHaveURL(new RegExp(`/productos/nuevo\\?categoria=${category}`))
@@ -100,26 +95,30 @@ for (const [category, file] of samples) {
           await expect(
             assistant.getByRole('heading', { name: 'Descripción por voz' }),
           ).toBeVisible()
+
+          // La carga/grabación inicia la interpretación automáticamente: escuchar antes
+          // del evento para no perder una respuesta de ASR ya completada.
+          const completed = page.waitForResponse(
+            async (response) => {
+              if (
+                !response.url().includes('/capturas/catalogo/') ||
+                response.request().method() !== 'GET' ||
+                response.status() !== 200
+              ) return false
+              return (await response.json()).estado === 'COMPLETADA'
+            },
+            { timeout: 150_000 },
+          )
           if (mode === 'upload') {
-            await page
-              .getByLabel('O subir un archivo de audio', { exact: true })
-              .setInputFiles(join(directory!, file + '.wav'))
+            const chooser = page.waitForEvent('filechooser')
+            await assistant.getByRole('button', { name: 'Seleccionar archivo' }).click()
+            await (await chooser).setFiles(join(directory!, file + '.wav'))
           } else {
-            await page.getByRole('button', { name: 'Grabar descripción', exact: true }).click()
-            await expect(page.getByRole('status').filter({ hasText: 'Grabando' })).toBeVisible()
+            await assistant.getByRole('button', { name: 'Grabar descripción' }).click()
+            await expect(assistant.getByRole('status').filter({ hasText: 'Grabando' })).toBeVisible()
             await page.waitForTimeout(16000)
-            await page.getByRole('button', { name: 'Detener', exact: true }).click()
+            await assistant.getByRole('button', { name: 'Finalizar grabación' }).click()
           }
-          const completed = page.waitForResponse(async (response) => {
-            if (
-              !response.url().includes('/capturas/catalogo/') ||
-              response.request().method() !== 'GET' ||
-              response.status() !== 200
-            )
-              return false
-            return (await response.json()).estado === 'COMPLETADA'
-          })
-          await page.getByRole('button', { name: 'Procesar audio', exact: true }).click()
           const proposal = (await (await completed).json()) as ResultadoCatalogo
           await expect(page.getByRole('heading', { name: 'Campos detectados' })).toBeVisible()
           const text = page.getByRole('textbox', { name: 'Transcripción / texto corregido' })
@@ -131,7 +130,7 @@ for (const [category, file] of samples) {
           const fields = proposal.propuesta!.fields
           const controls = {
             nombre: 'Nombre comercial *',
-            precio_lista: 'Precio de lista (BOB) *',
+            precio_lista: 'Precio normal de venta (Bs) *',
             unidad_stock: 'Unidad comercial *',
             observaciones: 'Notas del producto (opcional)',
             modelo: 'Modelo',
@@ -184,7 +183,7 @@ for (const [category, file] of samples) {
             .fill(`VOICE-${category}-${mode}-${Date.now()}`)
           const name = page.getByLabel('Nombre comercial *', { exact: true })
           if (!(await name.inputValue())) await name.fill(`Prueba voz ${category}`)
-          await page.getByLabel('Precio de lista (BOB) *', { exact: true }).fill('100')
+          await page.getByLabel('Precio normal de venta (Bs) *', { exact: true }).fill('100')
           const savedResponse = page.waitForResponse(
             (r) =>
               r.request().method() === 'POST' &&
