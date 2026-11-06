@@ -61,7 +61,7 @@ useFocusTrap(
   z-index: 140;
 }
 .modal {
-  width: min(36rem, 100%);
+  width: min(44rem, 100%);
   max-height: calc(100dvh - 2rem);
   overflow: auto;
   border: 1px solid var(--color-border);

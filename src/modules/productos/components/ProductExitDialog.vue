@@ -51,19 +51,21 @@ const titleId = useId()
         <Button variant="secondary" :disabled="saving" @click="emit('stay')">
           <ArrowLeft :size="17" aria-hidden="true" /> Seguir editando
         </Button>
-        <Button
-          variant="secondary"
-          class="exit-discard"
-          :disabled="saving"
-          @click="emit('discard')"
-        >
-          <LogOut :size="17" aria-hidden="true" />
-          {{ existingProductId ? 'Ir a la ficha' : 'Descartar y salir' }}
-        </Button>
-        <Button class="exit-save" :processing="saving" @click="emit('save')">
-          <Save :size="17" aria-hidden="true" />
-          {{ existingProductId ? 'Completar y salir' : 'Guardar producto y salir' }}
-        </Button>
+        <div class="exit-actions__decisions">
+          <Button
+            variant="danger"
+            class="exit-discard"
+            :disabled="saving"
+            @click="emit('discard')"
+          >
+            <LogOut :size="17" aria-hidden="true" />
+            {{ existingProductId ? 'Ir a la ficha' : 'Descartar y salir' }}
+          </Button>
+          <Button variant="success" class="exit-save" :processing="saving" @click="emit('save')">
+            <Save :size="17" aria-hidden="true" />
+            {{ existingProductId ? 'Completar y salir' : 'Guardar producto y salir' }}
+          </Button>
+        </div>
       </div>
     </template>
   </Modal>
@@ -108,10 +110,17 @@ const titleId = useId()
 }
 .exit-actions {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
   flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--space-2);
+  gap: var(--space-3);
   width: 100%;
+}
+.exit-actions__decisions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
 }
 .exit-actions :deep(.button) {
   min-height: 2.75rem;
@@ -120,17 +129,11 @@ const titleId = useId()
   justify-content: center;
   gap: 0.4rem;
 }
-.exit-actions :deep(.exit-discard) {
-  border-color: var(--color-danger);
-  color: var(--color-danger-text);
-}
-.exit-actions :deep(.exit-discard:hover:not(:disabled)) {
-  background: var(--color-danger-soft);
-}
 @media (max-width: 40rem) {
-  .exit-actions {
-    display: grid;
-    grid-template-columns: 1fr;
+  .exit-actions,
+  .exit-actions__decisions {
+    flex-direction: column;
+    width: 100%;
   }
   .exit-actions :deep(.button) {
     width: 100%;

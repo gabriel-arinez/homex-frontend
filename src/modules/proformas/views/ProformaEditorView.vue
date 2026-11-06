@@ -44,6 +44,7 @@ import {
   Trash2,
   Wrench,
   Save,
+  Send,
 } from '@lucide/vue'
 import Button from '@/shared/ui/Button.vue'
 import Card from '@/shared/ui/Card.vue'
@@ -2011,7 +2012,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             </div>
             <div class="editor-actions__operations">
               <Button
-                variant="secondary"
+                variant="success"
                 class="editor-save-draft"
                 :processing="saving"
                 @click="persist(false)"
@@ -2021,11 +2022,14 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               </Button>
               <Button
                 v-if="!isReview"
+                variant="info"
                 :disabled="!canEmit"
                 :processing="saving"
                 @click="requestReview"
-                >Enviar a revisión</Button
               >
+                <Send :size="17" aria-hidden="true" />
+                Enviar a revisión
+              </Button>
               <Button
                 v-if="persisted"
                 variant="secondary"
@@ -3409,14 +3413,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   }
 }
 .editor-actions :deep(.button.editor-save-draft) {
-  color: var(--color-primary-accent);
-  background: var(--color-primary-soft);
-  border-color: var(--color-primary);
   box-shadow: none;
-}
-.editor-actions :deep(.button.editor-save-draft:hover:not(:disabled)) {
-  background: var(--color-surface-hover);
-  border-color: var(--color-primary);
 }
 .line-heading {
   display: flex;

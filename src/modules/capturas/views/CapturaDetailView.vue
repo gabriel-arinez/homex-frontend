@@ -4,6 +4,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import type { CapturaRevision, ConfirmarCaptura, ValorCatalogoPublico } from '@/generated/api'
 import { capturasService } from '../services/capturasService'
 import { proformasService } from '@/modules/proformas/services/proformasService'
+import { Check } from '@lucide/vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
 import Card from '@/shared/ui/Card.vue'
 import Button from '@/shared/ui/Button.vue'
@@ -343,14 +344,16 @@ onBeforeUnmount(() => {
                 v-model="form.descripcion"
                 label="Descripción comercial"
                 name="descripcion"
-              /><Button type="submit" :disabled="processing || !canConfirm"
-                >Revisar y confirmar</Button
-              >
+              /><Button variant="success" type="submit" :disabled="processing || !canConfirm">
+                <Check :size="17" aria-hidden="true" />
+                Revisar y confirmar
+              </Button>
             </form></Card
           >
         </div></template
       ><ConfirmDialog
         :open="confirmOpen"
+        variant="success"
         title="Confirmar corrección humana"
         description="Se incorporará una línea a la proforma. Esta acción no aprueba la proforma y no puede repetirse."
         confirm-label="Confirmar revisión"

@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import type { Pedido, ValorCatalogoPublico } from '@/generated/api'
 import { pedidosService } from '../services/pedidosService'
+import { FileText, Send, Check } from '@lucide/vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
 import Card from '@/shared/ui/Card.vue'
 import Button from '@/shared/ui/Button.vue'
@@ -158,14 +159,22 @@ onMounted(load)
           <div class="actions">
             <Button
               v-if="currentCode === 'CONFIRMADO'"
+              variant="info"
               :disabled="processing"
               @click="receiptOpen = true"
-              >Emitir recibo</Button
+            >
+              <FileText :size="17" aria-hidden="true" />
+              Emitir recibo
+            </Button
             ><Button
               v-if="currentCode === 'LISTO_ENTREGA'"
+              variant="info"
               :disabled="processing"
               @click="noteOpen = true"
-              >Emitir nota de entrega</Button
+            >
+              <Send :size="17" aria-hidden="true" />
+              Emitir nota de entrega
+            </Button
             ><Button
               v-if="!['CANCELADO', 'ENTREGADO'].includes(currentCode)"
               variant="danger"
@@ -225,9 +234,10 @@ onMounted(load)
       </form>
       <template #footer
         ><Button variant="secondary" @click="receiptOpen = false">Volver</Button
-        ><Button type="submit" form="receipt" :disabled="processing || !form.tipo_pago"
-          >Emitir</Button
-        ></template
+        ><Button variant="info" type="submit" form="receipt" :disabled="processing || !form.tipo_pago">
+          <Send :size="17" aria-hidden="true" />
+          Emitir
+        </Button></template
       ></Modal
     ><ConfirmDialog
       :open="cancelOpen"
@@ -239,6 +249,7 @@ onMounted(load)
       @confirm="cancel"
     /><ConfirmDialog
       :open="noteOpen"
+      variant="info"
       title="Emitir nota de entrega"
       description="Se creará la única nota del pedido con la fecha actual de emisión."
       confirm-label="Emitir nota"

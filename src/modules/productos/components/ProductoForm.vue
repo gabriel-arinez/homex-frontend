@@ -931,6 +931,7 @@ onMounted(load)
           >Cancelar</Button
         >
         <Button
+          variant="success"
           type="submit"
           :processing="processing"
           processing-label="Guardando producto…"

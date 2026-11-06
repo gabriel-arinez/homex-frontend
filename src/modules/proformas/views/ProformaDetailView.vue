@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, ClipboardCheck, Download, FileText, Pencil, Paperclip } from '@lucide/vue'
+import { ArrowLeft, Check, ClipboardCheck, Download, FileText, Pencil, Paperclip } from '@lucide/vue'
 import type { DetalleProforma, Proforma } from '@/generated/api'
 import { ApiError } from '@/shared/api'
 import { downloadBlob } from '@/shared/download/downloadBlob'
@@ -202,10 +202,13 @@ onMounted(() => void load())
         </Button>
         <Button
           v-if="inReview"
+          variant="success"
           :disabled="processing || !canApprove"
           @click="confirmAction = 'approve'"
-          >Aprobar y crear pedido</Button
         >
+          <Check :size="17" aria-hidden="true" />
+          Aprobar y crear pedido
+        </Button>
         <Button
           v-if="inReview"
           variant="secondary"
@@ -402,6 +405,7 @@ onMounted(() => void load())
 
     <ConfirmDialog
       :open="Boolean(confirmAction)"
+      :variant="confirmAction === 'approve' ? 'success' : confirmAction === 'not-completed' ? 'danger' : 'info'"
       :title="
         confirmAction === 'approve'
           ? 'Aprobar y crear pedido'

@@ -14,7 +14,7 @@ import TextField from '@/shared/ui/TextField.vue'
 import TextAreaField from '@/shared/ui/TextAreaField.vue'
 import Toast from '@/shared/ui/Toast.vue'
 import MuebleOptionPicker from './MuebleOptionPicker.vue'
-import { Pencil, AlertCircle, CheckCircle2, Layers3, Plus } from '@lucide/vue'
+import { Pencil, AlertCircle, CheckCircle2, Layers3, Plus, Save } from '@lucide/vue'
 import { asignarEspesorPendiente, pendienteResuelto } from '../services/pendientesAsistencia'
 import { proformasService } from '../services/proformasService'
 import {
@@ -1881,9 +1881,10 @@ onMounted(loadCatalog)
     </div>
     <p v-if="error || externalError" role="alert">{{ error || externalError }}</p>
     <div v-if="!studio || activeSection === 'revision'" class="actions review-actions">
-      <Button type="submit" :disabled="processing">{{
-        studio ? 'Agregar mueble a la proforma' : 'Guardar especificación'
-      }}</Button>
+      <Button variant="success" type="submit" :disabled="processing">
+        <Save :size="17" aria-hidden="true" />
+        {{ studio ? 'Agregar mueble a la proforma' : 'Guardar especificación' }}
+      </Button>
       <Button v-if="!studio" variant="secondary" @click="emit('cancel')">Cancelar</Button>
     </div>
   </form>
