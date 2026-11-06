@@ -32,7 +32,8 @@ describe('Furniture Studio: consentimiento antes de aplicar propuesta PRF04', ()
       expect(wrapper.text()).toContain('Revisar transcripción')
       expect(wrapper.text()).toContain('Corrige las palabras o códigos antes de aplicar los datos.')
       const transcript = wrapper.get('textarea#transcripcion-corregida')
-      expect((transcript.element as HTMLTextAreaElement).value).toBe('')
+      const textArea = transcript.element as HTMLTextAreaElement
+      expect(textArea.value).toBe('')
       expect(wrapper.get('label[for="transcripcion-corregida"]').text()).toBe(
         'Transcripción / texto corregido',
       )
@@ -59,9 +60,7 @@ describe('Furniture Studio: consentimiento antes de aplicar propuesta PRF04', ()
       expect(wrapper.emitted('proposed')).toHaveLength(1)
       expect(wrapper.emitted('applied')).toBeUndefined()
       expect(wrapper.text()).toContain(captura24.texto_transcrito_original)
-      expect((wrapper.get('textarea#transcripcion-corregida').element as HTMLTextAreaElement).value).toBe(
-        captura24.texto_transcrito_original,
-      )
+      expect(textArea.value).toBe(captura24.texto_transcrito_original)
       expect(wrapper.find('details.voice-original').exists()).toBe(true)
     } finally {
       wrapper.unmount()
