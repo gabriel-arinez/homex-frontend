@@ -1069,6 +1069,9 @@ for (const width of [360, 768, 1440]) {
     })
     await unit.selectOption('cm')
     await page.getByLabel('ancho', { exact: true }).fill('125')
+    // El asistente persiste minimizado tras aplicar la propuesta: abrirlo para revisar el ASR.
+    await page.getByRole('button', { name: 'Completar por voz' }).click()
+    await expect(page.getByRole('dialog', { name: 'Completar mueble por voz' })).toBeVisible()
     await page.getByText('Ver transcripción original', { exact: true }).click()
     await expect(
       page.locator('details').filter({ hasText: 'Ver transcripción original' }),
@@ -1087,8 +1090,14 @@ for (const width of [360, 768, 1440]) {
       await expect(
         page.getByRole('alert').filter({ hasText: 'No se obtuvo una propuesta utilizable' }),
       ).toBeVisible()
+      await expect(
+        page.locator('details').filter({ hasText: 'Ver transcripción original' }),
+      ).toContainText(captura24.texto_transcrito_original!)
+      await page.getByRole('button', { name: 'Minimizar asistente de voz' }).click()
       await expect(page.getByLabel('ancho', { exact: true })).toHaveValue('125')
       await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Escritorio')
+      // Minimizar no destruye la transcripción ni los resultados terminales.
+      await page.getByRole('button', { name: 'Completar por voz' }).click()
       await expect(
         page.locator('details').filter({ hasText: 'Ver transcripción original' }),
       ).toContainText(captura24.texto_transcrito_original!)
