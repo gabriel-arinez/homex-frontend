@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw'
 import { describe, expect, it, vi } from 'vitest'
 import ProformaEditorView from '@/modules/proformas/views/ProformaEditorView.vue'
 import { proformasService } from '@/modules/proformas/services/proformasService'
+import { productosService } from '@/modules/productos/services/productosService'
 import { server } from '@/tests/msw/server'
 
 const options: Record<string, object[]> = {
@@ -33,7 +34,7 @@ const click = async (wrapper: Awaited<ReturnType<typeof mounted>>['wrapper'], te
   await button.trigger('click')
 }
 
-async function mounted() {
+async function mounted(path = '/proformas/nueva') {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -42,7 +43,7 @@ async function mounted() {
       { path: '/proformas/:id', name: 'proforma-readonly', component: { template: '<div />' } },
     ],
   })
-  await router.push('/proformas/nueva')
+  await router.push(path)
   const wrapper = mount(ProformaEditorView, {
     global: { plugins: [createPinia(), router], stubs: { Teleport: true } },
   })
@@ -51,6 +52,69 @@ async function mounted() {
 }
 
 describe('AP3 editor integral', () => {
+  it('consulta una línea histórica sin sustituir el importe ni habilitar su edición', async () => {
+    references()
+    const historicalLine = {
+      id: 31,
+      proforma: 1,
+      tipo_item: 1,
+      tipo_item_info: options.TIPO_ITEM![0]!,
+      producto: 7,
+      familia_producto: null,
+      nombre: 'Silla negociada histórica',
+      descripcion: 'Tapizado acordado',
+      cantidad: '2.0000',
+      unidad: 2,
+      unidad_info: options.UNIDAD_MEDIDA![0]!,
+      modo_calculo: 'TOTAL_NEGOCIADO',
+      precio_unitario: '150.00',
+      importe_negociado: '321.75',
+      descuento: '10.25',
+      precio_antes_snapshot: null,
+      precio_ahora_snapshot: null,
+      total: '311.50',
+      galeria_id: null,
+      especificacion: null,
+    }
+    vi.spyOn(proformasService, 'get').mockResolvedValue({
+      id: 1,
+      estado_info: { codigo: 'BORRADOR' },
+      moneda_info: { codigo: 'BOB' },
+      detalles: [historicalLine],
+    } as never)
+    vi.spyOn(productosService, 'get').mockResolvedValue({
+      id: 7,
+      sku: 'S-007',
+      nombre: 'Silla actual',
+      categoria_info: { nombre: 'Silla' },
+      familia_info: { nombre: 'Oficina' },
+      unidad_stock_info: { nombre: 'Pieza' },
+      precio_vigente: '720.00',
+      precio_lista: '800.00',
+      stock: '2.0000',
+      demanda_pendiente: '1.0000',
+      disponibilidad_referencial: '1.0000',
+      imagen_principal: null,
+    } as never)
+    server.use(
+      http.get('http://localhost:8000/api/v1/catalogo/productos/7/imagenes/', () =>
+        HttpResponse.json({ imagenes: [], limite: 8 }),
+      ),
+    )
+    const { wrapper } = await mounted('/proformas/1/editar')
+    await flushPromises()
+    await wrapper
+      .get('[aria-label="Ver detalle completo de Silla negociada histórica"]')
+      .trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Importe negociado histórico')
+    expect(wrapper.text()).toContain('321.75')
+    expect(wrapper.text()).toContain('Precio vigente del catálogo')
+    expect(wrapper.text()).toContain('720.00')
+    expect(wrapper.find('.viewer-footer .context-action').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
   it('abre y navega los cuatro apartados sin persistir ni perder información', async () => {
     references()
     let writes = 0

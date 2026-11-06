@@ -8,7 +8,9 @@ const props = defineProps<{
   titleId?: string
   description?: string
   wide?: boolean
+  extraWide?: boolean
   fullscreen?: boolean
+  stickyFrame?: boolean
   priority?: boolean
 }>()
 const emit = defineEmits<{ close: [] }>()
@@ -29,20 +31,26 @@ useFocusTrap(
       <section
         ref="panel"
         class="modal"
-        :class="{ 'modal--wide': wide, 'modal--fullscreen': fullscreen }"
+        :class="{
+          'modal--wide': wide,
+          'modal--extra-wide': extraWide,
+          'modal--fullscreen': fullscreen,
+          'modal--sticky-frame': stickyFrame,
+        }"
         role="dialog"
         aria-modal="true"
         :aria-labelledby="titleId || 'modal-title'"
         @keydown.esc="emit('close')"
       >
         <header role="presentation">
-          <div>
+          <slot name="title-icon" />
+          <div class="modal__heading">
             <h2 :id="titleId || 'modal-title'">{{ title }}</h2>
             <p v-if="description">{{ description }}</p>
           </div>
           <button type="button" aria-label="Cerrar" @click="emit('close')"><X /></button>
         </header>
-        <div class="modal__content"><slot /></div>
+        <div class="modal__content" :tabindex="stickyFrame ? 0 : undefined"><slot /></div>
         <footer v-if="$slots.footer"><slot name="footer" /></footer>
       </section></div
   ></Teleport>
@@ -71,6 +79,9 @@ useFocusTrap(
 .modal--wide {
   width: min(62rem, 100%);
 }
+.modal--extra-wide {
+  width: min(75rem, 100%);
+}
 .modal--fullscreen {
   width: min(90rem, 100%);
   height: calc(100dvh - 2rem);
@@ -83,6 +94,29 @@ useFocusTrap(
   gap: var(--space-4);
   padding: var(--space-5);
 }
+.modal--sticky-frame {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.modal--sticky-frame header,
+.modal--sticky-frame footer {
+  flex: 0 0 auto;
+  position: sticky;
+  z-index: 1;
+  background: var(--color-surface-raised);
+}
+.modal--sticky-frame header {
+  top: 0;
+}
+.modal--sticky-frame footer {
+  bottom: 0;
+}
+.modal--sticky-frame .modal__content {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
 .modal header {
   border-bottom: 1px solid var(--color-border);
 }
@@ -93,6 +127,10 @@ useFocusTrap(
 .modal h2,
 .modal p {
   margin: 0;
+}
+.modal__heading {
+  min-width: 0;
+  flex: 1;
 }
 .modal p {
   color: var(--color-text-secondary);

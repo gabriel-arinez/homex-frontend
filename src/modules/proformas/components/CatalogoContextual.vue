@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import Modal from '@/shared/ui/Modal.vue'
 import type { CatalogoContextState } from '../services/catalogoContext'
 import type { FamiliaProducto, Producto, ValorCatalogoPublico } from '@/generated/api'
 import { productosService } from '@/modules/productos/services/productosService'
 import { proformasService } from '../services/proformasService'
 import ProductImage from '@/modules/productos/components/ProductImage.vue'
+import ProductoVistaRapida from '@/modules/productos/components/ProductoVistaRapida.vue'
 import Button from '@/shared/ui/Button.vue'
 import SearchField from '@/shared/ui/SearchField.vue'
 import Select from '@/shared/ui/Select.vue'
@@ -17,7 +17,6 @@ import {
 } from '@/shared/media/catalogImageVisibility'
 import {
   ArrowLeft,
-  ArrowRight,
   Check,
   ChevronDown,
   CircleAlert,
@@ -550,42 +549,19 @@ onBeforeUnmount(() => {
       :total-pages="totalPages"
       @change="page = $event"
     />
-    <Modal
+    <ProductoVistaRapida
       :open="Boolean(preview)"
-      :title="preview?.nombre ?? 'Ficha de catálogo'"
+      :product="preview"
+      :action-label="
+        preview && existingProductIds.includes(preview.id)
+          ? 'Ir a línea'
+          : 'Seleccionar para cotizar'
+      "
+      :detail-to="preview ? `/productos/${preview.id}` : ''"
+      :gallery-endpoint="preview ? `/api/v1/catalogo/productos/${preview.id}/imagenes/` : ''"
       @close="preview = null"
-    >
-      <div v-if="preview" class="preview">
-        <ProductImage :image="preview.imagen_principal" :alt="preview.nombre" />
-        <p>SKU: {{ preview.sku || 'Sin SKU' }} · {{ preview.categoria_info?.nombre }}</p>
-        <p>Familia: {{ preview.familia_info?.nombre || 'Sin familia' }}</p>
-        <p>Unidad: {{ preview.unidad_stock_info?.nombre }}</p>
-        <p>
-          Precio lista: {{ money(preview.precio_lista ?? '0') }} · Vigente:
-          {{ money(preview.precio_vigente) }}
-        </p>
-        <p>
-          Stock: {{ preview.stock }} · Disponibilidad referencial:
-          {{ preview.disponibilidad_referencial }}
-        </p>
-        <p v-if="preview.silla">
-          Modelo: {{ preview.silla.modelo }} · Especificaciones:
-          {{ preview.silla.especificaciones }}
-        </p>
-        <p v-if="preview.piso">
-          Modelo: {{ preview.piso.modelo }} · Espesor: {{ preview.piso.espesor_mm }} mm
-        </p>
-        <div class="preview-actions">
-          <Button variant="secondary" @click="preview = null">Cerrar ficha</Button>
-          <Button @click="selectPreviewProduct">
-            <ArrowRight :size="16" aria-hidden="true" />
-            {{
-              existingProductIds.includes(preview.id) ? 'Ir a línea' : 'Seleccionar para cotizar'
-            }}
-          </Button>
-        </div>
-      </div>
-    </Modal>
+      @action="selectPreviewProduct"
+    />
     <div v-if="category && family" class="pendiente">
       <p>¿Aún no está definida la variante de esta familia?</p>
       <Button variant="secondary" @click="emit('pending', Number(family), Number(category))">

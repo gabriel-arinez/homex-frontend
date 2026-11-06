@@ -65,12 +65,13 @@ import { loadPending, savePending } from '@/shared/media/pending'
 import { galleryService } from '@/shared/media/gallery'
 import MuebleStudio from '../components/MuebleStudio.vue'
 import { mapearCapturaAsistida } from '../services/capturaAsistidaMapper'
-import { leerDatosTecnicos, tecnicaIgual } from '../services/muebleTecnico'
+import { tecnicaIgual } from '../services/muebleTecnico'
 import { proformasService } from '../services/proformasService'
 import { retornoAProformas } from '../utils/navegacionProformas'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { productosService } from '@/modules/productos/services/productosService'
 import ProductImage from '@/modules/productos/components/ProductImage.vue'
+import ProductoVistaRapida from '@/modules/productos/components/ProductoVistaRapida.vue'
 import GalleryPhoto from '@/shared/media/GalleryPhoto.vue'
 import { useQuoteFurnitureCovers } from '../composables/useQuoteFurnitureCovers'
 import { useQuoteProductImages } from '../composables/useQuoteProductImages'
@@ -145,6 +146,8 @@ const editingLine = ref<number | null>(null)
 const menuLineId = ref<string | null>(null)
 const readingLineId = ref<string | null>(null)
 const readMaster = ref<Producto | null>(null)
+const readLoading = ref(false)
+const readError = ref('')
 let readRequestId = 0
 const specLine = ref<number | null>(null)
 const draftingFurniture = ref<LineaLocal | null>(null)
@@ -335,6 +338,7 @@ const {
 watch(existingProductIds, (ids) => void ensureQuoteImages(ids), { immediate: true })
 const {
   coverFor: furnitureCoverFor,
+  galleryFor: furnitureGalleryFor,
   ensureLines: ensureFurnitureCovers,
   refreshLine: refreshFurnitureCover,
 } = useQuoteFurnitureCovers()
@@ -510,36 +514,58 @@ const fieldErrorMessages = computed(() => {
 const readingLine = computed(
   () => lineas.value.find((line) => line.localId === readingLineId.value) ?? null,
 )
-const readingTechnical = computed(() =>
-  leerDatosTecnicos(readingLine.value?.especificacion?.datos_tecnicos),
+const readingLineForViewer = computed(() => {
+  const line = readingLine.value
+  if (!line) return null
+  const estimated = totalEstimadoLinea(line)
+  return {
+    ...line,
+    tipo_item_info: tipos.value.find((item) => item.id === line.tipo_item) ?? {
+      nombre: 'No especificado',
+    },
+    unidad_info: unidades.value.find((item) => item.id === line.unidad) ?? {
+      nombre: 'No especificada',
+    },
+    total: estimated === null ? 'Pendiente' : money(estimated),
+  } as unknown as DetalleProforma
+})
+const readingFurnitureGallery = computed(() => {
+  const line = readingLine.value
+  return line ? furnitureGalleryFor(line, proformaId.value) : []
+})
+const readingProductGalleryEndpoint = computed(() =>
+  readingLine.value?.producto
+    ? `/api/v1/catalogo/productos/${readingLine.value.producto}/imagenes/`
+    : '',
 )
-function readableTechnical(value: unknown): string {
-  if (value === null || value === undefined) return 'No especificado'
-  if (Array.isArray(value)) return value.map(readableTechnical).join(', ')
-  if (typeof value === 'object')
-    return Object.entries(value as Record<string, unknown>)
-      .map(([key, v]) => `${key.replace(/_/g, ' ')}: ${readableTechnical(v)}`)
-      .join(' · ')
-  return String(value)
-}
 async function openLineRead(id: string) {
   readingLineId.value = id
   menuLineId.value = null
   readMaster.value = null
+  readError.value = ''
   const token = ++readRequestId
   const productId = readingLine.value?.producto
-  if (!productId) return
+  if (!productId) {
+    if (readingLine.value) void ensureFurnitureCovers([readingLine.value], proformaId.value)
+    return
+  }
+  readLoading.value = true
   try {
     const product = await productosService.get(productId)
     if (token === readRequestId) readMaster.value = product
   } catch {
-    // La línea negociada debe poder consultarse aunque el maestro no esté disponible.
+    if (token === readRequestId)
+      readError.value = 'No se pudieron cargar los datos actuales del catálogo.'
+  } finally {
+    if (token === readRequestId) readLoading.value = false
   }
 }
 function closeLineRead() {
   readRequestId++
   readingLineId.value = null
   readMaster.value = null
+  readLoading.value = false
+  readError.value = ''
 }
 function editReadLine() {
   const index = lineas.value.findIndex((line) => line.localId === readingLineId.value)
@@ -2041,116 +2067,22 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         </footer>
       </template>
 
-      <Modal
+      <ProductoVistaRapida
         :open="Boolean(readingLine)"
-        :title="readingLine?.nombre ?? 'Detalle de línea'"
+        :line="readingLineForViewer"
+        :product="readMaster"
+        :gallery="readingFurnitureGallery"
+        :gallery-endpoint="readingProductGalleryEndpoint"
+        :product-loading="readLoading"
+        :product-error="readError"
+        :action-label="
+          readingLine && readingLine.modo_calculo !== 'TOTAL_NEGOCIADO' ? 'Editar línea' : ''
+        "
+        :detail-to="readMaster ? `/productos/${readMaster.id}` : ''"
         @close="closeLineRead"
-      >
-        <div v-if="readingLine" class="read-line">
-          <p>
-            <strong>Tipo:</strong> {{ tipos.find((x) => x.id === readingLine?.tipo_item)?.nombre }}
-          </p>
-          <p>
-            <strong>SKU:</strong>
-            {{
-              readMaster?.sku ||
-              (readingLine.producto
-                ? 'Producto #' + readingLine.producto
-                : 'Variante pendiente / mueble a pedido')
-            }}
-          </p>
-          <p>
-            <strong>Descripción:</strong>
-            {{ readingLine.descripcion || 'Sin descripción adicional' }}
-          </p>
-          <p>
-            <strong>Cantidad:</strong> {{ readingLine.cantidad }}
-            {{ unidades.find((x) => x.id === readingLine?.unidad)?.nombre }}
-          </p>
-          <p v-if="readingLine.familia_producto && !readingLine.producto" role="status">
-            Variante pendiente; no se reserva stock.
-          </p>
-          <p v-if="readingLine.modo_calculo === 'TOTAL_NEGOCIADO'">
-            <strong>Importe negociado histórico:</strong> {{ readingLine.importe_negociado }}
-          </p>
-          <p v-else>
-            <strong>Precio unitario cotizado:</strong>
-            {{ money(Number(readingLine.precio_unitario)) }}
-          </p>
-          <p><strong>Descuento:</strong> {{ money(Number(readingLine.descuento)) }}</p>
-          <p>
-            <strong>Importe estimado:</strong>
-            {{
-              totalEstimadoLinea(readingLine) === null
-                ? 'Pendiente'
-                : money(totalEstimadoLinea(readingLine)!)
-            }}
-          </p>
-          <template v-if="readMaster">
-            <h3>Datos actuales del catálogo · solo lectura</h3>
-            <p>{{ readMaster.nombre }} · {{ readMaster.categoria_info?.nombre }}</p>
-            <p>Precio vigente de referencia BOB: {{ readMaster.precio_vigente }}</p>
-            <p>Disponibilidad referencial: {{ readMaster.disponibilidad_referencial }}</p>
-            <p v-if="readMaster.silla">Silla: {{ readMaster.silla.modelo }}</p>
-            <p v-if="readMaster.piso">
-              Piso: {{ readMaster.piso.modelo }} · {{ readMaster.piso.espesor_mm }} mm
-            </p>
-          </template>
-          <template v-if="readingLine.especificacion">
-            <h3>Ficha técnica · solo lectura</h3>
-            <p v-if="readingLine.especificacion.tipo_mueble">
-              Tipo de mueble:
-              {{
-                tiposMueble.find((t) => t.id === readingLine?.especificacion?.tipo_mueble)
-                  ?.nombre ?? 'Histórico'
-              }}
-            </p>
-            <p v-if="readingLine.especificacion.observaciones">
-              Observaciones: {{ readingLine.especificacion.observaciones }}
-            </p>
-            <h4>Características y dimensiones</h4>
-            <p>{{ readableTechnical(readingTechnical.caracteristicas_generales) }}</p>
-            <h4>Conjuntos</h4>
-            <ul>
-              <li v-for="g in readingTechnical.conjuntos ?? []" :key="g.uid">{{ g.nombre }}</li>
-            </ul>
-            <h4>Componentes</h4>
-            <ul>
-              <li v-for="(c, i) in readingTechnical.componentes ?? []" :key="c.uid ?? i">
-                <strong>{{ c.nombre }}</strong>
-                <span v-if="c.cantidad_interna"> · {{ c.cantidad_interna }} por mueble</span>
-                <span v-if="c.material"> · {{ c.material }}</span>
-                <span v-if="c.espesor"> · {{ c.espesor }}</span>
-                <span v-if="c.color"> · {{ c.color }}</span>
-                <span v-if="c.dimensiones"> · {{ readableTechnical(c.dimensiones) }}</span>
-                <span v-for="a in c.atributos ?? []" :key="a.codigo || a.nombre">
-                  · {{ a.nombre }}: {{ a.valor }} {{ a.unidad ?? '' }}
-                </span>
-              </li>
-            </ul>
-            <h4>Accesorios</h4>
-            <ul>
-              <li v-for="(a, i) in readingTechnical.accesorios ?? []" :key="i">{{ a }}</li>
-            </ul>
-            <h4 v-if="readingTechnical.advertencias?.length">Información pendiente histórica</h4>
-            <ul>
-              <li v-for="(a, i) in readingTechnical.advertencias ?? []" :key="i">{{ a }}</li>
-            </ul>
-            <p v-if="readingTechnical.descripcion_original">
-              Descripción original: {{ readingTechnical.descripcion_original }}
-            </p>
-          </template>
-          <div class="actions">
-            <Button
-              v-if="readingLine.modo_calculo !== 'TOTAL_NEGOCIADO'"
-              variant="secondary"
-              @click="editReadLine"
-              >Editar</Button
-            >
-            <Button variant="secondary" @click="closeLineRead">Cerrar</Button>
-          </div>
-        </div>
-      </Modal>
+        @retry="readingLine && void openLineRead(readingLine.localId)"
+        @action="editReadLine"
+      />
       <Modal
         wide
         :open="lineModal"

@@ -25,6 +25,7 @@ import {
   unidadesProducto,
 } from '../utils/presentacionCatalogo'
 import ProductImage from '../components/ProductImage.vue'
+import ProductoVistaRapida from '../components/ProductoVistaRapida.vue'
 import {
   readCatalogImagesVisible,
   writeCatalogImagesVisible,
@@ -47,6 +48,7 @@ const canCreate = computed(() => session.can('catalogo.crear_producto'))
 const showImages = ref(readCatalogImagesVisible())
 watch(showImages, writeCatalogImagesVisible)
 const products = ref<Producto[]>([])
+const quickViewProduct = ref<Producto | null>(null)
 const total = ref(0)
 const loading = ref(true)
 const error = ref('')
@@ -653,6 +655,14 @@ onBeforeUnmount(() => {
         <article v-for="product in products" :key="product.id" class="product-card">
           <div class="product-visual">
             <ProductImage :image="product.imagen_principal" :alt="product.nombre" />
+            <button
+              type="button"
+              class="quick-view-trigger"
+              :aria-label="'Vista rápida de ' + product.nombre"
+              @click="quickViewProduct = product"
+            >
+              <Eye :size="18" aria-hidden="true" />
+            </button>
           </div>
           <div class="card-body">
             <div class="card-flags">
@@ -761,6 +771,15 @@ onBeforeUnmount(() => {
                 }}</Badge>
               </td>
               <td class="actions" data-label="Acciones">
+                <button
+                  type="button"
+                  class="view-detail"
+                  :aria-label="'Vista rápida de ' + product.nombre"
+                  title="Vista rápida"
+                  @click="quickViewProduct = product"
+                >
+                  <Eye :size="18" aria-hidden="true" />
+                </button>
                 <RouterLink
                   class="view-detail"
                   :to="'/productos/' + product.id"
@@ -783,6 +802,15 @@ onBeforeUnmount(() => {
         </div>
       </nav>
     </template>
+    <ProductoVistaRapida
+      :open="Boolean(quickViewProduct)"
+      :product="quickViewProduct"
+      :detail-to="quickViewProduct ? `/productos/${quickViewProduct.id}` : ''"
+      :gallery-endpoint="
+        quickViewProduct ? `/api/v1/catalogo/productos/${quickViewProduct.id}/imagenes/` : ''
+      "
+      @close="quickViewProduct = null"
+    />
   </div>
 </template>
 
@@ -979,10 +1007,29 @@ onBeforeUnmount(() => {
   border-color: var(--color-border-strong);
 }
 .product-visual {
+  position: relative;
   display: grid;
   aspect-ratio: 4 / 3;
   overflow: hidden;
   background: var(--color-background);
+}
+.quick-view-trigger {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  cursor: pointer;
+}
+.quick-view-trigger:hover {
+  color: var(--color-primary-accent);
+  background: var(--color-surface-hover);
 }
 .product-visual :deep(.product-image) {
   width: 100%;
