@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
-import { FileAudio, Mic, Upload, X, Pause, Play, Square } from '@lucide/vue'
+import { FileAudio } from '@lucide/vue'
 import {
   MAX_AUDIO_BYTES,
   MAX_UPLOAD_SECONDS,
@@ -8,6 +8,7 @@ import {
 } from '@/modules/capturas/audioLimits'
 import type { ResultadoAsistida } from '@/generated/api'
 import AudioRecorder from '@/modules/capturas/components/AudioRecorder.vue'
+import VoiceCaptureControls from '@/modules/capturas/components/VoiceCaptureControls.vue'
 import Button from '@/shared/ui/Button.vue'
 import Modal from '@/shared/ui/Modal.vue'
 import { useCapturaAsistida } from '../composables/useCapturaAsistida'
@@ -207,25 +208,28 @@ function cancel() {
 </script>
 <template>
   <section class="voice-workflow" aria-label="Asistencia por voz">
-    <div v-if="!recording" class="voice-shortcuts">
-      <button
-        type="button"
-        class="voice-record"
-        :disabled="voice.processing.value || recording"
-        @click="start('record')"
-      >
-        <Mic :size="28" aria-hidden="true" /> Grabar descripción
-      </button>
-      <button
-        type="button"
-        class="voice-upload"
-        :disabled="voice.processing.value || recording"
-        @click="start('upload')"
-      >
-        <Upload :size="28" aria-hidden="true" /> Seleccionar archivo
-      </button>
-      <p>Describe tu mueble. Graba hasta 3 minutos o sube audio de hasta 20 MB y 5 minutos.</p>
-    </div>
+    <VoiceCaptureControls
+      :recording="recording"
+      :paused="paused"
+      :disabled="voice.processing.value"
+      hint="Describe tu mueble. Graba hasta 3 minutos o sube audio de hasta 20 MB y 5 minutos."
+      @record="start('record')"
+      @upload="start('upload')"
+      @pause="pausar"
+      @resume="reanudar"
+      @finish="finalizar"
+      @cancel="cancel"
+    >
+      <template #recorder>
+        <AudioRecorder
+          v-if="recording"
+          ref="recorder"
+          compact
+          @ready="(audio) => audio && send(audio)"
+          @status="onRecorderStatus"
+        />
+      </template>
+    </VoiceCaptureControls>
     <input
       ref="fileInput"
       class="visually-hidden-audio"
@@ -236,26 +240,6 @@ function cancel() {
       aria-hidden="true"
       @change="seleccionarAudio"
     />
-    <div v-if="recording" class="voice-live">
-      <AudioRecorder
-        ref="recorder"
-        compact
-        @ready="(audio) => audio && send(audio)"
-        @status="onRecorderStatus"
-      />
-      <div class="voice-live-actions" role="group" aria-label="Controles de grabación">
-        <Button v-if="!paused" variant="secondary" @click="pausar"
-          ><Pause :size="17" aria-hidden="true" /> Pausar</Button
-        >
-        <Button v-else variant="secondary" @click="reanudar"
-          ><Play :size="17" aria-hidden="true" /> Reanudar</Button
-        >
-        <Button @click="finalizar"><Square :size="17" aria-hidden="true" /> Finalizar</Button>
-        <Button variant="danger" @click="cancel"
-          ><X :size="17" aria-hidden="true" /> Cancelar</Button
-        >
-      </div>
-    </div>
     <div v-if="voice.processing.value" class="voice-processing" role="status" aria-live="polite">
       <FileAudio :size="20" aria-hidden="true" />
       <div>
@@ -310,57 +294,6 @@ function cancel() {
   display: grid;
   gap: 1rem;
 }
-.voice-shortcuts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.65rem;
-}
-.voice-live-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.65rem;
-}
-.voice-shortcuts button {
-  display: inline-flex;
-  justify-content: center;
-  align-items: center;
-  flex-direction: column;
-  gap: 0.65rem;
-  min-height: 5.6rem;
-  padding: 1rem;
-  border-radius: var(--radius-control);
-  font: inherit;
-  font-size: 0.87rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-.voice-shortcuts button:focus-visible,
-.voice-cancel:focus-visible {
-  outline: 2px solid var(--color-primary-accent);
-  outline-offset: 2px;
-}
-.voice-shortcuts button:disabled {
-  opacity: 0.6;
-  cursor: wait;
-}
-.voice-record {
-  background: var(--color-primary);
-  border: 1px solid var(--color-primary);
-  color: #fff;
-}
-.voice-upload {
-  background: var(--color-surface);
-  color: var(--color-text);
-  border: 1px solid var(--color-border-strong);
-}
-.voice-shortcuts p {
-  grid-column: 1 / -1;
-  width: 100%;
-  order: 3;
-  margin: 0;
-  font-size: 0.78rem;
-  color: var(--color-text-secondary);
-}
 .visually-hidden-audio {
   position: absolute;
   width: 1px;
@@ -368,15 +301,6 @@ function cancel() {
   clip-path: inset(50%);
   overflow: hidden;
   white-space: nowrap;
-}
-.voice-live {
-  display: grid;
-  gap: 0.65rem;
-  max-width: 47rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  padding: var(--space-3);
-  background: var(--color-surface-soft);
 }
 .voice-cancel {
   display: flex;
@@ -448,13 +372,5 @@ function cancel() {
   font: inherit;
   resize: vertical;
   margin-bottom: 0.7rem;
-}
-@media (max-width: 36rem) {
-  .voice-shortcuts {
-    grid-template-columns: 1fr;
-  }
-  .voice-shortcuts p {
-    grid-column: 1;
-  }
 }
 </style>
