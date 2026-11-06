@@ -104,7 +104,8 @@ for (const [category, file] of samples) {
                 !response.url().includes('/capturas/catalogo/') ||
                 response.request().method() !== 'GET' ||
                 response.status() !== 200
-              ) return false
+              )
+                return false
               return (await response.json()).estado === 'COMPLETADA'
             },
             { timeout: 150_000 },
@@ -115,7 +116,9 @@ for (const [category, file] of samples) {
             await (await chooser).setFiles(join(directory!, file + '.wav'))
           } else {
             await assistant.getByRole('button', { name: 'Grabar descripción' }).click()
-            await expect(assistant.getByRole('status').filter({ hasText: 'Grabando' })).toBeVisible()
+            await expect(
+              assistant.getByRole('status').filter({ hasText: 'Grabando' }),
+            ).toBeVisible()
             await page.waitForTimeout(16000)
             await assistant.getByRole('button', { name: 'Finalizar grabación' }).click()
           }
