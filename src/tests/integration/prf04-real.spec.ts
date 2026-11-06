@@ -16,11 +16,14 @@ test('PRF-04 voz real hasta guardado integral sin escrituras prematuras', async 
   await page.goto('/proformas/nueva')
   await page.getByRole('button', { name: 'Añadir ítem' }).click()
   await page.getByRole('button', { name: 'Mueble a pedido' }).click()
-  await page.getByRole('button', { name: 'Grabar descripción' }).click()
+  await page.getByRole('button', { name: 'Completar por voz' }).click()
+  const assistant = page.getByRole('dialog', { name: 'Completar mueble por voz' })
+  await expect(assistant).toBeVisible()
+  await assistant.getByRole('button', { name: 'Grabar descripción' }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Grabando' })).toBeVisible()
   // Reproducir el fixture completo a través de MediaRecorder real de Chromium.
   await page.waitForTimeout(12000)
-  await page.getByRole('button', { name: 'Detener', exact: true }).click()
+  await assistant.getByRole('button', { name: 'Finalizar' }).click()
   await expect(page.getByRole('heading', { name: 'Propuesta obtenida por voz' })).toBeVisible({
     timeout: 120000,
   })
