@@ -23,12 +23,21 @@ const emit = defineEmits<{
 
 <template>
   <div v-if="!recording" class="voice-source-actions" role="group" aria-label="Origen del audio">
-    <Button class="source-action source-record voice-record" :disabled="disabled" @click="emit('record')">
+    <Button
+      class="source-action source-record voice-record"
+      :disabled="disabled"
+      @click="emit('record')"
+    >
       <Mic :size="28" aria-hidden="true" />
       <strong>Grabar descripción</strong>
       <small>Máximo 3 minutos</small>
     </Button>
-    <Button variant="secondary" class="source-action voice-upload" :disabled="disabled" @click="emit('upload')">
+    <Button
+      variant="secondary"
+      class="source-action voice-upload"
+      :disabled="disabled"
+      @click="emit('upload')"
+    >
       <FileAudio :size="28" aria-hidden="true" />
       <strong>Seleccionar archivo</strong>
       <small>Hasta 20 MB y 5 minutos</small>
@@ -72,7 +81,9 @@ const emit = defineEmits<{
   white-space: normal;
   text-align: center;
 }
-.voice-source-actions :deep(.source-action strong) { font-size: 0.93rem; }
+.voice-source-actions :deep(.source-action strong) {
+  font-size: 0.93rem;
+}
 .voice-source-actions :deep(.source-action small) {
   font-size: 0.76rem;
   font-weight: 400;
@@ -99,7 +110,12 @@ const emit = defineEmits<{
   gap: 0.65rem;
 }
 @media (max-width: 36rem) {
-  .voice-source-actions { grid-template-columns: 1fr; }
-  .voice-source-actions :deep(.source-action) { min-height: 7rem; padding: 0.65rem; }
+  .voice-source-actions {
+    grid-template-columns: 1fr;
+  }
+  .voice-source-actions :deep(.source-action) {
+    min-height: 7rem;
+    padding: 0.65rem;
+  }
 }
 </style>

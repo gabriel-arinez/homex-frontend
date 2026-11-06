@@ -15,7 +15,10 @@ const props = withDefaults(
 const emit = defineEmits<{ close: [] }>()
 const panel = ref<HTMLElement | null>(null)
 const labelId = useId()
-useFocusTrap(panel, computed(() => props.open))
+useFocusTrap(
+  panel,
+  computed(() => props.open),
+)
 </script>
 
 <template>
@@ -35,7 +38,12 @@ useFocusTrap(panel, computed(() => props.open))
             <h2 :id="labelId">{{ title }}</h2>
             <p class="muted">{{ description }}</p>
           </div>
-          <button type="button" class="drawer-close" :aria-label="closeLabel" @click="emit('close')">
+          <button
+            type="button"
+            class="drawer-close"
+            :aria-label="closeLabel"
+            @click="emit('close')"
+          >
             <X :size="20" aria-hidden="true" />
           </button>
         </header>
@@ -85,7 +93,9 @@ useFocusTrap(panel, computed(() => props.open))
   font-weight: 750;
   letter-spacing: 0.06em;
 }
-.drawer-header .muted { color: var(--color-text-secondary); }
+.drawer-header .muted {
+  color: var(--color-text-secondary);
+}
 .drawer-close {
   flex: 0 0 auto;
   display: grid;
@@ -98,8 +108,13 @@ useFocusTrap(panel, computed(() => props.open))
   background: transparent;
   cursor: pointer;
 }
-.drawer-close:focus-visible { outline: 2px solid var(--color-primary-accent); outline-offset: 2px; }
+.drawer-close:focus-visible {
+  outline: 2px solid var(--color-primary-accent);
+  outline-offset: 2px;
+}
 @media (max-width: 42rem) {
-  .voice-drawer { width: 100%; }
+  .voice-drawer {
+    width: 100%;
+  }
 }
 </style>

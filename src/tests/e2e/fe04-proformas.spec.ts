@@ -1038,7 +1038,8 @@ for (const width of [360, 768, 1440]) {
     expect(captures).toBe(0)
     await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Mueble previo')
     await page
-      .getByRole('dialog', { name: 'Completar mueble por voz' }).locator('input[type="file"]')
+      .getByRole('dialog', { name: 'Completar mueble por voz' })
+      .locator('input[type="file"]')
       .setInputFiles({ name: '24.wav', mimeType: 'audio/wav', buffer: Buffer.from('fixture') })
     await expect(page.getByRole('heading', { name: 'Propuesta obtenida por voz' })).toBeVisible()
     await expect(page.getByText('unidad del ancho', { exact: false }).first()).toBeVisible()

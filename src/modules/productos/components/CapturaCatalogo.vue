@@ -1,11 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Mic,
-  RotateCcw,
-} from '@lucide/vue'
+import { AlertTriangle, CheckCircle2, Mic, RotateCcw } from '@lucide/vue'
 import {
   ALLOWED_AUDIO_EXTENSIONS,
   MAX_AUDIO_BYTES,
