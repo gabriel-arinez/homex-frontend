@@ -25,6 +25,17 @@ describe('Furniture Studio: consentimiento antes de aplicar propuesta PRF04', ()
       global: { stubs: { AudioRecorder: true, Teleport: true } },
     })
     try {
+      expect(wrapper.text()).toContain('Descripción por voz')
+      expect(wrapper.text()).toContain('Dicta nombre, medidas, materiales o características del mueble.')
+      expect(wrapper.text()).toContain('Revisar transcripción')
+      expect(wrapper.text()).toContain('Corrige las palabras o códigos antes de aplicar los datos.')
+      const transcript = wrapper.get('textarea#transcripcion-corregida')
+      expect(transcript.element.value).toBe('')
+      expect(wrapper.get('label[for="transcripcion-corregida"]').text()).toBe(
+        'Transcripción / texto corregido',
+      )
+      expect(wrapper.find('details.voice-original').exists()).toBe(false)
+      expect(wrapper.findAll('button').find((b) => b.text().includes('Reinterpretar texto'))?.attributes('disabled')).toBeDefined()
       const upload = wrapper
         .findAll('button')
         .find((button) => button.text().includes('Seleccionar archivo'))
@@ -41,6 +52,10 @@ describe('Furniture Studio: consentimiento antes de aplicar propuesta PRF04', ()
       expect(wrapper.emitted('proposed')).toHaveLength(1)
       expect(wrapper.emitted('applied')).toBeUndefined()
       expect(wrapper.text()).toContain(captura24.texto_transcrito_original)
+      expect(wrapper.get('textarea#transcripcion-corregida').element.value).toBe(
+        captura24.texto_transcrito_original,
+      )
+      expect(wrapper.find('details.voice-original').exists()).toBe(true)
     } finally {
       wrapper.unmount()
     }
