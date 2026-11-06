@@ -3,7 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import CapturaAsistida from '@/modules/proformas/components/CapturaAsistida.vue'
 vi.mock('@/modules/capturas/audioLimits', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/modules/capturas/audioLimits')>()
-  return { ...original, readAudioDuration: vi.fn().mockResolvedValue(30) }
+  return { ...original, readAudioDuration: vi.fn<() => Promise<number>>().mockResolvedValue(30) }
 })
 import { asistidasService } from '@/modules/capturas/services/asistidasService'
 import { captura24 } from '../fixtures/captura24'

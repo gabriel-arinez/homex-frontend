@@ -6,7 +6,7 @@ import { readAudioDuration } from '@/modules/capturas/audioLimits'
 
 vi.mock('@/modules/capturas/audioLimits', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/modules/capturas/audioLimits')>()
-  return { ...original, readAudioDuration: vi.fn().mockResolvedValue(60) }
+  return { ...original, readAudioDuration: vi.fn<() => Promise<number>>().mockResolvedValue(60) }
 })
 
 afterEach(() => vi.restoreAllMocks())

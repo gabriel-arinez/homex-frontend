@@ -10,7 +10,7 @@ import { readAudioDuration } from '@/modules/capturas/audioLimits'
 
 vi.mock('@/modules/capturas/audioLimits', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/modules/capturas/audioLimits')>()
-  return { ...actual, readAudioDuration: vi.fn().mockResolvedValue(10) }
+  return { ...actual, readAudioDuration: vi.fn<() => Promise<number>>().mockResolvedValue(10) }
 })
 
 afterEach(() => vi.restoreAllMocks())
@@ -130,6 +130,13 @@ describe('Voz en creación de catálogo', () => {
     vi.spyOn(proformasService, 'families').mockResolvedValue({
       count: 0, next: null, previous: null, results: [],
     })
+    vi.spyOn(proformasService, 'options').mockImplementation(async (code: string) =>
+      code === 'CATEGORIA_PRODUCTO'
+        ? [{ id: 1, codigo: 'SILLA', nombre: 'Silla', concepto_codigo: code }]
+        : code === 'UNIDAD_MEDIDA'
+          ? [{ id: 2, codigo: 'PIEZA', nombre: 'Pieza', concepto_codigo: code }]
+          : [],
+    )
     const w = mount(ProductoForm, {
       props: { preselectCategory: 'SILLA' },
       global: { stubs: { Teleport: true } },
@@ -140,7 +147,7 @@ describe('Voz en creación de catálogo', () => {
     assistant.vm.$emit('recording-state', true, false, 12)
     await flushPromises()
     await w.get('button[aria-label="Cerrar asistente de voz"]').trigger('click')
-    expect(w.getComponent(CapturaCatalogo).exists()).toBe(true)
+    expect(w.findComponent(CapturaCatalogo).exists()).toBe(true)
     expect(w.get('.voice-mini').text()).toContain('Grabación en curso')
     await w.get('.voice-mini').trigger('click')
     expect(w.get('.voice-backdrop').attributes('style')).not.toContain('display: none')
