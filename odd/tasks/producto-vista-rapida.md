@@ -29,6 +29,12 @@ Authorized scope: existing frontend product, gallery/image services/components a
 Acceptance: reuse sufficient existing endpoints/types; avoid unnecessary requests and ignore stale async responses. Do not add dependencies.
 Checks: gallery present/missing/failure behavior; responsive/theme/accessibility checks; run available TypeScript, lint, format, unit, E2E/integration and build verifications, reporting unavailable or environment-blocked checks honestly.
 
+### S5 — Align catalog imagery and keep the quote modal concise
+
+Authorized scope: shared product quick-view and contextual catalog image presentation. The user requires “revisa que el tamaño de las imagenes tanto en la bandeja como en el modal se vean reflejados en el apartado, de productos de catalogo, ahora mejora el diseño del modal de resumen, ya que como su nombre lo dice es un resumen super basico que contiene lo mas importante, no todo el detalle, ya que para eso esta el apartado: 04 revisar, asi que ajusta esos cambios”. Keep catalog product-only quick view detailed; make quote-line preview a concise, readable summary, retaining historical amounts and removing extended technical/catalog detail from that summary; keep larger media in catalog quick view and align catalog table thumbnails with the 96px tray images.
+Acceptance: quote-line summary presents only type/SKU when applicable, quantity, saved quote/negotiated price, discount when applicable, line total and optional description; does not show technical detail/current catalog prices. Catalog products retain their full product data and use an enlarged image in both grid/table and the shared modal.
+Checks: product-viewer unit tests; targeted catalog/proforma E2E; type-check, lint, formatting, and diff check.
+
 ## Tasks
 
 - T1 — S1,S2 — inline — complete; commit `724ec69` — shared component, data model, and safe quote/furniture presentation. RED: missing component import; GREEN: viewer unit suite.
@@ -37,6 +43,7 @@ Checks: gallery present/missing/failure behavior; responsive/theme/accessibility
 - T4 — S2,S3 — inline — complete; commit `24d62f5` — clarify quantity, unit price, discount, and line total in the Proforma product tray; slightly enlarge thumbnails.
 - T5 — S2,S3 — inline — complete; commit `655fe87` — move line pricing metrics into the adjacent blank space on wide screens; keep long item names wrapped and responsive layouts stacked.
 - T6 — S1,S2,S3 — inline — complete; commit `b6b4c32` — modestly enlarge line thumbnails and quick-view modal/media; restore whole-row open behavior without intercepting the actions menu.
+- T7 — S2,S3,S5 — inline — complete; working-tree change (not committed) — align catalog table thumbnails to 96px and simplify quote-line quick view while keeping full catalog detail; unit and targeted E2E passed.
 
 ## Log
 
@@ -54,3 +61,6 @@ Checks: gallery present/missing/failure behavior; responsive/theme/accessibility
 - L12 — Verification: AP3 unit tests 4 passed; FE04 E2E passed and checked side-by-side metrics plus long-name wrapping; type-check passed. Work unit committed as `655fe87`.
 - L13 — User request (verbatim): “perefecto, ya quedo, [Image #1], sin embargo la imagen debe de ser mas grande, y lo propio con el modal que se habre al presionar, no importa que sea mas ancho, agranda el tamaño, tampoco exageres, y algo que note es que el modal ya no se habre cuando presiono la fila, revisa”. Increased thumbnails from 80px to 96px, widened the opt-in modal to 1280px, enlarged the viewer media area within viewport bounds, and made the entire line card open the preview while stopping menu clicks.
 - L14 — Verification: AP3 tests 4 passed; targeted E2E 2 passed, including row-click opening, no menu-triggered opening, modal >1200px, media width >480px, 96px thumbnail, and mobile stacking; type-check and formatting passed. Work unit committed as `b6b4c32`.
+- L15 — User requested parity for image sizing in catalog products and a true basic quote summary because full detail belongs in step “04 revisar”. Enlarged contextual catalog table thumbnails from 56px to 96px; the catalog grid and shared modal already use the enlarged image framing. Quote-line quick view now retains only line type, applicable SKU, quantity, saved quoted/negotiated amount, discount, total, and optional description; technical detail remains available in the review flow rather than this summary. Preserved product-only catalog detail and all calculations.
+- L16 — Checks: viewer unit tests (10 passed), targeted PRF-02 E2E (1 passed, including catalog modal image frame >480px and table thumbnail 96px), type-check, targeted ESLint, Prettier, and `git diff --check` passed. Initial E2E run failed only because the dialog exposes both header and footer Close buttons; changed the test to address the accessible header label and reran successfully.
+- L17 — User correction (verbatim): “organizalo mejor, mejora su diseño y agrega un resumen de datos”, followed by the screenshot and “fijate”. Stacked metric labels above their values, made the total span the summary width, made the no-discount state explicit, and added a separate compact data summary with saved furniture dimensions and observations when present. Extended components and legacy attributes remain outside the summary. Risk: none; no calculations, async flow, or product-only display changed.

@@ -491,7 +491,7 @@ onBeforeUnmount(() => {
                   <ProductImage
                     :image="producto.imagen_principal"
                     :alt="producto.nombre"
-                    sizes="56px"
+                    sizes="96px"
                   />
                 </div>
                 <div class="product-identity__copy">
@@ -801,8 +801,8 @@ onBeforeUnmount(() => {
 }
 .thumbnail {
   flex: none;
-  width: 3.5rem;
-  height: 3.5rem;
+  width: 6rem;
+  height: 6rem;
   border-radius: 0.4rem;
   overflow: hidden;
 }

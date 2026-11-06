@@ -973,6 +973,18 @@ test('PRF-02 selecciona catálogo, consulta detalle y deshace sin escribir profo
   await page.getByRole('button', { name: 'Producto de catálogo' }).click()
   await expect(page.getByText('S-01', { exact: false })).toBeVisible()
 
+  const catalogCard = page.locator('.producto').filter({ hasText: 'Silla ejecutiva' })
+  await catalogCard.getByRole('button', { name: 'Ver ficha' }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  const catalogMedia = await page.getByRole('dialog').locator('.media-frame').boundingBox()
+  expect(catalogMedia?.width).toBeGreaterThan(480)
+  await page.getByRole('dialog').getByLabel('Cerrar').click()
+  await page.getByRole('button', { name: 'Lista' }).click()
+  const catalogRow = page.locator('.catalog-table tr').filter({ hasText: 'Silla ejecutiva' })
+  const catalogThumbnail = await catalogRow.locator('.thumbnail').boundingBox()
+  expect(catalogThumbnail?.width).toBe(96)
+  await page.getByRole('button', { name: 'Cuadrícula' }).click()
+
   await page.getByRole('button', { name: 'Seleccionar para cotizar' }).click()
   await expect(page.getByLabel('Nombre comercial')).toHaveValue('Silla ejecutiva')
   await expect(page.getByLabel('Precio unitario (BOB)')).toHaveValue('1200.00')
@@ -990,9 +1002,15 @@ test('PRF-02 selecciona catálogo, consulta detalle y deshace sin escribir profo
   expect(writes).toBe(0)
 
   await page.getByRole('button', { name: 'Ver detalle completo de Silla ejecutiva' }).click()
-  await expect(
-    page.getByRole('dialog').getByText('Precio unitario cotizado:', { exact: false }),
-  ).toBeVisible()
+  await expect(page.getByRole('dialog').getByText('Resumen de la línea')).toBeVisible()
+  await expect(page.getByRole('dialog').getByText('Ficha técnica')).toHaveCount(0)
+  const summary = page.getByRole('dialog').locator('.line-summary-metrics')
+  const summaryBox = await summary.boundingBox()
+  const totalBox = await summary.locator('.line-summary-total').boundingBox()
+  expect(totalBox?.width).toBe(summaryBox?.width)
+  const quantityLabel = await summary.locator('dt').first().boundingBox()
+  const quantityValue = await summary.locator('dd').first().boundingBox()
+  expect(quantityValue!.y).toBeGreaterThan(quantityLabel!.y)
   await page.getByRole('dialog').getByRole('button', { name: 'Cerrar' }).last().click()
   await page.getByRole('button', { name: 'Acciones de Silla ejecutiva' }).click()
   await page.getByRole('menuitem', { name: 'Eliminar' }).click()

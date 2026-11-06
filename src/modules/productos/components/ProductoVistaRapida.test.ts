@@ -67,21 +67,22 @@ function mountViewer(props: Record<string, unknown> = {}) {
 afterEach(() => vi.restoreAllMocks())
 
 describe('ProductoVistaRapida', () => {
-  it('separa precios actuales de catálogo y valores negociados históricos', () => {
+  it('muestra un resumen de cotización sin mezclar datos actuales del catálogo', () => {
     const wrapper = mountViewer({ line })
-    expect(wrapper.text()).toContain('Precio vigente del catálogo')
-    expect(wrapper.text()).toContain('720.00')
+    expect(wrapper.text()).toContain('Resumen de la línea')
     expect(wrapper.text()).toContain('Importe negociado histórico')
     expect(wrapper.text()).toContain('321.75')
-    expect(wrapper.text()).not.toContain('Precio unitario cotizado: 150.00')
+    expect(wrapper.text()).toContain('311.50')
+    expect(wrapper.text()).not.toContain('Precio vigente del catálogo')
   })
 
-  it('presenta ficha técnica anidada sin descartar atributos históricos', () => {
+  it('mantiene la ficha técnica detallada fuera del modal de resumen', () => {
     const wrapper = mountViewer({ line })
-    expect(wrapper.text()).toContain('Alto')
+    expect(wrapper.text()).not.toContain('Ficha técnica')
+    expect(wrapper.text()).not.toContain('Tablero')
+    expect(wrapper.text()).not.toContain('A-11')
+    expect(wrapper.text()).toContain('Resumen de datos')
     expect(wrapper.text()).toContain('75 cm')
-    expect(wrapper.text()).toContain('Tablero')
-    expect(wrapper.text()).toContain('A-11')
     expect(wrapper.text()).toContain('Conservar tono nogal')
   })
 

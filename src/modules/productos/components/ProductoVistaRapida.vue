@@ -14,10 +14,10 @@ import {
 import type { DetalleProforma, Producto } from '@/generated/api'
 import type { GalleryImage } from '@/shared/media/gallery'
 import { galleryService } from '@/shared/media/gallery'
-import { leerDatosTecnicos } from '@/modules/proformas/services/muebleTecnico'
 import Modal from '@/shared/ui/Modal.vue'
 import Button from '@/shared/ui/Button.vue'
 import GalleryPhoto from '@/shared/media/GalleryPhoto.vue'
+import { leerDatosTecnicos } from '@/modules/proformas/services/muebleTecnico'
 
 const props = withDefaults(
   defineProps<{
@@ -80,7 +80,6 @@ const headerIcon = computed(() => {
   if (code === 'PISO_FLOTANTE') return Layers
   return Package
 })
-const technical = computed(() => leerDatosTecnicos(props.line?.especificacion?.datos_tecnicos))
 const galleryImages = computed(() =>
   loadedGallery.value.length ? loadedGallery.value : props.gallery,
 )
@@ -210,27 +209,6 @@ function flatten(value: unknown, prefix = ''): DisplayField[] {
     return flatten(child, key)
   })
 }
-const generalFields = computed(() => flatten(technical.value.caracteristicas_generales))
-const additionalFields = computed(() => {
-  const known = new Set([
-    'caracteristicas_generales',
-    'conjuntos',
-    'componentes',
-    'accesorios',
-    'advertencias',
-    'descripcion_original',
-  ])
-  return Object.entries(technical.value)
-    .filter(([key]) => !known.has(key))
-    .flatMap(([key, value]) => flatten(value, key))
-})
-const components = computed(() => technical.value.componentes ?? [])
-const sets = computed(() => technical.value.conjuntos ?? [])
-const accessories = computed(() => technical.value.accesorios ?? [])
-const warnings = computed(() => technical.value.advertencias ?? [])
-function componentFields(component: (typeof components.value)[number]) {
-  return flatten(component).filter((field) => field.label !== 'Elemento 1')
-}
 function productFields(product: Producto) {
   const fields: DisplayField[] = []
   if (product.silla?.modelo) fields.push({ label: 'Modelo de silla', value: product.silla.modelo })
@@ -271,6 +249,13 @@ function productFields(product: Producto) {
 function lineAmount() {
   return props.line?.total ?? ''
 }
+const summaryDimensions = computed(() => {
+  const technical = leerDatosTecnicos(props.line?.especificacion?.datos_tecnicos)
+  return flatten(technical.caracteristicas_generales)
+    .filter((field) => ['Alto', 'Ancho', 'Largo', 'Profundidad'].includes(field.label))
+    .slice(0, 4)
+})
+const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.trim() ?? '')
 </script>
 
 <template>
@@ -306,7 +291,7 @@ function lineAmount() {
       </div>
       <template v-else>
         <div
-          v-if="productLoading || productError || error"
+          v-if="!line && (productLoading || productError || error)"
           class="catalog-message"
           :class="{ 'catalog-message--error': productError || error }"
           :role="productError || error ? 'status' : 'status'"
@@ -399,7 +384,7 @@ function lineAmount() {
         </section>
 
         <div class="detail-panels">
-          <section v-if="product" class="info-card">
+          <section v-if="product && !line" class="info-card">
             <h3><Package :size="18" aria-hidden="true" />Identificación de catálogo</h3>
             <dl>
               <div>
@@ -431,7 +416,7 @@ function lineAmount() {
             </dl>
           </section>
 
-          <section v-if="product" class="info-card">
+          <section v-if="product && !line" class="info-card">
             <h3>Información comercial actual</h3>
             <p class="section-note">
               Valores vigentes del catálogo; no reemplazan importes negociados de la proforma.
@@ -468,51 +453,64 @@ function lineAmount() {
             </dl>
           </section>
 
-          <section v-if="line" class="info-card quote-card">
-            <h3>Valores guardados en la proforma</h3>
-            <p class="section-note">
-              Importes históricos o negociados de esta línea; se conservan tal como fueron
-              cotizados.
-            </p>
-            <dl>
-              <div>
-                <dt>Tipo de línea</dt>
-                <dd>{{ line.tipo_item_info?.nombre || 'No especificado' }}</dd>
-              </div>
-              <div v-if="line.producto && product?.sku">
-                <dt>SKU</dt>
-                <dd>{{ product.sku }}</dd>
-              </div>
-              <div>
-                <dt>Descripción</dt>
-                <dd>{{ line.descripcion || 'Sin descripción adicional' }}</dd>
-              </div>
+          <section v-if="line" class="info-card quote-card quote-card--summary">
+            <h3>Resumen de la línea</h3>
+            <p class="section-note">Valores guardados en esta proforma.</p>
+            <div class="line-summary-meta">
+              <span>{{ line.tipo_item_info?.nombre || 'Línea de proforma' }}</span>
+              <span v-if="line.producto && product?.sku">SKU {{ product.sku }}</span>
+            </div>
+            <dl class="line-summary-metrics">
               <div>
                 <dt>Cantidad</dt>
                 <dd>{{ line.cantidad }} {{ line.unidad_info?.nombre }}</dd>
-              </div>
-              <div v-if="line.modo_calculo !== 'TOTAL_NEGOCIADO'">
-                <dt>Precio unitario cotizado:</dt>
-                <dd>{{ line.precio_unitario ?? 'No especificado' }}</dd>
-              </div>
-              <div v-if="line.descuento && Number(line.descuento) !== 0">
-                <dt>Descuento</dt>
-                <dd>{{ line.descuento }}</dd>
               </div>
               <div v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
                 <dt>Importe negociado histórico</dt>
                 <dd>{{ line.importe_negociado ?? line.total }}</dd>
               </div>
+              <div v-else>
+                <dt>Precio por unidad cotizado</dt>
+                <dd>{{ line.precio_unitario ?? 'No especificado' }}</dd>
+              </div>
               <div>
-                <dt>
-                  Importe {{ line.modo_calculo === 'TOTAL_NEGOCIADO' ? 'histórico' : 'estimado' }}
-                </dt>
+                <dt>Descuento</dt>
+                <dd>
+                  {{
+                    line.descuento && Number(line.descuento) !== 0
+                      ? line.descuento
+                      : 'Sin descuento'
+                  }}
+                </dd>
+              </div>
+              <div class="line-summary-total">
+                <dt>Total de línea</dt>
                 <dd>{{ lineAmount() }}</dd>
               </div>
             </dl>
+            <p v-if="line.descripcion" class="line-summary-description">
+              <strong>Descripción</strong>{{ line.descripcion }}
+            </p>
           </section>
 
-          <section v-if="product && productFields(product).length" class="info-card">
+          <section
+            v-if="line && (summaryDimensions.length || summaryNotes)"
+            class="info-card data-summary"
+          >
+            <h3><Layers :size="18" aria-hidden="true" />Resumen de datos</h3>
+            <dl v-if="summaryDimensions.length" class="data-summary-dimensions">
+              <div v-for="field in summaryDimensions" :key="field.label">
+                <dt>{{ field.label }}</dt>
+                <dd>{{ field.value }}</dd>
+              </div>
+            </dl>
+            <p v-if="summaryNotes" class="line-summary-description">
+              <strong>Observaciones</strong>{{ summaryNotes }}
+            </p>
+            <p class="data-summary-hint">El detalle completo está en el paso 04 · Revisar.</p>
+          </section>
+
+          <section v-if="product && !line && productFields(product).length" class="info-card">
             <h3>Características del producto</h3>
             <dl>
               <div
@@ -523,79 +521,6 @@ function lineAmount() {
                 <dd>{{ field.value }}</dd>
               </div>
             </dl>
-          </section>
-
-          <section v-if="line?.especificacion" class="info-card technical-card">
-            <h3>
-              Ficha técnica
-              {{
-                line.especificacion.tipo_mueble_info?.nombre
-                  ? `· ${line.especificacion.tipo_mueble_info.nombre}`
-                  : '· histórica'
-              }}
-            </h3>
-            <p v-if="line.especificacion.observaciones">
-              <strong>Observaciones</strong><span>{{ line.especificacion.observaciones }}</span>
-            </p>
-            <div v-if="generalFields.length" class="technical-section">
-              <h4>Características y dimensiones</h4>
-              <dl>
-                <div v-for="(field, index) in generalFields" :key="`${field.label}-${index}`">
-                  <dt>{{ field.label }}</dt>
-                  <dd>{{ field.value }}</dd>
-                </div>
-              </dl>
-            </div>
-            <div v-if="sets.length" class="technical-section">
-              <h4>Conjuntos</h4>
-              <ul>
-                <li v-for="set in sets" :key="set.uid">{{ set.nombre }}</li>
-              </ul>
-            </div>
-            <div v-if="components.length" class="technical-section">
-              <h4>Componentes</h4>
-              <article
-                v-for="(component, index) in components"
-                :key="component.uid ?? index"
-                class="component-card"
-              >
-                <h5>{{ component.nombre || `Componente ${index + 1}` }}</h5>
-                <dl>
-                  <div
-                    v-for="(field, fieldIndex) in componentFields(component)"
-                    :key="`${field.label}-${fieldIndex}`"
-                  >
-                    <dt>{{ field.label }}</dt>
-                    <dd>{{ field.value }}</dd>
-                  </div>
-                </dl>
-              </article>
-            </div>
-            <div v-if="accessories.length" class="technical-section">
-              <h4>Accesorios</h4>
-              <ul>
-                <li v-for="(item, index) in accessories" :key="index">{{ item }}</li>
-              </ul>
-            </div>
-            <div v-if="warnings.length" class="technical-section">
-              <h4>Información histórica pendiente</h4>
-              <ul>
-                <li v-for="(item, index) in warnings" :key="index">{{ item }}</li>
-              </ul>
-            </div>
-            <div v-if="technical.descripcion_original" class="technical-section">
-              <h4>Descripción original</h4>
-              <p>{{ technical.descripcion_original }}</p>
-            </div>
-            <div v-if="additionalFields.length" class="technical-section">
-              <h4>Otros datos conservados</h4>
-              <dl>
-                <div v-for="(field, index) in additionalFields" :key="`${field.label}-${index}`">
-                  <dt>{{ field.label }}</dt>
-                  <dd>{{ field.value }}</dd>
-                </div>
-              </dl>
-            </div>
           </section>
         </div>
       </template>
@@ -738,6 +663,74 @@ function lineAmount() {
   color: var(--color-text-secondary);
   font-size: 0.9rem;
 }
+.quote-card--summary {
+  border-color: color-mix(in srgb, var(--color-primary) 32%, var(--color-border));
+}
+.line-summary-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.line-summary-meta span {
+  padding: 0.25rem 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  background: var(--color-background);
+  font-size: 0.82rem;
+}
+.line-summary-metrics {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.line-summary-metrics > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-background);
+}
+.line-summary-metrics dt {
+  font-size: 0.82rem;
+}
+.line-summary-total {
+  grid-column: 1 / -1;
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border)) !important;
+  background: color-mix(in srgb, var(--color-primary) 9%, var(--color-background)) !important;
+}
+.line-summary-total dd {
+  font-size: 1.5rem;
+}
+.data-summary-dimensions {
+  grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr));
+  gap: var(--space-3);
+}
+.data-summary-dimensions > div {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-1);
+}
+.data-summary-hint {
+  margin: var(--space-4) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+}
+.line-summary-description {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-3) 0 0;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+.line-summary-description strong {
+  color: var(--color-text);
+  font-size: 0.85rem;
+}
 dl {
   display: grid;
   gap: var(--space-2);
@@ -774,30 +767,6 @@ dd {
 .status--inactive {
   color: var(--color-text-secondary);
   background: var(--color-background);
-}
-.technical-card > p {
-  display: grid;
-  gap: var(--space-1);
-  margin: 0 0 var(--space-3);
-}
-.technical-section {
-  margin-top: var(--space-4);
-}
-.technical-section ul {
-  margin: 0;
-  padding-left: 1.25rem;
-}
-.technical-section li + li {
-  margin-top: var(--space-1);
-}
-.component-card {
-  margin-top: var(--space-2);
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-}
-.component-card h5 {
-  margin: 0 0 var(--space-2);
 }
 .viewer-state {
   grid-column: 1 / -1;
@@ -894,6 +863,9 @@ dd {
   }
 }
 @media (max-width: 420px) {
+  .line-summary-metrics {
+    grid-template-columns: 1fr;
+  }
   dl > div {
     grid-template-columns: 1fr;
     gap: 0.2rem;
