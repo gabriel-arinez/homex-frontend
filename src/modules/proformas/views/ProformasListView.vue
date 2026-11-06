@@ -795,12 +795,13 @@ onBeforeUnmount(() => {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.actions-cell,
+.proforma-table td.actions-cell,
 .proforma-table th.actions-heading {
-  text-align: center;
+  text-align: right;
+  padding-right: 1rem;
 }
 .actions-cell :deep(.proforma-actions) {
-  justify-content: center;
+  justify-content: flex-end;
 }
 .proforma-view-link {
   display: inline-grid;
