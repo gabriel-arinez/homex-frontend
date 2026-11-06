@@ -1539,7 +1539,12 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               @cancel="additionMode = 'none'"
             />
           </div>
-          <Card v-for="(line, index) in lineas" :key="line.localId" class="line-card">
+          <Card
+            v-for="(line, index) in lineas"
+            :key="line.localId"
+            class="line-card"
+            @click="openLineRead(line.localId)"
+          >
             <span class="line-index" aria-hidden="true">{{
               String(index + 1).padStart(2, '0')
             }}</span>
@@ -1549,7 +1554,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               tabindex="0"
               role="button"
               :aria-label="'Ver detalle completo de ' + line.nombre"
-              @click="openLineRead(line.localId)"
               @keydown.enter.prevent="openLineRead(line.localId)"
               @keydown.space.prevent="openLineRead(line.localId)"
             >
@@ -1558,7 +1562,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   <ProductImage
                     :image="quoteImages[line.producto] ?? null"
                     :alt="line.nombre"
-                    sizes="64px"
+                    sizes="96px"
                   />
                 </div>
                 <div v-else-if="furnitureCoverSource(line)" class="line-thumbnail">
@@ -1607,7 +1611,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               </strong>
               <strong v-else class="pending-value">Pendiente</strong>
             </div>
-            <div class="line-menu" @keydown.esc="menuLineId = null">
+            <div class="line-menu" @click.stop @keydown.esc="menuLineId = null">
               <button
                 type="button"
                 class="menu-trigger"
@@ -2521,6 +2525,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   grid-template-columns: auto minmax(14rem, 0.9fr) minmax(24rem, 1.5fr) auto auto;
   gap: var(--space-4);
   padding: var(--space-4);
+  cursor: pointer;
   border-color: var(--quote-border);
   box-shadow: 0 1px 2px rgb(0 0 0 / 3%);
 }
@@ -3444,8 +3449,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   overflow-wrap: anywhere;
 }
 .line-thumbnail {
-  width: 5rem;
-  height: 5rem;
+  width: 6rem;
+  height: 6rem;
   flex: none;
   overflow: hidden;
   border: 1px solid var(--color-border);

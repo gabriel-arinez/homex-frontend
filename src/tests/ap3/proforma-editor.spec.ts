@@ -105,6 +105,9 @@ describe('AP3 editor integral', () => {
     expect(metricsText).toContain('Descuento')
     expect(metricsText).toContain('Ninguno')
     expect(wrapper.get('.line-total').text()).toContain('Importe de línea')
+    await lineMetrics.trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Valores guardados en la proforma')
     wrapper.unmount()
   })
 

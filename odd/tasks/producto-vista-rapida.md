@@ -8,7 +8,7 @@ Branch: `feat/voz-panel-unificado-20261105` · Delivery: ask-on-risk · Chain st
 ### S1 — Shared responsive consultation view
 
 Authorized scope: reusable product quick-view presentation and only a narrowly scoped modal variant if required. The user asked to “Crea un componente reutilizable, por ejemplo ProductoVistaRapida.vue, con adaptadores para los distintos contextos.”
-Acceptance: one shared viewer, max-width around 1120–1200 px on desktop, responsive columns, structured commercial/identification/technical information, accessible images and no-images state, clear/light and dark theme, sticky header/footer with scrollable content, keyboard/focus/Escape support, and loading/error/retry/empty states where data is fetched. Do not expose private images or auth tokens, add dependencies, or broadly change `Modal.vue`.
+Acceptance: one shared viewer, max-width around 1120–1280 px on desktop, responsive columns, structured commercial/identification/technical information, accessible images and no-images state, clear/light and dark theme, sticky header/footer with scrollable content, keyboard/focus/Escape support, and loading/error/retry/empty states where data is fetched. Do not expose private images or auth tokens, add dependencies, or broadly change `Modal.vue`.
 Checks: focused unit tests; `npm run type-check`; `npm run lint:check`; `npm run format:check`; `npm run build`.
 
 ### S2 — Preserve quote snapshots and furniture detail
@@ -36,6 +36,7 @@ Checks: gallery present/missing/failure behavior; responsive/theme/accessibility
 - T3 — S1-S4 — inline — verified with environment advisories; committed in `724ec69` — regression coverage and applicable verification. Risk: item 4 (async gallery requests and stale-response ordering).
 - T4 — S2,S3 — inline — complete; commit `24d62f5` — clarify quantity, unit price, discount, and line total in the Proforma product tray; slightly enlarge thumbnails.
 - T5 — S2,S3 — inline — complete; commit `655fe87` — move line pricing metrics into the adjacent blank space on wide screens; keep long item names wrapped and responsive layouts stacked.
+- T6 — S1,S2,S3 — inline — verified; commit to follow — modestly enlarge line thumbnails and quick-view modal/media; restore whole-row open behavior without intercepting the actions menu.
 
 ## Log
 
@@ -51,3 +52,5 @@ Checks: gallery present/missing/failure behavior; responsive/theme/accessibility
 - L10 — Tray redesign verification: AP3 unit suite 4 passed; targeted E2E `FE04 crea con unitario y descuento, revisa y aprueba` passed; type-check and targeted Prettier passed. Existing E2E expectation for “3 ×” was updated to assert separate labels and computed line total. Calculation still uses `totalEstimadoLinea`; no business rule changed. Work unit committed as `24d62f5`.
 - L11 — User request (verbatim): “ya quedo, sin embargo, seria mas conveninete que el nuevo apartado con nuevos datos se muestre en el espacio en blanco, no debajo del nombre y si es que el nombre es muy largo, que puede serlo, un ajuste de texto”. Moved pricing metrics into an adjacent grid column on wide screens; retained wrapping for long names and a stacked layout at smaller widths.
 - L12 — Verification: AP3 unit tests 4 passed; FE04 E2E passed and checked side-by-side metrics plus long-name wrapping; type-check passed. Work unit committed as `655fe87`.
+- L13 — User request (verbatim): “perefecto, ya quedo, [Image #1], sin embargo la imagen debe de ser mas grande, y lo propio con el modal que se habre al presionar, no importa que sea mas ancho, agranda el tamaño, tampoco exageres, y algo que note es que el modal ya no se habre cuando presiono la fila, revisa”. Increased thumbnails from 80px to 96px, widened the opt-in modal to 1280px, enlarged the viewer media area within viewport bounds, and made the entire line card open the preview while stopping menu clicks.
+- L14 — Verification: AP3 tests 4 passed; targeted E2E 2 passed, including row-click opening, no menu-triggered opening, modal >1200px, media width >480px, 96px thumbnail, and mobile stacking; type-check and formatting passed.

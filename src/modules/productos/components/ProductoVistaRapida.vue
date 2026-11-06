@@ -618,7 +618,7 @@ function lineAmount() {
 <style scoped>
 .quick-view {
   display: grid;
-  grid-template-columns: minmax(16rem, 0.88fr) minmax(0, 1.12fr);
+  grid-template-columns: minmax(20rem, 1.05fr) minmax(0, 1.15fr);
   gap: var(--space-5);
   align-items: start;
 }
@@ -634,8 +634,8 @@ function lineAmount() {
 .media-frame {
   position: relative;
   display: grid;
-  min-height: 20rem;
-  max-height: 54vh;
+  min-height: 22rem;
+  max-height: 60vh;
   overflow: hidden;
   place-items: center;
   border: 1px solid var(--color-border);
@@ -644,7 +644,7 @@ function lineAmount() {
 }
 .media-frame :deep(img.gallery-image) {
   width: 100%;
-  max-height: 54vh;
+  max-height: 60vh;
   object-fit: contain;
   transition: transform 0.2s ease;
 }
@@ -884,7 +884,7 @@ dd {
     max-height: 36vh;
   }
   .media-frame :deep(img.gallery-image) {
-    max-height: 36vh;
+    max-height: 40vh;
   }
   dl > div {
     grid-template-columns: minmax(6rem, 0.7fr) minmax(0, 1.3fr);

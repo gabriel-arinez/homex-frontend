@@ -80,7 +80,7 @@ useFocusTrap(
   width: min(62rem, 100%);
 }
 .modal--extra-wide {
-  width: min(75rem, 100%);
+  width: min(80rem, 100%);
 }
 .modal--fullscreen {
   width: min(90rem, 100%);
