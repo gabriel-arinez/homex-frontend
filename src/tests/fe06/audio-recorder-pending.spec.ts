@@ -22,8 +22,12 @@ function setup() {
     start() {
       this.state = 'recording'
     }
-    pause() { this.state = 'paused' }
-    resume() { this.state = 'recording' }
+    pause() {
+      this.state = 'paused'
+    }
+    resume() {
+      this.state = 'recording'
+    }
     stop() {
       this.state = 'inactive'
       this.onstop?.()

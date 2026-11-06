@@ -491,9 +491,17 @@ onMounted(load)
       @click="voiceOpen = true"
     >
       <Mic :size="17" aria-hidden="true" />
-      {{ assistantProcessing ? 'Interpretando audio' : recordingPaused ? 'Grabación pausada' : 'Grabación en curso' }}
+      {{
+        assistantProcessing
+          ? 'Interpretando audio'
+          : recordingPaused
+            ? 'Grabación pausada'
+            : 'Grabación en curso'
+      }}
       <template v-if="recordingActive">
-        · {{ String(Math.floor(recordingElapsed / 60)).padStart(2, '0') }}:{{ String(recordingElapsed % 60).padStart(2, '0') }}
+        · {{ String(Math.floor(recordingElapsed / 60)).padStart(2, '0') }}:{{
+          String(recordingElapsed % 60).padStart(2, '0')
+        }}
       </template>
       · Volver al asistente
     </button>
@@ -798,8 +806,8 @@ onMounted(load)
             </label>
             <div v-if="form.promo_activa" class="promotion-fields">
               <p v-if="legacyPromotion && promoUnchanged" class="promotion-legacy">
-                Esta promoción conserva un precio anterior histórico distinto del normal.
-                No cambiará mientras no edites la promoción.
+                Esta promoción conserva un precio anterior histórico distinto del normal. No
+                cambiará mientras no edites la promoción.
               </p>
               <p class="promotion-base">
                 Precio de referencia: <strong>{{ money(form.precio_lista) }}</strong>
@@ -1411,7 +1419,9 @@ textarea {
   font-weight: 700;
   cursor: pointer;
 }
-.voice-mini svg { color: var(--color-primary); }
+.voice-mini svg {
+  color: var(--color-primary);
+}
 .voice-drawer {
   display: flex;
   flex-direction: column;

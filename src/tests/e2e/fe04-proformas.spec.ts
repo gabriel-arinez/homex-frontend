@@ -863,7 +863,9 @@ test('PRF-01 conserva cliente y catálogo sin reabrir línea obsoleta tras cance
   })
   await page.goto('/proformas/1/editar?draft=prf01-retorno')
   await expect(page.getByRole('dialog', { name: 'Agregar producto' })).toHaveCount(0)
-  await expect(page.getByRole('heading', { name: 'Seleccionar producto del catálogo' })).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: 'Seleccionar producto del catálogo' }),
+  ).toBeVisible()
   await page.getByRole('button', { name: 'Cliente', exact: true }).click()
   await expect(page.getByRole('region').getByText('Ana Pérez', { exact: true })).toBeVisible()
 })

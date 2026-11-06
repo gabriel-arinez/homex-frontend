@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
 import { FileAudio, Mic, Upload, X, Pause, Play, Square } from '@lucide/vue'
-import { MAX_AUDIO_BYTES, MAX_UPLOAD_SECONDS, readAudioDuration } from '@/modules/capturas/audioLimits'
+import {
+  MAX_AUDIO_BYTES,
+  MAX_UPLOAD_SECONDS,
+  readAudioDuration,
+} from '@/modules/capturas/audioLimits'
 import type { ResultadoAsistida } from '@/generated/api'
 import AudioRecorder from '@/modules/capturas/components/AudioRecorder.vue'
 import Button from '@/shared/ui/Button.vue'
@@ -96,11 +100,22 @@ function reinterpret() {
 }
 function onRecorderStatus(state: string, seconds: number) {
   paused.value = state === 'PAUSED'
-  emit('recording-state', recording.value && ['RECORDING', 'PAUSED'].includes(state), paused.value, seconds)
+  emit(
+    'recording-state',
+    recording.value && ['RECORDING', 'PAUSED'].includes(state),
+    paused.value,
+    seconds,
+  )
 }
-function pausar() { recorder.value?.pauseRecording() }
-function reanudar() { recorder.value?.resumeRecording() }
-function finalizar() { recorder.value?.stopRecording() }
+function pausar() {
+  recorder.value?.pauseRecording()
+}
+function reanudar() {
+  recorder.value?.resumeRecording()
+}
+function finalizar() {
+  recorder.value?.stopRecording()
+}
 async function seleccionarAudio(event: Event) {
   const input = event.target as HTMLInputElement
   const archivo = input.files?.[0]
@@ -222,12 +237,23 @@ function cancel() {
       @change="seleccionarAudio"
     />
     <div v-if="recording" class="voice-live">
-      <AudioRecorder ref="recorder" compact @ready="(audio) => audio && send(audio)" @status="onRecorderStatus" />
+      <AudioRecorder
+        ref="recorder"
+        compact
+        @ready="(audio) => audio && send(audio)"
+        @status="onRecorderStatus"
+      />
       <div class="voice-live-actions" role="group" aria-label="Controles de grabación">
-        <Button v-if="!paused" variant="secondary" @click="pausar"><Pause :size="17" aria-hidden="true" /> Pausar</Button>
-        <Button v-else variant="secondary" @click="reanudar"><Play :size="17" aria-hidden="true" /> Reanudar</Button>
+        <Button v-if="!paused" variant="secondary" @click="pausar"
+          ><Pause :size="17" aria-hidden="true" /> Pausar</Button
+        >
+        <Button v-else variant="secondary" @click="reanudar"
+          ><Play :size="17" aria-hidden="true" /> Reanudar</Button
+        >
         <Button @click="finalizar"><Square :size="17" aria-hidden="true" /> Finalizar</Button>
-        <Button variant="danger" @click="cancel"><X :size="17" aria-hidden="true" /> Cancelar</Button>
+        <Button variant="danger" @click="cancel"
+          ><X :size="17" aria-hidden="true" /> Cancelar</Button
+        >
       </div>
     </div>
     <div v-if="voice.processing.value" class="voice-processing" role="status" aria-live="polite">

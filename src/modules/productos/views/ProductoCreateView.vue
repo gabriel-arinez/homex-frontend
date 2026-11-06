@@ -121,7 +121,8 @@ async function save(body: ProductoWritable, images: LocalImage[]) {
 function cancel() {
   if (saving.value) return
   exitError.value = ''
-  if (createdId.value !== null || dirty.value || productForm.value?.hasRecording()) confirmCancel.value = true
+  if (createdId.value !== null || dirty.value || productForm.value?.hasRecording())
+    confirmCancel.value = true
   else void router.push(destination())
 }
 function stay() {

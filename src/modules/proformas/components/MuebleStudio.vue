@@ -103,7 +103,12 @@ const galleryError = ref('')
 const galleryRef = ref<InstanceType<typeof ImageGallery> | null>(null)
 const galleryBusy = ref(false)
 const galleryStatus = ref({ confirmed: 0, pending: 0, busy: false, error: false })
-function onGalleryStatus(value: { confirmed: number; pending: number; busy: boolean; error: boolean }) {
+function onGalleryStatus(value: {
+  confirmed: number
+  pending: number
+  busy: boolean
+  error: boolean
+}) {
   galleryStatus.value = value
 }
 const imageStepStatus = computed(() => {
@@ -252,9 +257,17 @@ async function seleccionarApartado(id: typeof seccion.value) {
       @click="voiceOpen = true"
     >
       <Mic :size="17" aria-hidden="true" />
-      {{ voiceProcessing ? 'Interpretando audio' : voicePaused ? 'Grabación pausada' : 'Grabación en curso' }}
+      {{
+        voiceProcessing
+          ? 'Interpretando audio'
+          : voicePaused
+            ? 'Grabación pausada'
+            : 'Grabación en curso'
+      }}
       <template v-if="voiceActive">
-        · {{ String(Math.floor(voiceElapsed / 60)).padStart(2, '0') }}:{{ String(voiceElapsed % 60).padStart(2, '0') }}
+        · {{ String(Math.floor(voiceElapsed / 60)).padStart(2, '0') }}:{{
+          String(voiceElapsed % 60).padStart(2, '0')
+        }}
       </template>
       · Volver al asistente
     </button>
@@ -274,7 +287,12 @@ async function seleccionarApartado(id: typeof seccion.value) {
               <h2 id="studio-voice-title">Completar mueble por voz</h2>
               <span>Describe el mueble y revisa la propuesta antes de incorporarla.</span>
             </div>
-            <button class="studio-voice-close" type="button" aria-label="Minimizar asistente de voz" @click="voiceOpen = false">
+            <button
+              class="studio-voice-close"
+              type="button"
+              aria-label="Minimizar asistente de voz"
+              @click="voiceOpen = false"
+            >
               <X :size="20" aria-hidden="true" />
             </button>
           </header>
@@ -307,7 +325,10 @@ async function seleccionarApartado(id: typeof seccion.value) {
         /></span>
         <span class="studio-step-label"
           ><small>{{ String(i + 1).padStart(2, '0') }}</small
-          >{{ item.titulo }}<small v-if="item.id === 'imagenes' && imageStepStatus === 'pending'"> · Opcional</small></span
+          >{{ item.titulo
+          }}<small v-if="item.id === 'imagenes' && imageStepStatus === 'pending'">
+            · Opcional</small
+          ></span
         >
         <AlertCircle
           v-if="estadoApartados[item.id] === 'issues'"
@@ -493,9 +514,7 @@ async function seleccionarApartado(id: typeof seccion.value) {
         @changed="emit('changed')"
         @cancel="requestCloseStudio"
         @request-section="editarDesdeRevision($event)"
-        @section-status="
-          estadoApartados = { ...$event, imagenes: imageStepStatus }
-        "
+        @section-status="estadoApartados = { ...$event, imagenes: imageStepStatus }"
         @type-created="emit('typeCreated', $event)"
       />
     </fieldset>
@@ -515,7 +534,10 @@ async function seleccionarApartado(id: typeof seccion.value) {
       description="Hay una grabación activa. Si vuelves a la proforma perderás el audio que todavía no finalizaste."
       confirm-label="Descartar grabación y volver"
       @close="leaveVoiceConfirm = false"
-      @confirm="leaveVoiceConfirm = false; emit('cancel')"
+      @confirm="
+        leaveVoiceConfirm = false
+        emit('cancel')
+      "
     />
   </section>
 </template>
@@ -584,8 +606,14 @@ async function seleccionarApartado(id: typeof seccion.value) {
   font-weight: 750;
   letter-spacing: 0.06em;
 }
-.studio-voice-header h2 { margin: 0.4rem 0; font-size: 1.45rem; }
-.studio-voice-header span { color: var(--color-text-secondary); font-size: 0.84rem; }
+.studio-voice-header h2 {
+  margin: 0.4rem 0;
+  font-size: 1.45rem;
+}
+.studio-voice-header span {
+  color: var(--color-text-secondary);
+  font-size: 0.84rem;
+}
 .studio-voice-close {
   flex: none;
   display: grid;
@@ -598,7 +626,9 @@ async function seleccionarApartado(id: typeof seccion.value) {
   border-radius: var(--radius-control);
   cursor: pointer;
 }
-.studio-voice-workflow { padding: var(--space-5); }
+.studio-voice-workflow {
+  padding: var(--space-5);
+}
 .studio-header {
   display: flex;
   justify-content: space-between;

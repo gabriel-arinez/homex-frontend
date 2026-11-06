@@ -15,7 +15,9 @@ const r = useAudioRecorder(),
       `${String(Math.floor(r.elapsed.value / 60)).padStart(2, '0')}:${String(r.elapsed.value % 60).padStart(2, '0')}`,
   )
 watch(r.blob, (value) => emit('ready', value))
-watch([r.state, r.elapsed], () => emit('status', r.state.value, r.elapsed.value), { immediate: true })
+watch([r.state, r.elapsed], () => emit('status', r.state.value, r.elapsed.value), {
+  immediate: true,
+})
 async function start() {
   await r.start()
   emit('ready', null)
@@ -41,7 +43,11 @@ function cancel() {
 <template>
   <section class="recorder" aria-labelledby="recorder-title">
     <h2 id="recorder-title">Grabación de audio</h2>
-    <p v-if="r.state.value === 'RECORDING' || r.state.value === 'PAUSED'" role="status" class="recording">
+    <p
+      v-if="r.state.value === 'RECORDING' || r.state.value === 'PAUSED'"
+      role="status"
+      class="recording"
+    >
       <span aria-hidden="true"></span>{{ r.state.value === 'PAUSED' ? 'Pausado' : 'Grabando' }}
       {{ time }} / 03:00
     </p>
@@ -70,10 +76,16 @@ function cancel() {
         :disabled="!r.supported.value"
         @click="start"
         ><Mic />Grabar</Button
-      ><Button v-if="r.state.value === 'RECORDING'" variant="secondary" @click="r.pause"><Pause />Pausar</Button
-      ><Button v-if="r.state.value === 'PAUSED'" variant="secondary" @click="r.resume"><Play />Reanudar</Button
-      ><Button v-if="['RECORDING', 'PAUSED'].includes(r.state.value)" @click="stop"><Square />Finalizar</Button
-      ><Button v-if="['RECORDING', 'PAUSED'].includes(r.state.value)" variant="secondary" @click="cancel"
+      ><Button v-if="r.state.value === 'RECORDING'" variant="secondary" @click="r.pause"
+        ><Pause />Pausar</Button
+      ><Button v-if="r.state.value === 'PAUSED'" variant="secondary" @click="r.resume"
+        ><Play />Reanudar</Button
+      ><Button v-if="['RECORDING', 'PAUSED'].includes(r.state.value)" @click="stop"
+        ><Square />Finalizar</Button
+      ><Button
+        v-if="['RECORDING', 'PAUSED'].includes(r.state.value)"
+        variant="secondary"
+        @click="cancel"
         ><X />Cancelar</Button
       ><Button v-if="r.state.value === 'READY'" variant="secondary" @click="cancel"
         ><RotateCcw />Descartar y repetir</Button

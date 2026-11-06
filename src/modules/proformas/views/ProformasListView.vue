@@ -687,12 +687,24 @@ onBeforeUnmount(() => {
   border-collapse: collapse;
   table-layout: fixed;
 }
-.col-quote { width: 22%; }
-.col-client { width: 20%; }
-.col-date { width: 22%; }
-.col-status { width: 14%; }
-.col-total { width: 15%; }
-.col-actions { width: 7%; }
+.col-quote {
+  width: 22%;
+}
+.col-client {
+  width: 20%;
+}
+.col-date {
+  width: 22%;
+}
+.col-status {
+  width: 14%;
+}
+.col-total {
+  width: 15%;
+}
+.col-actions {
+  width: 7%;
+}
 .proforma-table th,
 .proforma-table td {
   text-align: left;

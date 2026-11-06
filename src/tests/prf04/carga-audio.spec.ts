@@ -120,7 +120,10 @@ describe('PRF-04 carga de grabaciones', () => {
     const crear = vi.spyOn(asistidasService, 'create')
     vi.mocked(readAudioDuration).mockResolvedValueOnce(301)
     const wrapper = montar()
-    await wrapper.findAll('button').find((button) => button.text().includes('Seleccionar archivo'))!.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Seleccionar archivo'))!
+      .trigger('click')
     await seleccionar(wrapper, new File(['audio'], 'excesivo.wav', { type: 'audio/wav' }))
     await flushPromises()
     expect(wrapper.text()).toContain('superar 5 minutos')

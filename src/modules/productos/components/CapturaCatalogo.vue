@@ -1,7 +1,22 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { AlertTriangle, CheckCircle2, FileAudio, Mic, RotateCcw, Square, Pause, Play, X } from '@lucide/vue'
-import { ALLOWED_AUDIO_EXTENSIONS, MAX_AUDIO_BYTES, MAX_UPLOAD_SECONDS, readAudioDuration } from '@/modules/capturas/audioLimits'
+import {
+  AlertTriangle,
+  CheckCircle2,
+  FileAudio,
+  Mic,
+  RotateCcw,
+  Square,
+  Pause,
+  Play,
+  X,
+} from '@lucide/vue'
+import {
+  ALLOWED_AUDIO_EXTENSIONS,
+  MAX_AUDIO_BYTES,
+  MAX_UPLOAD_SECONDS,
+  readAudioDuration,
+} from '@/modules/capturas/audioLimits'
 import type {
   CamposCatalogo,
   CategoriaEnum,
@@ -67,7 +82,12 @@ async function startRecording() {
 function onRecorderStatus(state: string, elapsed: number) {
   paused.value = state === 'PAUSED'
   recordingElapsed.value = elapsed
-  emit('recording-state', recording.value && ['RECORDING', 'PAUSED'].includes(state), paused.value, elapsed)
+  emit(
+    'recording-state',
+    recording.value && ['RECORDING', 'PAUSED'].includes(state),
+    paused.value,
+    elapsed,
+  )
 }
 function pauseRecording() {
   recorder.value?.pauseRecording()
@@ -274,7 +294,12 @@ async function upload(event: Event) {
         @ready="onRecorded"
         @status="onRecorderStatus"
       />
-      <div v-if="recording" class="recording-toolbar" role="group" aria-label="Controles de grabación">
+      <div
+        v-if="recording"
+        class="recording-toolbar"
+        role="group"
+        aria-label="Controles de grabación"
+      >
         <Button v-if="!paused" variant="secondary" @click="pauseRecording">
           <Pause :size="17" aria-hidden="true" /> Pausar
         </Button>
