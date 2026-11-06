@@ -150,7 +150,7 @@ describe('Voz en creación de catálogo', () => {
     expect(w.findComponent(CapturaCatalogo).exists()).toBe(true)
     expect(w.get('.voice-mini').text()).toContain('Grabación en curso')
     await w.get('.voice-mini').trigger('click')
-    expect(w.get('.voice-backdrop').attributes('style')).not.toContain('display: none')
+    expect(w.get('.voice-backdrop').isVisible()).toBe(true)
     w.unmount()
   })
 
