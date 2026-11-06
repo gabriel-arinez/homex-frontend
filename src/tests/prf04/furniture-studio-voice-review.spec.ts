@@ -26,7 +26,9 @@ describe('Furniture Studio: consentimiento antes de aplicar propuesta PRF04', ()
     })
     try {
       expect(wrapper.text()).toContain('Descripción por voz')
-      expect(wrapper.text()).toContain('Dicta nombre, medidas, materiales o características del mueble.')
+      expect(wrapper.text()).toContain(
+        'Dicta nombre, medidas, materiales o características del mueble.',
+      )
       expect(wrapper.text()).toContain('Revisar transcripción')
       expect(wrapper.text()).toContain('Corrige las palabras o códigos antes de aplicar los datos.')
       const transcript = wrapper.get('textarea#transcripcion-corregida')
@@ -35,7 +37,12 @@ describe('Furniture Studio: consentimiento antes de aplicar propuesta PRF04', ()
         'Transcripción / texto corregido',
       )
       expect(wrapper.find('details.voice-original').exists()).toBe(false)
-      expect(wrapper.findAll('button').find((b) => b.text().includes('Reinterpretar texto'))?.attributes('disabled')).toBeDefined()
+      expect(
+        wrapper
+          .findAll('button')
+          .find((b) => b.text().includes('Reinterpretar texto'))
+          ?.attributes('disabled'),
+      ).toBeDefined()
       const upload = wrapper
         .findAll('button')
         .find((button) => button.text().includes('Seleccionar archivo'))

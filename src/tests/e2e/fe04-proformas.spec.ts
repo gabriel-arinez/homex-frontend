@@ -1075,7 +1075,9 @@ for (const width of [360, 768, 1440]) {
     await expect(page.getByRole('dialog', { name: 'Completar mueble por voz' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Descripción por voz' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Revisar transcripción' })).toBeVisible()
-    await expect(page.getByRole('textbox', { name: 'Transcripción / texto corregido' })).toBeVisible()
+    await expect(
+      page.getByRole('textbox', { name: 'Transcripción / texto corregido' }),
+    ).toBeVisible()
     await page.getByText('Ver transcripción original', { exact: true }).click()
     await expect(
       page.locator('details').filter({ hasText: 'Ver transcripción original' }),

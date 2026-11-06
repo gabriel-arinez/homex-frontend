@@ -215,36 +215,36 @@ function cancel() {
       description="Dicta nombre, medidas, materiales o características del mueble."
     >
       <VoiceCaptureControls
-      :recording="recording"
-      :paused="paused"
-      :disabled="voice.processing.value"
-      @record="start('record')"
-      @upload="start('upload')"
-      @pause="pausar"
-      @resume="reanudar"
-      @finish="finalizar"
-      @cancel="cancel"
-    >
-      <template #recorder>
-        <AudioRecorder
-          v-if="recording"
-          ref="recorder"
-          compact
-          @ready="(audio) => audio && send(audio)"
-          @status="onRecorderStatus"
-        />
-      </template>
-    </VoiceCaptureControls>
-    <input
-      ref="fileInput"
-      class="visually-hidden-audio"
-      type="file"
-      tabindex="-1"
-      :disabled="!puedeSeleccionarAudio || voice.processing.value"
-      accept=".wav,.mp3,.m4a,.ogg,.webm"
-      aria-hidden="true"
-      @change="seleccionarAudio"
-    />
+        :recording="recording"
+        :paused="paused"
+        :disabled="voice.processing.value"
+        @record="start('record')"
+        @upload="start('upload')"
+        @pause="pausar"
+        @resume="reanudar"
+        @finish="finalizar"
+        @cancel="cancel"
+      >
+        <template #recorder>
+          <AudioRecorder
+            v-if="recording"
+            ref="recorder"
+            compact
+            @ready="(audio) => audio && send(audio)"
+            @status="onRecorderStatus"
+          />
+        </template>
+      </VoiceCaptureControls>
+      <input
+        ref="fileInput"
+        class="visually-hidden-audio"
+        type="file"
+        tabindex="-1"
+        :disabled="!puedeSeleccionarAudio || voice.processing.value"
+        accept=".wav,.mp3,.m4a,.ogg,.webm"
+        aria-hidden="true"
+        @change="seleccionarAudio"
+      />
     </VoiceSection>
     <div v-if="voice.processing.value" class="voice-processing" role="status" aria-live="polite">
       <FileAudio :size="20" aria-hidden="true" />
