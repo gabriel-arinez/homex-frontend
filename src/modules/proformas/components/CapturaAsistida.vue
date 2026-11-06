@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
-import { FileAudio } from '@lucide/vue'
+import { FileAudio, RotateCcw } from '@lucide/vue'
 import {
   MAX_AUDIO_BYTES,
   MAX_UPLOAD_SECONDS,
@@ -9,6 +9,7 @@ import {
 import type { ResultadoAsistida } from '@/generated/api'
 import AudioRecorder from '@/modules/capturas/components/AudioRecorder.vue'
 import VoiceCaptureControls from '@/modules/capturas/components/VoiceCaptureControls.vue'
+import VoiceSection from '@/modules/capturas/components/VoiceSection.vue'
 import Button from '@/shared/ui/Button.vue'
 import Modal from '@/shared/ui/Modal.vue'
 import { useCapturaAsistida } from '../composables/useCapturaAsistida'
@@ -208,11 +209,15 @@ function cancel() {
 </script>
 <template>
   <section class="voice-workflow" aria-label="Asistencia por voz">
-    <VoiceCaptureControls
+    <VoiceSection
+      icon="mic"
+      title="Descripción por voz"
+      description="Dicta nombre, medidas, materiales o características del mueble."
+    >
+      <VoiceCaptureControls
       :recording="recording"
       :paused="paused"
       :disabled="voice.processing.value"
-      hint="Describe tu mueble. Graba hasta 3 minutos o sube audio de hasta 20 MB y 5 minutos."
       @record="start('record')"
       @upload="start('upload')"
       @pause="pausar"
@@ -240,6 +245,7 @@ function cancel() {
       aria-hidden="true"
       @change="seleccionarAudio"
     />
+    </VoiceSection>
     <div v-if="voice.processing.value" class="voice-processing" role="status" aria-live="polite">
       <FileAudio :size="20" aria-hidden="true" />
       <div>
@@ -250,29 +256,40 @@ function cancel() {
     </div>
     <p v-if="fileError" role="alert" class="voice-error">{{ fileError }}</p>
     <p v-if="voice.error.value" role="alert" class="voice-error">{{ voice.error.value }}</p>
-    <details v-if="original" class="voice-transcript">
-      <summary>Ver transcripción original</summary>
-      <blockquote>{{ original }}</blockquote>
-      <p v-if="lastInterpretation && lastInterpretation !== original">
-        Última interpretación: {{ lastInterpretation }}
-      </p>
-      <label for="transcripcion-corregida">Corregir texto para una nueva interpretación</label>
+    <VoiceSection
+      icon="review"
+      title="Revisar transcripción"
+      description="Corrige las palabras o códigos antes de aplicar los datos."
+    >
+      <details v-if="original" class="voice-original">
+        <summary>Ver transcripción original</summary>
+        <blockquote>{{ original }}</blockquote>
+        <p v-if="lastInterpretation && lastInterpretation !== original">
+          Última interpretación: {{ lastInterpretation }}
+        </p>
+      </details>
+      <label class="transcript-label" for="transcripcion-corregida">
+        Transcripción / texto corregido
+      </label>
       <textarea
         id="transcripcion-corregida"
         v-model="corrected"
         :disabled="voice.processing.value"
         rows="4"
+        placeholder="Ej. Mesa de reunión para diez personas, ancho…, largo…, materiales…"
       />
       <Button
+        variant="secondary"
         :disabled="voice.processing.value || !corrected.trim() || corrected === lastInterpretation"
         @click="reinterpret"
       >
-        Interpretar texto corregido
+        <RotateCcw :size="16" aria-hidden="true" />
+        Reinterpretar texto
       </Button>
-    </details>
-    <p v-else-if="hasResult" role="status">
-      La interpretación se ha procesado. Revisa la ficha antes de incorporarla.
-    </p>
+      <p v-if="hasResult && !original" role="status">
+        La interpretación se ha procesado. Revisa la ficha antes de incorporarla.
+      </p>
+    </VoiceSection>
     <Modal
       :open="confirm"
       title="Reemplazar información del mueble"
@@ -302,18 +319,6 @@ function cancel() {
   overflow: hidden;
   white-space: nowrap;
 }
-.voice-cancel {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  justify-self: start;
-  border: 0;
-  background: transparent;
-  color: var(--color-text-secondary);
-  font: inherit;
-  font-size: 0.8rem;
-  cursor: pointer;
-}
 .voice-processing {
   display: flex;
   align-items: center;
@@ -338,39 +343,40 @@ function cancel() {
 .voice-error {
   color: var(--color-danger-text);
 }
-.voice-transcript {
-  background: var(--color-surface);
+.voice-original {
   border: 1px solid var(--color-border);
-  padding: var(--space-4);
-  border-radius: var(--radius-card);
-  max-width: 58rem;
-}
-.voice-transcript summary {
-  font-weight: 650;
-  cursor: pointer;
-}
-.voice-transcript blockquote {
-  border-left: 2px solid var(--color-primary);
-  padding-left: 1rem;
-  margin: 1rem 0;
-  color: var(--color-text-secondary);
+  border-radius: var(--radius-control);
+  padding: var(--space-3);
   overflow-wrap: anywhere;
 }
-.voice-transcript label {
-  display: block;
-  margin: 1rem 0 0.4rem;
+.voice-original summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+.voice-original blockquote {
+  border-left: 2px solid var(--color-primary);
+  margin: 0.75rem 0;
+  padding-left: 1rem;
+  color: var(--color-text-secondary);
+}
+.voice-original p {
+  color: var(--color-text-secondary);
+  font-size: 0.83rem;
+}
+.transcript-label {
+  font-size: 0.85rem;
   font-weight: 600;
 }
-.voice-transcript textarea {
+#transcripcion-corregida {
   width: 100%;
   display: block;
-  padding: var(--space-3);
+  min-height: 7rem;
+  padding: 0.75rem;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text);
   font: inherit;
   resize: vertical;
-  margin-bottom: 0.7rem;
 }
 </style>
