@@ -283,7 +283,8 @@ async function upload(event: Event) {
           type="file"
           accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm"
           :disabled="processing || recording || requesting"
-          aria-label="Seleccionar audio del dispositivo"
+          tabindex="-1"
+          aria-hidden="true"
           @change="upload"
         />
       </div>

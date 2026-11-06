@@ -866,7 +866,10 @@ test('PRF-01 conserva cliente y catálogo sin reabrir línea obsoleta tras cance
   await expect(
     page.getByRole('heading', { name: 'Seleccionar producto del catálogo' }),
   ).toBeVisible()
-  await page.getByRole('button', { name: 'Cliente', exact: true }).click()
+  await page
+    .getByRole('navigation', { name: 'Apartados de la proforma' })
+    .getByRole('button', { name: /Cliente/ })
+    .click()
   await expect(page.getByRole('region').getByText('Ana Pérez', { exact: true })).toBeVisible()
 })
 

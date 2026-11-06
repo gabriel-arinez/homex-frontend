@@ -233,7 +233,7 @@ function cancel() {
       tabindex="-1"
       :disabled="!puedeSeleccionarAudio || voice.processing.value"
       accept=".wav,.mp3,.m4a,.ogg,.webm"
-      aria-label="Seleccionar archivo de audio"
+      aria-hidden="true"
       @change="seleccionarAudio"
     />
     <div v-if="recording" class="voice-live">
