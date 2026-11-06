@@ -1073,6 +1073,9 @@ for (const width of [360, 768, 1440]) {
     // El asistente persiste minimizado tras aplicar la propuesta: abrirlo para revisar el ASR.
     await page.getByRole('button', { name: 'Completar por voz' }).click()
     await expect(page.getByRole('dialog', { name: 'Completar mueble por voz' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Descripción por voz' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Revisar transcripción' })).toBeVisible()
+    await expect(page.getByRole('textbox', { name: 'Transcripción / texto corregido' })).toBeVisible()
     await page.getByText('Ver transcripción original', { exact: true }).click()
     await expect(
       page.locator('details').filter({ hasText: 'Ver transcripción original' }),
@@ -1085,9 +1088,9 @@ for (const width of [360, 768, 1440]) {
         version_proyeccion: terminal === 'VERSION' ? 'PRF04_1' : 'PRF04_2',
       }
       await page
-        .getByLabel('Corregir texto para una nueva interpretación')
+        .getByRole('textbox', { name: 'Transcripción / texto corregido' })
         .fill(`Corrección ${terminal}`)
-      await page.getByRole('button', { name: 'Interpretar texto corregido' }).click()
+      await page.getByRole('button', { name: 'Reinterpretar texto' }).click()
       await expect(
         page.getByRole('alert').filter({ hasText: 'No se obtuvo una propuesta utilizable' }),
       ).toBeVisible()
