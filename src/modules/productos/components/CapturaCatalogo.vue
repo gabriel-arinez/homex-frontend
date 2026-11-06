@@ -3,13 +3,8 @@ import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import {
   AlertTriangle,
   CheckCircle2,
-  FileAudio,
   Mic,
   RotateCcw,
-  Square,
-  Pause,
-  Play,
-  X,
 } from '@lucide/vue'
 import {
   ALLOWED_AUDIO_EXTENSIONS,
@@ -24,6 +19,7 @@ import type {
   ValorCatalogoPublico,
 } from '@/generated/api'
 import AudioRecorder from '@/modules/capturas/components/AudioRecorder.vue'
+import VoiceCaptureControls from '@/modules/capturas/components/VoiceCaptureControls.vue'
 import Button from '@/shared/ui/Button.vue'
 import { catalogoCapturaService } from '../services/catalogoCapturaService'
 
@@ -256,61 +252,37 @@ async function upload(event: Event) {
           <p>Dicta nombre, marca, colores o características del producto.</p>
         </div>
       </div>
-      <div class="voice-source-actions" role="group" aria-label="Origen del audio">
-        <Button
-          class="source-action source-record"
-          :disabled="processing || requesting"
-          @click="startRecording"
-        >
-          <Square v-if="recording" :size="28" aria-hidden="true" />
-          <Mic v-else :size="28" aria-hidden="true" />
-          <strong>{{ recording ? 'Finalizar grabación' : 'Grabar descripción' }}</strong>
-          <small>{{ recording ? 'Finalizar y transcribir' : 'Máximo 3 minutos' }}</small>
-        </Button>
-        <Button
-          variant="secondary"
-          class="source-action"
-          :disabled="processing || recording || requesting"
-          @click="chooseAudio"
-        >
-          <FileAudio :size="28" aria-hidden="true" />
-          <strong>Seleccionar archivo</strong>
-          <small>Hasta 20 MB y 5 minutos</small>
-        </Button>
-        <input
-          ref="fileInput"
-          class="visually-hidden"
-          type="file"
-          accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm"
-          :disabled="processing || recording || requesting"
-          tabindex="-1"
-          aria-hidden="true"
-          @change="upload"
-        />
-      </div>
-      <AudioRecorder
-        v-if="recording"
-        ref="recorder"
-        compact
-        @ready="onRecorded"
-        @status="onRecorderStatus"
-      />
-      <div
-        v-if="recording"
-        class="recording-toolbar"
-        role="group"
-        aria-label="Controles de grabación"
+      <VoiceCaptureControls
+        :recording="recording"
+        :paused="paused"
+        :disabled="processing || requesting"
+        @record="startRecording"
+        @upload="chooseAudio"
+        @pause="pauseRecording"
+        @resume="resumeRecording"
+        @finish="recorder?.stopRecording()"
+        @cancel="cancelRecording"
       >
-        <Button v-if="!paused" variant="secondary" @click="pauseRecording">
-          <Pause :size="17" aria-hidden="true" /> Pausar
-        </Button>
-        <Button v-else variant="secondary" @click="resumeRecording">
-          <Play :size="17" aria-hidden="true" /> Reanudar
-        </Button>
-        <Button variant="danger" @click="cancelRecording">
-          <X :size="17" aria-hidden="true" /> Cancelar grabación
-        </Button>
-      </div>
+        <template #recorder>
+          <AudioRecorder
+            v-if="recording"
+            ref="recorder"
+            compact
+            @ready="onRecorded"
+            @status="onRecorderStatus"
+          />
+        </template>
+      </VoiceCaptureControls>
+      <input
+        ref="fileInput"
+        class="visually-hidden"
+        type="file"
+        accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm"
+        :disabled="processing || recording || requesting"
+        tabindex="-1"
+        aria-hidden="true"
+        @change="upload"
+      />
     </div>
 
     <div v-if="processing" class="processing-note" role="status">
@@ -401,12 +373,6 @@ async function upload(event: Event) {
   </section>
 </template>
 <style scoped>
-.recording-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.65rem;
-  margin-top: 0.65rem;
-}
 .voice-catalog {
   display: grid;
   gap: var(--space-5);
@@ -438,31 +404,6 @@ async function upload(event: Event) {
   font-size: 0.82rem;
   color: var(--color-text-secondary);
   line-height: 1.5;
-}
-.voice-source-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
-  position: relative;
-}
-.voice-source-actions :deep(.source-action) {
-  min-width: 0;
-  min-height: 7.5rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 0.45rem;
-  white-space: normal;
-  text-align: center;
-}
-.voice-source-actions :deep(.source-action strong) {
-  font-size: 0.93rem;
-}
-.voice-source-actions :deep(.source-action small) {
-  font-size: 0.76rem;
-  font-weight: 400;
-  opacity: 0.9;
 }
 .visually-hidden {
   position: absolute;
@@ -593,10 +534,6 @@ async function upload(event: Event) {
 @media (max-width: 36rem) {
   .voice-catalog {
     padding: var(--space-4);
-  }
-  .voice-source-actions :deep(.source-action) {
-    min-height: 7rem;
-    padding: 0.65rem;
   }
 }
 @media (prefers-reduced-motion: reduce) {
