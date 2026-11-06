@@ -85,6 +85,9 @@ describe('Bandeja de proformas HOMEX', () => {
       const menu = document.body.querySelector('[role="menu"]')
       expect(menu?.textContent).toContain('Continuar edición')
       expect(menu?.textContent).toContain('Ver resumen y gestión')
+      expect(menu?.textContent).toContain('Anular proforma')
+      expect(menu?.querySelector('a[href*="accion=cancel"]')).not.toBeNull()
+      expect(menu?.querySelector('a[href*="accion=cancel"] svg[aria-hidden="true"]')).not.toBeNull()
       expect(menu?.querySelector('a[href="/proformas/1/editar"]')).not.toBeNull()
       expect(menu?.querySelector('a[href="/proformas/1"]')).not.toBeNull()
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
@@ -101,23 +104,27 @@ describe('Bandeja de proformas HOMEX', () => {
     const wrapper = mount(ProformasListView, { global: { plugins: [router] } })
     try {
       await flushPromises()
-      await wrapper.get('button.proforma-more-filters').trigger('click')
+      expect(wrapper.find('button.proforma-more-filters').exists()).toBe(false)
+      expect(wrapper.find('.client-picker').exists()).toBe(false)
+      expect(wrapper.get('input[name="fecha-desde-proforma"]').isVisible()).toBe(true)
       await wrapper.get('#estado-proforma').setValue('BORRADOR')
-      await wrapper.get('#moneda-proforma-filtro').setValue('USD')
       await wrapper.get('input[name="fecha-desde-proforma"]').setValue('2026-10-01')
       await wrapper.get('input[name="fecha-hasta-proforma"]').setValue('2026-10-31')
+      expect(wrapper.get('input[name="fecha-desde-proforma"]').attributes('max')).toBe('2026-10-31')
+      expect(wrapper.get('input[name="fecha-hasta-proforma"]').attributes('min')).toBe('2026-10-01')
+      expect(
+        wrapper.get('button[aria-label="Limpiar filtros"]').attributes('disabled'),
+      ).toBeUndefined()
       await new Promise((resolve) => setTimeout(resolve, 30))
       await flushPromises()
       expect(list).toHaveBeenLastCalledWith(
         expect.objectContaining({
           estado: 'BORRADOR',
-          moneda: 'USD',
           fecha_desde: '2026-10-01',
           fecha_hasta: '2026-10-31',
           page: 1,
         }),
       )
-      expect(router.currentRoute.value.query.moneda).toBe('USD')
       expect(router.currentRoute.value.query.fecha_desde).toBe('2026-10-01')
     } finally {
       wrapper.unmount()

@@ -52,6 +52,18 @@ async function mounted(path = '/proformas/nueva') {
 }
 
 describe('AP3 editor integral', () => {
+  it('habilita guardar solo si hay cambios reales y lo deshabilita al revertirlos', async () => {
+    references()
+    const { wrapper } = await mounted()
+    const save = wrapper.get('button.editor-save-draft')
+    expect(save.attributes('disabled')).toBeDefined()
+    await click(wrapper, 'Condiciones')
+    await wrapper.get('#titulo').setValue('Nueva propuesta')
+    expect(save.attributes('disabled')).toBeUndefined()
+    await wrapper.get('#titulo').setValue('')
+    expect(save.attributes('disabled')).toBeDefined()
+    wrapper.unmount()
+  })
   it('desglosa cantidad, precio unitario, descuento e importe de la línea con claridad', async () => {
     references()
     vi.spyOn(proformasService, 'get').mockResolvedValue({
@@ -107,7 +119,7 @@ describe('AP3 editor integral', () => {
     expect(wrapper.get('.line-total').text()).toContain('Importe de línea')
     await lineMetrics.trigger('click')
     await flushPromises()
-    expect(wrapper.text()).toContain('Valores guardados en la proforma')
+    expect(wrapper.text()).toContain('Resumen de la línea')
     wrapper.unmount()
   })
 
@@ -168,8 +180,7 @@ describe('AP3 editor integral', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('Importe negociado histórico')
     expect(wrapper.text()).toContain('321.75')
-    expect(wrapper.text()).toContain('Precio vigente del catálogo')
-    expect(wrapper.text()).toContain('720.00')
+    expect(wrapper.text()).not.toContain('Precio vigente del catálogo')
     expect(wrapper.find('.viewer-footer .context-action').exists()).toBe(false)
     wrapper.unmount()
   })

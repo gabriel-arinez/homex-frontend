@@ -1361,17 +1361,35 @@ test('@a11y FE04 bandeja de proformas usa menú único y visualización de solo 
   await actions.click()
   await expect(page.getByRole('menuitem', { name: 'Continuar edición' })).toBeVisible()
   await expect(page.getByRole('menuitem', { name: 'Ver resumen y gestión' })).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: 'Anular proforma' })).toBeVisible()
   const accessibility = await new AxeBuilder({ page }).include('.proforma-table').analyze()
   expect(accessibility.violations).toEqual([])
   await page.keyboard.press('Escape')
   await expect(page.getByRole('menuitem', { name: 'Continuar edición' })).toHaveCount(0)
 
-  await page.getByRole('button', { name: 'Más filtros' }).click()
-  await page.locator('#moneda-proforma-filtro').selectOption('USD')
-  await expect(page).toHaveURL(/moneda=USD/)
+  await expect(page.getByRole('button', { name: 'Más filtros' })).toHaveCount(0)
+  await expect(page.locator('input[name="fecha-desde-proforma"]')).toBeVisible()
+  await expect(page.locator('input[name="fecha-hasta-proforma"]')).toBeVisible()
   await page.setViewportSize({ width: 390, height: 844 })
   await noOverflow(page)
   await expect(page.getByRole('button', { name: 'Acciones de la proforma #101' })).toBeVisible()
+})
+
+test('FE04 acciones de bandeja solicitan confirmación antes de anular', async ({ page }) => {
+  await mockBackend(page)
+  let cancellations = 0
+  await page.route('**/api/v1/proformas/1/anular/', async (route) => {
+    cancellations++
+    await route.fulfill({ status: 500 })
+  })
+  await page.goto('/proformas')
+  await page.getByRole('button', { name: 'Acciones de la proforma #101' }).click()
+  await page.getByRole('menuitem', { name: 'Anular proforma' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('heading', { name: 'Anular proforma' })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Cancelar' }).click()
+  await expect(dialog).toHaveCount(0)
+  expect(cancellations).toBe(0)
 })
 
 test('FE04 muestra creación real y alinea totales; histórico sin hora inventada', async ({

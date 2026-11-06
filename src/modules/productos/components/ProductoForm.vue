@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { dateRangeError } from '@/shared/validation/dateRange'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import type {
   CamposCatalogo,
@@ -381,7 +382,7 @@ function submit(): boolean {
         'Revisa los precios de la promoción. El promocional no puede superar al anterior.',
       ]
     }
-    if (form.fecha_inicio && form.fecha_fin && form.fecha_fin < form.fecha_inicio)
+    if (dateRangeError(form.fecha_inicio || '', form.fecha_fin || ''))
       fields.value.promocion = ['La fecha final no puede ser anterior al inicio.']
   }
   if (Object.keys(fields.value).length) {
@@ -825,12 +826,14 @@ onMounted(load)
                   name="inicio"
                   label="Fecha de inicio"
                   type="date"
+                  :max="form.fecha_fin || undefined"
                 />
                 <TextField
                   v-model="form.fecha_fin"
                   name="fin"
                   label="Fecha de finalización"
                   type="date"
+                  :min="form.fecha_inicio || undefined"
                 />
               </div>
               <p v-if="fieldError('promocion')" class="field-error" role="alert">

@@ -1,7 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Check, ClipboardCheck, Download, FileText, Pencil, Paperclip } from '@lucide/vue'
+import {
+  ArrowLeft,
+  Ban,
+  Check,
+  CircleX,
+  ClipboardCheck,
+  Download,
+  FileText,
+  Pencil,
+  Paperclip,
+  RotateCcw,
+} from '@lucide/vue'
 import type { DetalleProforma, Proforma } from '@/generated/api'
 import { ApiError } from '@/shared/api'
 import { downloadBlob } from '@/shared/download/downloadBlob'
@@ -25,7 +36,7 @@ const emit = defineEmits<{ openMenu: [] }>()
 const route = useRoute()
 const router = useRouter()
 const id = Number(route.params.id)
-const quote = ref<Proforma | null>(null)
+const quote = ref<(Proforma & { fecha_vencimiento?: string | null }) | null>(null)
 const { images: quoteImages, ensure: ensureQuoteImages } = useQuoteProductImages()
 const { coverFor: furnitureCoverFor, ensureLines: ensureFurnitureCovers } =
   useQuoteFurnitureCovers()
@@ -40,7 +51,7 @@ const error = ref('')
 const success = ref('')
 const downloadNotice = ref('')
 const lastPedidoId = ref<number | null>(null)
-const confirmAction = ref<'approve' | 'not-completed' | 'reopen' | null>(null)
+const confirmAction = ref<'approve' | 'not-completed' | 'reopen' | 'cancel' | null>(null)
 const listPath = computed(() => retornoAProformas(route.query.returnTo))
 const stateCode = computed(() => quote.value?.estado_info.codigo ?? '')
 const editable = computed(() => ['BORRADOR', 'EN_REVISION'].includes(stateCode.value))
@@ -103,6 +114,16 @@ async function load() {
   error.value = ''
   try {
     await refreshQuote()
+    const action = route.query.accion
+    if (action === 'cancel' && editable.value) confirmAction.value = action
+    if (action === 'approve' && canApprove.value) confirmAction.value = action
+    if (action === 'not-completed' && inReview.value) confirmAction.value = action
+    if (action === 'reopen' && stateCode.value === 'NO_CONCRETADA') confirmAction.value = action
+    if (typeof action === 'string') {
+      const query = { ...route.query }
+      delete query.accion
+      void router.replace({ query })
+    }
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : 'No se pudo cargar la proforma.'
   } finally {
@@ -129,6 +150,9 @@ async function transition() {
       const result = await proformasService.approve(id)
       lastPedidoId.value = result.pedido_id
       success.value = `Proforma aprobada. Pedido #${result.pedido_id} confirmado.`
+    } else if (action === 'cancel') {
+      await proformasService.cancel(id)
+      success.value = 'Proforma anulada.'
     } else if (action === 'not-completed') {
       await proformasService.markNotCompleted(id)
       success.value = 'Proforma marcada como no concretada.'
@@ -201,6 +225,14 @@ onMounted(() => void load())
           <Pencil :size="17" aria-hidden="true" /> Continuar edición
         </Button>
         <Button
+          v-if="editable"
+          variant="danger"
+          :disabled="processing"
+          @click="confirmAction = 'cancel'"
+        >
+          <Ban :size="17" aria-hidden="true" /> Anular proforma
+        </Button>
+        <Button
           v-if="inReview"
           variant="success"
           :disabled="processing || !canApprove"
@@ -214,13 +246,13 @@ onMounted(() => void load())
           variant="secondary"
           :disabled="processing"
           @click="confirmAction = 'not-completed'"
-          >Marcar no concretada</Button
+          ><CircleX :size="17" aria-hidden="true" /> Marcar no concretada</Button
         >
         <Button
           v-if="stateCode === 'NO_CONCRETADA'"
           :disabled="processing"
           @click="confirmAction = 'reopen'"
-          >Reabrir en revisión</Button
+          ><RotateCcw :size="17" aria-hidden="true" /> Reabrir en revisión</Button
         >
       </template>
     </PageHeader>
@@ -296,6 +328,10 @@ onMounted(() => void load())
           <div>
             <dt>Validez</dt>
             <dd>{{ quote.validez_oferta ? `${quote.validez_oferta} días` : 'No definida' }}</dd>
+          </div>
+          <div v-if="quote.fecha_vencimiento">
+            <dt>Último día de validez</dt>
+            <dd>{{ quote.fecha_vencimiento.split('-').reverse().join('/') }}</dd>
           </div>
           <div>
             <dt>Adelanto</dt>
@@ -405,20 +441,30 @@ onMounted(() => void load())
 
     <ConfirmDialog
       :open="Boolean(confirmAction)"
-      :variant="confirmAction === 'approve' ? 'success' : confirmAction === 'not-completed' ? 'danger' : 'info'"
+      :variant="
+        confirmAction === 'approve'
+          ? 'success'
+          : confirmAction === 'not-completed' || confirmAction === 'cancel'
+            ? 'danger'
+            : 'info'
+      "
       :title="
         confirmAction === 'approve'
           ? 'Aprobar y crear pedido'
-          : confirmAction === 'not-completed'
-            ? 'Marcar como no concretada'
-            : 'Reabrir en revisión'
+          : confirmAction === 'cancel'
+            ? 'Anular proforma'
+            : confirmAction === 'not-completed'
+              ? 'Marcar como no concretada'
+              : 'Reabrir en revisión'
       "
       :description="
         confirmAction === 'approve'
           ? 'Esta acción confirmará el pedido y aplicará los movimientos de inventario correspondientes. No se podrá deshacer desde la proforma.'
-          : confirmAction === 'not-completed'
-            ? 'La cotización quedará registrada como no concretada y podrá reabrirse posteriormente.'
-            : 'La proforma volverá a EN REVISIÓN y podrá corregirse antes de aprobarla.'
+          : confirmAction === 'cancel'
+            ? 'La proforma quedará anulada y no podrá editarse ni aprobarse.'
+            : confirmAction === 'not-completed'
+              ? 'La cotización quedará registrada como no concretada y podrá reabrirse posteriormente.'
+              : 'La proforma volverá a EN REVISIÓN y podrá corregirse antes de aprobarla.'
       "
       :confirm-label="confirmAction === 'approve' ? 'Aprobar y crear pedido' : 'Confirmar'"
       @close="confirmAction = null"

@@ -1,19 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Clock3,
-  Eye,
-  Plus,
-  SlidersHorizontal,
-} from '@lucide/vue'
-import type { Cliente, ProformaListado, ValorCatalogoPublico } from '@/generated/api'
+import { ChevronLeft, ChevronRight, Clock3, Eye, Plus, RotateCcw } from '@lucide/vue'
+import type { ProformaListado, ValorCatalogoPublico } from '@/generated/api'
 import { proformasService } from '../services/proformasService'
 import { presentarCreacion } from '../utils/fechaCreacion'
-import ClienteSelector from '../components/ClienteSelector.vue'
 import ProformaActionsMenu from '../components/ProformaActionsMenu.vue'
 import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
 import Badge from '@/shared/ui/Badge.vue'
@@ -23,6 +14,7 @@ import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
 import SearchField from '@/shared/ui/SearchField.vue'
+import { dateRangeError, isValidDate, localToday } from '@/shared/validation/dateRange'
 import Select from '@/shared/ui/Select.vue'
 
 const emit = defineEmits<{ openMenu: [] }>()
@@ -30,9 +22,8 @@ const route = useRoute()
 const router = useRouter()
 const queryString = (key: string) =>
   typeof route.query[key] === 'string' ? String(route.query[key]) : ''
-const validDate = (value: string) =>
-  /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value))
-const routeDate = (key: string) => (validDate(queryString(key)) ? queryString(key) : '')
+const routeDate = (key: string) => (isValidDate(queryString(key)) ? queryString(key) : '')
+const today = localToday()
 const routePage = () => {
   const parsed = Number(queryString('pagina'))
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 1
@@ -50,12 +41,10 @@ const filasConCreacion = computed(() =>
   }),
 )
 const states = ref<ValorCatalogoPublico[]>([])
-const currencies = ref<ValorCatalogoPublico[]>([])
 const loading = ref(true)
 const error = ref('')
 const search = ref(queryString('q'))
 const state = ref(queryString('estado'))
-const currency = ref(queryString('moneda'))
 const customer = ref(
   /^\d+$/.test(queryString('cliente')) && Number(queryString('cliente')) > 0
     ? queryString('cliente')
@@ -67,26 +56,12 @@ const dateTo = ref(routeDate('fecha_hasta'))
 const page = ref(routePage())
 const total = ref(0)
 const size = 10
-const showAdvanced = ref(
-  Boolean(currency.value || customer.value || dateFrom.value || dateTo.value),
-)
 const pages = computed(() => Math.max(1, Math.ceil(total.value / size)))
 const fromItem = computed(() => (page.value - 1) * size + 1)
 const toItem = computed(() => Math.min(total.value, page.value * size))
-const dateError = computed(() =>
-  dateFrom.value && dateTo.value && dateFrom.value > dateTo.value
-    ? 'La fecha inicial no puede ser posterior a la fecha final.'
-    : '',
-)
+const dateError = computed(() => dateRangeError(dateFrom.value, dateTo.value, localToday()))
 const hasFilters = computed(() =>
-  Boolean(
-    search.value.trim() ||
-    state.value ||
-    currency.value ||
-    customer.value ||
-    dateFrom.value ||
-    dateTo.value,
-  ),
+  Boolean(search.value.trim() || state.value || customer.value || dateFrom.value || dateTo.value),
 )
 const filters = computed(() => [
   ...(search.value.trim() ? [{ key: 'q', label: `Búsqueda: ${search.value.trim()}` }] : []),
@@ -95,14 +70,6 @@ const filters = computed(() => [
         {
           key: 'state',
           label: `Estado: ${states.value.find((x) => x.codigo === state.value)?.nombre ?? state.value}`,
-        },
-      ]
-    : []),
-  ...(currency.value
-    ? [
-        {
-          key: 'currency',
-          label: `Moneda: ${currencies.value.find((x) => x.codigo === currency.value)?.nombre ?? currency.value}`,
         },
       ]
     : []),
@@ -142,18 +109,11 @@ function editable(row: ProformaListado) {
 function customerLabel(row: ProformaListado) {
   return row.cliente_resumen?.empresa?.trim() || row.cliente_resumen?.nombre?.trim() || 'Prospecto'
 }
-function selectCustomer(value: Cliente | null) {
-  customerName.value =
-    value?.empresa?.trim() ||
-    (value ? [value.nombres, value.apellidos].filter(Boolean).join(' ').trim() : '') ||
-    ''
-}
 
 function currentQuery() {
   return {
     q: search.value.trim() || undefined,
     estado: state.value || undefined,
-    moneda: currency.value || undefined,
     cliente: customer.value || undefined,
     fecha_desde: dateFrom.value || undefined,
     fecha_hasta: dateTo.value || undefined,
@@ -184,7 +144,6 @@ async function load() {
     const response = await proformasService.list({
       search: search.value.trim() || undefined,
       estado: state.value || undefined,
-      moneda: currency.value || undefined,
       cliente: customer.value ? Number(customer.value) : undefined,
       fecha_desde: dateFrom.value || undefined,
       fecha_hasta: dateTo.value || undefined,
@@ -215,16 +174,15 @@ function scheduleLoad(delay = 0) {
     void load()
   }, delay)
 }
-watch([search, state, currency, customer, dateFrom, dateTo], (_newValues, oldValues) => {
+watch([search, state, customer, dateFrom, dateTo], (_newValues, oldValues) => {
   if (restoringRoute || !mounted) return
   if (page.value !== 1) page.value = 1
   const onlySearchChanged =
     oldValues &&
     state.value === oldValues[1] &&
-    currency.value === oldValues[2] &&
-    customer.value === oldValues[3] &&
-    dateFrom.value === oldValues[4] &&
-    dateTo.value === oldValues[5]
+    customer.value === oldValues[2] &&
+    dateFrom.value === oldValues[3] &&
+    dateTo.value === oldValues[4]
   scheduleLoad(onlySearchChanged ? 300 : 0)
 })
 watch(page, () => {
@@ -238,7 +196,6 @@ watch(
     const incoming = {
       search: queryString('q'),
       state: queryString('estado'),
-      currency: queryString('moneda'),
       customer: /^\d+$/.test(queryString('cliente')) ? queryString('cliente') : '',
       dateFrom: routeDate('fecha_desde'),
       dateTo: routeDate('fecha_hasta'),
@@ -247,7 +204,6 @@ watch(
     if (
       search.value === incoming.search &&
       state.value === incoming.state &&
-      currency.value === incoming.currency &&
       customer.value === incoming.customer &&
       dateFrom.value === incoming.dateFrom &&
       dateTo.value === incoming.dateTo &&
@@ -257,13 +213,10 @@ watch(
     restoringRoute = true
     search.value = incoming.search
     state.value = incoming.state
-    currency.value = incoming.currency
     customer.value = incoming.customer
     dateFrom.value = incoming.dateFrom
     dateTo.value = incoming.dateTo
     page.value = incoming.page
-    if (incoming.currency || incoming.customer || incoming.dateFrom || incoming.dateTo)
-      showAdvanced.value = true
     if (debounce) clearTimeout(debounce)
     await nextTick()
     restoringRoute = false
@@ -273,7 +226,6 @@ watch(
 function removeFilter(key: string) {
   if (key === 'q') search.value = ''
   if (key === 'state') state.value = ''
-  if (key === 'currency') currency.value = ''
   if (key === 'customer') {
     customer.value = ''
     customerName.value = ''
@@ -284,7 +236,6 @@ function removeFilter(key: string) {
 function clearFilters() {
   search.value = ''
   state.value = ''
-  currency.value = ''
   customer.value = ''
   customerName.value = ''
   dateFrom.value = ''
@@ -303,14 +254,6 @@ onMounted(() => {
     })
     .catch(() => {
       states.value = []
-    })
-  void proformasService
-    .options('MONEDA')
-    .then((value) => {
-      currencies.value = value
-    })
-    .catch(() => {
-      currencies.value = []
     })
 })
 onBeforeUnmount(() => {
@@ -363,41 +306,13 @@ onBeforeUnmount(() => {
             ]"
           />
         </div>
-        <button
-          type="button"
-          class="proforma-more-filters"
-          :aria-expanded="showAdvanced"
-          :aria-controls="showAdvanced ? 'proforma-filtros-avanzados' : undefined"
-          @click="showAdvanced = !showAdvanced"
-        >
-          <SlidersHorizontal :size="18" aria-hidden="true" />
-          Más filtros
-          <ChevronDown :size="16" aria-hidden="true" :class="{ rotated: showAdvanced }" />
-        </button>
-      </div>
-      <div v-if="showAdvanced" id="proforma-filtros-avanzados" class="proforma-filters__advanced">
-        <div class="proforma-customer">
-          <ClienteSelector v-model="customer" label="Cliente" @select="selectCustomer" />
-        </div>
-        <Select
-          v-model="currency"
-          name="moneda-proforma-filtro"
-          label="Moneda"
-          :options="[
-            { label: 'Todas las monedas', value: '' },
-            ...currencies.map((x) => ({ label: x.nombre, value: x.codigo })),
-            ...(currency && !currencies.some((x) => x.codigo === currency)
-              ? [{ label: currency, value: currency }]
-              : []),
-          ]"
-        />
         <label class="proforma-date"
           >Desde
           <input
             v-model="dateFrom"
             type="date"
             name="fecha-desde-proforma"
-            :max="dateTo || undefined"
+            :max="dateTo && dateTo < today ? dateTo : today"
         /></label>
         <label class="proforma-date"
           >Hasta
@@ -406,7 +321,17 @@ onBeforeUnmount(() => {
             type="date"
             name="fecha-hasta-proforma"
             :min="dateFrom || undefined"
+            :max="today"
         /></label>
+        <Button
+          variant="secondary"
+          aria-label="Limpiar filtros"
+          title="Limpiar filtros"
+          :disabled="!hasFilters"
+          @click="clearFilters"
+        >
+          <RotateCcw :size="18" aria-hidden="true" />
+        </Button>
       </div>
       <p v-if="dateError" class="proforma-date-error" role="alert">{{ dateError }}</p>
     </section>
@@ -505,7 +430,8 @@ onBeforeUnmount(() => {
               </td>
               <td class="actions-cell">
                 <ProformaActionsMenu
-                  v-if="editable(row)"
+                  v-if="editable(row) || row.estado_info.codigo === 'NO_CONCRETADA'"
+                  :estado="row.estado_info.codigo"
                   :id="row.id"
                   :numero="row.numero"
                   :return-to="route.fullPath === '/proformas' ? undefined : route.fullPath"
@@ -566,7 +492,7 @@ onBeforeUnmount(() => {
 }
 .proforma-filters__main {
   display: grid;
-  grid-template-columns: minmax(18rem, 1fr) minmax(11rem, 14rem) auto;
+  grid-template-columns: minmax(15rem, 2fr) repeat(3, minmax(8rem, 1fr)) auto;
   align-items: end;
   gap: 0.85rem;
 }
@@ -879,7 +805,7 @@ onBeforeUnmount(() => {
 }
 @media (max-width: 53rem) {
   .proforma-filters__main {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .proforma-search {
     grid-column: 1/-1;

@@ -126,6 +126,7 @@ function conditionError(field: keyof ReturnType<typeof validateQuoteConditions>)
   )
 }
 const dirty = ref(false)
+const savedContent = ref('')
 const conflicted = ref(false)
 const persisted = ref<Proforma | null>(null)
 const tipos = ref<ValorCatalogoPublico[]>([])
@@ -694,6 +695,7 @@ function fill(value: Proforma) {
   clienteSeleccionado.value = value.cliente_resumen ?? null
   lineas.value = value.detalles.map(normalizeLine)
   removedLines.value = []
+  savedContent.value = currentContent()
   dirty.value = false
 }
 async function load() {
@@ -1255,6 +1257,23 @@ function body(emitir: boolean): ProformaIntegralWritable {
     detalles,
   }
 }
+function currentContent() {
+  const data = body(false)
+  return JSON.stringify([
+    data.cliente,
+    data.cliente_nuevo,
+    data.titulo,
+    data.moneda_codigo,
+    data.plazo_entrega,
+    data.validez_oferta,
+    data.porcentaje_adelanto,
+    data.observaciones,
+    data.detalles,
+  ])
+}
+const hasRealChanges = computed(
+  () => Boolean(savedContent.value) && currentContent() !== savedContent.value,
+)
 async function requestReview() {
   if (!canEmit.value || saving.value) return
   const confirmed = await askConfirmation(
@@ -1367,6 +1386,7 @@ onBeforeRouteLeave(async () => {
 onMounted(async () => {
   window.addEventListener('beforeunload', beforeUnload)
   await Promise.all([loadReferences(), load()])
+  if (!persisted.value) savedContent.value = currentContent()
   restoreContextualDraft()
   editorReady.value = true
 })
@@ -2072,6 +2092,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <Button
                 variant="success"
                 class="editor-save-draft"
+                :disabled="!hasRealChanges"
                 :processing="saving"
                 @click="persist(false)"
               >

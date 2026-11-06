@@ -39,6 +39,8 @@ export const proformasService = {
   update: (id: number, body: PatchedProformaWritable) =>
     apiRequest<Proforma>(`/api/v1/proformas/${id}/`, { method: 'PATCH', body }),
   send: (id: number) => apiRequest<Proforma>(`/api/v1/proformas/${id}/enviar/`, { method: 'POST' }),
+  cancel: (id: number) =>
+    apiRequest<Proforma>(`/api/v1/proformas/${id}/anular/`, { method: 'POST' }),
   markNotCompleted: (id: number) =>
     apiRequest<Proforma>(`/api/v1/proformas/${id}/no-concretar/`, { method: 'POST' }),
   reopen: (id: number) =>
