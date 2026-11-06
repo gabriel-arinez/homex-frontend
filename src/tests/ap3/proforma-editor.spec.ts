@@ -52,6 +52,59 @@ async function mounted(path = '/proformas/nueva') {
 }
 
 describe('AP3 editor integral', () => {
+  it('desglosa cantidad, precio unitario, descuento e importe de la línea con claridad', async () => {
+    references()
+    vi.spyOn(proformasService, 'get').mockResolvedValue({
+      id: 1,
+      estado_info: { codigo: 'BORRADOR' },
+      moneda_info: { codigo: 'BOB' },
+      detalles: [
+        {
+          id: 32,
+          proforma: 1,
+          tipo_item: 1,
+          producto: 7,
+          nombre: 'Mesa de reunión para 10 personas',
+          descripcion: '',
+          cantidad: '1.0000',
+          unidad: 2,
+          modo_calculo: 'UNITARIO',
+          precio_unitario: '7300.00',
+          descuento: '0.00',
+          importe_negociado: null,
+          total: '7300.00',
+          galeria_id: null,
+          especificacion: null,
+        },
+      ],
+    } as never)
+    vi.spyOn(productosService, 'get').mockResolvedValue({
+      id: 7,
+      sku: 'M-007',
+      nombre: 'Mesa de reunión para 10 personas',
+      imagen_principal: null,
+    } as never)
+    server.use(
+      http.get('http://localhost:8000/api/v1/catalogo/productos/7/imagenes/', () =>
+        HttpResponse.json({ imagenes: [], limite: 8 }),
+      ),
+    )
+
+    const { wrapper } = await mounted('/proformas/1/editar')
+    const lineSummary = wrapper.get(
+      '[aria-label="Ver detalle completo de Mesa de reunión para 10 personas"]',
+    )
+    const summaryText = lineSummary.text().replace(/\s+/g, ' ')
+    expect(summaryText).toContain('Cantidad')
+    expect(summaryText).toContain('1.0000 Pieza')
+    expect(summaryText).toContain('Precio por unidad')
+    expect(summaryText).toContain('Bs 7.300,00')
+    expect(summaryText).toContain('Descuento')
+    expect(summaryText).toContain('Ninguno')
+    expect(wrapper.text()).toContain('Importe de línea')
+    wrapper.unmount()
+  })
+
   it('consulta una línea histórica sin sustituir el importe ni habilitar su edición', async () => {
     references()
     const historicalLine = {

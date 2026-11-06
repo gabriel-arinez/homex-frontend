@@ -650,6 +650,9 @@ function money(value: number) {
     currency: header.moneda_codigo,
   }).format(value)
 }
+function unitName(unitId: number) {
+  return unidades.value.find((unit) => unit.id === unitId)?.nombre ?? 'unidad'
+}
 function localId() {
   return crypto.randomUUID()
 }
@@ -1566,19 +1569,44 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 </div>
                 <strong>{{ line.nombre }}</strong>
               </div>
-              <p v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
-                Importe histórico negociado: {{ money(Number(line.importe_negociado || 0)) }}
-              </p>
-              <p v-else-if="totalEstimadoLinea(line) !== null">
-                {{ line.cantidad }} × {{ money(Number(line.precio_unitario)) }}
-                <span v-if="Number(line.descuento) === 0">· Sin descuento</span>
-              </p>
+              <div v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'" class="line-metrics">
+                <div class="line-metric">
+                  <span>Modalidad</span><strong>Importe histórico negociado</strong>
+                </div>
+                <div class="line-metric">
+                  <span>Importe negociado</span>
+                  <strong>{{ money(Number(line.importe_negociado || 0)) }}</strong>
+                </div>
+                <div v-if="Number(line.descuento) > 0" class="line-metric">
+                  <span>Descuento aplicado</span>
+                  <strong>{{ money(Number(line.descuento)) }}</strong>
+                </div>
+              </div>
+              <div v-else-if="totalEstimadoLinea(line) !== null" class="line-metrics">
+                <div class="line-metric">
+                  <span>Cantidad</span
+                  ><strong>{{ line.cantidad }} {{ unitName(line.unidad) }}</strong>
+                </div>
+                <div class="line-metric">
+                  <span>Precio por unidad</span>
+                  <strong>{{ money(Number(line.precio_unitario)) }}</strong>
+                </div>
+                <div class="line-metric">
+                  <span>Descuento</span>
+                  <strong>{{
+                    Number(line.descuento ?? 0) === 0 ? 'Ninguno' : money(Number(line.descuento))
+                  }}</strong>
+                </div>
+              </div>
               <p v-else class="pending-value">Precio pendiente</p>
             </div>
-            <strong v-if="totalEstimadoLinea(line) !== null">
-              {{ money(totalEstimadoLinea(line)!) }}
-            </strong>
-            <strong v-else class="pending-value">Importe pendiente</strong>
+            <div class="line-total">
+              <span>Importe de línea</span>
+              <strong v-if="totalEstimadoLinea(line) !== null">
+                {{ money(totalEstimadoLinea(line)!) }}
+              </strong>
+              <strong v-else class="pending-value">Pendiente</strong>
+            </div>
             <div class="line-menu" @keydown.esc="menuLineId = null">
               <button
                 type="button"
@@ -2526,12 +2554,45 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   color: var(--color-text-secondary);
   font-size: 0.83rem;
 }
+.line-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, max-content));
+  gap: var(--space-2) var(--space-5);
+  margin-top: var(--space-3);
+}
+.line-metric {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.line-metric > span,
+.line-total > span {
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.line-metric > strong {
+  overflow-wrap: anywhere;
+  font-size: 0.82rem;
+}
 .line-summary:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 4px;
   border-radius: 2px;
 }
-.line-card > strong {
+.line-total {
+  display: grid;
+  flex: 0 0 auto;
+  justify-items: end;
+  gap: 0.2rem;
+  min-width: 8.5rem;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-raised);
+  text-align: right;
+}
+.line-total strong {
   flex: 0 0 auto;
   color: var(--color-text);
   white-space: nowrap;
@@ -3003,7 +3064,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   .line-summary {
     flex-basis: calc(100% - 4rem);
   }
-  .line-card > strong {
+  .line-total {
     margin-left: 3rem;
   }
   .line-menu {
@@ -3357,8 +3418,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   overflow-wrap: anywhere;
 }
 .line-thumbnail {
-  width: 4rem;
-  height: 4rem;
+  width: 5rem;
+  height: 5rem;
   flex: none;
   overflow: hidden;
   border: 1px solid var(--color-border);

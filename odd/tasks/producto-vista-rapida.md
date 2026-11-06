@@ -14,7 +14,7 @@ Checks: focused unit tests; `npm run type-check`; `npm run lint:check`; `npm run
 ### S2 — Preserve quote snapshots and furniture detail
 
 Authorized scope: editor read view and existing quote presentation services only. The user requires “Importante: distingue expresamente los datos actuales del catálogo de los valores históricos o negociados de la proforma. No sustituyas precios cotizados por precios vigentes.” Preserve “TOTAL_NEGOCIADO” and current numeric precision; show line type, description, quantity/unit, quoted unit price, discount and estimated/historical negotiated amount. Present furniture dimensions as independent labeled fields with units, and components structurally; keep unknown/historical attributes in a safe readable additional section and hide optional empty sections.
-Acceptance: existing edit-line functions and their restrictions remain unchanged; a missing or failed product-master fetch never prevents reading a saved quote line.
+Acceptance: existing edit-line functions and their restrictions remain unchanged; a missing or failed product-master fetch never prevents reading a saved quote line. In the Proforma editor tray, label quantity, unit price, discount, and line total separately, and render thumbnails slightly larger without changing calculations.
 Checks: regression/unit tests for historic lines, TOTAL_NEGOCIADO, incomplete/extended furniture specs, and edit restrictions.
 
 ### S3 — Integrate all three entry points
@@ -31,11 +31,13 @@ Checks: gallery present/missing/failure behavior; responsive/theme/accessibility
 
 ## Tasks
 
-- T1 — S1,S2 — inline — complete; commit pending slice commits — shared component, data model, and safe quote/furniture presentation. RED: missing component import; GREEN: viewer unit suite.
-- T2 — S3,S4 — inline — complete; commit pending slice commits — connected editor, contextual selector, and both product-list layouts.
-- T3 — S1-S4 — inline — verified with environment advisories — regression coverage and applicable verification. Risk: item 4 (async gallery requests and stale-response ordering).
+- T1 — S1,S2 — inline — complete; commit `724ec69` — shared component, data model, and safe quote/furniture presentation. RED: missing component import; GREEN: viewer unit suite.
+- T2 — S3,S4 — inline — complete; commit `724ec69` — connected editor, contextual selector, and both product-list layouts.
+- T3 — S1-S4 — inline — verified with environment advisories; committed in `724ec69` — regression coverage and applicable verification. Risk: item 4 (async gallery requests and stale-response ordering).
+- T4 — S2,S3 — inline — verified; commit to follow — clarify quantity, unit price, discount, and line total in the Proforma product tray; slightly enlarge thumbnails.
 
 ## Log
+
 - L1 — User request (verbatim): “2. Objetivo\n\nRediseñar completamente el modal de visualización rápida de productos de HOMEX y unificar su presentación en tres ubicaciones:\n\nProductos incorporados a una proforma, incluidos muebles a pedido.\n\nSelector de productos de catálogo dentro del editor de proformas.\n\nBandeja principal de Productos, tanto en vista de tabla como de tarjetas.” Full acceptance requirements remain in the conversation prompt dated 2026-11-06.
 - L2 — Read-only map confirms the contextual selector already has a preview modal, editor quote-line view separates saved negotiated values from current catalog master data, and main product list has independent card/table render paths. Existing product and gallery frontend endpoints appear sufficient; verify details while implementing.
 - L3 — Built one shared `ProductoVistaRapida` and used opt-in `extraWide`/`stickyFrame` Modal styling. Current catalog list/detail, contextual selector, and quote-line data stay separate; historic totals continue using `totalEstimadoLinea` and saved `total`. Product and furniture gallery endpoints reuse existing authorized services; inline image zoom avoids a nested modal.
@@ -44,3 +46,5 @@ Checks: gallery present/missing/failure behavior; responsive/theme/accessibility
 - L6 — The feature forecast exceeds the ~400-line delivery budget. User selected `stacked-to-main`; prepare focused PR-ready slices ordered by dependency. Creating/pushing PRs remains unapproved remote work.
 - L7 — User selected the `stacked-to-main` chain strategy. Local work-unit commits may be prepared; no push or PR creation without explicit remote authorization.
 - L8 — Screenshot review found private gallery images were loaded through plain `<img>` URLs without the authenticated blob-fetch path already implemented by `GalleryPhoto.vue`. Reused that component for main and thumbnail images, surfaced load/error events for retries, added variant fallback when the largest variant fails, and removed sticky positioning that clipped the tall gallery panel. Regression RED reproduced variant failure; GREEN focused tests 10 passed; type-check, focused quick-view E2E (1 passed), and build passed. A later independent probe found a closed-view request still dispatched its fallback; added the guard immediately after primary resolution, with RED then GREEN and 15 focused tests passed.
+- L9 — User request (verbatim): “realiza un commit antes de continuar, posterior a ello, mejora el diseño de esa bandeja, para que sea mas intuitiva, se entienda mejor y la imagen se vea un poco mas grande”. Preceded the tray redesign with commit `724ec69`; follow-up focuses on clear pricing labels and larger thumbnails without changing calculations or historic snapshots.
+- L10 — Tray redesign verification: AP3 unit suite 4 passed; targeted E2E `FE04 crea con unitario y descuento, revisa y aprueba` passed; type-check and targeted Prettier passed. Existing E2E expectation for “3 ×” was updated to assert separate labels and computed line total. Calculation still uses `totalEstimadoLinea`; no business rule changed.
