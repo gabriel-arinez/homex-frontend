@@ -1569,37 +1569,37 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 </div>
                 <strong>{{ line.nombre }}</strong>
               </div>
-              <div v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'" class="line-metrics">
-                <div class="line-metric">
-                  <span>Modalidad</span><strong>Importe histórico negociado</strong>
-                </div>
-                <div class="line-metric">
-                  <span>Importe negociado</span>
-                  <strong>{{ money(Number(line.importe_negociado || 0)) }}</strong>
-                </div>
-                <div v-if="Number(line.descuento) > 0" class="line-metric">
-                  <span>Descuento aplicado</span>
-                  <strong>{{ money(Number(line.descuento)) }}</strong>
-                </div>
-              </div>
-              <div v-else-if="totalEstimadoLinea(line) !== null" class="line-metrics">
-                <div class="line-metric">
-                  <span>Cantidad</span
-                  ><strong>{{ line.cantidad }} {{ unitName(line.unidad) }}</strong>
-                </div>
-                <div class="line-metric">
-                  <span>Precio por unidad</span>
-                  <strong>{{ money(Number(line.precio_unitario)) }}</strong>
-                </div>
-                <div class="line-metric">
-                  <span>Descuento</span>
-                  <strong>{{
-                    Number(line.descuento ?? 0) === 0 ? 'Ninguno' : money(Number(line.descuento))
-                  }}</strong>
-                </div>
-              </div>
-              <p v-else class="pending-value">Precio pendiente</p>
             </div>
+            <div v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'" class="line-metrics">
+              <div class="line-metric">
+                <span>Modalidad</span><strong>Importe histórico negociado</strong>
+              </div>
+              <div class="line-metric">
+                <span>Importe negociado</span>
+                <strong>{{ money(Number(line.importe_negociado || 0)) }}</strong>
+              </div>
+              <div v-if="Number(line.descuento) > 0" class="line-metric">
+                <span>Descuento aplicado</span>
+                <strong>{{ money(Number(line.descuento)) }}</strong>
+              </div>
+            </div>
+            <div v-else-if="totalEstimadoLinea(line) !== null" class="line-metrics">
+              <div class="line-metric">
+                <span>Cantidad</span
+                ><strong>{{ line.cantidad }} {{ unitName(line.unidad) }}</strong>
+              </div>
+              <div class="line-metric">
+                <span>Precio por unidad</span>
+                <strong>{{ money(Number(line.precio_unitario)) }}</strong>
+              </div>
+              <div class="line-metric">
+                <span>Descuento</span>
+                <strong>{{
+                  Number(line.descuento ?? 0) === 0 ? 'Ninguno' : money(Number(line.descuento))
+                }}</strong>
+              </div>
+            </div>
+            <p v-else class="line-metrics pending-value">Precio pendiente</p>
             <div class="line-total">
               <span>Importe de línea</span>
               <strong v-if="totalEstimadoLinea(line) !== null">
@@ -2514,11 +2514,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   margin-top: var(--space-2);
 }
 .line-card {
-  display: flex;
+  display: grid;
   position: relative;
   min-width: 0;
   align-items: center;
-  justify-content: space-between;
+  grid-template-columns: auto minmax(14rem, 0.9fr) minmax(24rem, 1.5fr) auto auto;
   gap: var(--space-4);
   padding: var(--space-4);
   border-color: var(--quote-border);
@@ -2541,7 +2541,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 }
 .line-summary {
   min-width: 0;
-  flex: 1;
   cursor: pointer;
 }
 .line-summary strong {
@@ -2556,9 +2555,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 }
 .line-metrics {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(8rem, max-content));
+  min-width: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-2) var(--space-5);
-  margin-top: var(--space-3);
 }
 .line-metric {
   display: grid;
@@ -2582,7 +2581,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 }
 .line-total {
   display: grid;
-  flex: 0 0 auto;
   justify-items: end;
   gap: 0.2rem;
   min-width: 8.5rem;
@@ -2600,7 +2598,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 .line-menu {
   position: relative;
   z-index: 30;
-  flex: 0 0 auto;
 }
 .menu-trigger {
   display: grid;
@@ -2957,6 +2954,26 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   text-align: center;
 }
 @media (max-width: 64rem) {
+  .line-card {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+  }
+  .line-summary {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .line-metrics {
+    grid-column: 2;
+    grid-row: 2;
+    margin-top: var(--space-3);
+  }
+  .line-total {
+    grid-column: 3;
+    grid-row: 1 / 3;
+  }
+  .line-menu {
+    grid-column: 4;
+    grid-row: 1 / 3;
+  }
   .steps button {
     justify-content: center;
     padding: var(--space-3);
@@ -3058,17 +3075,26 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     width: 100%;
   }
   .line-card {
-    flex-wrap: wrap;
-    align-items: flex-start;
+    grid-template-columns: auto minmax(0, 1fr) auto;
   }
   .line-summary {
-    flex-basis: calc(100% - 4rem);
+    grid-column: 2 / 4;
+    grid-row: 1;
   }
-  .line-total {
+  .line-metrics {
+    grid-column: 2 / 4;
+    grid-row: 2;
     margin-left: 3rem;
   }
+  .line-total {
+    grid-column: 2;
+    grid-row: 3;
+    justify-self: start;
+  }
   .line-menu {
-    margin-left: auto;
+    grid-column: 3;
+    grid-row: 3;
+    justify-self: end;
   }
   .editor-actions {
     position: static;
