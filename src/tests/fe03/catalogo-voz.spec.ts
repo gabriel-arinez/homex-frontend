@@ -128,7 +128,10 @@ describe('Voz en creación de catálogo', () => {
 
   it('conserva la transcripción y grabación al minimizar y reabrir el asistente', async () => {
     vi.spyOn(proformasService, 'families').mockResolvedValue({
-      count: 0, next: null, previous: null, results: [],
+      count: 0,
+      next: null,
+      previous: null,
+      results: [],
     })
     vi.spyOn(proformasService, 'options').mockImplementation(async (code: string) =>
       code === 'CATEGORIA_PRODUCTO'
