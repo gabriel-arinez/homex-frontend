@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { useFocusTrap } from '@/shared/composables/useFocusTrap'
+import VoiceDrawer from '@/modules/capturas/components/VoiceDrawer.vue'
 import {
   ArrowLeft,
   AlertCircle,
@@ -12,7 +12,6 @@ import {
   Wallet,
   ImagePlus,
   Mic,
-  X,
 } from '@lucide/vue'
 import type {
   EspecificacionMueble,
@@ -87,12 +86,10 @@ function confirmCloseStudio() {
   leaveVoiceConfirm.value = false
   emit('cancel')
 }
-const voicePanel = ref<HTMLElement | null>(null)
 const voiceActive = ref(false)
 const voiceProcessing = ref(false)
 const voicePaused = ref(false)
 const voiceElapsed = ref(0)
-useFocusTrap(voicePanel, voiceOpen)
 function onVoiceProcessing(value: boolean) {
   voiceProcessing.value = value
   emit('processing', value)
@@ -275,46 +272,25 @@ async function seleccionarApartado(id: typeof seccion.value) {
       </template>
       · Volver al asistente
     </button>
-    <Teleport to="body">
-      <div v-show="voiceOpen" class="studio-voice-backdrop" @mousedown.self="voiceOpen = false">
-        <aside
-          ref="voicePanel"
-          class="studio-voice-panel"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="studio-voice-title"
-          @keydown.esc="voiceOpen = false"
-        >
-          <header class="studio-voice-header">
-            <div>
-              <p>ASISTENCIA COMERCIAL</p>
-              <h2 id="studio-voice-title">Completar mueble por voz</h2>
-              <span>Describe el mueble y revisa la propuesta antes de incorporarla.</span>
-            </div>
-            <button
-              class="studio-voice-close"
-              type="button"
-              aria-label="Minimizar asistente de voz"
-              @click="voiceOpen = false"
-            >
-              <X :size="20" aria-hidden="true" />
-            </button>
-          </header>
-          <CapturaAsistida
-            v-if="nueva"
-            class="studio-voice-workflow"
-            :dirty="dirty"
-            :sesion="sesion"
-            :moneda="moneda"
-            :proforma="proforma"
-            review-before-apply
-            @proposed="recibirCaptura"
-            @processing="onVoiceProcessing"
-            @recording-state="onVoiceState"
-          />
-        </aside>
-      </div>
-    </Teleport>
+    <VoiceDrawer
+      :open="voiceOpen"
+      title="Completar mueble por voz"
+      description="Describe el mueble y revisa la propuesta antes de incorporarla."
+      @close="voiceOpen = false"
+    >
+      <CapturaAsistida
+        v-if="nueva"
+        class="studio-voice-workflow"
+        :dirty="dirty"
+        :sesion="sesion"
+        :moneda="moneda"
+        :proforma="proforma"
+        review-before-apply
+        @proposed="recibirCaptura"
+        @processing="onVoiceProcessing"
+        @recording-state="onVoiceState"
+      />
+    </VoiceDrawer>
     <nav class="studio-steps" aria-label="Apartados del mueble a pedido">
       <button
         v-for="(item, i) in secciones"
@@ -575,56 +551,6 @@ async function seleccionarApartado(id: typeof seccion.value) {
   border-radius: var(--radius-control);
   font: inherit;
   font-weight: 650;
-  cursor: pointer;
-}
-.studio-voice-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1200;
-  display: flex;
-  justify-content: flex-end;
-  background: var(--color-overlay);
-}
-.studio-voice-panel {
-  width: min(44rem, 100%);
-  height: 100dvh;
-  overflow-y: auto;
-  background: var(--color-surface-raised);
-  border-left: 1px solid var(--color-border);
-}
-.studio-voice-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  gap: 1rem;
-  padding: var(--space-5);
-  border-bottom: 1px solid var(--color-border);
-}
-.studio-voice-header p {
-  margin: 0;
-  color: var(--color-primary-accent);
-  font-size: 0.73rem;
-  font-weight: 750;
-  letter-spacing: 0.06em;
-}
-.studio-voice-header h2 {
-  margin: 0.4rem 0;
-  font-size: 1.45rem;
-}
-.studio-voice-header span {
-  color: var(--color-text-secondary);
-  font-size: 0.84rem;
-}
-.studio-voice-close {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  color: var(--color-text);
-  background: transparent;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
   cursor: pointer;
 }
 .studio-voice-workflow {
