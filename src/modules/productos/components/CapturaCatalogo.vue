@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { AlertTriangle, CheckCircle2, Mic, RotateCcw } from '@lucide/vue'
+import { AlertTriangle, CheckCircle2, RotateCcw } from '@lucide/vue'
 import {
   ALLOWED_AUDIO_EXTENSIONS,
   MAX_AUDIO_BYTES,
@@ -15,6 +15,7 @@ import type {
 } from '@/generated/api'
 import AudioRecorder from '@/modules/capturas/components/AudioRecorder.vue'
 import VoiceCaptureControls from '@/modules/capturas/components/VoiceCaptureControls.vue'
+import VoiceSection from '@/modules/capturas/components/VoiceSection.vue'
 import Button from '@/shared/ui/Button.vue'
 import { catalogoCapturaService } from '../services/catalogoCapturaService'
 
@@ -239,14 +240,12 @@ async function upload(event: Event) {
     aria-label="Autocompletar producto por voz"
     :aria-busy="processing"
   >
-    <div class="voice-block">
-      <div class="block-title">
-        <Mic :size="19" aria-hidden="true" />
-        <div>
-          <h2>Descripción por voz</h2>
-          <p>Dicta nombre, marca, colores o características del producto.</p>
-        </div>
-      </div>
+    <VoiceSection
+      class="voice-block"
+      icon="mic"
+      title="Descripción por voz"
+      description="Dicta nombre, marca, colores o características del producto."
+    >
       <VoiceCaptureControls
         :recording="recording"
         :paused="paused"
@@ -278,7 +277,7 @@ async function upload(event: Event) {
         aria-hidden="true"
         @change="upload"
       />
-    </div>
+    </VoiceSection>
 
     <div v-if="processing" class="processing-note" role="status">
       <span class="loader" aria-hidden="true" />
@@ -289,14 +288,12 @@ async function upload(event: Event) {
       <AlertTriangle :size="17" aria-hidden="true" />{{ error }}
     </p>
 
-    <div class="voice-block">
-      <div class="block-title">
-        <RotateCcw :size="19" aria-hidden="true" />
-        <div>
-          <h2>Revisar transcripción</h2>
-          <p>Corrige las palabras o códigos antes de aplicar los datos.</p>
-        </div>
-      </div>
+    <VoiceSection
+      class="voice-block"
+      icon="review"
+      title="Revisar transcripción"
+      description="Corrige las palabras o códigos antes de aplicar los datos."
+    >
       <details v-if="original" class="original">
         <summary>Ver transcripción original</summary>
         <p>{{ original }}</p>
@@ -313,7 +310,7 @@ async function upload(event: Event) {
       <Button variant="secondary" :disabled="!text.trim() || processing" @click="interpret(false)">
         <RotateCcw :size="16" aria-hidden="true" /> Reinterpretar texto
       </Button>
-    </div>
+    </VoiceSection>
 
     <div v-if="result?.propuesta" class="voice-block results">
       <div class="block-title">
@@ -372,33 +369,6 @@ async function upload(event: Event) {
   display: grid;
   gap: var(--space-5);
   padding: var(--space-5);
-}
-.voice-block {
-  display: grid;
-  gap: var(--space-3);
-}
-.voice-block + .voice-block {
-  padding-top: var(--space-5);
-  border-top: 1px solid var(--color-border);
-}
-.block-title {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-}
-.block-title > svg {
-  flex: 0 0 auto;
-  color: var(--color-primary);
-}
-.block-title h2 {
-  margin: 0;
-  font-size: 1.06rem;
-}
-.block-title p {
-  margin: 0.35rem 0 0;
-  font-size: 0.82rem;
-  color: var(--color-text-secondary);
-  line-height: 1.5;
 }
 .visually-hidden {
   position: absolute;
