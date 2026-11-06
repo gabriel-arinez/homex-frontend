@@ -1,16 +1,23 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
-import { Mic, Square, X, RotateCcw } from '@lucide/vue'
+import { Mic, Square, X, RotateCcw, Pause, Play } from '@lucide/vue'
+import { MAX_RECORD_SECONDS } from '../audioLimits'
 import Button from '@/shared/ui/Button.vue'
 import { useAudioRecorder } from '../composables/useAudioRecorder'
 const props = withDefaults(defineProps<{ compact?: boolean }>(), { compact: false })
-const emit = defineEmits<{ ready: [blob: Blob | null] }>()
+const emit = defineEmits<{
+  ready: [blob: Blob | null]
+  status: [state: string, elapsed: number]
+}>()
 const r = useAudioRecorder(),
   time = computed(
     () =>
       `${String(Math.floor(r.elapsed.value / 60)).padStart(2, '0')}:${String(r.elapsed.value % 60).padStart(2, '0')}`,
   )
 watch(r.blob, (value) => emit('ready', value))
+watch([r.state, r.elapsed], () => emit('status', r.state.value, r.elapsed.value), {
+  immediate: true,
+})
 async function start() {
   await r.start()
   emit('ready', null)
@@ -19,6 +26,9 @@ async function start() {
 defineExpose({
   startRecording: start,
   stopRecording: () => r.stop(),
+  pauseRecording: () => r.pause(),
+  resumeRecording: () => r.resume(),
+  getState: () => r.state.value,
   cancelRecording: () => r.cancel(),
   getError: () => r.error.value,
 })
@@ -33,8 +43,16 @@ function cancel() {
 <template>
   <section class="recorder" aria-labelledby="recorder-title">
     <h2 id="recorder-title">Grabación de audio</h2>
-    <p v-if="r.state.value === 'RECORDING'" role="status" class="recording">
-      <span aria-hidden="true"></span>Grabando {{ time }}
+    <p
+      v-if="r.state.value === 'RECORDING' || r.state.value === 'PAUSED'"
+      role="status"
+      class="recording"
+    >
+      <span aria-hidden="true"></span>{{ r.state.value === 'PAUSED' ? 'Pausado' : 'Grabando' }}
+      {{ time }} / 03:00
+    </p>
+    <p v-if="r.elapsed.value >= MAX_RECORD_SECONDS - 30 && r.state.value !== 'READY'" role="status">
+      Quedan {{ MAX_RECORD_SECONDS - r.elapsed.value }} segundos para finalizar automáticamente.
     </p>
     <div
       v-if="r.state.value === 'RECORDING'"
@@ -58,8 +76,16 @@ function cancel() {
         :disabled="!r.supported.value"
         @click="start"
         ><Mic />Grabar</Button
-      ><Button v-if="r.state.value === 'RECORDING'" @click="stop"><Square />Detener</Button
-      ><Button v-if="r.state.value === 'RECORDING'" variant="secondary" @click="cancel"
+      ><Button v-if="r.state.value === 'RECORDING'" variant="secondary" @click="r.pause"
+        ><Pause />Pausar</Button
+      ><Button v-if="r.state.value === 'PAUSED'" variant="secondary" @click="r.resume"
+        ><Play />Reanudar</Button
+      ><Button v-if="['RECORDING', 'PAUSED'].includes(r.state.value)" @click="stop"
+        ><Square />Finalizar</Button
+      ><Button
+        v-if="['RECORDING', 'PAUSED'].includes(r.state.value)"
+        variant="secondary"
+        @click="cancel"
         ><X />Cancelar</Button
       ><Button v-if="r.state.value === 'READY'" variant="secondary" @click="cancel"
         ><RotateCcw />Descartar y repetir</Button

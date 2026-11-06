@@ -22,6 +22,12 @@ function setup() {
     start() {
       this.state = 'recording'
     }
+    pause() {
+      this.state = 'paused'
+    }
+    resume() {
+      this.state = 'recording'
+    }
     stop() {
       this.state = 'inactive'
       this.onstop?.()
@@ -36,7 +42,15 @@ afterEach(() => vi.unstubAllGlobals())
 function controls(wrapper: ReturnType<typeof mount>) {
   return (
     wrapper.vm.$ as unknown as {
-      setupState: { r: { start: () => Promise<void>; stop: () => void; cancel: () => void } }
+      setupState: {
+        r: {
+          start: () => Promise<void>
+          pause: () => void
+          resume: () => void
+          stop: () => void
+          cancel: () => void
+        }
+      }
     }
   ).setupState.r
 }
@@ -63,6 +77,26 @@ describe('recorder pending permission', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('Audio listo')
     expect(media.stopTrack).toHaveBeenCalledTimes(2)
+    wrapper.unmount()
+  })
+
+  it('pausa y reanuda sin descartar audio, y acepta finalizar desde pausa', async () => {
+    const media = setup()
+    const wrapper = mount(AudioRecorder)
+    const pending = controls(wrapper).start()
+    media.resolve()
+    await pending
+    controls(wrapper).pause()
+    await flushPromises()
+    expect(wrapper.text()).toContain('Pausado')
+    controls(wrapper).resume()
+    await flushPromises()
+    expect(wrapper.text()).toContain('Grabando')
+    controls(wrapper).pause()
+    controls(wrapper).stop()
+    await flushPromises()
+    expect(wrapper.text()).toContain('Audio listo')
+    expect(media.stopTrack).toHaveBeenCalledTimes(1)
     wrapper.unmount()
   })
 

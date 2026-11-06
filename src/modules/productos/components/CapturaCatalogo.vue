@@ -1,6 +1,22 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, ref } from 'vue'
-import { AlertTriangle, CheckCircle2, FileAudio, Mic, RotateCcw, Square } from '@lucide/vue'
+import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import {
+  AlertTriangle,
+  CheckCircle2,
+  FileAudio,
+  Mic,
+  RotateCcw,
+  Square,
+  Pause,
+  Play,
+  X,
+} from '@lucide/vue'
+import {
+  ALLOWED_AUDIO_EXTENSIONS,
+  MAX_AUDIO_BYTES,
+  MAX_UPLOAD_SECONDS,
+  readAudioDuration,
+} from '@/modules/capturas/audioLimits'
 import type {
   CamposCatalogo,
   CategoriaEnum,
@@ -15,12 +31,19 @@ const props = defineProps<{
   categoria: CategoriaEnum
   opciones?: Record<string, ValorCatalogoPublico[]>
 }>()
-const emit = defineEmits<{ apply: [fields: CamposCatalogo] }>()
+const emit = defineEmits<{
+  apply: [fields: CamposCatalogo]
+  'recording-state': [active: boolean, paused: boolean, elapsed: number]
+  'processing-state': [active: boolean]
+}>()
 const recorder = ref<InstanceType<typeof AudioRecorder> | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const requesting = ref(false)
 const recording = ref(false)
+const paused = ref(false)
+const recordingElapsed = ref(0)
 const processing = ref(false)
+watch(processing, (active) => emit('processing-state', active))
 const text = ref('')
 const original = ref('')
 const audio = ref<Blob | null>(null)
@@ -56,10 +79,40 @@ async function startRecording() {
     requesting.value = false
   }
 }
+function onRecorderStatus(state: string, elapsed: number) {
+  paused.value = state === 'PAUSED'
+  recordingElapsed.value = elapsed
+  emit(
+    'recording-state',
+    recording.value && ['RECORDING', 'PAUSED'].includes(state),
+    paused.value,
+    elapsed,
+  )
+}
+function pauseRecording() {
+  recorder.value?.pauseRecording()
+}
+function resumeRecording() {
+  recorder.value?.resumeRecording()
+}
+function cancelRecording() {
+  recorder.value?.cancelRecording()
+  recording.value = false
+  paused.value = false
+  recordingElapsed.value = 0
+  audio.value = null
+  emit('recording-state', false, false, 0)
+}
 function onRecorded(blob: Blob | null) {
   if (!blob) return
-  audio.value = blob
   recording.value = false
+  paused.value = false
+  emit('recording-state', false, false, recordingElapsed.value)
+  if (blob.size > MAX_AUDIO_BYTES) {
+    error.value = 'La grabación supera 20 MB. Intenta una descripción más corta.'
+    return
+  }
+  audio.value = blob
   void interpret(true)
 }
 function chooseAudio() {
@@ -161,13 +214,27 @@ function displayValue(field: string, value: unknown) {
       .join('; ')
   return value
 }
-function upload(event: Event) {
+async function upload(event: Event) {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
   target.value = ''
   if (!file) return
-  if (!/\.(wav|mp3|m4a|ogg|webm)$/i.test(file.name) || file.size === 0) {
+  if (!ALLOWED_AUDIO_EXTENSIONS.test(file.name) || file.size === 0) {
     error.value = 'Selecciona un audio válido en formato WAV, MP3, M4A, OGG o WebM.'
+    return
+  }
+  if (file.size > MAX_AUDIO_BYTES) {
+    error.value = 'El archivo supera el límite de 20 MB.'
+    return
+  }
+  try {
+    const seconds = await readAudioDuration(file)
+    if (seconds !== null && seconds > MAX_UPLOAD_SECONDS) {
+      error.value = 'El archivo supera los 5 minutos permitidos.'
+      return
+    }
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : 'No se pudo validar la duración.'
     return
   }
   result.value = null
@@ -197,8 +264,8 @@ function upload(event: Event) {
         >
           <Square v-if="recording" :size="28" aria-hidden="true" />
           <Mic v-else :size="28" aria-hidden="true" />
-          <strong>{{ recording ? 'Detener grabación' : 'Grabar descripción' }}</strong>
-          <small>{{ recording ? 'Terminar e interpretar' : 'Usar micrófono' }}</small>
+          <strong>{{ recording ? 'Finalizar grabación' : 'Grabar descripción' }}</strong>
+          <small>{{ recording ? 'Finalizar y transcribir' : 'Máximo 3 minutos' }}</small>
         </Button>
         <Button
           variant="secondary"
@@ -208,7 +275,7 @@ function upload(event: Event) {
         >
           <FileAudio :size="28" aria-hidden="true" />
           <strong>Seleccionar archivo</strong>
-          <small>WAV, MP3, M4A, OGG o WebM</small>
+          <small>Hasta 20 MB y 5 minutos</small>
         </Button>
         <input
           ref="fileInput"
@@ -216,11 +283,34 @@ function upload(event: Event) {
           type="file"
           accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm"
           :disabled="processing || recording || requesting"
-          aria-label="Seleccionar audio del dispositivo"
+          tabindex="-1"
+          aria-hidden="true"
           @change="upload"
         />
       </div>
-      <AudioRecorder v-if="recording" ref="recorder" compact @ready="onRecorded" />
+      <AudioRecorder
+        v-if="recording"
+        ref="recorder"
+        compact
+        @ready="onRecorded"
+        @status="onRecorderStatus"
+      />
+      <div
+        v-if="recording"
+        class="recording-toolbar"
+        role="group"
+        aria-label="Controles de grabación"
+      >
+        <Button v-if="!paused" variant="secondary" @click="pauseRecording">
+          <Pause :size="17" aria-hidden="true" /> Pausar
+        </Button>
+        <Button v-else variant="secondary" @click="resumeRecording">
+          <Play :size="17" aria-hidden="true" /> Reanudar
+        </Button>
+        <Button variant="danger" @click="cancelRecording">
+          <X :size="17" aria-hidden="true" /> Cancelar grabación
+        </Button>
+      </div>
     </div>
 
     <div v-if="processing" class="processing-note" role="status">
@@ -311,6 +401,12 @@ function upload(event: Event) {
   </section>
 </template>
 <style scoped>
+.recording-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 0.65rem;
+}
 .voice-catalog {
   display: grid;
   gap: var(--space-5);

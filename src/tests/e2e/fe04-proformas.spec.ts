@@ -812,7 +812,7 @@ test('PRF-01 protege cambios pendientes de la ficha técnica', async ({ page }) 
   await expect(page.getByRole('dialog')).toHaveCount(0)
 })
 
-test('PRF-01 restaura cliente y no descarta la línea al volver del producto contextual', async ({
+test('PRF-01 conserva cliente y catálogo sin reabrir línea obsoleta tras cancelar producto', async ({
   page,
 }) => {
   await mockBackend(page)
@@ -862,23 +862,14 @@ test('PRF-01 restaura cliente y no descarta la línea al volver del producto con
     )
   })
   await page.goto('/proformas/1/editar?draft=prf01-retorno')
-  await expect(page.getByRole('dialog')).toBeVisible()
-  await expect(page.getByLabel('Nombre comercial')).toHaveValue('Mesa pendiente')
-
-  await page.getByRole('button', { name: 'Cerrar', exact: true }).click()
-  await expect(page.getByRole('dialog', { name: 'Descartar línea' })).toBeVisible()
+  await expect(page.getByRole('dialog', { name: 'Agregar producto' })).toHaveCount(0)
+  await expect(
+    page.getByRole('heading', { name: 'Seleccionar producto del catálogo' }),
+  ).toBeVisible()
   await page
-    .getByRole('dialog', { name: 'Descartar línea' })
-    .getByRole('button', { name: 'Cancelar' })
+    .getByRole('navigation', { name: 'Apartados de la proforma' })
+    .getByRole('button', { name: /Cliente/ })
     .click()
-  await expect(page.getByLabel('Nombre comercial')).toHaveValue('Mesa pendiente')
-
-  await page.getByRole('button', { name: 'Cerrar', exact: true }).click()
-  await page
-    .getByRole('dialog', { name: 'Descartar línea' })
-    .getByRole('button', { name: 'Descartar cambios' })
-    .click()
-  await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(page.getByRole('region').getByText('Ana Pérez', { exact: true })).toBeVisible()
 })
 
@@ -1011,8 +1002,9 @@ test('@a11y PRF04 acciones directas de voz accesibles y sin reemplazo prematuro'
   await page.getByRole('button', { name: 'Añadir ítem' }).click()
   await page.getByRole('button', { name: 'Mueble a pedido' }).click()
   await page.getByLabel('Nombre comercial del mueble').fill('Mueble previo')
+  await page.getByRole('button', { name: 'Completar por voz' }).click()
   await expect(page.getByRole('button', { name: 'Grabar descripción' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Subir audio' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Seleccionar archivo' })).toBeVisible()
   const results = await new AxeBuilder({ page }).include('.voice-workflow').analyze()
   expect(results.violations).toEqual([])
   await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Mueble previo')
@@ -1041,11 +1033,12 @@ for (const width of [360, 768, 1440]) {
     await page.getByRole('button', { name: 'Añadir ítem' }).click()
     await page.getByRole('button', { name: 'Mueble a pedido' }).click()
     await page.getByLabel('Nombre comercial del mueble').fill('Mueble previo')
-    await page.getByRole('button', { name: 'Subir audio' }).click()
+    await page.getByRole('button', { name: 'Completar por voz' }).click()
+    await page.getByRole('button', { name: 'Seleccionar archivo' }).click()
     expect(captures).toBe(0)
     await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Mueble previo')
     await page
-      .getByLabel('Seleccionar archivo de audio')
+      .locator('.studio-voice-panel input[type="file"]')
       .setInputFiles({ name: '24.wav', mimeType: 'audio/wav', buffer: Buffer.from('fixture') })
     await expect(page.getByRole('heading', { name: 'Propuesta obtenida por voz' })).toBeVisible()
     await expect(page.getByText('unidad del ancho', { exact: false }).first()).toBeVisible()
@@ -1076,6 +1069,9 @@ for (const width of [360, 768, 1440]) {
     })
     await unit.selectOption('cm')
     await page.getByLabel('ancho', { exact: true }).fill('125')
+    // El asistente persiste minimizado tras aplicar la propuesta: abrirlo para revisar el ASR.
+    await page.getByRole('button', { name: 'Completar por voz' }).click()
+    await expect(page.getByRole('dialog', { name: 'Completar mueble por voz' })).toBeVisible()
     await page.getByText('Ver transcripción original', { exact: true }).click()
     await expect(
       page.locator('details').filter({ hasText: 'Ver transcripción original' }),
@@ -1094,8 +1090,14 @@ for (const width of [360, 768, 1440]) {
       await expect(
         page.getByRole('alert').filter({ hasText: 'No se obtuvo una propuesta utilizable' }),
       ).toBeVisible()
+      await expect(
+        page.locator('details').filter({ hasText: 'Ver transcripción original' }),
+      ).toContainText(captura24.texto_transcrito_original!)
+      await page.getByRole('button', { name: 'Minimizar asistente de voz' }).click()
       await expect(page.getByLabel('ancho', { exact: true })).toHaveValue('125')
       await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Escritorio')
+      // Minimizar no destruye la transcripción ni los resultados terminales.
+      await page.getByRole('button', { name: 'Completar por voz' }).click()
       await expect(
         page.locator('details').filter({ hasText: 'Ver transcripción original' }),
       ).toContainText(captura24.texto_transcrito_original!)

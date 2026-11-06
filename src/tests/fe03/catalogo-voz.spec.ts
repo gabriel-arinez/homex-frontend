@@ -6,6 +6,12 @@ import ProductoForm from '@/modules/productos/components/ProductoForm.vue'
 import { catalogoCapturaService } from '@/modules/productos/services/catalogoCapturaService'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import type { CategoriaEnum } from '@/generated/api'
+import { readAudioDuration } from '@/modules/capturas/audioLimits'
+
+vi.mock('@/modules/capturas/audioLimits', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/modules/capturas/audioLimits')>()
+  return { ...actual, readAudioDuration: vi.fn<() => Promise<number>>().mockResolvedValue(10) }
+})
 
 afterEach(() => vi.restoreAllMocks())
 function mockResult(category: CategoriaEnum) {
@@ -84,7 +90,7 @@ describe('Voz en creación de catálogo', () => {
     })
     await w.get('.source-record').trigger('click')
     await flushPromises()
-    expect(w.text()).toContain('Detener grabación')
+    expect(w.text()).toContain('Finalizar grabación')
     await w.get('.source-record').trigger('click')
     await flushPromises()
     expect(catalogoCapturaService.create).toHaveBeenCalledTimes(1)
@@ -93,6 +99,61 @@ describe('Voz en creación de catálogo', () => {
       expect.anything(),
     )
     expect(w.text()).toContain('Campos detectados')
+    w.unmount()
+  })
+
+  it('impide subir archivos de más de 20 MB y audios superiores a 5 minutos', async () => {
+    mockResult('SILLA')
+    const w = mount(CapturaCatalogo, { props: { categoria: 'SILLA' } })
+    const input = w.get('input[type="file"]')
+    Object.defineProperty(input.element, 'files', {
+      configurable: true,
+      value: [new File(['x'], 'demasiado.wav', { type: 'audio/wav' })],
+    })
+    vi.mocked(readAudioDuration).mockResolvedValueOnce(301)
+    await input.trigger('change')
+    await flushPromises()
+    expect(w.text()).toContain('supera los 5 minutos')
+    expect(catalogoCapturaService.create).not.toHaveBeenCalled()
+    Object.defineProperty(input.element, 'files', {
+      configurable: true,
+      value: [new File([new Uint8Array(20_000_001)], 'grande.wav', { type: 'audio/wav' })],
+    })
+    await input.trigger('change')
+    await flushPromises()
+    expect(w.text()).toContain('supera el límite de 20 MB')
+    expect(catalogoCapturaService.create).not.toHaveBeenCalled()
+    w.unmount()
+  })
+
+  it('conserva la transcripción y grabación al minimizar y reabrir el asistente', async () => {
+    vi.spyOn(proformasService, 'families').mockResolvedValue({
+      count: 0,
+      next: null,
+      previous: null,
+      results: [],
+    })
+    vi.spyOn(proformasService, 'options').mockImplementation(async (code: string) =>
+      code === 'CATEGORIA_PRODUCTO'
+        ? [{ id: 1, codigo: 'SILLA', nombre: 'Silla', concepto_codigo: code }]
+        : code === 'UNIDAD_MEDIDA'
+          ? [{ id: 2, codigo: 'PIEZA', nombre: 'Pieza', concepto_codigo: code }]
+          : [],
+    )
+    const w = mount(ProductoForm, {
+      props: { preselectCategory: 'SILLA' },
+      global: { stubs: { Teleport: true } },
+    })
+    await flushPromises()
+    await w.get('.voice-trigger').trigger('click')
+    const assistant = w.getComponent(CapturaCatalogo)
+    assistant.vm.$emit('recording-state', true, false, 12)
+    await flushPromises()
+    await w.get('button[aria-label="Cerrar asistente de voz"]').trigger('click')
+    expect(w.findComponent(CapturaCatalogo).exists()).toBe(true)
+    expect(w.get('.voice-mini').text()).toContain('Grabación en curso')
+    await w.get('.voice-mini').trigger('click')
+    expect(w.get('.voice-backdrop').isVisible()).toBe(true)
     w.unmount()
   })
 

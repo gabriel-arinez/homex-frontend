@@ -111,13 +111,16 @@ const titleId = useId()
   flex-wrap: wrap;
   gap: var(--space-2);
 }
+.leave-actions :deep(.button) {
+  min-height: 2.75rem;
+}
 .save-action {
-  background: #1d4ed8;
-  border-color: #1d4ed8;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
   color: #fff;
 }
 .save-action:hover:not(:disabled) {
-  background: #1e40af;
+  background: var(--color-primary-hover, var(--color-primary));
 }
 @media (max-width: 40rem) {
   .leave-actions,

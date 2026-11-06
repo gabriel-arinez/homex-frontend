@@ -2,6 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import CapturaAsistida from '@/modules/proformas/components/CapturaAsistida.vue'
 import { asistidasService } from '@/modules/capturas/services/asistidasService'
+import { readAudioDuration } from '@/modules/capturas/audioLimits'
+
+vi.mock('@/modules/capturas/audioLimits', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@/modules/capturas/audioLimits')>()
+  return { ...original, readAudioDuration: vi.fn<() => Promise<number>>().mockResolvedValue(60) }
+})
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -91,7 +97,7 @@ describe('PRF-04 carga de grabaciones', () => {
     try {
       await wrapper
         .findAll('button')
-        .find((button) => button.text().includes('Subir audio'))!
+        .find((button) => button.text().includes('Seleccionar archivo'))!
         .trigger('click')
 
       await seleccionar(wrapper, new File(['audio'], 'escritorio.aac', { type: 'audio/aac' }))
@@ -100,7 +106,7 @@ describe('PRF-04 carga de grabaciones', () => {
       // Cada nuevo archivo requiere una acción expresa del vendedor.
       await wrapper
         .findAll('button')
-        .find((button) => button.text().includes('Subir audio'))!
+        .find((button) => button.text().includes('Seleccionar archivo'))!
         .trigger('click')
       await seleccionar(wrapper, new File([], 'vacio.m4a', { type: 'audio/mp4' }))
       expect(wrapper.text()).toContain('archivo de audio está vacío')
@@ -108,6 +114,21 @@ describe('PRF-04 carga de grabaciones', () => {
     } finally {
       wrapper.unmount()
     }
+  })
+
+  it('rechaza audio mayor de cinco minutos antes de enviarlo al ASR', async () => {
+    const crear = vi.spyOn(asistidasService, 'create')
+    vi.mocked(readAudioDuration).mockResolvedValueOnce(301)
+    const wrapper = montar()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Seleccionar archivo'))!
+      .trigger('click')
+    await seleccionar(wrapper, new File(['audio'], 'excesivo.wav', { type: 'audio/wav' }))
+    await flushPromises()
+    expect(wrapper.text()).toContain('superar 5 minutos')
+    expect(crear).not.toHaveBeenCalled()
+    wrapper.unmount()
   })
 
   it('mantiene la confirmación antes de reemplazar un mueble', async () => {

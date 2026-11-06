@@ -20,6 +20,7 @@ const emit = defineEmits<{
   'update:modelValue': [images: LocalImage[]]
   changed: []
   busy: [value: boolean]
+  status: [value: { confirmed: number; pending: number; busy: boolean; error: boolean }]
 }>()
 const images = ref<GalleryImage[]>([]),
   pending = ref<LocalImage[]>([]),
@@ -54,6 +55,17 @@ const all = computed(() => [
 ])
 const cover = computed(() => all.value.find((i) => i.principal) ?? all.value[0])
 const current = computed(() => all.value[selected.value] ?? all.value[0])
+watch(
+  [() => images.value.length, () => local.value.length, busy, error],
+  () =>
+    emit('status', {
+      confirmed: images.value.length,
+      pending: local.value.length,
+      busy: busy.value,
+      error: Boolean(error.value),
+    }),
+  { immediate: true },
+)
 watch(
   () => all.value.length,
   (length) => {

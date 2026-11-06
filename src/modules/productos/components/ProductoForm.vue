@@ -36,6 +36,15 @@ const error = ref('')
 const fields = ref<Record<string, string[]>>({})
 const images = ref<LocalImage[]>([])
 const voiceOpen = ref(false)
+const assistantProcessing = ref(false)
+const recordingActive = ref(false)
+const recordingPaused = ref(false)
+const recordingElapsed = ref(0)
+function updateRecording(active: boolean, paused: boolean, elapsed: number) {
+  recordingActive.value = active
+  recordingPaused.value = paused
+  recordingElapsed.value = elapsed
+}
 const voicePanel = ref<HTMLElement | null>(null)
 useFocusTrap(voicePanel, voiceOpen)
 const voiceCandidates = ref<Array<[string, unknown]>>([])
@@ -436,7 +445,7 @@ function submit(): boolean {
   emit('save', body, images.value)
   return true
 }
-defineExpose({ submit })
+defineExpose({ submit, hasRecording: () => recordingActive.value })
 onMounted(load)
 </script>
 <template>
@@ -474,6 +483,28 @@ onMounted(load)
         <Mic :size="18" aria-hidden="true" /> Completar por voz
       </Button>
     </header>
+    <button
+      v-if="(recordingActive || assistantProcessing) && !voiceOpen"
+      type="button"
+      class="voice-mini"
+      aria-label="Volver al asistente de voz mientras se graba"
+      @click="voiceOpen = true"
+    >
+      <Mic :size="17" aria-hidden="true" />
+      {{
+        assistantProcessing
+          ? 'Interpretando audio'
+          : recordingPaused
+            ? 'Grabación pausada'
+            : 'Grabación en curso'
+      }}
+      <template v-if="recordingActive">
+        · {{ String(Math.floor(recordingElapsed / 60)).padStart(2, '0') }}:{{
+          String(recordingElapsed % 60).padStart(2, '0')
+        }}
+      </template>
+      · Volver al asistente
+    </button>
     <p v-if="error" class="error-summary" role="alert">{{ error }}</p>
     <p v-if="loading" role="status" class="loading-note">Cargando opciones del catálogo…</p>
     <div class="catalog-layout">
@@ -775,8 +806,8 @@ onMounted(load)
             </label>
             <div v-if="form.promo_activa" class="promotion-fields">
               <p v-if="legacyPromotion && promoUnchanged" class="promotion-legacy">
-                Esta promoción conserva un precio anterior histórico distinto del normal.
-                No cambiará mientras no edites la promoción.
+                Esta promoción conserva un precio anterior histórico distinto del normal. No
+                cambiará mientras no edites la promoción.
               </p>
               <p class="promotion-base">
                 Precio de referencia: <strong>{{ money(form.precio_lista) }}</strong>
@@ -915,7 +946,7 @@ onMounted(load)
   </form>
 
   <Teleport to="body">
-    <div v-if="voiceOpen" class="voice-backdrop" @mousedown.self="voiceOpen = false">
+    <div v-show="voiceOpen" class="voice-backdrop" @mousedown.self="voiceOpen = false">
       <aside
         ref="voicePanel"
         class="voice-drawer"
@@ -945,6 +976,8 @@ onMounted(load)
           :categoria="categoria"
           :opciones="opciones"
           @apply="applyVoice"
+          @recording-state="updateRecording"
+          @processing-state="assistantProcessing = $event"
         />
       </aside>
     </div>
@@ -1370,6 +1403,24 @@ textarea {
   display: flex;
   justify-content: flex-end;
   background: var(--color-overlay);
+}
+.voice-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.8rem;
+  min-height: 2.75rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-control);
+  background: var(--color-primary-soft);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.voice-mini svg {
+  color: var(--color-primary);
 }
 .voice-drawer {
   display: flex;

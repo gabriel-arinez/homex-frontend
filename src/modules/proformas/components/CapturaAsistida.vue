@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
-import { FileAudio, Mic, Upload, X } from '@lucide/vue'
+import { FileAudio, Mic, Upload, X, Pause, Play, Square } from '@lucide/vue'
+import {
+  MAX_AUDIO_BYTES,
+  MAX_UPLOAD_SECONDS,
+  readAudioDuration,
+} from '@/modules/capturas/audioLimits'
 import type { ResultadoAsistida } from '@/generated/api'
 import AudioRecorder from '@/modules/capturas/components/AudioRecorder.vue'
 import Button from '@/shared/ui/Button.vue'
@@ -18,17 +23,18 @@ const emit = defineEmits<{
   applied: [result: ResultadoAsistida]
   proposed: [result: ResultadoAsistida]
   processing: [value: boolean]
+  'recording-state': [active: boolean, paused: boolean, elapsed: number]
 }>()
 const voice = useCapturaAsistida()
 const confirm = ref(false)
 const recording = ref(false)
+const paused = ref(false)
 const recorder = ref<InstanceType<typeof AudioRecorder> | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const pendingMode = ref<'record' | 'upload'>('record')
 const puedeSeleccionarAudio = ref(false)
 const hasResult = ref(false)
 const fileError = ref('')
-const MAX_AUDIO_BYTES = 25_000_000
 const EXTENSIONES_AUDIO = new Set(['.wav', '.mp3', '.m4a', '.ogg', '.webm'])
 const original = ref('')
 const corrected = ref('')
@@ -65,7 +71,14 @@ async function activate() {
   recording.value = true
   puedeSeleccionarAudio.value = true
   await nextTick()
-  await recorder.value?.startRecording?.()
+  // El componente real expone startRecording; algunos tests sustituyen el grabador.
+  if (recorder.value?.startRecording) {
+    const started = await recorder.value.startRecording()
+    if (!started) {
+      recording.value = false
+      fileError.value = recorder.value.getError?.() || 'No fue posible iniciar la grabación.'
+    }
+  }
 }
 function start(mode: 'record' | 'upload' = 'record') {
   pendingMode.value = mode
@@ -85,7 +98,25 @@ function reinterpret() {
   if (props.dirty && !props.reviewBeforeApply) confirm.value = true
   else void send(undefined, pendingText.value)
 }
-function seleccionarAudio(event: Event) {
+function onRecorderStatus(state: string, seconds: number) {
+  paused.value = state === 'PAUSED'
+  emit(
+    'recording-state',
+    recording.value && ['RECORDING', 'PAUSED'].includes(state),
+    paused.value,
+    seconds,
+  )
+}
+function pausar() {
+  recorder.value?.pauseRecording()
+}
+function reanudar() {
+  recorder.value?.resumeRecording()
+}
+function finalizar() {
+  recorder.value?.stopRecording()
+}
+async function seleccionarAudio(event: Event) {
   const input = event.target as HTMLInputElement
   const archivo = input.files?.[0]
   input.value = ''
@@ -107,15 +138,27 @@ function seleccionarAudio(event: Event) {
   }
 
   if (archivo.size > MAX_AUDIO_BYTES) {
-    fileError.value = 'El archivo supera el límite de 25 MB.'
+    fileError.value = 'El archivo supera el límite de 20 MB.'
     return
   }
 
+  try {
+    const seconds = await readAudioDuration(archivo)
+    if (seconds !== null && seconds > MAX_UPLOAD_SECONDS) {
+      fileError.value = 'La duración del audio no puede superar 5 minutos.'
+      return
+    }
+  } catch (cause) {
+    fileError.value = cause instanceof Error ? cause.message : 'No se pudo validar el audio.'
+    return
+  }
   void send(archivo)
 }
 
 async function send(audio?: Blob, texto?: string) {
   recording.value = false
+  paused.value = false
+  emit('recording-state', false, false, 0)
   puedeSeleccionarAudio.value = false
   const context = JSON.stringify([props.sesion, props.moneda, props.proforma])
   const result = await voice.capture({
@@ -154,21 +197,24 @@ async function send(audio?: Blob, texto?: string) {
 }
 function cancel() {
   voice.cancel()
+  recorder.value?.cancelRecording()
   recording.value = false
+  paused.value = false
+  emit('recording-state', false, false, 0)
   puedeSeleccionarAudio.value = false
   fileError.value = ''
 }
 </script>
 <template>
   <section class="voice-workflow" aria-label="Asistencia por voz">
-    <div class="voice-shortcuts">
+    <div v-if="!recording" class="voice-shortcuts">
       <button
         type="button"
         class="voice-record"
         :disabled="voice.processing.value || recording"
         @click="start('record')"
       >
-        <Mic :size="19" aria-hidden="true" /> Grabar descripción
+        <Mic :size="28" aria-hidden="true" /> Grabar descripción
       </button>
       <button
         type="button"
@@ -176,9 +222,9 @@ function cancel() {
         :disabled="voice.processing.value || recording"
         @click="start('upload')"
       >
-        <Upload :size="19" aria-hidden="true" /> Subir audio
+        <Upload :size="28" aria-hidden="true" /> Seleccionar archivo
       </button>
-      <p>Describe las características del mueble o sube un audio para completar la ficha.</p>
+      <p>Describe tu mueble. Graba hasta 3 minutos o sube audio de hasta 20 MB y 5 minutos.</p>
     </div>
     <input
       ref="fileInput"
@@ -187,14 +233,28 @@ function cancel() {
       tabindex="-1"
       :disabled="!puedeSeleccionarAudio || voice.processing.value"
       accept=".wav,.mp3,.m4a,.ogg,.webm"
-      aria-label="Seleccionar archivo de audio"
+      aria-hidden="true"
       @change="seleccionarAudio"
     />
     <div v-if="recording" class="voice-live">
-      <AudioRecorder ref="recorder" @ready="(audio) => audio && send(audio)" />
-      <button type="button" class="voice-cancel" @click="cancel">
-        <X :size="16" aria-hidden="true" /> Cancelar dictado
-      </button>
+      <AudioRecorder
+        ref="recorder"
+        compact
+        @ready="(audio) => audio && send(audio)"
+        @status="onRecorderStatus"
+      />
+      <div class="voice-live-actions" role="group" aria-label="Controles de grabación">
+        <Button v-if="!paused" variant="secondary" @click="pausar"
+          ><Pause :size="17" aria-hidden="true" /> Pausar</Button
+        >
+        <Button v-else variant="secondary" @click="reanudar"
+          ><Play :size="17" aria-hidden="true" /> Reanudar</Button
+        >
+        <Button @click="finalizar"><Square :size="17" aria-hidden="true" /> Finalizar</Button>
+        <Button variant="danger" @click="cancel"
+          ><X :size="17" aria-hidden="true" /> Cancelar</Button
+        >
+      </div>
     </div>
     <div v-if="voice.processing.value" class="voice-processing" role="status" aria-live="polite">
       <FileAudio :size="20" aria-hidden="true" />
@@ -251,18 +311,23 @@ function cancel() {
   gap: 1rem;
 }
 .voice-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+.voice-live-actions {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
   gap: 0.65rem;
 }
 .voice-shortcuts button {
   display: inline-flex;
   justify-content: center;
   align-items: center;
+  flex-direction: column;
   gap: 0.65rem;
-  min-height: 3rem;
-  padding: 0.7rem 1rem;
+  min-height: 5.6rem;
+  padding: 1rem;
   border-radius: var(--radius-control);
   font: inherit;
   font-size: 0.87rem;
@@ -289,6 +354,7 @@ function cancel() {
   border: 1px solid var(--color-border-strong);
 }
 .voice-shortcuts p {
+  grid-column: 1 / -1;
   width: 100%;
   order: 3;
   margin: 0;
@@ -384,8 +450,11 @@ function cancel() {
   margin-bottom: 0.7rem;
 }
 @media (max-width: 36rem) {
-  .voice-shortcuts button {
-    flex: 1;
+  .voice-shortcuts {
+    grid-template-columns: 1fr;
+  }
+  .voice-shortcuts p {
+    grid-column: 1;
   }
 }
 </style>

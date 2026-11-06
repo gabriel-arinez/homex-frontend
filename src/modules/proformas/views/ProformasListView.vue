@@ -688,22 +688,22 @@ onBeforeUnmount(() => {
   table-layout: fixed;
 }
 .col-quote {
-  width: 21%;
+  width: 22%;
 }
 .col-client {
   width: 20%;
 }
 .col-date {
-  width: 18%;
+  width: 22%;
 }
 .col-status {
-  width: 15%;
+  width: 14%;
 }
 .col-total {
-  width: 18%;
+  width: 15%;
 }
 .col-actions {
-  width: 8%;
+  width: 7%;
 }
 .proforma-table th,
 .proforma-table td {
@@ -797,7 +797,10 @@ onBeforeUnmount(() => {
 }
 .actions-cell,
 .proforma-table th.actions-heading {
-  text-align: right;
+  text-align: center;
+}
+.actions-cell :deep(.proforma-actions) {
+  justify-content: center;
 }
 .proforma-view-link {
   display: inline-grid;
@@ -946,6 +949,7 @@ onBeforeUnmount(() => {
   .actions-cell {
     grid-column: 2;
     align-self: end;
+    justify-self: end;
   }
 }
 @media (max-width: 36rem) {

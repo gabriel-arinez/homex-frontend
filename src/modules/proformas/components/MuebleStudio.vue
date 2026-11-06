@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
+import { useFocusTrap } from '@/shared/composables/useFocusTrap'
 import {
   ArrowLeft,
   AlertCircle,
@@ -10,6 +11,8 @@ import {
   Settings2,
   Wallet,
   ImagePlus,
+  Mic,
+  X,
 } from '@lucide/vue'
 import type {
   EspecificacionMueble,
@@ -19,6 +22,7 @@ import type {
   ValorCatalogoPublico,
 } from '@/generated/api'
 import Button from '@/shared/ui/Button.vue'
+import ConfirmDialog from '@/shared/ui/ConfirmDialog.vue'
 import CapturaAsistida from './CapturaAsistida.vue'
 import EspecificacionForm from './EspecificacionForm.vue'
 import ImageGallery from '@/shared/media/ImageGallery.vue'
@@ -70,10 +74,53 @@ const emit = defineEmits<{
   processing: [value: boolean]
   typeCreated: [tipo: ValorCatalogoPublico]
 }>()
+const voiceOpen = ref(false)
+const leaveVoiceConfirm = ref(false)
+function requestCloseStudio() {
+  if (voiceActive.value) {
+    leaveVoiceConfirm.value = true
+    return
+  }
+  emit('cancel')
+}
+function confirmCloseStudio() {
+  leaveVoiceConfirm.value = false
+  emit('cancel')
+}
+const voicePanel = ref<HTMLElement | null>(null)
+const voiceActive = ref(false)
+const voiceProcessing = ref(false)
+const voicePaused = ref(false)
+const voiceElapsed = ref(0)
+useFocusTrap(voicePanel, voiceOpen)
+function onVoiceProcessing(value: boolean) {
+  voiceProcessing.value = value
+  emit('processing', value)
+}
+function onVoiceState(active: boolean, paused: boolean, elapsed: number) {
+  voiceActive.value = active
+  voicePaused.value = paused
+  voiceElapsed.value = elapsed
+}
 const galleryId = ref(props.galeriaId ?? '')
 const galleryError = ref('')
 const galleryRef = ref<InstanceType<typeof ImageGallery> | null>(null)
 const galleryBusy = ref(false)
+const galleryStatus = ref({ confirmed: 0, pending: 0, busy: false, error: false })
+function onGalleryStatus(value: {
+  confirmed: number
+  pending: number
+  busy: boolean
+  error: boolean
+}) {
+  galleryStatus.value = value
+}
+const imageStepStatus = computed(() => {
+  if (galleryError.value || galleryStatus.value.error) return 'issues' as const
+  if (galleryStatus.value.pending > 0 || galleryStatus.value.busy || galleryBusy.value)
+    return 'pending' as const
+  return galleryStatus.value.confirmed > 0 ? ('complete' as const) : ('pending' as const)
+})
 function onGalleryChanged() {
   emit('changed')
   emit('galleryChanged')
@@ -123,6 +170,9 @@ const estadoApartados = ref<Record<Seccion, 'pending' | 'complete' | 'issues'>>(
   comercial: 'pending',
   revision: 'pending',
 })
+watch(imageStepStatus, (state) => {
+  estadoApartados.value = { ...estadoApartados.value, imagenes: state }
+})
 const volverARevision = ref(false)
 const propuestaPorConfirmar = ref<ResultadoAsistida | null>(null)
 const datosPropuestos = computed(() =>
@@ -167,6 +217,7 @@ function editarDesdeRevision(section: Seccion) {
   seccion.value = section
 }
 function recibirCaptura(result: ResultadoAsistida) {
+  voiceOpen.value = false
   propuestaPorConfirmar.value = result
   volverARevision.value = false
   seccion.value = 'revision'
@@ -193,20 +244,77 @@ async function seleccionarApartado(id: typeof seccion.value) {
         <div class="studio-breadcrumb">PROFORMAS <span>/</span> MUEBLE A PEDIDO</div>
         <h1 id="furniture-studio-title">{{ titulo }}</h1>
       </div>
-      <Button type="button" variant="secondary" @click="emit('cancel')"
-        ><ArrowLeft :size="17" aria-hidden="true" /> Volver a proforma</Button
-      >
+      <div class="studio-header-actions">
+        <Button v-if="nueva" type="button" class="studio-voice-launch" @click="voiceOpen = true">
+          <Mic :size="18" aria-hidden="true" /> Completar por voz
+        </Button>
+        <Button type="button" variant="secondary" @click="requestCloseStudio">
+          <ArrowLeft :size="17" aria-hidden="true" /> Volver a proforma
+        </Button>
+      </div>
     </header>
-    <CapturaAsistida
-      v-if="nueva"
-      :dirty="dirty"
-      :sesion="sesion"
-      :moneda="moneda"
-      :proforma="proforma"
-      review-before-apply
-      @proposed="recibirCaptura"
-      @processing="emit('processing', $event)"
-    />
+    <button
+      v-if="(voiceActive || voiceProcessing) && !voiceOpen"
+      type="button"
+      class="studio-voice-mini"
+      aria-label="Reabrir asistente de voz del mueble"
+      @click="voiceOpen = true"
+    >
+      <Mic :size="17" aria-hidden="true" />
+      {{
+        voiceProcessing
+          ? 'Interpretando audio'
+          : voicePaused
+            ? 'Grabación pausada'
+            : 'Grabación en curso'
+      }}
+      <template v-if="voiceActive">
+        · {{ String(Math.floor(voiceElapsed / 60)).padStart(2, '0') }}:{{
+          String(voiceElapsed % 60).padStart(2, '0')
+        }}
+      </template>
+      · Volver al asistente
+    </button>
+    <Teleport to="body">
+      <div v-show="voiceOpen" class="studio-voice-backdrop" @mousedown.self="voiceOpen = false">
+        <aside
+          ref="voicePanel"
+          class="studio-voice-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="studio-voice-title"
+          @keydown.esc="voiceOpen = false"
+        >
+          <header class="studio-voice-header">
+            <div>
+              <p>ASISTENCIA COMERCIAL</p>
+              <h2 id="studio-voice-title">Completar mueble por voz</h2>
+              <span>Describe el mueble y revisa la propuesta antes de incorporarla.</span>
+            </div>
+            <button
+              class="studio-voice-close"
+              type="button"
+              aria-label="Minimizar asistente de voz"
+              @click="voiceOpen = false"
+            >
+              <X :size="20" aria-hidden="true" />
+            </button>
+          </header>
+          <CapturaAsistida
+            v-if="nueva"
+            class="studio-voice-workflow"
+            :dirty="dirty"
+            :sesion="sesion"
+            :moneda="moneda"
+            :proforma="proforma"
+            review-before-apply
+            @proposed="recibirCaptura"
+            @processing="onVoiceProcessing"
+            @recording-state="onVoiceState"
+          />
+        </aside>
+      </div>
+    </Teleport>
     <nav class="studio-steps" aria-label="Apartados del mueble a pedido">
       <button
         v-for="(item, i) in secciones"
@@ -221,7 +329,10 @@ async function seleccionarApartado(id: typeof seccion.value) {
         /></span>
         <span class="studio-step-label"
           ><small>{{ String(i + 1).padStart(2, '0') }}</small
-          >{{ item.titulo }}</span
+          >{{ item.titulo
+          }}<small v-if="item.id === 'imagenes' && imageStepStatus === 'pending'">
+            · Opcional</small
+          ></span
         >
         <AlertCircle
           v-if="estadoApartados[item.id] === 'issues'"
@@ -378,6 +489,7 @@ async function seleccionarApartado(id: typeof seccion.value) {
         :editable="seccion === 'imagenes'"
         title="Imágenes del mueble"
         @changed="onGalleryChanged"
+        @status="onGalleryStatus"
         @busy="galleryBusy = $event"
       />
       <p v-else>Sin imágenes de referencia.</p>
@@ -404,11 +516,9 @@ async function seleccionarApartado(id: typeof seccion.value) {
         :active-section="seccion === 'imagenes' ? 'imagenes' : seccion"
         @save="saveWithGallery"
         @changed="emit('changed')"
-        @cancel="emit('cancel')"
+        @cancel="requestCloseStudio"
         @request-section="editarDesdeRevision($event)"
-        @section-status="
-          estadoApartados = { ...$event, imagenes: galleryId ? 'complete' : 'pending' }
-        "
+        @section-status="estadoApartados = { ...$event, imagenes: imageStepStatus }"
         @type-created="emit('typeCreated', $event)"
       />
     </fieldset>
@@ -422,6 +532,14 @@ async function seleccionarApartado(id: typeof seccion.value) {
         {{ volverARevision ? 'Volver a revisar' : 'Continuar a ' + secciones[indice + 1]!.titulo }}
       </Button>
     </footer>
+    <ConfirmDialog
+      :open="leaveVoiceConfirm"
+      title="Descartar grabación"
+      description="Hay una grabación activa. Si vuelves a la proforma perderás el audio que todavía no finalizaste."
+      confirm-label="Descartar grabación y volver"
+      @close="leaveVoiceConfirm = false"
+      @confirm="confirmCloseStudio"
+    />
   </section>
 </template>
 
@@ -432,6 +550,85 @@ async function seleccionarApartado(id: typeof seccion.value) {
   width: 100%;
   min-width: 0;
   padding-bottom: var(--space-7);
+}
+.studio-header-actions {
+  display: flex;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.studio-voice-launch {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+.studio-voice-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-self: start;
+  padding: 0.7rem 1rem;
+  min-height: 2.75rem;
+  background: var(--color-primary-soft);
+  color: var(--color-text);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-control);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+.studio-voice-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  justify-content: flex-end;
+  background: var(--color-overlay);
+}
+.studio-voice-panel {
+  width: min(44rem, 100%);
+  height: 100dvh;
+  overflow-y: auto;
+  background: var(--color-surface-raised);
+  border-left: 1px solid var(--color-border);
+}
+.studio-voice-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+  padding: var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+.studio-voice-header p {
+  margin: 0;
+  color: var(--color-primary-accent);
+  font-size: 0.73rem;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+}
+.studio-voice-header h2 {
+  margin: 0.4rem 0;
+  font-size: 1.45rem;
+}
+.studio-voice-header span {
+  color: var(--color-text-secondary);
+  font-size: 0.84rem;
+}
+.studio-voice-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  color: var(--color-text);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+.studio-voice-workflow {
+  padding: var(--space-5);
 }
 .studio-header {
   display: flex;
