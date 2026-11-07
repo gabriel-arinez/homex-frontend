@@ -19,10 +19,17 @@ Objetivo: optimizar jerarquía visual, contraste de capas, distribución y micro
 - En el explorador izquierdo de piezas, mostrar resumen real de cada pieza (cantidad, material, espesor, color), indicador de alerta si falta el nombre y botón directo `+ Nueva pieza` al pie; cuando no hay piezas aún, presentar estado vacío de ancho completo con accesos rápidos de piezas frecuentes (`+ Tablero`, `+ Estructura`, etc.).
 - En el editor de la pieza seleccionada, unificar acciones (`Subir`, `Bajar`, `Duplicar`, `Quitar pieza`) directamente en la cabecera eliminando el acordeón oculto `Acciones de esta pieza`; agrupar campos en bloques claros (Datos de la pieza vs Materiales y medidas), ocultar el selector `Conjunto` cuando no existen conjuntos creados y unificar las características adicionales con `MuebleOptionPicker` + chips rápidos.
 
+### S3 — Paso 03 Accesorios
+
+- Unificar las cabeceras de `Accesorios incluidos` y `Notas para fabricación` con agrupación a la izquierda de ícono + título, indicador de estado (`Opcional` / `N incluidos`) y botón `+ Añadir accesorio` fijo en la cabecera superior derecha.
+- Reorganizar la lista de accesorios en una grilla de 2 columnas en escritorio (1 en móvil) con numeración sutil (`01`, `02`), acciones compactas (`Editar` y `Quitar` destructivo suave) y fila de edición de ancho completo con foco automático, confirmación con `Enter` y cancelación con `Escape` si está vacía.
+- Incorporar accesos rápidos de un clic para accesorios frecuentes (`+ Pasacables`, `+ Correderas telescópicas`, etc.) y aplicar jerarquía de 3 capas en `Notas para fabricación` (contenedor, sub-bloque `--color-surface-muted` y `<textarea>` `--color-surface-raised` con `placeholder` orientativo).
+
 ## Tasks
 
 - T1 — S1 — inline — `aeaeea3` — Paso 01 General completado y verificado.
-- T2 — S2 — inline — verificado — Paso 02 Estructura implementado y verificado con pruebas unitarias, E2E y accesibilidad.
+- T2 — S2 — inline — `308992e` — Paso 02 Estructura completado y verificado.
+- T3 — S3 — inline — verificado — Paso 03 Accesorios implementado y verificado con pruebas unitarias, E2E y accesibilidad.
 
 ## Log
 
@@ -30,3 +37,4 @@ Objetivo: optimizar jerarquía visual, contraste de capas, distribución y micro
 - L2 — En `MuebleStudio.vue` se alineó a la izquierda el bloque de cabecera del paso y se ajustó el contraste de la pestaña activa. En `MuebleOptionPicker.vue` se integró el estado seleccionado y la acción `Quitar` dentro del campo sin duplicar texto afuera.
 - L3 — En `EspecificacionForm.vue` se añadieron indicadores de obligatoriedad/opcionalidad, microcopy comercial, capitalización visual de medidas, acción `Quitar` en cabecera de sub-tarjeta para conservar alturas uniformes, accesos rápidos de un clic y estado vacío orientativo en Características generales.
 - L4 — En `EspecificacionForm.vue` (Paso 02 Estructura) se compactó la franja de `Conjuntos` cuando está vacía, se reemplazaron contadores de límite técnico por indicadores naturales, se enriqueció el árbol izquierdo con resumen real de cada pieza y botón `+ Nueva pieza`, se incorporó estado vacío de ancho completo con chips de piezas frecuentes, se llevaron las acciones `Duplicar` y `Quitar pieza` directamente a la cabecera del editor eliminando el acordeón oculto, se agruparon los campos en sub-bloques con jerarquía de 3 capas, se ocultó el selector `Conjunto` cuando no existen conjuntos y se unificaron las características adicionales con `MuebleOptionPicker` + chips rápidos.
+- L5 — En `EspecificacionForm.vue` (Paso 03 Accesorios) se corrigió la cabecera desalineada de `Notas para fabricación` agrupando ícono + título y badge `Opcional`, se llevó `+ Añadir accesorio` fijo a la cabecera de `Accesorios incluidos`, se transformó la lista en una grilla de 2 columnas con numeración (`01`, `02`), fila de edición de ancho completo con atajos `Enter`/`Escape`, chips de accesorios frecuentes de un clic y jerarquía de 3 capas en el bloque de observaciones (incluyendo `:deep(.textarea-field textarea)` con `--color-surface-raised`).

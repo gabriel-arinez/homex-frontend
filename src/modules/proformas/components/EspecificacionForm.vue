@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import type {
   AtributoMueble,
   PendienteAsistida,
@@ -20,6 +20,7 @@ import {
   ArrowDown,
   MessageSquareText,
   AlertCircle,
+  Check,
   CheckCircle2,
   Layers3,
   Plus,
@@ -630,14 +631,77 @@ function deshacerComponente() {
   activeComponentUid.value = removed.item.uid ?? String(removed.index)
   changed()
 }
+const accesoriosFrecuentes = [
+  'Pasacables',
+  'Correderas telescópicas',
+  'Bisagras cierre suave',
+  'Tiradores metálicos',
+  'Cerradura',
+  'Tomacorrientes integrados',
+  'Niveladores regulables',
+]
+const accesoriosRegistradosCount = computed(() => accesorios.filter((a) => a.trim()).length)
+const accesoriosFrecuentesDisponibles = computed(() =>
+  accesoriosFrecuentes.filter(
+    (frecuente) => !accesorios.some((actual) => normalized(actual) === normalized(frecuente)),
+  ),
+)
+function focusAccesorio(index: number) {
+  if (!props.studio) return
+  void nextTick(() => {
+    document.getElementById(`accesorio-${index}`)?.focus()
+  })
+}
+function editarAccesorio(index: number) {
+  accesorioEnEdicion.value = index
+  focusAccesorio(index)
+}
 function addAccesorio() {
-  if (accesorios.some((item) => !item.trim())) {
-    aviso.value = 'Completa o elimina el accesorio sin descripción antes de agregar otro.'
+  const emptyIndex = accesorios.findIndex((item) => !item.trim())
+  if (emptyIndex >= 0) {
+    if (props.studio) {
+      editarAccesorio(emptyIndex)
+      touchedAccesorios[emptyIndex] = true
+    } else {
+      aviso.value = 'Completa o elimina el accesorio sin descripción antes de agregar otro.'
+    }
     return
   }
   accesorios.push('')
   accesorioEnEdicion.value = accesorios.length - 1
+  focusAccesorio(accesorios.length - 1)
   changed()
+}
+function addAccesorioRapido(nombre: string) {
+  const emptyIndex = accesorios.findIndex((item) => !item.trim())
+  if (emptyIndex >= 0) {
+    accesorios[emptyIndex] = nombre
+    delete touchedAccesorios[emptyIndex]
+    accesorioEnEdicion.value = null
+    changed()
+    return
+  }
+  accesorios.push(nombre)
+  accesorioEnEdicion.value = null
+  changed()
+}
+function onAccesorioKeydown(event: KeyboardEvent, index: number) {
+  if (!props.studio) return
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    if (accesorios[index]?.trim()) {
+      accesorioEnEdicion.value = null
+    } else {
+      touchedAccesorios[index] = true
+    }
+  } else if (event.key === 'Escape') {
+    event.preventDefault()
+    if (!accesorios[index]?.trim()) {
+      accesorios.splice(index, 1)
+      delete touchedAccesorios[index]
+    }
+    accesorioEnEdicion.value = null
+  }
 }
 function removeAccesorio(index: number) {
   const item = accesorios[index]
@@ -1900,62 +1964,129 @@ onMounted(loadCatalog)
           >
         </section>
         <section id="accesorios" v-show="!studio || activeSection === 'accesorios'">
-          <div class="heading">
-            <h3><Wrench v-if="studio" :size="19" aria-hidden="true" />Accesorios incluidos</h3>
-            <span v-if="studio" class="accessory-count"
-              >{{ accesorios.filter((a) => a.trim()).length }} registrados</span
+          <div class="heading" :class="{ 'accessories-section-header': studio }">
+            <div :class="{ 'accessories-section-copy': studio }">
+              <h3>
+                <span class="section-heading-main"
+                  ><Wrench v-if="studio" :size="19" aria-hidden="true" />Accesorios incluidos</span
+                >
+                <span v-if="studio" class="section-badge">{{
+                  accesoriosRegistradosCount
+                    ? `${accesoriosRegistradosCount} ${accesoriosRegistradosCount === 1 ? 'incluido' : 'incluidos'}`
+                    : 'Opcional'
+                }}</span>
+              </h3>
+              <p v-if="studio" class="accessory-guidance">
+                Herrajes, conexiones eléctricas o complementos que se entregan con el mueble.
+              </p>
+            </div>
+            <Button v-if="studio" variant="secondary" class="accessory-add" @click="addAccesorio"
+              ><Plus :size="15" aria-hidden="true" />Añadir accesorio</Button
             >
           </div>
-          <p v-if="studio" class="accessory-guidance">
-            Registra los accesorios que se incluirán con el mueble.
-          </p>
-          <p v-if="studio && !accesorios.length" class="accessory-empty">
-            Todavía no hay accesorios. Puedes añadirlos si corresponden.
-          </p>
+          <div v-if="studio && !accesorios.length" class="accessory-empty">
+            <p class="accessory-empty__title">
+              Todavía no hay accesorios. Puedes añadirlos si corresponden.
+            </p>
+            <p class="accessory-empty__hint">
+              Suma uno frecuente en un clic abajo o usa «Añadir accesorio» para describir uno a
+              medida.
+            </p>
+          </div>
           <div
-            v-for="(_, i) in accesorios"
-            :key="i"
-            class="accessory-item"
-            :class="{ 'accessory-item--studio': studio }"
+            v-if="accesorios.length"
+            :class="studio ? 'accessories-grid' : 'accessories-list-legacy'"
           >
-            <template v-if="studio && accesorios[i]?.trim() && accesorioEnEdicion !== i">
-              <div class="accessory-item-label">
-                <Wrench v-if="studio" :size="18" aria-hidden="true" /><strong>{{
-                  accesorios[i]
-                }}</strong>
-              </div>
-              <Button variant="secondary" @click="accesorioEnEdicion = i"
-                ><Pencil :size="15" aria-hidden="true" /> Editar</Button
-              >
-            </template>
-            <TextField
-              v-else
-              v-model="accesorios[i]"
-              :name="`accesorio-${i}`"
-              label="Descripción del accesorio *"
-              :error="errorAccesorio(i)"
-              @blur="touchedAccesorios[i] = true"
-            />
-            <Button
-              variant="secondary"
-              :aria-label="studio ? `Quitar accesorio ${accesorios[i] || i + 1}` : undefined"
-              @click="removeAccesorio(i)"
-              >Quitar</Button
+            <div
+              v-for="(_, i) in accesorios"
+              :key="i"
+              class="accessory-item"
+              :class="{
+                'accessory-item--studio': studio,
+                'accessory-item--editing':
+                  studio && (!accesorios[i]?.trim() || accesorioEnEdicion === i),
+              }"
+              @keydown="onAccesorioKeydown($event, i)"
             >
-            <Button
-              v-if="studio && accesorioEnEdicion === i && accesorios[i]?.trim()"
-              variant="secondary"
-              @click="accesorioEnEdicion = null"
-              >Listo</Button
-            >
+              <template v-if="studio && accesorios[i]?.trim() && accesorioEnEdicion !== i">
+                <div class="accessory-item-label">
+                  <span class="accessory-index" aria-hidden="true">{{
+                    String(i + 1).padStart(2, '0')
+                  }}</span>
+                  <strong class="accessory-name">{{ accesorios[i] }}</strong>
+                </div>
+                <div class="accessory-item-actions">
+                  <button type="button" class="component-tool-btn" @click="editarAccesorio(i)">
+                    <Pencil :size="14" aria-hidden="true" />Editar
+                  </button>
+                  <button
+                    type="button"
+                    class="component-tool-btn component-tool-btn--danger"
+                    :aria-label="`Quitar accesorio ${accesorios[i] || i + 1}`"
+                    @click="removeAccesorio(i)"
+                  >
+                    <Trash2 :size="14" aria-hidden="true" />Quitar
+                  </button>
+                </div>
+              </template>
+              <template v-else>
+                <TextField
+                  v-model="accesorios[i]"
+                  :name="`accesorio-${i}`"
+                  label="Descripción del accesorio *"
+                  :placeholder="
+                    studio
+                      ? 'Ej. 2 tomacorrientes al centro, correderas telescópicas...'
+                      : undefined
+                  "
+                  :error="errorAccesorio(i)"
+                  @blur="touchedAccesorios[i] = true"
+                />
+                <div v-if="studio" class="accessory-edit-actions">
+                  <Button
+                    v-if="accesorios[i]?.trim()"
+                    variant="primary"
+                    @click="accesorioEnEdicion = null"
+                    ><Check :size="15" aria-hidden="true" />Listo</Button
+                  >
+                  <button
+                    type="button"
+                    class="component-tool-btn component-tool-btn--danger accessory-edit-remove"
+                    :aria-label="`Quitar accesorio ${accesorios[i] || i + 1}`"
+                    @click="removeAccesorio(i)"
+                  >
+                    <Trash2 :size="15" aria-hidden="true" />Quitar
+                  </button>
+                </div>
+                <Button v-else variant="secondary" @click="removeAccesorio(i)">Quitar</Button>
+              </template>
+            </div>
           </div>
           <Button
+            v-if="!studio"
             variant="secondary"
-            :disabled="!studio && accesorios.some((a) => !a.trim())"
+            :disabled="accesorios.some((a) => !a.trim())"
             class="accessory-add"
             @click="addAccesorio"
-            ><Plus :size="16" aria-hidden="true" /> Añadir accesorio</Button
+            >Añadir accesorio</Button
           >
+          <div
+            v-if="studio && accesoriosFrecuentesDisponibles.length"
+            class="section-adder accessory-quick-adder"
+          >
+            <div class="quick-chips">
+              <span class="quick-chips__label">Frecuentes:</span>
+              <button
+                v-for="frecuente in accesoriosFrecuentesDisponibles"
+                :key="frecuente"
+                type="button"
+                class="quick-chip"
+                @click="addAccesorioRapido(frecuente)"
+              >
+                <Plus :size="14" aria-hidden="true" /> {{ frecuente }}
+              </button>
+            </div>
+          </div>
           <div v-if="studio && accesoriosRetirados.length" class="undo-notice" role="status">
             Se quitó un accesorio.
             <button type="button" @click="deshacerAccesorio">Deshacer</button>
@@ -1967,18 +2098,35 @@ onMounted(loadCatalog)
             >Deshacer eliminación de accesorio</Button
           >
         </section>
-        <section v-show="!studio || activeSection === 'accesorios'">
+        <section
+          v-show="!studio || activeSection === 'accesorios'"
+          :class="{ 'observaciones-section': studio }"
+        >
           <h3 v-if="studio" class="observaciones-heading">
-            <MessageSquareText :size="19" aria-hidden="true" />Notas para fabricación
+            <span class="section-heading-main"
+              ><MessageSquareText :size="19" aria-hidden="true" />Notas para fabricación</span
+            >
+            <span class="section-badge">Opcional</span>
           </h3>
-          <TextAreaField
-            v-model="form.observaciones"
-            name="observaciones-especificacion"
-            label="Observaciones y detalles adicionales"
-            :rows="5"
-            hint="Incluye indicaciones de fabricación, instalación o acuerdos especiales."
-          />
-          <div v-if="base.advertencias?.length">
+          <p v-if="studio" class="section-guidance">
+            Indica detalles de armado, instalación en sitio, pasacables o acuerdos especiales con el
+            cliente.
+          </p>
+          <div :class="{ 'observaciones-box': studio }">
+            <TextAreaField
+              v-model="form.observaciones"
+              name="observaciones-especificacion"
+              label="Observaciones y detalles adicionales"
+              :placeholder="
+                studio
+                  ? 'Ej. Entregar desarmado, instalar en piso 3, igualar tono con muestra del cliente...'
+                  : undefined
+              "
+              :rows="studio ? 4 : 5"
+              hint="Incluye indicaciones de fabricación, instalación o acuerdos especiales."
+            />
+          </div>
+          <div v-if="base.advertencias?.length" class="observaciones-warnings">
             <h4>Información pendiente histórica</h4>
             <ul>
               <li v-for="item in base.advertencias" :key="item">{{ item }}</li>
@@ -2430,10 +2578,17 @@ details.card[open] > summary {
 }
 .component-subblock,
 .component-attributes-legacy,
+.accessories-list-legacy,
 .conjunto-destino {
   display: grid;
   gap: var(--space-3);
   min-width: 0;
+}
+.accessories-list-legacy .accessory-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
 }
 .component-identity-grid {
   display: grid;
@@ -2564,6 +2719,7 @@ details.card[open] > summary {
 }
 .configurator--studio :deep(.field input),
 .configurator--studio :deep(.field textarea),
+.configurator--studio :deep(.textarea-field textarea),
 .configurator--studio :deep(.field select),
 .configurator--studio :deep(.select select) {
   background: var(--color-surface-raised);
@@ -3240,53 +3396,164 @@ details.card[open] > summary {
   font-weight: 700;
   cursor: pointer;
 }
-.configurator--studio .accessory-guidance,
-.configurator--studio .accessory-empty {
+.configurator--studio #accesorios,
+.configurator--studio .observaciones-section {
+  display: grid;
+  gap: 1rem;
+}
+.configurator--studio .accessories-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem 1.25rem;
+  flex-wrap: wrap;
+}
+.configurator--studio .accessories-section-copy {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+  flex: 1 1 18rem;
+}
+.configurator--studio .accessories-section-copy h3 {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  font-size: 1.02rem;
+}
+.configurator--studio .accessories-section-copy .section-badge {
+  margin-left: 0.1rem;
+}
+.configurator--studio .accessory-guidance {
   margin: 0;
   color: var(--color-text-secondary);
-  font-size: 0.85rem;
+  font-size: 0.84rem;
+  line-height: 1.45;
 }
 .configurator--studio .accessory-empty {
-  padding: 1rem;
+  display: grid;
+  gap: 0.25rem;
+  padding: 1rem 1.1rem;
   border: 1px dashed var(--color-border-strong);
   border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
 }
-.configurator--studio .accessory-add {
-  justify-self: start;
+.configurator--studio .accessory-empty__title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text);
 }
-.configurator--studio .accessory-count {
+.configurator--studio .accessory-empty__hint {
+  margin: 0;
+  font-size: 0.8rem;
   color: var(--color-text-secondary);
-  font-size: 0.78rem;
+}
+.configurator--studio .accessories-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  align-items: start;
 }
 .configurator--studio .accessory-item--studio {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.8rem;
+  justify-content: space-between;
+  gap: 0.65rem 0.85rem;
   align-items: center;
   min-width: 0;
   background: var(--color-surface-muted);
   border: 1px solid var(--color-border);
-  padding: 0.75rem;
+  padding: 0.75rem 0.9rem;
   border-radius: var(--radius-control);
+  transition: border-color var(--transition-fast);
 }
-.configurator--studio .accessory-item--studio .field {
-  flex: 1;
-  min-width: 13rem;
+.configurator--studio .accessory-item--studio:hover {
+  border-color: var(--color-border-strong);
+}
+.configurator--studio .accessory-item--editing {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0.75rem;
+  padding: 0.95rem;
+  border-color: color-mix(in srgb, var(--color-primary) 50%, var(--color-border-strong));
+}
+.configurator--studio .accessory-item--editing :deep(.field) {
+  min-width: 0;
+  width: 100%;
 }
 .configurator--studio .accessory-item-label {
   display: flex;
-  gap: 0.6rem;
-  flex: 1;
+  gap: 0.65rem;
+  flex: 1 1 11rem;
   align-items: center;
   min-width: 0;
 }
-.configurator--studio .accessory-item-label svg {
-  color: var(--color-primary-accent);
+.configurator--studio .accessory-index {
   flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.7rem;
+  height: 1.7rem;
+  padding: 0 0.35rem;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
 }
-.configurator--studio .accessory-item-label strong {
+.configurator--studio .accessory-name {
   overflow-wrap: anywhere;
-  font-size: 0.85rem;
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+.configurator--studio .accessory-name::first-letter {
+  text-transform: uppercase;
+}
+.configurator--studio .accessory-item-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+.configurator--studio .accessory-edit-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding-top: 1.75rem;
+}
+.configurator--studio .accessory-edit-remove {
+  min-height: 2.75rem;
+  padding: 0.5rem 0.8rem;
+}
+.configurator--studio .accessory-quick-adder {
+  margin-top: 0;
+}
+.configurator--studio .observaciones-box {
+  padding: 0.95rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
+}
+.configurator--studio .observaciones-warnings {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
+}
+.configurator--studio .observaciones-warnings h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.86rem;
+}
+.configurator--studio .observaciones-warnings ul {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
 }
 .commercial-layout {
   display: contents;
@@ -3677,7 +3944,8 @@ details.card[open] > summary {
   .configurator--studio .commercial-layout {
     grid-template-columns: minmax(0, 1fr);
   }
-  .configurator--studio .studio-component-layout {
+  .configurator--studio .studio-component-layout,
+  .configurator--studio .accessories-grid {
     grid-template-columns: 1fr;
   }
   .configurator--studio .tree-group {
@@ -3720,8 +3988,12 @@ details.card[open] > summary {
   .configurator--studio .studio-component-detail .component-specs-grid,
   .configurator--studio .component-identity-grid,
   .configurator--studio .component-identity-grid--with-group,
-  .configurator--studio .component-attributes-grid {
+  .configurator--studio .component-attributes-grid,
+  .configurator--studio .accessory-item--editing {
     grid-template-columns: 1fr;
+  }
+  .configurator--studio .accessory-edit-actions {
+    padding-top: 0;
   }
   .configurator--studio .component-identity-grid--with-group :deep(.select) {
     grid-column: auto;

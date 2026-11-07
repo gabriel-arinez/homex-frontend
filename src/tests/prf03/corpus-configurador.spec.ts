@@ -493,4 +493,63 @@ describe('PRF-03 corpus representativo conservado por el configurador visual', (
       wrapper.unmount()
     }
   })
+
+  it('en modo Studio agiliza Accesorios con chips rápidos, grilla compacta, atajos de teclado y cabecera alineada en Notas', async () => {
+    const wrapper = mount(EspecificacionForm, {
+      props: {
+        ...opciones,
+        studio: true,
+        activeSection: 'accesorios',
+        detalle: {
+          nombre: 'Mesa de reunión',
+          cantidad: '1',
+          unidad: 20,
+          precio_unitario: '500',
+          descuento: '0',
+        },
+      },
+    })
+    try {
+      expect(wrapper.get('#accesorios .section-badge').text()).toBe('Opcional')
+      expect(wrapper.get('.observaciones-heading .section-heading-main').text()).toContain(
+        'Notas para fabricación',
+      )
+      expect(wrapper.get('.observaciones-heading .section-badge').text()).toBe('Opcional')
+      expect(
+        wrapper.get('textarea[name="observaciones-especificacion"]').attributes('placeholder'),
+      ).toContain('Entregar desarmado')
+
+      const chipPasacables = wrapper
+        .findAll('#accesorios .quick-chip')
+        .find((b) => b.text().includes('Pasacables'))
+      expect(chipPasacables).toBeDefined()
+      await chipPasacables!.trigger('click')
+
+      expect(wrapper.get('#accesorios .section-badge').text()).toBe('1 incluido')
+      expect(wrapper.get('.accessory-index').text()).toBe('01')
+      expect(wrapper.get('.accessory-name').text()).toBe('Pasacables')
+      expect(
+        wrapper.findAll('#accesorios .quick-chip').some((b) => b.text().includes('Pasacables')),
+      ).toBe(false)
+
+      const btnAnadir = wrapper
+        .findAll('#accesorios button')
+        .find((b) => b.text().includes('Añadir accesorio'))
+      expect(btnAnadir).toBeDefined()
+      await btnAnadir!.trigger('click')
+      expect(wrapper.find('#accesorio-1').exists()).toBe(true)
+
+      await wrapper.get('#accesorio-1').trigger('keydown', { key: 'Escape' })
+      expect(wrapper.find('#accesorio-1').exists()).toBe(false)
+
+      await btnAnadir!.trigger('click')
+      await wrapper.get('#accesorio-1').setValue('2 tomacorrientes al centro')
+      await wrapper.get('#accesorio-1').trigger('keydown', { key: 'Enter' })
+      expect(wrapper.find('#accesorio-1').exists()).toBe(false)
+      expect(wrapper.get('#accesorios .section-badge').text()).toBe('2 incluidos')
+      expect(wrapper.findAll('.accessory-item--studio')).toHaveLength(2)
+    } finally {
+      wrapper.unmount()
+    }
+  })
 })
