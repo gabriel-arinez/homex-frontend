@@ -32,6 +32,7 @@ import {
   Wallet,
   Calculator,
   Trash2,
+  Copy,
 } from '@lucide/vue'
 import { asignarEspesorPendiente, pendienteResuelto } from '../services/pendientesAsistencia'
 import { proformasService } from '../services/proformasService'
@@ -544,7 +545,8 @@ function confirmarDestinoDelConjunto(id: string) {
   destinoDelConjunto.value = ''
   changed()
 }
-function addComponente(conjunto_uid?: string) {
+const piezasFrecuentes = ['Tablero', 'Mesón', 'Estructura', 'Puerta', 'Cajón', 'Estante']
+function addComponente(conjunto_uid?: string, nombreInicial = '') {
   if (componentes.length >= limites.max_componentes) {
     aviso.value = 'Has alcanzado el máximo de componentes permitidos.'
     return
@@ -557,12 +559,51 @@ function addComponente(conjunto_uid?: string) {
   componentes.push({
     uid: nuevoUid,
     conjunto_uid: conjunto_uid || undefined,
-    nombre: '',
+    nombre: nombreInicial,
     cantidad_interna: 1,
     atributos: [],
   })
   activeComponentUid.value = nuevoUid
   changed()
+}
+function resumenComponente(pieza: ComponenteTecnico): string {
+  const partes: string[] = []
+  if (pieza.cantidad_interna != null) {
+    partes.push(`${pieza.cantidad_interna} ${pieza.cantidad_interna === 1 ? 'unidad' : 'unidades'}`)
+  }
+  if (pieza.material?.trim()) partes.push(pieza.material.trim())
+  if (pieza.espesor?.trim()) partes.push(pieza.espesor.trim())
+  if (pieza.color?.trim()) partes.push(pieza.color.trim())
+  return partes.length ? partes.join(' · ') : 'Sin especificaciones aún'
+}
+function piezaConProblemas(pieza: ComponenteTecnico): boolean {
+  if (!pieza.nombre?.trim())
+    return Boolean(submitAttempted.value || touchedPiezas[pieza.uid ?? pieza.nombre])
+  if (
+    pieza.cantidad_interna !== undefined &&
+    (!Number.isInteger(pieza.cantidad_interna) || pieza.cantidad_interna <= 0)
+  )
+    return true
+  return Boolean(pieza.atributos?.some((a) => Boolean(errorAtributo(a))))
+}
+function atributosComponenteDisponibles(componente: ComponenteTecnico) {
+  const actuales = componente.atributos ?? []
+  return catalogo.value.filter(
+    (x) =>
+      (!Array.isArray(x.ambitos) || !x.ambitos.length || x.ambitos.includes('componente')) &&
+      !actuales.some(
+        (actual) =>
+          (actual.codigo && actual.codigo === x.codigo) ||
+          normalized(actual.nombre) === normalized(x.nombre),
+      ),
+  )
+}
+function elegirAtributoComponente(componente: ComponenteTecnico, value: string) {
+  const item = catalogo.value.find((x) => String(x.id) === value)
+  if (item) addAttribute(componente.atributos || (componente.atributos = []), item)
+}
+function crearAtributoComponente(componente: ComponenteTecnico, nombre: string) {
+  addAttribute(componente.atributos || (componente.atributos = []), undefined, nombre)
 }
 function setCantidadInterna(componente: ComponenteTecnico, event: Event) {
   const value = (event.target as HTMLInputElement).value
@@ -1367,14 +1408,35 @@ onMounted(loadCatalog)
         </section>
         <section
           v-show="!studio || activeSection === 'estructura'"
-          :class="{ 'studio-group-management': studio }"
+          :class="{
+            'studio-group-management': studio,
+            'studio-group-management--compact': studio && !conjuntos.length,
+          }"
         >
-          <div class="heading">
-            <h3>
-              <Layers3 v-if="studio" :size="19" aria-hidden="true" />Conjuntos ({{
-                conjuntos.length
-              }}/{{ limites.max_conjuntos }})
-            </h3>
+          <div class="heading group-management-header">
+            <div class="group-management-copy">
+              <h3>
+                <span class="section-heading-main"
+                  ><Layers3 v-if="studio" :size="19" aria-hidden="true" />{{
+                    studio
+                      ? 'Conjuntos'
+                      : `Conjuntos (${conjuntos.length}/${limites.max_conjuntos})`
+                  }}</span
+                >
+                <span v-if="studio" class="section-badge">{{
+                  conjuntos.length
+                    ? `${conjuntos.length} ${conjuntos.length === 1 ? 'módulo' : 'módulos'}${conjuntos.length >= limites.max_conjuntos - 2 ? ` de ${limites.max_conjuntos}` : ''}`
+                    : 'Opcional'
+                }}</span>
+              </h3>
+              <p v-if="studio" class="structure-guidance">
+                {{
+                  conjuntos.length
+                    ? 'Agrupa piezas relacionadas por cada módulo o sección del mueble.'
+                    : 'Úsalos solo si el mueble se divide en módulos (ej. escritorio + cajonera).'
+                }}
+              </p>
+            </div>
             <Button
               variant="secondary"
               :disabled="
@@ -1383,59 +1445,88 @@ onMounted(loadCatalog)
                   conjuntos.some((g) => !componentes.some((c) => c.conjunto_uid === g.uid)))
               "
               @click="addConjunto"
-              >Añadir conjunto</Button
+              ><Plus v-if="studio" :size="15" aria-hidden="true" />Añadir conjunto</Button
             >
           </div>
-          <p v-if="studio" class="structure-guidance">
-            Agrupa piezas relacionadas cuando el mueble tenga módulos o secciones.
-          </p>
-          <article v-for="(g, gi) in conjuntos" :key="g.uid" class="card studio-group-card">
-            <div class="inline">
-              <TextField
-                v-model="g.nombre"
-                :name="`grupo-${gi}`"
-                label="Nombre del conjunto *"
-                :error="errorGrupo(g)"
-                @blur="touchedGrupos[g.uid] = true"
-              /><Button variant="secondary" @click="addComponente(g.uid)">Añadir componente</Button
-              ><Button variant="secondary" @click="removeConjunto(gi)">Quitar conjunto</Button>
-            </div>
-            <div
-              v-if="conjuntoPorEliminar === g.uid"
-              class="conjunto-destino"
-              role="group"
-              :aria-label="'Reasignación del conjunto ' + g.nombre"
-            >
-              <p>Elige a dónde mover sus componentes. Ninguna pieza se eliminará.</p>
-              <label
-                >Destino de componentes
-                <select v-model="destinoDelConjunto" aria-label="Destino de componentes">
-                  <option value="">Sin conjunto</option>
-                  <option
-                    v-for="otro in conjuntos.filter((c) => c.uid !== g.uid)"
-                    :key="otro.uid"
-                    :value="otro.uid"
-                  >
-                    {{ otro.nombre }}
-                  </option>
-                </select>
-              </label>
-              <Button variant="secondary" @click="confirmarDestinoDelConjunto(g.uid)">
-                Mover componentes y quitar conjunto
-              </Button>
-              <Button variant="secondary" @click="conjuntoPorEliminar = null"
-                >Cancelar traslado</Button
+          <div v-if="conjuntos.length" class="studio-groups-list">
+            <article v-for="(g, gi) in conjuntos" :key="g.uid" class="card studio-group-card">
+              <div class="inline studio-group-card__row">
+                <TextField
+                  v-model="g.nombre"
+                  :name="`grupo-${gi}`"
+                  label="Nombre del conjunto *"
+                  :placeholder="studio ? 'Ej. Módulo principal, Cajonera lateral' : undefined"
+                  :error="errorGrupo(g)"
+                  @blur="touchedGrupos[g.uid] = true"
+                />
+                <span v-if="studio" class="studio-group-card__count">
+                  {{ componentes.filter((c) => c.conjunto_uid === g.uid).length }}
+                  {{
+                    componentes.filter((c) => c.conjunto_uid === g.uid).length === 1
+                      ? 'pieza'
+                      : 'piezas'
+                  }}
+                </span>
+                <div class="studio-group-card__actions">
+                  <Button variant="secondary" @click="addComponente(g.uid)"
+                    >Añadir componente</Button
+                  ><Button variant="secondary" @click="removeConjunto(gi)">Quitar conjunto</Button>
+                </div>
+              </div>
+              <div
+                v-if="conjuntoPorEliminar === g.uid"
+                class="conjunto-destino"
+                role="group"
+                :aria-label="'Reasignación del conjunto ' + g.nombre"
               >
-            </div>
-          </article>
+                <p>Elige a dónde mover sus componentes. Ninguna pieza se eliminará.</p>
+                <div class="conjunto-destino__controls">
+                  <label class="conjunto-destino__select"
+                    ><span>Destino de componentes</span>
+                    <select v-model="destinoDelConjunto" aria-label="Destino de componentes">
+                      <option value="">Sin conjunto</option>
+                      <option
+                        v-for="otro in conjuntos.filter((c) => c.uid !== g.uid)"
+                        :key="otro.uid"
+                        :value="otro.uid"
+                      >
+                        {{ otro.nombre }}
+                      </option>
+                    </select>
+                  </label>
+                  <Button variant="secondary" @click="confirmarDestinoDelConjunto(g.uid)">
+                    Mover componentes y quitar conjunto
+                  </Button>
+                  <Button variant="secondary" @click="conjuntoPorEliminar = null"
+                    >Cancelar traslado</Button
+                  >
+                </div>
+              </div>
+            </article>
+          </div>
         </section>
         <section id="componentes" v-show="!studio || activeSection === 'estructura'">
-          <div class="heading">
-            <h3>
-              <Package v-if="studio" :size="19" aria-hidden="true" />Componentes ({{
-                componentes.length
-              }}/{{ limites.max_componentes }})
-            </h3>
+          <div class="heading components-section-header">
+            <div class="components-section-copy">
+              <h3>
+                <span class="section-heading-main"
+                  ><Package v-if="studio" :size="19" aria-hidden="true" />{{
+                    studio
+                      ? 'Componentes del mueble'
+                      : `Componentes (${componentes.length}/${limites.max_componentes})`
+                  }}</span
+                >
+                <span v-if="studio" class="section-badge">{{
+                  componentes.length
+                    ? `${componentes.length} ${componentes.length === 1 ? 'pieza' : 'piezas'}${componentes.length >= limites.max_componentes - 5 ? ` de ${limites.max_componentes}` : ''}`
+                    : 'Opcional'
+                }}</span>
+              </h3>
+              <p v-if="studio" class="structure-guidance">
+                Detalla las piezas principales (tablero, estructura, puertas) para orientar la
+                cotización y fabricación.
+              </p>
+            </div>
             <Button
               variant="secondary"
               :disabled="
@@ -1444,26 +1535,23 @@ onMounted(loadCatalog)
                   componentes.some((c) => !c.nombre.trim()))
               "
               @click="addComponente()"
-              >Agregar componente</Button
+              ><Plus v-if="studio" :size="15" aria-hidden="true" />Agregar componente</Button
             >
           </div>
-          <p v-if="studio" class="structure-guidance">
-            Selecciona una pieza para consultar o editar sus datos.
-          </p>
-          <div class="studio-component-layout">
+          <div
+            class="studio-component-layout"
+            :class="{ 'studio-component-layout--empty': studio && !componentes.length }"
+          >
             <aside
-              v-if="studio"
+              v-if="studio && componentes.length"
               class="studio-component-tree"
               aria-label="Explorador de componentes"
             >
               <p class="tree-heading">
-                <Layers3 :size="15" aria-hidden="true" /> ELEMENTOS DEL MUEBLE
-              </p>
-              <p v-if="!componentes.length" class="tree-empty">
-                No hay piezas todavía. Utiliza «Agregar componente» para comenzar.
+                <Layers3 :size="15" aria-hidden="true" /> PIEZAS DEL MUEBLE
               </p>
               <div v-for="grupo in gruposArbol" :key="grupo.id" class="tree-group">
-                <h4>
+                <h4 v-if="conjuntos.length">
                   {{ grupo.nombre }} <small>{{ grupo.piezas.length }}</small>
                 </h4>
                 <button
@@ -1478,10 +1566,31 @@ onMounted(loadCatalog)
                   :aria-pressed="activeComponentUid === (item.pieza.uid || String(item.index))"
                   @click="activeComponentUid = item.pieza.uid || String(item.index)"
                 >
-                  <strong>{{ item.pieza.nombre || 'Componente sin nombre' }}</strong>
-                  <small>{{ item.pieza.cantidad_interna ?? '—' }} por mueble</small>
+                  <span class="tree-item__top">
+                    <strong class="tree-item__title">{{
+                      item.pieza.nombre || 'Componente sin nombre'
+                    }}</strong>
+                    <AlertCircle
+                      v-if="piezaConProblemas(item.pieza)"
+                      :size="15"
+                      class="tree-item__issue"
+                      aria-label="Requiere atención"
+                    />
+                    <span v-else-if="!item.pieza.nombre?.trim()" class="tree-item__draft"
+                      >Por nombrar</span
+                    >
+                  </span>
+                  <small class="tree-item__meta">{{ resumenComponente(item.pieza) }}</small>
                 </button>
               </div>
+              <button
+                type="button"
+                class="tree-add-btn"
+                :disabled="componentes.length >= limites.max_componentes"
+                @click="addComponente()"
+              >
+                <Plus :size="15" aria-hidden="true" /> Nueva pieza
+              </button>
             </aside>
             <div class="studio-component-detail">
               <component
@@ -1495,148 +1604,287 @@ onMounted(loadCatalog)
                 <summary v-if="!studio">
                   Componente {{ i + 1 }}: {{ c.nombre || 'Sin nombre' }}
                 </summary>
-                <div class="heading">
+                <div class="heading component-editor__header">
                   <div class="component-identity">
-                    <small v-if="studio"
-                      >PIEZA SELECCIONADA · {{ i + 1 }} DE {{ componentes.length }}</small
-                    >
+                    <small v-if="studio">PIEZA {{ i + 1 }} DE {{ componentes.length }}</small>
                     <strong>{{
                       studio ? c.nombre || 'Componente sin nombre' : `Componente ${i + 1}`
                     }}</strong>
                   </div>
-                  <div class="component-reorder">
-                    <button type="button" :disabled="i === 0" @click="move(i, -1)">
-                      <ArrowUp v-if="studio" :size="15" aria-hidden="true" /> Subir</button
-                    ><button
-                      type="button"
-                      :disabled="i === componentes.length - 1"
-                      @click="move(i, 1)"
-                    >
-                      <ArrowDown v-if="studio" :size="15" aria-hidden="true" /> Bajar
-                    </button>
+                  <div class="component-toolbar">
+                    <div class="component-reorder">
+                      <button
+                        type="button"
+                        :disabled="i === 0"
+                        :title="studio ? 'Mover pieza arriba' : undefined"
+                        @click="move(i, -1)"
+                      >
+                        <ArrowUp v-if="studio" :size="15" aria-hidden="true" /> Subir</button
+                      ><button
+                        type="button"
+                        :disabled="i === componentes.length - 1"
+                        :title="studio ? 'Mover pieza abajo' : undefined"
+                        @click="move(i, 1)"
+                      >
+                        <ArrowDown v-if="studio" :size="15" aria-hidden="true" /> Bajar
+                      </button>
+                    </div>
+                    <div v-if="studio" class="component-direct-actions">
+                      <button
+                        type="button"
+                        class="component-tool-btn"
+                        @click="duplicateComponente(i)"
+                      >
+                        <Copy :size="15" aria-hidden="true" />Duplicar
+                      </button>
+                      <button
+                        type="button"
+                        class="component-tool-btn component-tool-btn--danger"
+                        :aria-label="`Quitar componente ${c.nombre || i + 1}`"
+                        @click="removeComponente(i)"
+                      >
+                        <Trash2 :size="15" aria-hidden="true" />Quitar pieza
+                      </button>
+                    </div>
                   </div>
                 </div>
-                <div class="grid">
-                  <TextField
-                    v-model="c.nombre"
-                    :name="`componente-nombre-${i}`"
-                    label="Nombre *"
-                    :error="errorPieza(c)"
-                    @blur="touchedPiezas[c.uid ?? c.nombre] = true"
-                  /><label class="number-field"
-                    >Cantidad por mueble<input
-                      :value="c.cantidad_interna ?? ''"
-                      @input="setCantidadInterna(c, $event)"
-                      :name="`componente-${i}-cantidad`"
-                      type="number"
-                      min="1" /></label
-                  ><TextField
-                    v-model="c.material"
-                    :name="`componente-material-${i}`"
-                    label="Material"
-                  /><TextField
-                    v-model="c.espesor"
-                    :name="`componente-espesor-${i}`"
-                    label="Espesor"
-                  /><TextField v-model="c.color" :name="`componente-color-${i}`" label="Color" />
-                  <p v-if="c.dimensiones && typeof c.dimensiones !== 'string'">
-                    Dimensiones históricas: {{ readableDimension(c.dimensiones) }}
-                  </p>
-                  <TextField
-                    v-else
-                    v-model="c.dimensiones"
-                    :name="`componente-dimensiones-${i}`"
-                    label="Medidas o dimensiones de la pieza"
-                  />
-                </div>
-                <Select
-                  v-model="c.conjunto_uid"
-                  :name="`componente-${i}-grupo`"
-                  label="Conjunto"
-                  :options="[
-                    { label: 'Sin conjunto', value: '' },
-                    ...conjuntos.map((g) => ({ label: g.nombre || 'Sin nombre', value: g.uid })),
-                  ]"
-                />
-                <div class="attribute-search component-attribute-search">
-                  <TextField
-                    v-model="componentSearch[c.uid || String(i)]"
-                    :name="`buscar-atributo-componente-${i}`"
-                    label="Buscar característica para este componente"
-                  />
-                  <div v-if="componentSearch[c.uid || String(i)]" class="suggestions">
-                    <button
-                      v-for="item in matchingAttributes(
-                        componentSearch[c.uid || String(i)] || '',
-                        'componente',
-                      )"
-                      :key="item.id"
-                      type="button"
-                      @click="addComponentAttribute(c, c.uid || String(i), item)"
-                    >
-                      {{ item.nombre }} · {{ item.grupo }}
-                    </button>
-                    <button type="button" @click="addComponentAttribute(c, c.uid || String(i))">
-                      Añadir atributo personalizado local
-                    </button>
-                  </div>
-                </div>
-                <div v-for="(a, ai) in c.atributos" :key="a.codigo || a.nombre" class="inline">
-                  <p v-if="errorAtributo(a)" class="studio-attribute-error" role="alert">
-                    {{ errorAtributo(a) }}
-                  </p>
-                  <label v-if="a.tipo_entrada === 'entero'">
-                    {{ a.nombre }}
-                    <input v-model="a.valor" :name="`atributo-${i}-${ai}`" type="number" step="1" />
-                  </label>
-                  <label v-else-if="a.tipo_entrada === 'numero_unidad'">
-                    {{ a.nombre }}
-                    <input
-                      v-model="a.valor"
-                      :name="`atributo-${i}-${ai}`"
-                      type="number"
-                      step="any"
+                <div class="component-subblock">
+                  <div
+                    class="component-identity-grid"
+                    :class="{
+                      'component-identity-grid--with-group': !studio || conjuntos.length > 0,
+                    }"
+                  >
+                    <TextField
+                      v-model="c.nombre"
+                      :name="`componente-nombre-${i}`"
+                      label="Nombre *"
+                      :placeholder="studio ? 'Ej. Tablero superior, Estructura' : undefined"
+                      :error="errorPieza(c)"
+                      @blur="touchedPiezas[c.uid ?? c.nombre] = true"
+                    /><label class="number-field"
+                      ><span>Cantidad por mueble</span
+                      ><input
+                        :value="c.cantidad_interna ?? ''"
+                        :placeholder="studio ? 'Ej. 1 (opcional)' : undefined"
+                        :name="`componente-${i}-cantidad`"
+                        type="number"
+                        min="1"
+                        @input="setCantidadInterna(c, $event)"
+                    /></label>
+                    <Select
+                      v-if="!studio || conjuntos.length > 0"
+                      v-model="c.conjunto_uid"
+                      :name="`componente-${i}-grupo`"
+                      label="Conjunto"
+                      :options="[
+                        { label: 'Sin conjunto', value: '' },
+                        ...conjuntos.map((g) => ({
+                          label: g.nombre || 'Sin nombre',
+                          value: g.uid,
+                        })),
+                      ]"
                     />
-                  </label>
-                  <TextField
-                    v-else
-                    v-model="a.valor"
-                    :name="`atributo-${i}-${ai}`"
-                    :label="a.nombre"
-                  />
-                  <label v-if="a.tipo_entrada === 'numero_unidad'"
-                    >Unidad de {{ a.nombre }}
-                    <select v-model="a.unidad">
-                      <option value="">No especificada</option>
-                      <option v-for="unidad in unidadesPermitidas" :key="unidad" :value="unidad">
-                        {{ unidad }}
-                      </option>
-                    </select>
-                  </label>
-                  <Button variant="secondary" @click="c.atributos?.splice(ai, 1)">Quitar</Button>
-                </div>
-                <details v-if="studio" class="component-actions-menu">
-                  <summary>Acciones de esta pieza</summary>
-                  <div>
-                    <Button variant="secondary" @click="duplicateComponente(i)"
-                      >Duplicar componente</Button
-                    >
-                    <Button variant="secondary" @click="removeComponente(i)"
-                      >Quitar componente</Button
-                    >
                   </div>
-                </details>
-                <div v-else class="inline">
+                </div>
+                <div class="component-subblock">
+                  <div v-if="studio" class="component-subblock__header">
+                    <h4>Materiales y dimensiones</h4>
+                    <span>Opcional</span>
+                  </div>
+                  <div class="grid component-specs-grid">
+                    <TextField
+                      v-model="c.material"
+                      :name="`componente-material-${i}`"
+                      label="Material"
+                      :placeholder="studio ? 'Ej. Melamina, Hierro, Vidrio' : undefined"
+                    /><TextField
+                      v-model="c.espesor"
+                      :name="`componente-espesor-${i}`"
+                      label="Espesor"
+                      :placeholder="studio ? 'Ej. 18 mm, 25 mm' : undefined"
+                    /><TextField
+                      v-model="c.color"
+                      :name="`componente-color-${i}`"
+                      label="Color"
+                      :placeholder="studio ? 'Ej. Nogal, Blanco mate' : undefined"
+                    />
+                    <p
+                      v-if="c.dimensiones && typeof c.dimensiones !== 'string'"
+                      class="component-legacy-dimensions"
+                    >
+                      Dimensiones históricas: {{ readableDimension(c.dimensiones) }}
+                    </p>
+                    <TextField
+                      v-else
+                      v-model="c.dimensiones"
+                      :name="`componente-dimensiones-${i}`"
+                      label="Medidas o dimensiones de la pieza"
+                      :placeholder="studio ? 'Ej. 240 × 120 cm' : undefined"
+                    />
+                  </div>
+                </div>
+                <div class="component-subblock component-attributes-block">
+                  <div v-if="studio" class="component-subblock__header">
+                    <h4>Características adicionales</h4>
+                    <span>Opcional</span>
+                  </div>
+                  <div
+                    v-if="c.atributos?.length"
+                    :class="studio ? 'component-attributes-grid' : 'component-attributes-legacy'"
+                  >
+                    <div
+                      v-for="(a, ai) in c.atributos"
+                      :key="a.codigo || a.nombre"
+                      :class="
+                        studio
+                          ? [
+                              'studio-attribute-row',
+                              'studio-attribute-row--nested',
+                              {
+                                'studio-attribute-row--with-unit':
+                                  a.tipo_entrada === 'numero_unidad',
+                              },
+                            ]
+                          : 'inline'
+                      "
+                    >
+                      <label v-if="a.tipo_entrada === 'entero'" class="studio-attribute-field">
+                        <span>{{ a.nombre }}</span>
+                        <input
+                          v-model="a.valor"
+                          :name="`atributo-${i}-${ai}`"
+                          type="number"
+                          step="1"
+                        />
+                      </label>
+                      <label
+                        v-else-if="a.tipo_entrada === 'numero_unidad'"
+                        class="studio-attribute-field"
+                      >
+                        <span>{{ a.nombre }}</span>
+                        <input
+                          v-model="a.valor"
+                          :name="`atributo-${i}-${ai}`"
+                          type="number"
+                          step="any"
+                        />
+                      </label>
+                      <TextField
+                        v-else
+                        v-model="a.valor"
+                        :name="`atributo-${i}-${ai}`"
+                        :label="a.nombre"
+                        :placeholder="studio ? 'Especifica el valor' : undefined"
+                      />
+                      <label v-if="a.tipo_entrada === 'numero_unidad'" class="studio-attribute-unit"
+                        ><span :class="{ 'sr-only': studio }">Unidad de {{ a.nombre }}</span>
+                        <select v-model="a.unidad" :aria-label="`Unidad de ${a.nombre}`">
+                          <option value="">No especificada</option>
+                          <option
+                            v-for="unidad in unidadesPermitidas"
+                            :key="unidad"
+                            :value="unidad"
+                          >
+                            {{ unidad }}
+                          </option>
+                        </select>
+                      </label>
+                      <button
+                        v-if="studio"
+                        type="button"
+                        class="card-remove-action"
+                        :aria-label="`Quitar característica ${a.nombre}`"
+                        @click="c.atributos?.splice(ai, 1)"
+                      >
+                        <Trash2 :size="14" aria-hidden="true" /> Quitar
+                      </button>
+                      <Button v-else variant="secondary" @click="c.atributos?.splice(ai, 1)"
+                        >Quitar</Button
+                      >
+                      <p v-if="errorAtributo(a)" class="studio-attribute-error" role="alert">
+                        {{ errorAtributo(a) }}
+                      </p>
+                    </div>
+                  </div>
+                  <div class="attribute-search component-attribute-search">
+                    <template v-if="studio">
+                      <div v-if="atributosComponenteDisponibles(c).length" class="quick-chips">
+                        <span class="quick-chips__label">Sugeridas:</span>
+                        <button
+                          v-for="sugerido in atributosComponenteDisponibles(c).slice(0, 5)"
+                          :key="sugerido.id"
+                          type="button"
+                          class="quick-chip"
+                          @click="elegirAtributoComponente(c, String(sugerido.id))"
+                        >
+                          <Plus :size="14" aria-hidden="true" /> {{ sugerido.nombre }}
+                        </button>
+                      </div>
+                      <MuebleOptionPicker
+                        :model-value="''"
+                        :name="`buscar-atributo-componente-${i}`"
+                        label="Agregar característica a esta pieza"
+                        placeholder="Buscar o crear característica (ej. tapacanto, acabado)..."
+                        :options="
+                          atributosComponenteDisponibles(c).map((x) => ({
+                            value: String(x.id),
+                            label: x.nombre,
+                          }))
+                        "
+                        allow-create
+                        create-label="Agregar característica personalizada"
+                        @update:model-value="elegirAtributoComponente(c, $event)"
+                        @create="crearAtributoComponente(c, $event)"
+                      />
+                    </template>
+                    <template v-else>
+                      <TextField
+                        v-model="componentSearch[c.uid || String(i)]"
+                        :name="`buscar-atributo-componente-${i}`"
+                        label="Buscar característica para este componente"
+                      />
+                      <div v-if="componentSearch[c.uid || String(i)]" class="suggestions">
+                        <button
+                          v-for="item in matchingAttributes(
+                            componentSearch[c.uid || String(i)] || '',
+                            'componente',
+                          )"
+                          :key="item.id"
+                          type="button"
+                          @click="addComponentAttribute(c, c.uid || String(i), item)"
+                        >
+                          {{ item.nombre }} · {{ item.grupo }}
+                        </button>
+                        <button type="button" @click="addComponentAttribute(c, c.uid || String(i))">
+                          Añadir atributo personalizado local
+                        </button>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+                <div v-if="!studio" class="inline">
                   <Button variant="secondary" @click="duplicateComponente(i)">Duplicar</Button>
                   <Button variant="secondary" @click="removeComponente(i)">Quitar</Button>
                 </div>
               </component>
               <div v-if="studio && !componentes.length" class="empty-editor">
-                <h4>Empieza por una pieza</h4>
+                <h4>Aún no agregaste piezas para este mueble</h4>
                 <p>
-                  Agrega un componente y podrás completar sus materiales, dimensiones y
-                  características.
+                  Elige una pieza frecuente para empezar en un clic o usa «Agregar componente»
+                  arriba.
                 </p>
+                <div class="quick-chips empty-editor__chips">
+                  <button
+                    v-for="frecuente in piezasFrecuentes"
+                    :key="frecuente"
+                    type="button"
+                    class="quick-chip"
+                    @click="addComponente(undefined, frecuente)"
+                  >
+                    <Plus :size="14" aria-hidden="true" /> {{ frecuente }}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -2180,6 +2428,26 @@ details.card[open] > summary {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
 }
+.component-subblock,
+.component-attributes-legacy,
+.conjunto-destino {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.component-identity-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  min-width: 0;
+}
+.studio-group-card__actions,
+.conjunto-destino__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-2);
+}
 .inline,
 .heading,
 .actions {
@@ -2223,7 +2491,8 @@ details.card[open] > summary {
   color: var(--color-danger);
 }
 @media (max-width: 48rem) {
-  .grid {
+  .grid,
+  .component-identity-grid {
     grid-template-columns: 1fr;
   }
   .inline,
@@ -2295,8 +2564,19 @@ details.card[open] > summary {
 }
 .configurator--studio :deep(.field input),
 .configurator--studio :deep(.field textarea),
-.configurator--studio :deep(.field select) {
+.configurator--studio :deep(.field select),
+.configurator--studio :deep(.select select) {
   background: var(--color-surface-raised);
+}
+.configurator--studio .configurator-fields > section :deep(.button--secondary) {
+  background: var(--color-surface-raised);
+  border-color: var(--color-border-strong);
+}
+.configurator--studio
+  .configurator-fields
+  > section
+  :deep(.button--secondary:hover:not(:disabled)) {
+  background: var(--color-surface-hover);
 }
 .configurator--studio .configurator-fields > section > h3 {
   margin-bottom: 0.2rem;
@@ -2467,144 +2747,407 @@ details.card[open] > summary {
   color: var(--color-text-secondary);
   font-size: 0.83rem;
 }
+.configurator--studio .studio-group-management {
+  display: grid;
+  gap: 0.9rem;
+}
+.configurator--studio .studio-group-management--compact {
+  padding: 0.9rem 1.25rem;
+  background: var(--color-surface-muted);
+  border-style: dashed;
+}
+.configurator--studio .group-management-header,
+.configurator--studio .components-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem 1.25rem;
+  flex-wrap: wrap;
+}
+.configurator--studio .group-management-copy,
+.configurator--studio .components-section-copy {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+  flex: 1 1 18rem;
+}
+.configurator--studio .group-management-copy h3,
+.configurator--studio .components-section-copy h3 {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  font-size: 1.02rem;
+}
+.configurator--studio .group-management-copy .section-badge,
+.configurator--studio .components-section-copy .section-badge {
+  margin-left: 0.1rem;
+}
+.configurator--studio .studio-group-management--compact .section-badge {
+  background: var(--color-surface-raised);
+}
+.configurator--studio .studio-groups-list {
+  display: grid;
+  gap: 0.75rem;
+}
+.configurator--studio .studio-group-card {
+  padding: 0.95rem 1rem;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+.configurator--studio .studio-group-card__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: end;
+  gap: 0.75rem;
+}
+.configurator--studio .studio-group-card__count {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.configurator--studio .studio-group-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.configurator--studio .conjunto-destino {
+  padding: 0.85rem;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: var(--radius-control);
+}
+.configurator--studio .conjunto-destino p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+}
+.configurator--studio .conjunto-destino__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.6rem;
+}
+.configurator--studio .conjunto-destino__select {
+  display: grid;
+  gap: var(--space-2);
+  font-size: 0.84rem;
+  font-weight: 600;
+  min-width: 12rem;
+}
+.configurator--studio .conjunto-destino__select select {
+  min-height: 2.75rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font: inherit;
+}
 .configurator--studio #componentes {
   display: grid;
-  gap: 1rem;
+  gap: 1.1rem;
 }
 .configurator--studio .studio-component-layout {
   display: grid;
-  grid-template-columns: minmax(13rem, 0.72fr) minmax(0, 1.6fr);
+  grid-template-columns: minmax(14rem, 0.74fr) minmax(0, 1.66fr);
   gap: 1rem;
   align-items: start;
   min-width: 0;
+}
+.configurator--studio .studio-component-layout--empty {
+  grid-template-columns: minmax(0, 1fr);
 }
 .configurator--studio .studio-component-tree {
   display: grid;
   align-content: start;
   gap: 0.65rem;
-  padding: 1rem;
+  padding: 0.95rem;
   background: var(--color-surface-muted);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-card);
   min-width: 0;
 }
 .configurator--studio .tree-heading {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin: 0 0 0.5rem;
+  gap: 0.45rem;
+  margin: 0 0 0.2rem;
   font-size: 0.7rem;
   color: var(--color-text-secondary);
   font-weight: 750;
   letter-spacing: 0.06em;
 }
-.configurator--studio .tree-empty {
-  font-size: 0.78rem;
-  color: var(--color-text-secondary);
-  line-height: 1.5;
+.configurator--studio .tree-heading svg {
+  color: var(--color-primary-accent);
 }
 .configurator--studio .tree-group {
   display: grid;
-  gap: 0.4rem;
+  gap: 0.45rem;
 }
 .configurator--studio .tree-group h4 {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  font-size: 0.83rem;
-  margin: 0.5rem 0 0.15rem;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  margin: 0.35rem 0 0.1rem;
 }
 .configurator--studio .tree-group h4 small {
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
   color: var(--color-text-secondary);
+  font-size: 0.72rem;
 }
 .configurator--studio .tree-item {
   display: grid;
-  gap: 0.2rem;
+  gap: 0.28rem;
   text-align: left;
-  padding: 0.75rem;
+  padding: 0.75rem 0.85rem;
   min-width: 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   color: var(--color-text);
-  background: var(--color-surface);
+  background: var(--color-surface-raised);
   font: inherit;
   cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
 }
 .configurator--studio .tree-item:hover {
   border-color: var(--color-border-strong);
+  background: var(--color-surface-hover);
 }
 .configurator--studio .tree-item--active {
   border-color: var(--color-primary);
-  background: var(--color-primary-soft);
+  background: color-mix(in srgb, var(--color-primary-soft) 60%, var(--color-surface-raised));
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+.configurator--studio .tree-item--active:hover {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary-soft) 72%, var(--color-surface-raised));
 }
 .configurator--studio .tree-item:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
-.configurator--studio .tree-item strong {
-  overflow-wrap: anywhere;
-  font-size: 0.85rem;
+.configurator--studio .tree-item__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  min-width: 0;
 }
-.configurator--studio .tree-item small {
+.configurator--studio .tree-item__title {
+  overflow-wrap: anywhere;
+  font-size: 0.86rem;
+  line-height: 1.3;
+}
+.configurator--studio .tree-item__title::first-letter {
+  text-transform: uppercase;
+}
+.configurator--studio .tree-item__issue {
+  flex-shrink: 0;
+  color: var(--color-danger);
+}
+.configurator--studio .tree-item__draft {
+  flex-shrink: 0;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
   color: var(--color-text-secondary);
-  font-size: 0.73rem;
+  font-size: 0.68rem;
+  font-weight: 650;
+}
+.configurator--studio .tree-item__meta {
+  color: var(--color-text-secondary);
+  font-size: 0.74rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.configurator--studio .tree-add-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  width: 100%;
+  min-height: 2.45rem;
+  margin-top: 0.15rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+}
+.configurator--studio .tree-add-btn svg {
+  color: var(--color-primary-accent);
+}
+.configurator--studio .tree-add-btn:hover:not(:disabled) {
+  border-style: solid;
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+.configurator--studio .tree-add-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.configurator--studio .tree-add-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 .configurator--studio .studio-component-detail {
   min-width: 0;
 }
 .configurator--studio .studio-component-detail .component-editor {
-  background: var(--color-surface-muted);
+  display: grid;
+  gap: 1rem;
+  padding: clamp(1rem, 2vw, 1.35rem);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-card);
   min-width: 0;
   margin: 0;
 }
-.configurator--studio .studio-component-detail .heading {
-  gap: 0.5rem;
-  align-items: center;
+.configurator--studio .component-editor__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--color-border);
 }
 .configurator--studio .structure-guidance {
   margin: 0;
   color: var(--color-text-secondary);
-  font-size: 0.85rem;
+  font-size: 0.84rem;
+  line-height: 1.45;
 }
 .configurator--studio .component-identity {
   display: grid;
-  gap: 0.25rem;
+  gap: 0.2rem;
   min-width: 0;
   overflow-wrap: anywhere;
 }
 .configurator--studio .component-identity small {
   color: var(--color-text-secondary);
   font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-weight: 750;
+  letter-spacing: 0.05em;
 }
-.configurator--studio .component-reorder {
+.configurator--studio .component-identity strong {
+  font-size: 1.05rem;
+  line-height: 1.25;
+}
+.configurator--studio .component-identity strong::first-letter {
+  text-transform: uppercase;
+}
+.configurator--studio .component-toolbar {
   display: flex;
-  gap: 0.4rem;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.configurator--studio .component-reorder,
+.configurator--studio .component-direct-actions {
+  display: flex;
+  gap: 0.35rem;
   flex-wrap: wrap;
 }
-.configurator--studio .component-reorder button {
+.configurator--studio .component-reorder button,
+.configurator--studio .component-tool-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  min-height: 2.25rem;
-  padding: 0.4rem 0.65rem;
-  border: 1px solid var(--color-border);
+  min-height: 2.2rem;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
-  background: var(--color-surface);
+  background: var(--color-surface-raised);
   color: var(--color-text);
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 0.79rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+.configurator--studio .component-reorder button:hover:not(:disabled),
+.configurator--studio .component-tool-btn:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+}
+.configurator--studio .component-tool-btn--danger {
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
+}
+.configurator--studio .component-tool-btn--danger:hover:not(:disabled) {
+  background: var(--color-danger-soft);
+  border-color: var(--color-danger);
 }
 .configurator--studio .component-reorder button:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
+}
+.configurator--studio .component-subblock {
+  display: grid;
+  gap: 0.85rem;
+  padding: 0.95rem;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  min-width: 0;
+}
+.configurator--studio .component-subblock__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.configurator--studio .component-subblock__header h4 {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+.configurator--studio .component-subblock__header span {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+.configurator--studio .component-identity-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(9.5rem, 0.75fr);
+  gap: var(--space-3);
+  align-items: start;
+}
+.configurator--studio .component-identity-grid--with-group {
+  grid-template-columns: minmax(0, 1.35fr) minmax(10.5rem, 0.85fr) minmax(10rem, 0.9fr);
 }
 .configurator--studio .number-field {
   display: grid;
   align-content: start;
-  gap: 0.4rem;
+  gap: var(--space-2);
   min-width: 0;
   font-weight: 600;
 }
@@ -2612,59 +3155,71 @@ details.card[open] > summary {
   width: 100%;
   min-width: 0;
   min-height: 2.75rem;
-  padding: 0.6rem;
+  padding: 0.625rem 0.75rem;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
-  background: var(--color-surface);
+  background: var(--color-surface-raised);
   color: var(--color-text);
   font: inherit;
 }
-.configurator--studio .studio-component-detail .grid {
+.configurator--studio .studio-component-detail .component-specs-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+.configurator--studio .component-legacy-dimensions {
+  margin: 0;
+  align-self: center;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+}
+.configurator--studio .component-attributes-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.configurator--studio .studio-component-detail .component-attribute-search {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0;
+}
+.configurator--studio .component-subblock .quick-chip,
+.configurator--studio .empty-editor .quick-chip {
+  background: var(--color-surface-raised);
 }
 .configurator--studio .studio-component-detail button {
   cursor: pointer;
 }
-.configurator--studio .component-actions-menu {
-  border-top: 1px solid var(--color-border);
-  padding-top: 0.65rem;
-}
-.configurator--studio .component-actions-menu summary {
-  font-size: 0.82rem;
-  font-weight: 700;
-  cursor: pointer;
-  color: var(--color-text-secondary);
-}
-.configurator--studio .component-actions-menu > div {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin-top: 0.75rem;
-}
 .configurator--studio .studio-component-detail button:focus-visible {
   outline: 2px solid var(--color-primary);
-}
-.configurator--studio .studio-component-detail .attribute-search {
-  margin-top: 1rem;
+  outline-offset: 2px;
 }
 .configurator--studio .empty-editor {
-  padding: 2.5rem;
+  display: grid;
+  justify-items: center;
+  gap: 0.45rem;
+  padding: clamp(1.5rem, 3vw, 2.35rem);
   border: 1px dashed var(--color-border-strong);
   border-radius: var(--radius-card);
+  background: var(--color-surface-muted);
   text-align: center;
 }
 .configurator--studio .empty-editor h4 {
-  margin: 0 0 0.3rem;
+  margin: 0;
+  font-size: 0.98rem;
 }
 .configurator--studio .empty-editor p {
+  margin: 0;
+  max-width: 34rem;
   font-size: 0.83rem;
   color: var(--color-text-secondary);
 }
-.configurator--studio .studio-group-card {
-  background: var(--color-surface-muted);
-}
-.configurator--studio .studio-group-card .inline {
-  align-items: end;
+.configurator--studio .empty-editor__chips {
+  justify-content: center;
+  margin-top: 0.45rem;
 }
 .configurator--studio .undo-notice {
   display: flex;
@@ -2672,7 +3227,7 @@ details.card[open] > summary {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 0.5rem;
-  padding: 0.6rem 0.9rem;
+  padding: 0.65rem 0.95rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-surface-muted);
@@ -3103,7 +3658,16 @@ details.card[open] > summary {
 }
 @media (max-width: 75rem) {
   .configurator--studio .studio-component-layout {
-    grid-template-columns: minmax(11rem, 0.7fr) minmax(0, 1.4fr);
+    grid-template-columns: minmax(11.5rem, 0.72fr) minmax(0, 1.4fr);
+  }
+  .configurator--studio .studio-component-layout--empty {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .configurator--studio .component-identity-grid--with-group {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .configurator--studio .component-identity-grid--with-group :deep(.select) {
+    grid-column: 1 / -1;
   }
   .configurator--studio .dimensions-section .measure-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3116,12 +3680,19 @@ details.card[open] > summary {
   .configurator--studio .studio-component-layout {
     grid-template-columns: 1fr;
   }
-  .configurator--studio .studio-component-tree {
+  .configurator--studio .tree-group {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .configurator--studio .tree-heading,
-  .configurator--studio .tree-empty {
-    grid-column: 1/-1;
+  .configurator--studio .tree-group h4 {
+    grid-column: 1 / -1;
+  }
+  .configurator--studio .studio-group-card__row {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+  .configurator--studio .studio-group-card__count {
+    justify-self: start;
+    min-height: 2rem;
   }
   .configurator--studio .review-piece-attributes {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3145,9 +3716,19 @@ details.card[open] > summary {
   .configurator--studio .review-measures {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .configurator--studio .studio-component-tree,
-  .configurator--studio .studio-component-detail .grid {
+  .configurator--studio .tree-group,
+  .configurator--studio .studio-component-detail .component-specs-grid,
+  .configurator--studio .component-identity-grid,
+  .configurator--studio .component-identity-grid--with-group,
+  .configurator--studio .component-attributes-grid {
     grid-template-columns: 1fr;
+  }
+  .configurator--studio .component-identity-grid--with-group :deep(.select) {
+    grid-column: auto;
+  }
+  .configurator--studio .conjunto-destino__select {
+    min-width: 0;
+    width: 100%;
   }
   .configurator--studio .review-piece-attributes {
     grid-template-columns: 1fr;
@@ -3190,6 +3771,9 @@ details.card[open] > summary {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   min-width: 0;
+}
+.configurator--studio .studio-attribute-row--nested {
+  background: var(--color-surface);
 }
 .configurator--studio .studio-attribute-row--with-unit {
   grid-template-columns: minmax(0, 1fr) 6.6rem;

@@ -13,12 +13,20 @@ Objetivo: optimizar jerarquía visual, contraste de capas, distribución y micro
 - En `Dimensiones generales`, orientar el texto al vendedor, capitalizar visualmente las etiquetas sin romper contratos de accesibilidad, unificar la altura de todas las tarjetas de medida ubicando `Quitar` en la cabecera de las medidas agregadas y sumar accesos rápidos de un clic junto al buscador `Agregar medida`.
 - En `Características generales`, mostrar estado vacío orientativo cuando no hay elementos, ubicar las características registradas por encima del buscador y alinear cada tarjeta con altura uniforme.
 
+### S2 — Paso 02 Estructura
+
+- Compactar `Conjuntos` en una franja discreta de una sola línea cuando `conjuntos.length === 0`, reservando protagonismo a las piezas del mueble; reemplazar contadores técnicos `(0/10)` y `(3/40)` por indicadores naturales (`Opcional` / `N piezas`).
+- En el explorador izquierdo de piezas, mostrar resumen real de cada pieza (cantidad, material, espesor, color), indicador de alerta si falta el nombre y botón directo `+ Nueva pieza` al pie; cuando no hay piezas aún, presentar estado vacío de ancho completo con accesos rápidos de piezas frecuentes (`+ Tablero`, `+ Estructura`, etc.).
+- En el editor de la pieza seleccionada, unificar acciones (`Subir`, `Bajar`, `Duplicar`, `Quitar pieza`) directamente en la cabecera eliminando el acordeón oculto `Acciones de esta pieza`; agrupar campos en bloques claros (Datos de la pieza vs Materiales y medidas), ocultar el selector `Conjunto` cuando no existen conjuntos creados y unificar las características adicionales con `MuebleOptionPicker` + chips rápidos.
+
 ## Tasks
 
-- T1 — S1 — inline — implementado sin commit — Paso 01 General completado y verificado (vue-tsc, ESLint, Prettier, 62 unitarias y 5 flujos E2E/axe-core en 360px, 768px y 1440px).
+- T1 — S1 — inline — `aeaeea3` — Paso 01 General completado y verificado.
+- T2 — S2 — inline — verificado — Paso 02 Estructura implementado y verificado con pruebas unitarias, E2E y accesibilidad.
 
 ## Log
 
 - L1 — Diagnóstico de Paso 01 General: `--color-surface-muted` no existía en `themes.css`, aplanando tres niveles jerárquicos al mismo color. Se definió `--color-surface-muted` con mezcla de tokens existentes y se diferenciaron los controles editables con `--color-surface-raised`.
 - L2 — En `MuebleStudio.vue` se alineó a la izquierda el bloque de cabecera del paso y se ajustó el contraste de la pestaña activa. En `MuebleOptionPicker.vue` se integró el estado seleccionado y la acción `Quitar` dentro del campo sin duplicar texto afuera.
 - L3 — En `EspecificacionForm.vue` se añadieron indicadores de obligatoriedad/opcionalidad, microcopy comercial, capitalización visual de medidas, acción `Quitar` en cabecera de sub-tarjeta para conservar alturas uniformes, accesos rápidos de un clic y estado vacío orientativo en Características generales.
+- L4 — En `EspecificacionForm.vue` (Paso 02 Estructura) se compactó la franja de `Conjuntos` cuando está vacía, se reemplazaron contadores de límite técnico por indicadores naturales, se enriqueció el árbol izquierdo con resumen real de cada pieza y botón `+ Nueva pieza`, se incorporó estado vacío de ancho completo con chips de piezas frecuentes, se llevaron las acciones `Duplicar` y `Quitar pieza` directamente a la cabecera del editor eliminando el acordeón oculto, se agruparon los campos en sub-bloques con jerarquía de 3 capas, se ocultó el selector `Conjunto` cuando no existen conjuntos y se unificaron las características adicionales con `MuebleOptionPicker` + chips rápidos.

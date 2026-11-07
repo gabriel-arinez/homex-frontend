@@ -420,4 +420,77 @@ describe('PRF-03 corpus representativo conservado por el configurador visual', (
       crear.mockRestore()
     }
   })
+
+  it('en modo Studio optimiza Estructura con chips iniciales, resumen real de pieza, acciones directas y conjunto condicional', async () => {
+    const wrapper = mount(EspecificacionForm, {
+      props: {
+        ...opciones,
+        studio: true,
+        activeSection: 'estructura',
+        detalle: {
+          nombre: 'Mesa de reunión',
+          cantidad: '1',
+          unidad: 20,
+          precio_unitario: '500',
+          descuento: '0',
+        },
+      },
+    })
+    try {
+      expect(wrapper.find('.studio-group-management--compact').exists()).toBe(true)
+      expect(wrapper.find('.studio-component-tree').exists()).toBe(false)
+      expect(wrapper.find('.studio-component-layout--empty').exists()).toBe(true)
+
+      const chipTablero = wrapper
+        .findAll('.empty-editor__chips .quick-chip')
+        .find((b) => b.text().includes('Tablero'))
+      expect(chipTablero).toBeDefined()
+      await chipTablero!.trigger('click')
+
+      expect(wrapper.find('.studio-component-tree').exists()).toBe(true)
+      expect(
+        (wrapper.get('input[name="componente-nombre-0"]').element as HTMLInputElement).value,
+      ).toBe('Tablero')
+      expect(wrapper.find('select[name="componente-0-grupo"]').exists()).toBe(false)
+      expect(wrapper.find('.component-actions-menu').exists()).toBe(false)
+
+      await wrapper.get('#componente-material-0').setValue('Melamínico')
+      await wrapper.get('#componente-espesor-0').setValue('18 mm')
+      expect(wrapper.get('.tree-item__meta').text()).toBe('1 unidad · Melamínico · 18 mm')
+
+      await wrapper.get('input[name="componente-0-cantidad"]').setValue('')
+      expect(wrapper.get('.tree-item__meta').text()).toBe('Melamínico · 18 mm')
+
+      const pickerInput = wrapper.get('#buscar-atributo-componente-0')
+      await pickerInput.trigger('focus')
+      await pickerInput.setValue('Tapacanto PVC')
+      const crearAtributo = wrapper
+        .findAll('.mueble-picker__create')
+        .find((b) => b.text().includes('Tapacanto PVC'))
+      expect(crearAtributo).toBeDefined()
+      await crearAtributo!.trigger('click')
+      expect(wrapper.find('input[name="atributo-0-0"]').exists()).toBe(true)
+
+      const btnConjunto = wrapper
+        .findAll('button')
+        .find((b) => b.text().includes('Añadir conjunto'))
+      await btnConjunto!.trigger('click')
+      expect(wrapper.find('.studio-group-management--compact').exists()).toBe(false)
+      expect(wrapper.find('select[name="componente-0-grupo"]').exists()).toBe(true)
+
+      const btnDuplicar = wrapper
+        .findAll('.component-direct-actions .component-tool-btn')
+        .find((b) => b.text().includes('Duplicar'))
+      expect(btnDuplicar).toBeDefined()
+      await btnDuplicar!.trigger('click')
+      expect(wrapper.findAll('.tree-item')).toHaveLength(2)
+
+      const btnsQuitar = wrapper.findAll('button[aria-label="Quitar componente Tablero"]')
+      expect(btnsQuitar).toHaveLength(2)
+      await btnsQuitar[1]!.trigger('click')
+      expect(wrapper.findAll('.tree-item')).toHaveLength(1)
+    } finally {
+      wrapper.unmount()
+    }
+  })
 })
