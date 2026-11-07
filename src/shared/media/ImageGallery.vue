@@ -412,9 +412,29 @@ onBeforeUnmount(() => {
 defineExpose({ flush: upload, count: computed(() => all.value.length) })
 </script>
 <template>
-  <section class="image-gallery" :aria-label="title" @dragover.prevent @drop.prevent="drop">
-    <h3>
-      {{ title }} <small>{{ all.length }}/{{ limit }}</small>
+  <section
+    class="image-gallery"
+    :class="{ 'image-gallery--streamlined': streamlined }"
+    :aria-label="title"
+    @dragover.prevent
+    @drop.prevent="drop"
+  >
+    <h3 :class="{ 'gallery-heading': streamlined }">
+      <span v-if="streamlined" class="gallery-heading__title">
+        <ImagePlus :size="19" class="gallery-heading__icon" aria-hidden="true" />
+        <span>{{ title }}</span>
+      </span>
+      <template v-else>{{ title }}</template>
+      {{ ' ' }}
+      <span v-if="streamlined" class="gallery-heading__meta">
+        <span v-if="!all.length" class="gallery-badge gallery-badge--optional" aria-hidden="true">
+          Opcional
+        </span>
+        <small class="gallery-badge" :class="{ 'gallery-badge--active': all.length > 0 }">
+          {{ all.length }}/{{ limit }}
+        </small>
+      </span>
+      <small v-else>{{ all.length }}/{{ limit }}</small>
     </h3>
     <button
       v-if="cover"
@@ -423,18 +443,44 @@ defineExpose({ flush: upload, count: computed(() => all.value.length) })
       aria-label="Ampliar imagen principal"
       @click="showCover"
     >
+      <span v-if="streamlined" class="hero-badge" aria-hidden="true">
+        <Star :size="13" />
+        Portada principal
+      </span>
       <GalleryPhoto :src="cover.url" :alt="cover.nombre" />
+      <span v-if="streamlined" class="hero-action-pill" aria-hidden="true">
+        <ZoomIn :size="14" />
+        {{ editable ? 'Ampliar o gestionar' : 'Ampliar imagen' }}
+      </span>
     </button>
+    <div v-else-if="streamlined" class="empty empty--streamlined">
+      <span class="empty__icon" aria-hidden="true">
+        <ImagePlus :size="24" />
+      </span>
+      <strong>Sin imágenes cargadas todavía</strong>
+      <span>
+        Este paso es opcional. Arrastra o selecciona fotos desde el panel derecho si deseas ilustrar
+        el mueble en la proforma.
+      </span>
+    </div>
     <p v-else class="empty">Sin imágenes. Puedes guardar sin adjuntar fotografías.</p>
     <div class="thumbs">
       <button
         v-for="(item, index) in all"
         :key="item.key"
         type="button"
+        :class="{ 'thumb--cover': streamlined && cover?.key === item.key }"
         :aria-label="`Ver ${item.nombre}`"
         @click="show(index)"
       >
         <GalleryPhoto :src="item.url" :alt="item.nombre" />
+        <span
+          v-if="streamlined && cover?.key === item.key"
+          class="thumb-cover-tag"
+          aria-hidden="true"
+        >
+          <Star :size="11" />
+        </span>
       </button>
     </div>
     <div v-if="editable" class="actions">
@@ -447,7 +493,9 @@ defineExpose({ flush: upload, count: computed(() => all.value.length) })
         @dragleave="dropActive = false"
         @drop.stop.prevent="drop"
       >
-        <ImagePlus :size="24" aria-hidden="true" />
+        <span class="drop-zone__icon" aria-hidden="true">
+          <ImagePlus :size="22" />
+        </span>
         <strong>Arrastra imágenes aquí</strong>
         <span>JPEG, PNG o WebP · hasta 10 MiB por archivo</span>
       </div>
@@ -474,6 +522,16 @@ defineExpose({ flush: upload, count: computed(() => all.value.length) })
         @click="managing = true"
         >Gestionar imágenes</Button
       >
+      <p v-if="streamlined" class="actions-guide">
+        <template v-if="all.length">
+          La portada ilustrará este mueble en la proforma. Haz clic en cualquier miniatura para
+          <strong>cambiar portada, ordenar o quitar</strong>.
+        </template>
+        <template v-else>
+          La primera imagen subida quedará como portada principal en la proforma (máximo
+          {{ limit }} fotos).
+        </template>
+      </p>
     </div>
     <p v-if="editable && !streamlined" class="hint">
       Arrastra imágenes aquí · JPEG, PNG o WebP · 10 MiB por archivo.
@@ -559,6 +617,17 @@ defineExpose({ flush: upload, count: computed(() => all.value.length) })
         @keydown.left.self.prevent="navigate(-1)"
         @keydown.right.self.prevent="navigate(1)"
       >
+        <div v-if="streamlined && current" class="viewer-file">
+          <div class="viewer-file__name">
+            <span class="viewer-file__index">Foto {{ selected + 1 }} de {{ all.length }}</span>
+            <strong>{{ current.nombre }}</strong>
+          </div>
+          <span v-if="current.principal" class="viewer-file__badge viewer-file__badge--cover">
+            <Star :size="13" aria-hidden="true" />
+            Imagen principal
+          </span>
+          <span v-else class="viewer-file__badge">Referencia adicional</span>
+        </div>
         <div
           v-if="current"
           ref="imageViewport"
@@ -582,11 +651,15 @@ defineExpose({ flush: upload, count: computed(() => all.value.length) })
             v-for="(item, index) in all"
             :key="item.key"
             type="button"
+            :class="{ 'thumb--cover': cover?.key === item.key }"
             :aria-label="`Ver ${item.nombre}`"
             :aria-pressed="selected === index"
             @click="thumbnail(index)"
           >
             <GalleryPhoto :src="item.url" :alt="item.nombre" />
+            <span v-if="cover?.key === item.key" class="thumb-cover-tag" aria-hidden="true">
+              <Star :size="11" />
+            </span>
           </button>
         </div>
         <div class="viewer-toolbar">
@@ -639,6 +712,7 @@ defineExpose({ flush: upload, count: computed(() => all.value.length) })
               <Button
                 type="button"
                 variant="secondary"
+                :class="{ 'viewer-cover-btn--active': current.principal }"
                 :disabled="
                   loading ||
                   busy ||
@@ -648,7 +722,8 @@ defineExpose({ flush: upload, count: computed(() => all.value.length) })
                 "
                 @click="primary(selected)"
               >
-                <Star :size="16" aria-hidden="true" /> Establecer principal
+                <Star :size="16" aria-hidden="true" />
+                {{ current.principal ? 'Portada actual' : 'Establecer principal' }}
               </Button>
               <span class="viewer-order-label">Orden</span>
               <Button
@@ -684,10 +759,6 @@ defineExpose({ flush: upload, count: computed(() => all.value.length) })
         <p v-if="zoom > 1" class="viewer-hint">
           Arrastra la imagen o usa las barras de desplazamiento y las flechas del teclado.
         </p>
-        <div v-if="streamlined && current" class="viewer-file">
-          <strong>{{ current.nombre }}</strong>
-          <span v-if="current.principal">Imagen principal</span>
-        </div>
         <p v-if="streamlined && error" role="alert">{{ error }}</p>
         <div v-if="!streamlined" class="thumbs">
           <button
@@ -727,6 +798,46 @@ h3 small,
   color: var(--color-text-secondary);
   font-size: 0.8rem;
 }
+.gallery-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  font-size: 1rem;
+}
+.gallery-heading__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+.gallery-heading__icon {
+  color: var(--color-primary-accent);
+  flex-shrink: 0;
+}
+.gallery-heading__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.gallery-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.2;
+  background: var(--color-surface-muted);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+.gallery-badge--active {
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
+}
 .hero {
   width: 100%;
   height: 20rem;
@@ -734,6 +845,61 @@ h3 small,
   border-radius: var(--radius-card);
   background: var(--color-background);
   cursor: zoom-in;
+}
+.image-gallery--streamlined .hero {
+  position: relative;
+  overflow: hidden;
+  padding: var(--space-3);
+  background: var(--color-surface-muted);
+  transition: border-color var(--transition-fast);
+}
+.image-gallery--streamlined .hero:hover {
+  border-color: var(--color-border-strong);
+}
+.hero-badge {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-strong);
+  pointer-events: none;
+}
+.hero-badge svg {
+  color: var(--color-primary-accent);
+  flex-shrink: 0;
+}
+.hero-action-pill {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-strong);
+  pointer-events: none;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+}
+.image-gallery--streamlined .hero:hover .hero-action-pill {
+  background: var(--color-surface-hover);
+  border-color: var(--color-primary-accent);
 }
 .thumbs {
   display: flex;
@@ -748,6 +914,39 @@ h3 small,
   border-radius: var(--radius-control);
   cursor: pointer;
 }
+.image-gallery--streamlined .thumbs button,
+.viewer--streamlined .thumbs button {
+  position: relative;
+  overflow: hidden;
+  padding: 0.2rem;
+  background: var(--color-surface-raised);
+  transition: border-color var(--transition-fast);
+}
+.image-gallery--streamlined .thumbs button:hover,
+.viewer--streamlined .thumbs button:hover {
+  border-color: var(--color-border-strong);
+}
+.image-gallery--streamlined > .thumbs button.thumb--cover {
+  border-color: var(--color-primary-accent);
+}
+.viewer--streamlined > .thumbs button.thumb--cover {
+  border-color: var(--color-border-strong);
+}
+.thumb-cover-tag {
+  position: absolute;
+  top: 0.2rem;
+  left: 0.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 999px;
+  background: var(--color-surface-raised);
+  color: var(--color-primary-accent);
+  border: 1px solid var(--color-primary-accent);
+  pointer-events: none;
+}
 .actions {
   display: flex;
   gap: 0.5rem;
@@ -758,12 +957,26 @@ h3 small,
   display: grid;
   justify-items: center;
   gap: var(--space-2);
-  padding: var(--space-5) var(--space-3);
-  border: 2px dashed var(--color-border-strong);
+  padding: var(--space-4) var(--space-3);
+  border: 1.5px dashed var(--color-border-strong);
   border-radius: var(--radius-control);
+  background: var(--color-surface);
   color: var(--color-text-secondary);
   text-align: center;
   font-size: 0.8rem;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+}
+.drop-zone__icon {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  color: var(--color-primary-accent);
 }
 .drop-zone svg {
   color: var(--color-primary-accent);
@@ -776,11 +989,51 @@ h3 small,
   border-color: var(--color-primary);
   background: var(--color-primary-soft);
 }
+.actions-guide {
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+.actions-guide strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
 .empty {
   padding: 2rem 1rem;
   text-align: center;
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-card);
+  color: var(--color-text-secondary);
+}
+.empty--streamlined {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 0.5rem;
+  padding: 2.25rem 1.5rem;
+  background: var(--color-surface-muted);
+  border-color: var(--color-border-strong);
+}
+.empty__icon {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  color: var(--color-primary-accent);
+}
+.empty--streamlined strong {
+  color: var(--color-text);
+  font-size: 0.95rem;
+}
+.empty--streamlined > span:last-child {
+  max-width: 28rem;
+  font-size: 0.83rem;
+  line-height: 1.5;
   color: var(--color-text-secondary);
 }
 .file-input {
@@ -839,22 +1092,29 @@ h3 small,
   min-width: 0;
 }
 .viewer--streamlined {
+  --viewer-height: min(50vh, 33rem);
+  gap: 0.8rem;
   grid-template-columns: minmax(0, 1fr) 4.5rem;
   grid-template-areas:
+    'file file'
     'image thumbnails'
     'toolbar toolbar'
     'hint hint'
-    'file file'
     'error error';
 }
 .viewer--streamlined > .large {
   grid-area: image;
   min-width: 0;
+  height: var(--viewer-height);
+  background: var(--color-surface-muted);
+}
+.viewer--streamlined .zoom-canvas {
+  height: calc(var(--viewer-height) * var(--zoom));
 }
 .viewer--streamlined > .thumbs {
   grid-area: thumbnails;
   flex-direction: column;
-  max-height: min(55vh, 36rem);
+  max-height: var(--viewer-height);
   overflow-x: hidden;
   overflow-y: auto;
 }
@@ -863,25 +1123,66 @@ h3 small,
 }
 .viewer--streamlined > .viewer-toolbar {
   grid-area: toolbar;
+  padding: 0.55rem 0.75rem;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  gap: var(--space-2) var(--space-3);
+}
+.viewer--streamlined .viewer-toolbar :deep(.button) {
+  min-height: 2.4rem;
+  padding: 0.4rem 0.72rem;
+  font-size: 0.84rem;
+  white-space: nowrap;
+}
+.viewer--streamlined .viewer-toolbar :deep(.button--secondary) {
+  background: var(--color-surface-raised);
+  border-color: var(--color-border-strong);
+}
+.viewer--streamlined .viewer-toolbar :deep(.button--secondary:hover:not(:disabled)) {
+  background: var(--color-surface-hover);
+}
+.viewer--streamlined .viewer-toolbar :deep(.viewer-cover-btn--active:disabled) {
+  opacity: 1;
+  color: var(--color-primary-accent);
+  background: var(--color-primary-soft);
+  border-color: color-mix(in srgb, var(--color-primary-accent) 45%, var(--color-border));
+}
+.viewer--streamlined .viewer-zoom input {
+  width: 6.75rem;
 }
 .viewer--streamlined > .viewer-hint {
   grid-area: hint;
 }
 .viewer--streamlined > .viewer-file {
   grid-area: file;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.8rem;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
 }
 .viewer--streamlined > [role='alert'] {
   grid-area: error;
 }
+@media (min-width: 68rem) {
+  .viewer--streamlined .viewer-zoom,
+  .viewer--streamlined .viewer-management {
+    padding-left: var(--space-3);
+    border-left: 1px solid var(--color-border);
+  }
+}
 @media (max-width: 48rem) {
   .viewer--streamlined {
+    --viewer-height: min(38vh, 18rem);
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
+      'file'
       'image'
       'thumbnails'
       'toolbar'
       'hint'
-      'file'
       'error';
   }
   .viewer--streamlined > .thumbs {
@@ -889,6 +1190,9 @@ h3 small,
     max-height: none;
     overflow-x: auto;
     overflow-y: hidden;
+  }
+  .viewer--streamlined .viewer-zoom input {
+    width: min(6.5rem, 32vw);
   }
 }
 .viewer-toolbar,
@@ -932,13 +1236,48 @@ h3 small,
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: var(--space-1);
+  gap: var(--space-2);
   min-width: 0;
   overflow-wrap: anywhere;
 }
-.viewer-file span {
+.viewer-file__name {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.viewer-file__name strong {
+  font-size: 0.88rem;
+  color: var(--color-text);
+}
+.viewer-file .viewer-file__index {
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  font-size: 0.72rem;
+  font-weight: 700;
   color: var(--color-text-secondary);
-  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.viewer-file .viewer-file__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+.viewer-file .viewer-file__badge--cover {
+  color: var(--color-primary-accent);
+  background: var(--color-primary-soft);
+  border-color: color-mix(in srgb, var(--color-primary-accent) 45%, var(--color-border));
 }
 .viewer-management-actions {
   display: flex;

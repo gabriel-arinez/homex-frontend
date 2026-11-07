@@ -466,6 +466,7 @@ async function seleccionarApartado(id: typeof seccion.value) {
       <section
         v-show="seccion === 'imagenes' || seccion === 'revision'"
         class="studio-review-gallery"
+        :class="{ 'studio-review-gallery--editing': seccion === 'imagenes' }"
       >
         <p v-if="galleryError" role="alert">
           {{ galleryError }}
@@ -497,7 +498,11 @@ async function seleccionarApartado(id: typeof seccion.value) {
           >Gestionar imágenes</Button
         >
       </section>
-      <fieldset class="studio-content" :disabled="processing">
+      <fieldset
+        v-show="seccion !== 'imagenes' || Boolean(externalError)"
+        class="studio-content"
+        :disabled="processing"
+      >
         <EspecificacionForm
           :key="formVersion"
           :tipos="tipos"
@@ -590,10 +595,10 @@ async function seleccionarApartado(id: typeof seccion.value) {
   font-size: 0.67rem;
   font-weight: 750;
   letter-spacing: 0.09em;
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
 }
 .studio-breadcrumb span {
-  color: var(--color-border-strong);
+  color: var(--color-text-secondary);
 }
 .studio-header h1 {
   margin: 0.55rem 0 0;
@@ -659,7 +664,7 @@ async function seleccionarApartado(id: typeof seccion.value) {
 }
 .studio-step-label small {
   font-size: 0.65rem;
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
 }
 .studio-complete,
 .studio-issue {
@@ -741,15 +746,26 @@ async function seleccionarApartado(id: typeof seccion.value) {
     height: min(40vh, 16rem);
   }
 }
+.studio-review-gallery--editing {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: clamp(1rem, 2vw, 1.35rem);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
 :deep(.studio-gallery--editing) {
-  grid-template-columns: minmax(0, 1fr) minmax(16rem, 20rem);
+  grid-template-columns: minmax(0, 1fr) minmax(16.5rem, 20rem);
   grid-template-rows: auto auto auto auto auto minmax(0, 1fr) auto;
   align-items: start;
-  gap: var(--space-3) var(--space-5);
+  gap: var(--space-4);
 }
 :deep(.studio-gallery--editing > h3) {
   grid-column: 1 / -1;
   grid-row: 1;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
 }
 :deep(.studio-gallery--editing > .hero),
 :deep(.studio-gallery--editing > .empty) {
@@ -758,13 +774,11 @@ async function seleccionarApartado(id: typeof seccion.value) {
   min-width: 0;
 }
 :deep(.studio-gallery--editing > .hero) {
-  height: clamp(20rem, 42vh, 28rem);
+  height: clamp(19rem, 42vh, 26rem);
 }
 :deep(.studio-gallery--editing > .empty) {
   align-self: stretch;
-  display: grid;
-  place-items: center;
-  min-height: 16rem;
+  min-height: 16.5rem;
 }
 :deep(.studio-gallery--editing > .thumbs) {
   grid-column: 1;
@@ -776,10 +790,18 @@ async function seleccionarApartado(id: typeof seccion.value) {
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  gap: var(--space-3);
   padding: var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
-  background: var(--color-surface);
+  background: var(--color-surface-muted);
+}
+:deep(.studio-gallery--editing > .actions > .button--secondary) {
+  background: var(--color-surface-raised);
+  border-color: var(--color-border-strong);
+}
+:deep(.studio-gallery--editing > .actions > .button--secondary:hover:not(:disabled)) {
+  background: var(--color-surface-hover);
 }
 :deep(.studio-gallery--editing > .hint) {
   grid-column: 2;
@@ -801,7 +823,7 @@ async function seleccionarApartado(id: typeof seccion.value) {
   grid-row: 6;
 }
 :deep(.studio-gallery--editing.studio-gallery--has-images) {
-  grid-template-columns: 4.5rem minmax(0, 1fr) minmax(16rem, 20rem);
+  grid-template-columns: 4.5rem minmax(0, 1fr) minmax(16.5rem, 20rem);
 }
 :deep(.studio-gallery--has-images > .hero) {
   grid-column: 2;
@@ -810,7 +832,7 @@ async function seleccionarApartado(id: typeof seccion.value) {
   grid-column: 1;
   grid-row: 2 / 7;
   flex-direction: column;
-  max-height: clamp(20rem, 42vh, 28rem);
+  max-height: clamp(19rem, 42vh, 26rem);
   overflow-x: hidden;
   overflow-y: auto;
 }

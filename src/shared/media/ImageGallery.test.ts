@@ -112,6 +112,36 @@ describe('Galería reutilizable', () => {
     expect(wrapper.find('.drop-zone').exists()).toBe(false)
     wrapper.unmount()
   })
+  it('señaliza cuál miniatura es la portada principal y orienta el estado en el visor simplificado', async () => {
+    vi.spyOn(galleryService, 'list').mockResolvedValueOnce(gallery([]))
+    const emptyWrapper = mount(ImageGallery, {
+      props: { endpoint: '/gallery/', streamlined: true, title: 'Imágenes del mueble' },
+      global: { stubs },
+    })
+    await flushPromises()
+    expect(emptyWrapper.find('.empty--streamlined').text()).toContain(
+      'Sin imágenes cargadas todavía',
+    )
+    expect(emptyWrapper.get('h3').text()).toContain('0/8')
+    emptyWrapper.unmount()
+
+    vi.spyOn(galleryService, 'list').mockResolvedValueOnce(gallery([image(1), image(2, true)]))
+    const wrapper = mount(ImageGallery, {
+      props: { endpoint: '/gallery/', streamlined: true, title: 'Imágenes del mueble' },
+      global: { stubs },
+    })
+    await flushPromises()
+    expect(wrapper.get('.hero').text()).toContain('Portada principal')
+    expect(wrapper.get('.thumbs [aria-label="Ver Foto 1"]').classes()).not.toContain('thumb--cover')
+    expect(wrapper.get('.thumbs [aria-label="Ver Foto 2"]').classes()).toContain('thumb--cover')
+    await wrapper.get('.hero').trigger('click')
+    expect(wrapper.get('.viewer-file').text()).toContain('Imagen principal')
+    expect(wrapper.get('.viewer-management').text()).toContain('Portada actual')
+    await wrapper.get('.viewer [aria-label="Ver Foto 1"]').trigger('click')
+    expect(wrapper.get('.viewer-file').text()).toContain('Referencia adicional')
+    expect(wrapper.get('.viewer-management').text()).toContain('Establecer principal')
+    wrapper.unmount()
+  })
   it('interrumpe la cola anterior si cambia la galería durante una carga', async () => {
     vi.spyOn(galleryService, 'list').mockImplementation(async (path) =>
       path === '/new/' ? gallery([image(9, true)]) : gallery([]),
