@@ -113,7 +113,7 @@ describe('PRF-03 corpus representativo conservado por el configurador visual', (
         activeSection: 'comercial',
         detalle: {
           nombre: 'Mesa',
-          cantidad: '2',
+          cantidad: '2.0000',
           unidad: 20,
           precio_unitario: '125.50',
           descuento: '10.00',
@@ -121,10 +121,25 @@ describe('PRF-03 corpus representativo conservado por el configurador visual', (
       },
     })
     expect(wrapper.find('.commercial-layout .commercial-fields').exists()).toBe(true)
+    expect((wrapper.get('[name="mueble-cantidad"]').element as HTMLInputElement).value).toBe('2')
+    const nombresCampos = wrapper
+      .findAll('#comercial input, #comercial select')
+      .map((el) => el.attributes('name'))
+    expect(nombresCampos.indexOf('mueble-cantidad')).toBeLessThan(
+      nombresCampos.indexOf('mueble-descripcion'),
+    )
+    expect(wrapper.get('#comercial > h3').text()).toContain('Importe listo')
     expect(wrapper.get('.commercial-total').text()).toContain('Resumen de cotización')
+    expect(wrapper.get('.commercial-total').text()).toContain('2 pieza × 125.50 BOB')
     expect(wrapper.get('.commercial-total').text()).toContain('241.00 BOB')
     expect((wrapper.get('[name="mueble-precio"]').element as HTMLInputElement).value).toBe('125.50')
     wrapper.unmount()
+
+    const pendingWrapper = mount(EspecificacionForm, {
+      props: { ...opciones, studio: true, activeSection: 'comercial' },
+    })
+    expect(pendingWrapper.get('#comercial > h3').text()).toContain('Precio obligatorio')
+    pendingWrapper.unmount()
   })
   it('orienta el apartado de accesorios y observaciones cuando está vacío', () => {
     const wrapper = mount(EspecificacionForm, {

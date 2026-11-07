@@ -32,12 +32,19 @@ Objetivo: optimizar jerarquía visual, contraste de capas, distribución y micro
 - Señalizar de forma inmediata cuál foto es la portada principal (badge superpuesto `Portada principal` + `Ampliar o gestionar` en `.hero`, e indicador `Star` + borde de acento en la miniatura correspondiente), mejorar el estado vacío (`0/8`) y sumar una guía breve en la columna de carga explicando cómo cambiar portada, ordenar o quitar.
 - Reorganizar el modal `Visor de imágenes` en modo `streamlined`: ubicar la franja `.viewer-file` arriba con posición, nombre y badge `Imagen principal` / `Referencia adicional`, estructurar `.viewer-toolbar` con superficie propia y separadores entre navegación, zoom y gestión en una sola fila en escritorio, y confirmar `Portada actual` cuando la imagen abierta ya es principal.
 
+### S5 — Paso 05 Precio
+
+- Corregir la cabecera de `#comercial` agrupando ícono `Wallet` + título `Condiciones de cotización` a la izquierda, eliminando el texto duplicado con la cabecera del paso e incorporando a la derecha un badge dinámico (`Precio obligatorio` / `Importe listo`).
+- Reordenar y separar los controles en 2 sub-bloques con jerarquía de 3 capas (`--color-surface-muted` + campos `--color-surface-raised`): primero el bloque principal de cotización (`Cantidad cotizada` normalizando enteros como `1.0000` → `1` al iniciar, `Unidad comercial`, `Precio unitario negociado` y `Descuento monetario total de línea`), y debajo el bloque secundario opcional (`Descripción comercial opcional` con `placeholder` y guía clara para diferenciarlo de las notas de taller).
+- Enriquecer `Resumen de cotización` tipo recibo con desglose vivo (`cantidad × unitario`), decimales tabulares uniformes, resaltado de descuento cuando es mayor a cero, recuadro elevado (`--color-surface-raised`) para `Total estimado del mueble` y contenedor estilizado para `Revisión de precio total dictado` cuando provenga de captura por voz.
+
 ## Tasks
 
 - T1 — S1 — inline — `aeaeea3` — Paso 01 General completado y verificado.
 - T2 — S2 — inline — `308992e` — Paso 02 Estructura completado y verificado.
 - T3 — S3 — inline — `de4f8db` — Paso 03 Accesorios completado y verificado.
-- T4 — S4 — inline — verificado — Paso 04 Imágenes implementado y verificado con pruebas unitarias, E2E, contraste WCAG AA y responsividad móvil (360px).
+- T4 — S4 — inline — `528d5db` — Paso 04 Imágenes completado y verificado.
+- T5 — S5 — inline — verificado — Paso 05 Precio implementado y verificado con pruebas unitarias, E2E, contraste WCAG AA y responsividad móvil (360px).
 
 ## Log
 
@@ -47,3 +54,4 @@ Objetivo: optimizar jerarquía visual, contraste de capas, distribución y micro
 - L4 — En `EspecificacionForm.vue` (Paso 02 Estructura) se compactó la franja de `Conjuntos` cuando está vacía, se reemplazaron contadores de límite técnico por indicadores naturales, se enriqueció el árbol izquierdo con resumen real de cada pieza y botón `+ Nueva pieza`, se incorporó estado vacío de ancho completo con chips de piezas frecuentes, se llevaron las acciones `Duplicar` y `Quitar pieza` directamente a la cabecera del editor eliminando el acordeón oculto, se agruparon los campos en sub-bloques con jerarquía de 3 capas, se ocultó el selector `Conjunto` cuando no existen conjuntos y se unificaron las características adicionales con `MuebleOptionPicker` + chips rápidos.
 - L5 — En `EspecificacionForm.vue` (Paso 03 Accesorios) se corrigió la cabecera desalineada de `Notas para fabricación` agrupando ícono + título y badge `Opcional`, se llevó `+ Añadir accesorio` fijo a la cabecera de `Accesorios incluidos`, se transformó la lista en una grilla de 2 columnas con numeración (`01`, `02`), fila de edición de ancho completo con atajos `Enter`/`Escape`, chips de accesorios frecuentes de un clic y jerarquía de 3 capas en el bloque de observaciones (incluyendo `:deep(.textarea-field textarea)` con `--color-surface-raised`).
 - L6 — En `MuebleStudio.vue` e `ImageGallery.vue` (Paso 04 Imágenes) se envolvió la galería en una tarjeta `--color-surface` con jerarquía de 3 capas, se señalizó la portada principal en `.hero` y en miniaturas (`Star` + borde de acento), se enriqueció el estado vacío (`0/8`) y la guía contextual del panel de carga, y se reestructuró el `Visor de imágenes` llevando `.viewer-file` a una franja superior clara con badge `Imagen principal` / `Referencia adicional` y agrupando `.viewer-toolbar` con confirmación `Portada actual`. También se ajustó el contraste en modo claro de migas y numeración de pasos en `MuebleStudio.vue`.
+- L7 — En `EspecificacionForm.vue` (Paso 05 Precio) se alineó la cabecera `Condiciones de cotización` con badge vivo (`Precio obligatorio` / `Importe listo`), se normalizó la cantidad inicial entera (`1.0000` → `1`), se reordenaron y agruparon los campos en dos sub-bloques con 3 capas (negociación principal arriba y glosa opcional para proforma debajo), se rediseñó `Resumen de cotización` tipo recibo con fórmula viva y recuadro elevado para el total estimado, y se estilizó el aviso de importe dictado por voz.

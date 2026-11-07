@@ -127,16 +127,30 @@ const form = reactive({
   tipo_mueble: String(props.especificacion?.tipo_mueble ?? ''),
   observaciones: props.especificacion?.observaciones ?? '',
 })
+function normalizarCantidadInicial(valor: string | number | null | undefined): string {
+  if (valor === undefined || valor === null) return '1'
+  const texto = String(valor).trim()
+  if (!texto) return ''
+  const numero = Number(texto)
+  if (Number.isFinite(numero) && Number.isInteger(numero) && /^[+-]?\d+(?:\.0+)?$/.test(texto)) {
+    return String(numero)
+  }
+  return texto
+}
+
 const comercial = reactive({
   nombre: String(props.detalle?.nombre ?? ''),
   descripcion: String(props.detalle?.descripcion ?? ''),
-  cantidad: String(props.detalle?.cantidad ?? '1'),
+  cantidad: normalizarCantidadInicial(props.detalle?.cantidad),
   unidad: String(
     props.detalle?.unidad ?? props.unidades?.find((x) => x.codigo === 'PIEZA')?.id ?? '',
   ),
   precio_unitario: String(props.detalle?.precio_unitario ?? ''),
   descuento: String(props.detalle?.descuento ?? '0.00'),
 })
+const unidadComercialNombre = computed(
+  () => props.unidades?.find((u) => String(u.id) === comercial.unidad)?.nombre ?? 'unidad',
+)
 const destinosEspesor = reactive<Record<number, string>>({})
 const espesoresConfirmados = reactive<Record<number, string>>({})
 
@@ -2135,12 +2149,27 @@ onMounted(loadCatalog)
         </section>
         <section id="comercial" v-show="!studio || activeSection === 'comercial'">
           <h3>
-            <Wallet v-if="studio" :size="19" aria-hidden="true" />Datos comerciales de este mueble
+            <span class="section-heading-main">
+              <Wallet v-if="studio" :size="19" aria-hidden="true" />
+              <span>{{
+                studio ? 'Condiciones de cotización' : 'Datos comerciales de este mueble'
+              }}</span>
+            </span>
+            <span
+              v-if="studio"
+              class="section-badge"
+              :class="totalEstimado !== null ? 'section-badge--ready' : 'section-badge--required'"
+            >
+              <Check v-if="totalEstimado !== null" :size="13" aria-hidden="true" />
+              {{ totalEstimado !== null ? 'Importe listo' : 'Precio obligatorio' }}
+            </span>
           </h3>
-          <p v-if="studio" class="section-guidance">
-            Define la cantidad y el precio cotizado para este mueble.
-          </p>
-          <aside v-if="totalDictado" aria-label="Revisión de precio total dictado">
+          <aside
+            v-if="totalDictado"
+            class="commercial-dictated"
+            :class="{ 'commercial-dictated--warning': diferenciaComercial }"
+            aria-label="Revisión de precio total dictado"
+          >
             <p>
               Total reconocido en el dictado:
               <strong>{{ totalDictado.total_negociado }} {{ moneda ?? 'BOB' }}</strong
@@ -2163,72 +2192,130 @@ onMounted(loadCatalog)
           </aside>
           <div class="commercial-layout">
             <div class="grid commercial-fields">
-              <TextField
-                v-model="comercial.descripcion"
-                class="commercial-description"
-                name="mueble-descripcion"
-                label="Descripción comercial opcional"
-              />
-              <TextField
-                v-model="comercial.cantidad"
-                name="mueble-cantidad"
-                label="Cantidad cotizada *"
-                input-mode="numeric"
-                :error="errorCampo('comercial', 0, touched.cantidad)"
-                @blur="touched.cantidad = true"
-              />
-              <Select
-                v-model="comercial.unidad"
-                name="mueble-unidad"
-                label="Unidad comercial *"
-                :options="
-                  (unidades ?? [])
-                    .filter((u) => ['PIEZA', 'JUEGO'].includes(u.codigo))
-                    .map((u) => ({ label: u.nombre, value: String(u.id) }))
-                "
-              />
-              <TextField
-                v-model="comercial.precio_unitario"
-                name="mueble-precio"
-                :label="'Precio unitario negociado (' + (moneda ?? 'BOB') + ') *'"
-                input-mode="decimal"
-                :hint="studio ? 'Importe cotizado por cada unidad.' : undefined"
-                :error="errorCampo('comercial', 2, touched.precio)"
-                @blur="touched.precio = true"
-              />
-              <TextField
-                v-model="comercial.descuento"
-                name="mueble-descuento"
-                label="Descuento monetario total de línea *"
-                input-mode="decimal"
-                :hint="studio ? 'Se descuenta una sola vez del subtotal de la línea.' : undefined"
-                :error="errorCampo('comercial', 3, touched.descuento)"
-                @blur="touched.descuento = true"
-              />
+              <div class="commercial-subblock">
+                <p v-if="studio" class="commercial-subblock__title">CANTIDAD E IMPORTE NEGOCIADO</p>
+                <div class="commercial-core-grid">
+                  <TextField
+                    v-model="comercial.cantidad"
+                    name="mueble-cantidad"
+                    label="Cantidad cotizada *"
+                    input-mode="numeric"
+                    :placeholder="studio ? 'Ej.: 1' : undefined"
+                    :hint="studio ? 'Unidades enteras a fabricar.' : undefined"
+                    :error="errorCampo('comercial', 0, touched.cantidad)"
+                    @blur="touched.cantidad = true"
+                  />
+                  <div class="commercial-unit-field">
+                    <Select
+                      v-model="comercial.unidad"
+                      name="mueble-unidad"
+                      label="Unidad comercial *"
+                      :options="
+                        (unidades ?? [])
+                          .filter((u) => ['PIEZA', 'JUEGO'].includes(u.codigo))
+                          .map((u) => ({ label: u.nombre, value: String(u.id) }))
+                      "
+                    />
+                    <small v-if="studio" class="commercial-unit-hint">
+                      Unidad mostrada en la línea de proforma.
+                    </small>
+                  </div>
+                  <TextField
+                    v-model="comercial.precio_unitario"
+                    name="mueble-precio"
+                    :label="'Precio unitario negociado (' + (moneda ?? 'BOB') + ') *'"
+                    input-mode="decimal"
+                    :placeholder="studio ? '0.00' : undefined"
+                    :hint="studio ? 'Importe cotizado por cada unidad.' : undefined"
+                    :error="errorCampo('comercial', 2, touched.precio)"
+                    @blur="touched.precio = true"
+                  />
+                  <TextField
+                    v-model="comercial.descuento"
+                    name="mueble-descuento"
+                    label="Descuento monetario total de línea *"
+                    input-mode="decimal"
+                    :placeholder="studio ? '0.00' : undefined"
+                    :hint="
+                      studio ? 'Se descuenta una sola vez del subtotal de la línea.' : undefined
+                    "
+                    :error="errorCampo('comercial', 3, touched.descuento)"
+                    @blur="touched.descuento = true"
+                  />
+                </div>
+              </div>
+              <div class="commercial-subblock commercial-subblock--optional">
+                <div v-if="studio" class="commercial-optional-head">
+                  <span class="commercial-subblock__title">GLOSA EN LA PROFORMA</span>
+                  <span class="section-badge">Opcional</span>
+                </div>
+                <TextField
+                  v-model="comercial.descripcion"
+                  class="commercial-description"
+                  name="mueble-descripcion"
+                  label="Descripción comercial opcional"
+                  :placeholder="
+                    studio ? 'Ej.: Incluye entrega e instalación en sala principal' : undefined
+                  "
+                  :hint="
+                    studio
+                      ? 'Texto visible para el cliente junto al nombre del mueble (no reemplaza las notas de fabricación).'
+                      : undefined
+                  "
+                />
+              </div>
             </div>
             <div class="commercial-total" role="status">
-              <h4 v-if="studio">
-                <Calculator :size="18" aria-hidden="true" />Resumen de cotización
-              </h4>
-              <div>
-                <span>Subtotal</span
-                ><strong>{{
-                  cantidadValida && precioValido
-                    ? (Number(comercial.cantidad) * Number(comercial.precio_unitario)).toFixed(2) +
-                      ' ' +
-                      (moneda ?? 'BOB')
-                    : 'Pendiente'
-                }}</strong>
+              <div v-if="studio" class="commercial-total__header">
+                <h4><Calculator :size="18" aria-hidden="true" />Resumen de cotización</h4>
+                <span class="commercial-currency-pill">{{ moneda ?? 'BOB' }}</span>
               </div>
-              <div>
-                <span>Descuento</span
-                ><strong>{{
-                  descuentoValido ? comercial.descuento + ' ' + (moneda ?? 'BOB') : 'Pendiente'
-                }}</strong>
+              <div class="commercial-total__rows">
+                <div class="commercial-total__row">
+                  <div class="commercial-total__label-group">
+                    <span>Subtotal</span>
+                    <small
+                      v-if="studio && cantidadValida && precioValido"
+                      class="commercial-total__formula"
+                    >
+                      {{ comercial.cantidad }} {{ unidadComercialNombre.toLowerCase() }} ×
+                      {{ Number(comercial.precio_unitario).toFixed(2) }} {{ moneda ?? 'BOB' }}
+                    </small>
+                  </div>
+                  <strong>{{
+                    cantidadValida && precioValido
+                      ? (Number(comercial.cantidad) * Number(comercial.precio_unitario)).toFixed(
+                          2,
+                        ) +
+                        ' ' +
+                        (moneda ?? 'BOB')
+                      : 'Pendiente'
+                  }}</strong>
+                </div>
+                <div
+                  class="commercial-total__row"
+                  :class="{
+                    'commercial-total__row--discount':
+                      studio && descuentoValido && Number(comercial.descuento) > 0,
+                  }"
+                >
+                  <span>Descuento</span>
+                  <strong>{{
+                    descuentoValido
+                      ? (studio && Number(comercial.descuento) > 0 ? '− ' : '') +
+                        Number(comercial.descuento).toFixed(2) +
+                        ' ' +
+                        (moneda ?? 'BOB')
+                      : 'Pendiente'
+                  }}</strong>
+                </div>
               </div>
-              <div class="commercial-total-main">
-                <span>Total estimado del mueble</span
-                ><strong>{{
+              <div
+                class="commercial-total-main"
+                :class="{ 'commercial-total-main--ready': totalEstimado !== null }"
+              >
+                <span>Total estimado del mueble</span>
+                <strong>{{
                   totalEstimado === null
                     ? 'Importe pendiente'
                     : totalEstimado.toFixed(2) + ' ' + (moneda ?? 'BOB')
@@ -2716,6 +2803,17 @@ details.card[open] > summary {
   border-color: color-mix(in srgb, var(--color-primary) 50%, var(--color-border));
   background: color-mix(in srgb, var(--color-primary-soft) 55%, var(--color-surface));
   color: var(--color-text);
+}
+.configurator--studio .section-badge--ready {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-color: color-mix(in srgb, var(--color-success) 50%, var(--color-border));
+  background: color-mix(in srgb, var(--color-success-soft) 65%, var(--color-surface));
+  color: var(--color-success);
+}
+.configurator--studio .section-badge--ready svg {
+  color: var(--color-success);
 }
 .configurator--studio :deep(.field input),
 .configurator--studio :deep(.field textarea),
@@ -3555,66 +3653,203 @@ details.card[open] > summary {
   font-size: 0.82rem;
   color: var(--color-text-secondary);
 }
-.commercial-layout {
+.commercial-layout,
+.commercial-subblock,
+.commercial-core-grid,
+.commercial-total__rows {
   display: contents;
+}
+.commercial-unit-field {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.configurator--studio #comercial {
+  gap: 1rem;
+}
+.configurator--studio .commercial-dictated {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--color-info) 45%, var(--color-border));
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-info-soft) 55%, var(--color-surface));
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+.configurator--studio .commercial-dictated--warning {
+  border-color: color-mix(in srgb, var(--color-warning) 55%, var(--color-border));
+  background: color-mix(in srgb, var(--color-warning-soft) 55%, var(--color-surface));
+}
+.configurator--studio .commercial-dictated p {
+  margin: 0;
+  color: var(--color-text);
+}
+.configurator--studio .commercial-dictated label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-strong);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.configurator--studio .commercial-dictated input[type='checkbox'] {
+  margin-top: 0.15rem;
+  accent-color: var(--color-primary);
 }
 .configurator--studio .commercial-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(18rem, 1fr);
+  grid-template-columns: minmax(0, 1.65fr) minmax(18.5rem, 1fr);
   gap: var(--space-5);
   align-items: start;
 }
 .configurator--studio .commercial-fields {
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
-  gap: var(--space-4);
+  gap: 0.9rem;
   min-width: 0;
+}
+.configurator--studio .commercial-subblock {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-muted);
+  min-width: 0;
+}
+.configurator--studio .commercial-subblock__title {
+  margin: 0;
+  font-size: 0.71rem;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+}
+.configurator--studio .commercial-optional-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.configurator--studio .commercial-core-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem var(--space-4);
+  align-items: start;
+  min-width: 0;
+}
+.configurator--studio .commercial-unit-hint {
+  color: var(--color-text-secondary);
+  font-weight: 400;
 }
 .configurator--studio .commercial-description {
   grid-column: 1 / -1;
 }
 .configurator--studio .commercial-total {
+  position: sticky;
+  top: 1rem;
   display: grid;
-  gap: 0.7rem;
-  padding: 1rem;
+  gap: 0.85rem;
+  padding: 1.05rem;
   border-radius: var(--radius-card);
   border: 1px solid var(--color-border);
   background: var(--color-surface-muted);
   min-width: 0;
   max-width: none;
 }
+.configurator--studio .commercial-total__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid var(--color-border);
+}
 .configurator--studio .commercial-total h4 {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin: 0 0 var(--space-2);
+  margin: 0;
   font-size: 0.95rem;
 }
 .configurator--studio .commercial-total h4 svg {
   color: var(--color-primary-accent);
+  flex-shrink: 0;
 }
-.configurator--studio .commercial-total > div {
+.configurator--studio .commercial-currency-pill {
+  padding: 0.16rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+  font-size: 0.71rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+}
+.configurator--studio .commercial-total__rows {
+  display: grid;
+  gap: 0.65rem;
+}
+.configurator--studio .commercial-total__row {
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0.85rem;
   align-items: baseline;
   font-size: 0.86rem;
 }
-.configurator--studio .commercial-total > div span {
+.configurator--studio .commercial-total__row strong {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.configurator--studio .commercial-total__label-group {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.configurator--studio .commercial-total__row span {
   color: var(--color-text-secondary);
 }
-.configurator--studio .commercial-total .commercial-total-main {
-  padding-top: 1rem;
-  border-top: 1px solid var(--color-border-strong);
-  font-weight: 700;
-}
-.configurator--studio .commercial-total .commercial-total-main strong {
-  font-size: 1.45rem;
+.configurator--studio .commercial-total__formula {
+  color: var(--color-text-secondary);
+  font-size: 0.74rem;
   font-variant-numeric: tabular-nums;
 }
+.configurator--studio .commercial-total__row--discount strong {
+  color: var(--color-success);
+}
+.configurator--studio .commercial-total .commercial-total-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface-raised);
+  font-weight: 700;
+}
+.configurator--studio .commercial-total .commercial-total-main--ready {
+  border-color: color-mix(in srgb, var(--color-primary-accent) 40%, var(--color-border-strong));
+}
+.configurator--studio .commercial-total .commercial-total-main span {
+  color: var(--color-text);
+  font-size: 0.86rem;
+}
+.configurator--studio .commercial-total .commercial-total-main strong {
+  font-size: 1.4rem;
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+}
 .configurator--studio .commercial-total p {
-  margin: 0.1rem 0 0;
+  margin: 0;
   color: var(--color-text-secondary);
-  font-size: 0.72rem;
+  font-size: 0.74rem;
+  line-height: 1.4;
 }
 .configurator--studio #revision {
   display: grid;
@@ -3944,6 +4179,9 @@ details.card[open] > summary {
   .configurator--studio .commercial-layout {
     grid-template-columns: minmax(0, 1fr);
   }
+  .configurator--studio .commercial-total {
+    position: static;
+  }
   .configurator--studio .studio-component-layout,
   .configurator--studio .accessories-grid {
     grid-template-columns: 1fr;
@@ -3973,7 +4211,8 @@ details.card[open] > summary {
   .configurator--studio .review-hero {
     flex-wrap: wrap;
   }
-  .configurator--studio .commercial-fields {
+  .configurator--studio .commercial-fields,
+  .configurator--studio .commercial-core-grid {
     grid-template-columns: minmax(0, 1fr);
   }
   .configurator--studio .dimensions-section .measure-grid,
