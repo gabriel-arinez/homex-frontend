@@ -82,12 +82,27 @@ function buscarOpciones() {
   open.value = true
   active.value = -1
 }
+function clearSelection() {
+  emit('update:modelValue', '')
+  search.value = ''
+  active.value = -1
+  open.value = false
+}
 </script>
 <template>
   <div class="mueble-picker" @focusout="close">
     <label :for="name">{{ label }}</label>
-    <div class="mueble-picker__input">
-      <Search :size="17" aria-hidden="true" />
+    <div
+      class="mueble-picker__input"
+      :class="{ 'mueble-picker__input--selected': Boolean(selected) && !open && !search }"
+    >
+      <Check
+        v-if="selected && !open && !search"
+        :size="17"
+        class="mueble-picker__selected-icon"
+        aria-hidden="true"
+      />
+      <Search v-else :size="17" aria-hidden="true" />
       <input
         :id="name"
         v-model="search"
@@ -103,17 +118,17 @@ function buscarOpciones() {
         @input="buscarOpciones"
         @keydown="keydown"
       />
-      <ChevronDown :size="16" aria-hidden="true" />
-    </div>
-    <div v-if="selected" class="mueble-picker__selected">
-      <Check :size="15" aria-hidden="true" /> {{ selected.label }}
       <button
+        v-if="selected"
         type="button"
+        class="mueble-picker__clear"
         :aria-label="'Quitar ' + selected.label"
-        @click="emit('update:modelValue', '')"
+        @mousedown.prevent
+        @click="clearSelection"
       >
         Quitar
       </button>
+      <ChevronDown :size="16" aria-hidden="true" />
     </div>
     <div v-if="open" :id="listId" class="mueble-picker__options" role="listbox" :aria-label="label">
       <button
@@ -150,25 +165,30 @@ function buscarOpciones() {
 .mueble-picker {
   position: relative;
   display: grid;
-  gap: 0.55rem;
+  gap: var(--space-2);
   min-width: 0;
   max-width: 36rem;
 }
 .mueble-picker > label {
-  font-weight: 650;
-  font-size: 0.85rem;
+  font-weight: 600;
 }
 .mueble-picker__input {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.6rem;
   border: 1px solid var(--color-border-strong);
-  background: var(--color-surface);
+  background: var(--color-surface-raised);
   border-radius: var(--radius-control);
-  padding: 0 0.8rem;
+  padding: 0 0.75rem;
   min-height: 2.75rem;
+  transition: border-color var(--transition-fast);
+}
+.mueble-picker__input--selected {
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border-strong));
+  background: color-mix(in srgb, var(--color-primary-soft) 35%, var(--color-surface-raised));
 }
 .mueble-picker__input:focus-within {
+  border-color: var(--color-primary);
   outline: 2px solid var(--color-primary-accent);
   outline-offset: 1px;
 }
@@ -181,27 +201,45 @@ function buscarOpciones() {
   background: transparent;
   color: var(--color-text);
   font: inherit;
-  font-size: 0.87rem;
+  font-size: 0.875rem;
+}
+.mueble-picker__input input::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 1;
+}
+.mueble-picker__input--selected input::placeholder {
+  color: var(--color-text);
+  font-weight: 600;
 }
 .mueble-picker__input svg {
   flex-shrink: 0;
   color: var(--color-text-secondary);
 }
-.mueble-picker__selected {
-  display: flex;
-  gap: 0.45rem;
-  align-items: center;
-  flex-wrap: wrap;
-  font-size: 0.77rem;
-  color: var(--color-text-secondary);
+.mueble-picker__input .mueble-picker__selected-icon {
+  color: var(--color-success);
 }
-.mueble-picker__selected button {
-  background: none;
-  border: 0;
-  color: var(--color-primary-accent);
+.mueble-picker__clear {
+  flex-shrink: 0;
+  padding: 0.22rem 0.55rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
   font: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
   cursor: pointer;
-  text-decoration: underline;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+.mueble-picker__clear:hover {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+.mueble-picker__clear:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
 }
 .mueble-picker__options {
   position: absolute;

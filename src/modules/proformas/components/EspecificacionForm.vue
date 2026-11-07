@@ -31,6 +31,7 @@ import {
   Wrench,
   Wallet,
   Calculator,
+  Trash2,
 } from '@lucide/vue'
 import { asignarEspesorPendiente, pendienteResuelto } from '../services/pendientesAsistencia'
 import { proformasService } from '../services/proformasService'
@@ -315,6 +316,13 @@ function enfocarDimension(clave: string) {
 
 const nuevaMedida = ref('')
 const opcionesMedidas = ['largo', 'diámetro', 'lado_1', 'lado_2', 'altura_total', 'ancho_mesón']
+const medidasSugeridasDisponibles = computed(() =>
+  opcionesMedidas.filter((x) => !medidas.some((m) => m.clave === x)),
+)
+function etiquetaMedidaVisual(clave: string) {
+  const texto = clave.replace(/_/g, ' ').trim()
+  return texto ? texto.charAt(0).toUpperCase() + texto.slice(1) : clave
+}
 function agregarMedidaElegida(value: string) {
   nuevaMedida.value = value
   agregarMedida()
@@ -436,6 +444,17 @@ const conjuntoPorEliminar = ref<string | null>(null)
 const destinoDelConjunto = ref('')
 const atributosGenerales = reactive<AtributoTecnico[]>(
   structuredClone((generales.atributos as AtributoTecnico[] | undefined) ?? []),
+)
+const atributosGeneralesDisponibles = computed(() =>
+  catalogo.value.filter(
+    (x) =>
+      (!Array.isArray(x.ambitos) || !x.ambitos.length || x.ambitos.includes('mueble')) &&
+      !atributosGenerales.some(
+        (actual) =>
+          (actual.codigo && actual.codigo === x.codigo) ||
+          normalized(actual.nombre) === normalized(x.nombre),
+      ),
+  ),
 )
 function normalized(value: string) {
   return value
@@ -1029,15 +1048,24 @@ onMounted(loadCatalog)
           </ul>
         </aside>
         <section id="identificacion" v-show="!studio || activeSection === 'general'">
-          <h3><Tag v-if="studio" :size="19" aria-hidden="true" />Identificación</h3>
+          <h3>
+            <span class="section-heading-main"
+              ><Tag v-if="studio" :size="19" aria-hidden="true" />Identificación</span
+            >
+            <span v-if="studio" class="section-badge section-badge--required"
+              >Nombre obligatorio</span
+            >
+          </h3>
           <p v-if="studio" class="section-guidance">
-            Identifica el mueble con un nombre claro para reconocerlo en la proforma.
+            Identifica el mueble con un nombre claro para reconocerlo en la proforma y clasifícalo
+            si corresponde.
           </p>
           <div class="studio-identification-fields">
             <TextField
               v-model="comercial.nombre"
               name="mueble-nombre-comercial"
               label="Nombre comercial del mueble *"
+              :placeholder="studio ? 'Ej. Mesa de reunión para 10 personas' : undefined"
               :max-length="200"
               :error="errorCampo('general', 0, touched.nombre)"
               @blur="touched.nombre = true"
@@ -1048,7 +1076,7 @@ onMounted(loadCatalog)
               name="tipo-mueble-buscador"
               label="Tipo de mueble (opcional)"
               :options="tiposLocales.map((x) => ({ label: x.nombre, value: String(x.id) }))"
-              placeholder="Buscar un tipo existente..."
+              placeholder="Buscar o crear un tipo..."
               allow-create
               create-label="Crear nuevo tipo"
               :busy="creatingType"
@@ -1098,21 +1126,41 @@ onMounted(loadCatalog)
           v-show="!studio || activeSection === 'general'"
         >
           <h3>
-            <Ruler v-if="studio" :size="19" aria-hidden="true" />Dimensiones generales opcionales
+            <span class="section-heading-main"
+              ><Ruler v-if="studio" :size="19" aria-hidden="true" />{{
+                studio ? 'Dimensiones generales' : 'Dimensiones generales opcionales'
+              }}</span
+            >
+            <span v-if="studio" class="section-badge">Opcional</span>
           </h3>
-          <p>Cada medida conserva su unidad y los datos técnicos originales.</p>
+          <p>
+            {{
+              studio
+                ? 'Registra las medidas principales del mueble. Puedes dejar vacías las que no apliquen o sumar otras.'
+                : 'Cada medida conserva su unidad y los datos técnicos originales.'
+            }}
+          </p>
           <div class="measure-grid">
-            <div v-for="medida in medidas" :key="medida.clave" class="inline measure-row">
+            <div
+              v-for="medida in medidas"
+              :key="medida.clave"
+              class="inline measure-row"
+              :class="{
+                'measure-row--removable': !clavesIniciales.includes(medida.clave),
+                'measure-row--filled': Boolean(medida.valor.trim()),
+              }"
+            >
               <TextField
                 v-model="medida.valor"
                 :name="medida.clave"
                 :label="medida.clave.replace(/_/g, ' ')"
+                :placeholder="studio ? 'Sin definir' : undefined"
                 input-mode="decimal"
                 :error="errorMedida(medida)"
                 @blur="touchedMedidas[medida.clave] = true"
               />
-              <label
-                >Unidad
+              <label class="measure-unit"
+                ><span :class="{ 'sr-only': studio }">Unidad</span>
                 <select
                   :id="`unidad-${medida.clave}`"
                   v-model="medida.unidad"
@@ -1124,12 +1172,21 @@ onMounted(loadCatalog)
                       : undefined
                   "
                 >
-                  <option value="">Sin unidad identificada</option>
+                  <option value="">{{ studio ? 'Sin unidad' : 'Sin unidad identificada' }}</option>
                   <option v-for="unidad in unidadesPermitidas" :key="unidad" :value="unidad">
                     {{ unidad }}
                   </option>
                 </select>
               </label>
+              <button
+                v-if="studio && !clavesIniciales.includes(medida.clave)"
+                type="button"
+                class="card-remove-action"
+                :aria-label="`Quitar medida ${medida.clave.replace(/_/g, ' ')}`"
+                @click="eliminarMedida(medida.clave)"
+              >
+                <Trash2 :size="14" aria-hidden="true" /> Quitar
+              </button>
               <p
                 v-if="pendientesDimension(medida.clave).length"
                 :id="`pendiente-${medida.clave}`"
@@ -1143,7 +1200,7 @@ onMounted(loadCatalog)
                 }}
               </p>
               <Button
-                v-if="!clavesIniciales.includes(medida.clave)"
+                v-if="!studio && !clavesIniciales.includes(medida.clave)"
                 variant="secondary"
                 @click="eliminarMedida(medida.clave)"
                 >Quitar medida</Button
@@ -1162,47 +1219,126 @@ onMounted(loadCatalog)
               >Añadir medida</Button
             >
           </div>
-          <MuebleOptionPicker
-            v-else
-            :model-value="''"
-            name="agregar-medida"
-            label="Agregar medida"
-            placeholder="Buscar una medida, por ejemplo: diámetro"
-            :options="
-              opcionesMedidas
-                .filter((x) => !medidas.some((m) => m.clave === x))
-                .map((x) => ({ value: x, label: x.replace(/_/g, ' ') }))
-            "
-            allow-create
-            create-label="Agregar medida personalizada"
-            @update:model-value="agregarMedidaElegida"
-            @create="agregarMedidaElegida"
-          />
+          <div v-else class="section-adder">
+            <div v-if="medidasSugeridasDisponibles.length" class="quick-chips">
+              <span class="quick-chips__label">Medidas frecuentes:</span>
+              <button
+                v-for="sugerida in medidasSugeridasDisponibles"
+                :key="sugerida"
+                type="button"
+                class="quick-chip"
+                @click="agregarMedidaElegida(sugerida)"
+              >
+                <Plus :size="14" aria-hidden="true" /> {{ etiquetaMedidaVisual(sugerida) }}
+              </button>
+            </div>
+            <MuebleOptionPicker
+              :model-value="''"
+              name="agregar-medida"
+              label="Agregar medida"
+              placeholder="Buscar o escribir una medida, por ejemplo: diámetro"
+              :options="
+                medidasSugeridasDisponibles.map((x) => ({
+                  value: x,
+                  label: etiquetaMedidaVisual(x),
+                }))
+              "
+              allow-create
+              create-label="Agregar medida personalizada"
+              @update:model-value="agregarMedidaElegida"
+              @create="agregarMedidaElegida"
+            />
+          </div>
         </section>
-        <section v-show="!studio || activeSection === 'general'">
+        <section
+          id="caracteristicas-generales"
+          class="general-attributes-section"
+          v-show="!studio || activeSection === 'general'"
+        >
           <h3>
-            <SlidersHorizontal v-if="studio" :size="19" aria-hidden="true" />Características
-            generales
+            <span class="section-heading-main"
+              ><SlidersHorizontal v-if="studio" :size="19" aria-hidden="true" />Características
+              generales</span
+            >
+            <span v-if="studio" class="section-badge">Opcional</span>
           </h3>
           <p v-if="studio" class="section-guidance">
             Añade materiales, acabados u otros detalles generales cuando correspondan.
           </p>
-          <div class="attribute-search">
+          <p v-if="catalogError" role="status">{{ catalogError }}</p>
+          <p v-if="studio && !atributosGenerales.length" class="general-attributes-empty">
+            Sin características generales registradas. Puedes sumar material principal, acabado o
+            tono desde el buscador de abajo.
+          </p>
+          <div v-if="atributosGenerales.length" class="studio-attributes-grid">
+            <div
+              v-for="(a, i) in atributosGenerales"
+              :key="a.codigo || a.nombre"
+              class="inline studio-attribute-row"
+              :class="{ 'studio-attribute-row--with-unit': a.tipo_entrada === 'numero_unidad' }"
+            >
+              <label v-if="a.tipo_entrada === 'entero'" class="studio-attribute-field">
+                <span>{{ a.nombre }}</span>
+                <input v-model="a.valor" :name="`general-${i}`" type="number" step="1" />
+              </label>
+              <label v-else-if="a.tipo_entrada === 'numero_unidad'" class="studio-attribute-field">
+                <span>{{ a.nombre }}</span>
+                <input v-model="a.valor" :name="`general-${i}`" type="number" step="any" />
+              </label>
+              <TextField
+                v-else
+                v-model="a.valor"
+                :name="`general-${i}`"
+                :label="a.nombre"
+                :placeholder="studio ? 'Especifica el valor' : undefined"
+              />
+              <label v-if="a.tipo_entrada === 'numero_unidad'" class="studio-attribute-unit"
+                ><span :class="{ 'sr-only': studio }">Unidad de {{ a.nombre }}</span>
+                <select v-model="a.unidad" :aria-label="`Unidad de ${a.nombre}`">
+                  <option value="">No especificada</option>
+                  <option v-for="unidad in unidadesPermitidas" :key="unidad" :value="unidad">
+                    {{ unidad }}
+                  </option>
+                </select>
+              </label>
+              <button
+                v-if="studio"
+                type="button"
+                class="card-remove-action"
+                :aria-label="`Quitar característica ${a.nombre}`"
+                @click="atributosGenerales.splice(i, 1)"
+              >
+                <Trash2 :size="14" aria-hidden="true" /> Quitar
+              </button>
+              <Button v-else variant="secondary" @click="atributosGenerales.splice(i, 1)"
+                >Quitar</Button
+              >
+              <p v-if="errorAtributo(a)" class="studio-attribute-error" role="alert">
+                {{ errorAtributo(a) }}
+              </p>
+            </div>
+          </div>
+          <div class="attribute-search" :class="{ 'section-adder': studio }">
+            <div v-if="studio && atributosGeneralesDisponibles.length" class="quick-chips">
+              <span class="quick-chips__label">Sugeridas:</span>
+              <button
+                v-for="sugerido in atributosGeneralesDisponibles.slice(0, 5)"
+                :key="sugerido.id"
+                type="button"
+                class="quick-chip"
+                @click="elegirAtributoGeneral(String(sugerido.id))"
+              >
+                <Plus :size="14" aria-hidden="true" /> {{ sugerido.nombre }}
+              </button>
+            </div>
             <MuebleOptionPicker
               v-if="studio"
               :model-value="''"
               name="buscar-atributo-estudio"
               label="Agregar característica"
-              placeholder="Buscar característica existente..."
+              placeholder="Buscar o crear característica (ej. material, acabado)..."
               :options="
-                catalogo
-                  .filter(
-                    (x) =>
-                      !Array.isArray(x.ambitos) ||
-                      !x.ambitos.length ||
-                      x.ambitos.includes('mueble'),
-                  )
-                  .map((x) => ({ value: String(x.id), label: x.nombre }))
+                atributosGeneralesDisponibles.map((x) => ({ value: String(x.id), label: x.nombre }))
               "
               allow-create
               create-label="Agregar característica personalizada"
@@ -1226,37 +1362,6 @@ onMounted(loadCatalog)
               ><button type="button" @click="addAttribute(atributosGenerales)">
                 Añadir “{{ search }}” como atributo local
               </button>
-            </div>
-          </div>
-          <p v-if="catalogError" role="status">{{ catalogError }}</p>
-          <div class="studio-attributes-grid">
-            <div
-              v-for="(a, i) in atributosGenerales"
-              :key="a.codigo || a.nombre"
-              class="inline studio-attribute-row"
-            >
-              <p v-if="errorAtributo(a)" class="studio-attribute-error" role="alert">
-                {{ errorAtributo(a) }}
-              </p>
-              <label v-if="a.tipo_entrada === 'entero'">
-                {{ a.nombre }}
-                <input v-model="a.valor" :name="`general-${i}`" type="number" step="1" />
-              </label>
-              <label v-else-if="a.tipo_entrada === 'numero_unidad'">
-                {{ a.nombre }}
-                <input v-model="a.valor" :name="`general-${i}`" type="number" step="any" />
-              </label>
-              <TextField v-else v-model="a.valor" :name="`general-${i}`" :label="a.nombre" />
-              <label v-if="a.tipo_entrada === 'numero_unidad'"
-                >Unidad de {{ a.nombre }}
-                <select v-model="a.unidad">
-                  <option value="">No especificada</option>
-                  <option v-for="unidad in unidadesPermitidas" :key="unidad" :value="unidad">
-                    {{ unidad }}
-                  </option>
-                </select>
-              </label>
-              <Button variant="secondary" @click="atributosGenerales.splice(i, 1)">Quitar</Button>
             </div>
           </div>
         </section>
@@ -2157,67 +2262,188 @@ details.card[open] > summary {
 .configurator--studio .configurator-fields h3 {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.6rem;
+}
+.configurator--studio .section-heading-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
 }
 .configurator--studio .configurator-fields h3 svg {
   flex: none;
   color: var(--color-primary-accent);
 }
+.configurator--studio .section-badge {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.configurator--studio .section-badge--required {
+  border-color: color-mix(in srgb, var(--color-primary) 50%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary-soft) 55%, var(--color-surface));
+  color: var(--color-text);
+}
+.configurator--studio :deep(.field input),
+.configurator--studio :deep(.field textarea),
+.configurator--studio :deep(.field select) {
+  background: var(--color-surface-raised);
+}
 .configurator--studio .configurator-fields > section > h3 {
-  margin-bottom: 0.4rem;
-  font-size: 1rem;
+  margin-bottom: 0.2rem;
+  font-size: 1.02rem;
 }
 .configurator--studio .configurator-fields > section > p {
   margin: 0;
   color: var(--color-text-secondary);
-  font-size: 0.83rem;
+  font-size: 0.84rem;
+  line-height: 1.45;
 }
 .configurator--studio .configurator-fields #identificacion {
-  gap: 1.05rem;
-}
-.configurator--studio #identificacion .field:first-of-type {
-  max-width: 46rem;
+  gap: 1rem;
 }
 .configurator--studio .dimensions-section .measure-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-3);
-  margin: var(--space-3) 0;
+  margin: var(--space-2) 0 0;
 }
 .configurator--studio .dimensions-section .measure-row {
-  padding: 0.75rem;
+  position: relative;
+  padding: 0.85rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-surface-muted);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(5.8rem, 0.38fr);
-  gap: 0.6rem;
+  grid-template-columns: minmax(0, 1fr) 6.6rem;
+  gap: 0.55rem;
   align-items: start;
   min-width: 0;
+  transition: border-color var(--transition-fast);
 }
-.configurator--studio .dimensions-section .measure-row label {
+.configurator--studio .dimensions-section .measure-row--filled {
+  border-color: var(--color-border-strong);
+}
+.configurator--studio .dimensions-section .measure-row :deep(.field) {
+  gap: 0.45rem;
   min-width: 0;
-  font-size: 0.82rem;
-  font-weight: 600;
 }
-.configurator--studio .dimensions-section .measure-row label select {
+.configurator--studio .dimensions-section .measure-row :deep(.field > span) {
+  display: block;
+  min-height: 1.35rem;
+  line-height: 1.35rem;
+  font-size: 0.84rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.configurator--studio .dimensions-section .measure-row :deep(.field > span::first-letter) {
+  text-transform: uppercase;
+}
+.configurator--studio .dimensions-section .measure-row .measure-unit {
+  display: block;
+  min-width: 0;
+  padding-top: 1.8rem;
+}
+.configurator--studio .dimensions-section .measure-row .measure-unit select {
   width: 100%;
   min-height: 2.75rem;
-  margin-top: 0.45rem;
-  background: var(--color-surface);
+  padding: 0 0.5rem;
+  background: var(--color-surface-raised);
   color: var(--color-text);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
 }
+.configurator--studio .card-remove-action {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 1.5rem;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+.configurator--studio .card-remove-action:hover {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+.configurator--studio .card-remove-action:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
 .configurator--studio .dimensions-section .dimension-pending {
   grid-column: 1/-1;
-  color: var(--color-danger-text);
+  color: var(--color-danger);
   margin: 0;
   font-size: 0.77rem;
 }
-.configurator--studio .dimensions-section .measure-row > button {
-  grid-column: 1/-1;
-  justify-self: start;
+.configurator--studio .section-adder {
+  display: grid;
+  gap: 0.85rem;
+  padding-top: var(--space-3);
+  margin-top: var(--space-1);
+  border-top: 1px solid var(--color-border);
+}
+.configurator--studio .quick-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.configurator--studio .quick-chips__label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-right: 0.2rem;
+}
+.configurator--studio .quick-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 1.95rem;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast);
+}
+.configurator--studio .quick-chip svg {
+  color: var(--color-primary-accent);
+}
+.configurator--studio .quick-chip:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+.configurator--studio .quick-chip:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 .configurator--studio .dimensions-section .mueble-picker {
   max-width: 36rem;
@@ -2226,7 +2452,20 @@ details.card[open] > summary {
   position: static;
   background: transparent;
   padding: 0;
-  max-width: 40rem;
+}
+.configurator--studio .attribute-search.section-adder {
+  padding-top: var(--space-3);
+}
+.configurator--studio .attribute-search .mueble-picker {
+  max-width: 36rem;
+}
+.configurator--studio .general-attributes-empty {
+  padding: 0.9rem 1rem;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
+  color: var(--color-text-secondary);
+  font-size: 0.83rem;
 }
 .configurator--studio #componentes {
   display: grid;
@@ -2922,37 +3161,60 @@ details.card[open] > summary {
 }
 .configurator--studio .studio-identification-fields {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1.1rem;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: var(--space-3);
   align-items: start;
 }
 .configurator--studio .studio-identification-fields > * {
   min-width: 0;
   max-width: none;
+  padding: 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
 }
 .configurator--studio .studio-attributes-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
-  margin-top: 1rem;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
 }
 .configurator--studio .studio-attribute-row {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  align-items: end;
-  gap: 0.45rem;
-  padding: 0.8rem;
+  align-items: start;
+  gap: 0.55rem;
+  padding: 0.85rem;
   background: var(--color-surface-muted);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   min-width: 0;
 }
-.configurator--studio .studio-attribute-row > label,
-.configurator--studio .studio-attribute-row > .field {
+.configurator--studio .studio-attribute-row--with-unit {
+  grid-template-columns: minmax(0, 1fr) 6.6rem;
+}
+.configurator--studio .studio-attribute-row > .studio-attribute-field,
+.configurator--studio .studio-attribute-row > :deep(.field) {
   min-width: 0;
   width: 100%;
   display: grid;
-  gap: 0.35rem;
+  gap: 0.45rem;
+}
+.configurator--studio .studio-attribute-row > .studio-attribute-field > span,
+.configurator--studio .studio-attribute-row > :deep(.field > span) {
+  display: block;
+  min-height: 1.35rem;
+  line-height: 1.35rem;
+  padding-right: 4.5rem;
+  font-size: 0.84rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.configurator--studio .studio-attribute-row > .studio-attribute-unit {
+  display: block;
+  min-width: 0;
+  padding-top: 1.8rem;
 }
 .configurator--studio .studio-attribute-row input,
 .configurator--studio .studio-attribute-row select {
@@ -2963,11 +3225,8 @@ details.card[open] > summary {
   border-radius: var(--radius-control);
   padding: 0.6rem;
   color: var(--color-text);
-  background: var(--color-surface);
+  background: var(--color-surface-raised);
   font: inherit;
-}
-.configurator--studio .studio-attribute-row > button {
-  justify-self: start;
 }
 @media (max-width: 72rem) {
   .configurator--studio .studio-attributes-grid {
@@ -2981,6 +3240,7 @@ details.card[open] > summary {
   }
 }
 .configurator--studio .studio-attribute-error {
+  grid-column: 1 / -1;
   color: var(--color-danger);
   margin: 0;
   font-size: 0.78rem;

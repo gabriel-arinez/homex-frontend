@@ -4,6 +4,11 @@
   --color-background: #f8f7f5;
   --color-surface: #ffffff;
   --color-surface-raised: #ffffff;
+  --color-surface-muted: color-mix(
+    in srgb,
+    var(--color-background) 55%,
+    var(--color-surface-hover)
+  );
   --color-surface-hover: #f1eeea;
   --color-text: #282522;
   --color-text-secondary: #625e59;
@@ -31,6 +36,7 @@
   --color-background: #121212;
   --color-surface: #1f1f1f;
   --color-surface-raised: #272727;
+  --color-surface-muted: color-mix(in srgb, var(--color-background) 55%, var(--color-surface));
   --color-surface-hover: #303030;
   --color-text: #f5f3f1;
   --color-text-secondary: #b8b3ae;

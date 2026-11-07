@@ -152,14 +152,23 @@ describe('PRF-03 corpus representativo conservado por el configurador visual', (
     expect(wrapper.get('[name="componente-0-cantidad"]').attributes('min')).toBe('1')
     wrapper.unmount()
   })
-  it('orienta la identificación y las medidas en el estudio sin alterar sus campos', () => {
+  it('orienta la identificación y las medidas en el estudio sin alterar sus campos', async () => {
     const wrapper = mount(EspecificacionForm, {
       props: { ...opciones, studio: true, activeSection: 'general' },
     })
     expect(wrapper.get('#identificacion h3 svg').attributes('aria-hidden')).toBe('true')
     expect(wrapper.get('#dimensiones h3 svg').attributes('aria-hidden')).toBe('true')
     expect(wrapper.text()).toContain('Identifica el mueble con un nombre claro')
+    expect(wrapper.text()).toContain('Registra las medidas principales del mueble')
+    expect(wrapper.text()).toContain('Sin características generales registradas')
     expect(wrapper.find('#mueble-nombre-comercial').exists()).toBe(true)
+
+    const chipLargo = wrapper.findAll('.quick-chip').find((b) => b.text().includes('Largo'))
+    expect(chipLargo).toBeDefined()
+    await chipLargo!.trigger('click')
+    expect(wrapper.find('input[name="largo"]').exists()).toBe(true)
+    await wrapper.get('button[aria-label="Quitar medida largo"]').trigger('click')
+    expect(wrapper.find('input[name="largo"]').exists()).toBe(false)
     wrapper.unmount()
   })
   for (const caso of corpus) {

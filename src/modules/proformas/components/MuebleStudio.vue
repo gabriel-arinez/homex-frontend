@@ -629,10 +629,17 @@ async function seleccionarApartado(id: typeof seccion.value) {
   outline-offset: 2px;
 }
 .studio-steps .studio-step--active {
-  background: var(--color-primary-soft);
-  color: var(--color-primary-accent);
+  background: color-mix(in srgb, var(--color-primary-soft) 55%, var(--color-surface));
+  color: var(--color-text);
   border-color: var(--color-primary);
   box-shadow: inset 0 -3px 0 var(--color-primary);
+}
+.studio-steps .studio-step--active .studio-step-icon {
+  background: var(--color-primary-soft);
+  color: var(--color-primary-accent);
+}
+.studio-steps .studio-step--active .studio-step-label small {
+  color: var(--color-text-secondary);
 }
 .studio-step-icon {
   flex-shrink: 0;
@@ -666,30 +673,31 @@ async function seleccionarApartado(id: typeof seccion.value) {
   color: var(--color-danger);
 }
 .studio-section-heading {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 1rem;
+  display: grid;
+  justify-items: start;
+  gap: 0.35rem;
 }
 .studio-index {
   font-size: 0.7rem;
   font-weight: 750;
   letter-spacing: 0.08em;
   color: var(--color-primary-accent);
-  margin: 0 0 0.4rem;
+  margin: 0 0 0.25rem;
 }
 .studio-section-heading h2:focus {
   outline: none;
 }
 .studio-section-heading h2 {
-  font-size: clamp(1.15rem, 1.5vw, 1.5rem);
+  font-size: clamp(1.2rem, 1.55vw, 1.5rem);
   margin: 0;
 }
 .studio-section-heading > p {
+  margin: 0;
   color: var(--color-text-secondary);
-  max-width: 23rem;
-  text-align: right;
-  font-size: 0.82rem;
+  max-width: 46rem;
+  text-align: left;
+  font-size: 0.85rem;
+  line-height: 1.45;
 }
 .studio-content {
   min-width: 0;

@@ -48,4 +48,24 @@ describe('Furniture Studio: buscadores accesibles', () => {
     expect(wrapper.emitted('create')?.[0]).toEqual(['Altura total'])
     wrapper.unmount()
   })
+
+  it('integra el valor seleccionado y el botón Quitar dentro del campo sin duplicar texto afuera', async () => {
+    const wrapper = mount(MuebleOptionPicker, {
+      props: {
+        modelValue: '2',
+        name: 'tipo',
+        label: 'Tipo de mueble (opcional)',
+        options: opciones,
+      },
+      attachTo: document.body,
+    })
+    expect(wrapper.find('.mueble-picker__input--selected').exists()).toBe(true)
+    expect(wrapper.find('.mueble-picker__selected').exists()).toBe(false)
+    const clearBtn = wrapper.get(
+      '.mueble-picker__input button[aria-label="Quitar Mesa de reuniones"]',
+    )
+    await clearBtn.trigger('click')
+    expect(wrapper.emitted('update:modelValue')?.[0]).toEqual([''])
+    wrapper.unmount()
+  })
 })
