@@ -900,6 +900,22 @@ const erroresSecciones = computed<Record<SeccionStudio, string[]>>(() => {
     )
   return problemas
 })
+const tieneErroresRevision = computed(() =>
+  Object.values(erroresSecciones.value).some((lista) => lista.length > 0),
+)
+const revisionCompleta = computed(
+  () => !tieneErroresRevision.value && pendientesVisibles.value.length === 0,
+)
+const accesoriosRegistrados = computed(() => accesorios.filter((a) => a.trim()))
+const medidasRegistradas = computed(() => medidas.filter((m) => m.valor.trim()))
+const nombreTipoMueble = computed(
+  () => tiposLocales.value.find((x) => String(x.id) === form.tipo_mueble)?.nombre ?? '',
+)
+function piezaTieneDetalles(pieza: ComponenteTecnico): boolean {
+  return Boolean(
+    pieza.material || pieza.espesor || pieza.color || pieza.dimensiones || pieza.atributos?.length,
+  )
+}
 const estadoSecciones = computed<Record<SeccionStudio, 'pending' | 'issues' | 'complete'>>(() => ({
   general: erroresSecciones.value.general.length
     ? comercial.nombre.trim() || submitAttempted.value
@@ -2332,46 +2348,87 @@ onMounted(loadCatalog)
           aria-labelledby="revision-title"
         >
           <header class="review-hero">
-            <div>
-              <p class="review-eyebrow">FICHA TÉCNICO-COMERCIAL</p>
-              <h3 id="revision-title">Revisar mueble</h3>
+            <div class="review-hero__identity">
+              <div class="review-hero__eyebrow-row">
+                <p class="review-eyebrow">FICHA TÉCNICO-COMERCIAL</p>
+                <span aria-hidden="true" class="review-eyebrow-sep">·</span>
+                <h3 id="revision-title">Revisar mueble</h3>
+              </div>
               <h4>{{ comercial.nombre || 'Mueble pendiente de nombre' }}</h4>
-              <p>
-                {{
-                  tiposLocales.find((x) => String(x.id) === form.tipo_mueble)?.nombre ||
-                  'Tipo de mueble no especificado'
-                }}
-              </p>
+              <div class="review-hero__pills">
+                <span class="review-hero__pill">{{
+                  nombreTipoMueble || 'Tipo de mueble no especificado'
+                }}</span>
+                <span v-if="conjuntos.length" class="review-hero__pill">
+                  {{ conjuntos.length }} {{ conjuntos.length === 1 ? 'conjunto' : 'conjuntos' }}
+                </span>
+                <span class="review-hero__pill">
+                  {{
+                    componentes.length
+                      ? `${componentes.length} ${componentes.length === 1 ? 'pieza' : 'piezas'}`
+                      : 'Sin piezas detalladas'
+                  }}
+                </span>
+                <span v-if="accesoriosRegistrados.length" class="review-hero__pill">
+                  {{ accesoriosRegistrados.length }}
+                  {{ accesoriosRegistrados.length === 1 ? 'accesorio' : 'accesorios' }}
+                </span>
+              </div>
             </div>
-            <span
-              v-if="
-                !Object.values(erroresSecciones).some((lista) => lista.length) &&
-                !pendientesVisibles.length
-              "
-              class="review-check"
-              ><CheckCircle2 :size="18" aria-hidden="true" /> Datos completos</span
-            >
-            <span v-else class="review-check review-check--pending"
-              ><AlertCircle :size="18" aria-hidden="true" /> Hay información por revisar</span
-            >
+            <div class="review-hero__summary">
+              <span v-if="revisionCompleta" class="review-check"
+                ><CheckCircle2 :size="17" aria-hidden="true" /> Datos completos</span
+              >
+              <span v-else class="review-check review-check--pending"
+                ><AlertCircle :size="17" aria-hidden="true" /> Hay información por revisar</span
+              >
+              <div
+                v-if="studio"
+                class="review-hero__total"
+                :class="{ 'review-hero__total--ready': totalEstimado !== null }"
+              >
+                <span>
+                  {{
+                    cantidadValida
+                      ? `${comercial.cantidad} ${unidadComercialNombre} · Total estimado`
+                      : 'Total estimado'
+                  }}
+                </span>
+                <strong>{{
+                  totalEstimado === null
+                    ? 'Importe pendiente'
+                    : totalEstimado.toFixed(2) + ' ' + (moneda ?? 'BOB')
+                }}</strong>
+              </div>
+            </div>
           </header>
           <div
-            v-if="Object.values(erroresSecciones).some((lista) => lista.length)"
+            v-if="tieneErroresRevision"
             class="review-alert"
             aria-label="Datos que debes revisar"
           >
-            <h4><AlertCircle :size="19" aria-hidden="true" /> Información por completar</h4>
-            <p>Revisa estos datos antes de incorporar el mueble a la proforma.</p>
-            <div v-for="section in pasosValidacion" :key="section">
-              <button
-                v-for="(issue, index) in erroresSecciones[section]"
-                :key="index"
-                type="button"
-                @click="irASeccion(section)"
-              >
-                <AlertCircle :size="15" aria-hidden="true" /> {{ issue }}
-                <Pencil :size="14" aria-hidden="true" />
-              </button>
+            <div class="review-alert__header">
+              <h4><AlertCircle :size="19" aria-hidden="true" /> Información por completar</h4>
+              <p>Haz clic en cada aviso para ir directo al apartado y corregirlo.</p>
+            </div>
+            <div class="review-alert__list">
+              <template v-for="section in pasosValidacion" :key="section">
+                <button
+                  v-for="(issue, index) in erroresSecciones[section]"
+                  :key="`${section}-${index}`"
+                  type="button"
+                  @click="irASeccion(section)"
+                >
+                  <span class="review-alert__issue">
+                    <AlertCircle :size="15" aria-hidden="true" />
+                    <span>{{ issue }}</span>
+                  </span>
+                  <span class="review-alert__cta" aria-hidden="true">
+                    <span>Corregir</span>
+                    <Pencil :size="13" />
+                  </span>
+                </button>
+              </template>
             </div>
           </div>
           <div v-if="pendientesVisibles.length" class="review-pending">
@@ -2389,10 +2446,11 @@ onMounted(loadCatalog)
               <h4><Tag v-if="studio" :size="18" aria-hidden="true" />Información general</h4>
               <button
                 type="button"
+                class="review-edit-btn"
                 :aria-label="studio ? 'Editar información general' : undefined"
                 @click="irASeccion('general')"
               >
-                <Pencil :size="15" aria-hidden="true" /> Editar
+                <Pencil :size="14" aria-hidden="true" /> Editar
               </button>
             </header>
             <div class="review-info">
@@ -2401,25 +2459,24 @@ onMounted(loadCatalog)
               </div>
               <div>
                 <span>Tipo de mueble</span
-                ><strong>{{
-                  tiposLocales.find((x) => String(x.id) === form.tipo_mueble)?.nombre ||
-                  'No especificado'
-                }}</strong>
+                ><strong>{{ nombreTipoMueble || 'No especificado' }}</strong>
               </div>
             </div>
-            <h5>Dimensiones generales</h5>
-            <div v-if="medidas.some((m) => m.valor.trim())" class="review-measures">
-              <div v-for="medida in medidas.filter((m) => m.valor.trim())" :key="medida.clave">
-                <span>{{ medida.clave.replace(/_/g, ' ') }}</span>
-                <strong>{{ medida.valor }} {{ medida.unidad || 'Unidad pendiente' }}</strong>
+            <div class="review-subsection">
+              <h5>Dimensiones generales</h5>
+              <div v-if="medidasRegistradas.length" class="review-measures">
+                <div v-for="medida in medidasRegistradas" :key="medida.clave">
+                  <span>{{ etiquetaMedidaVisual(medida.clave) }}</span>
+                  <strong>{{ medida.valor }} {{ medida.unidad || 'Unidad pendiente' }}</strong>
+                </div>
               </div>
+              <p v-else class="review-empty">No se especificaron medidas generales.</p>
             </div>
-            <p v-else class="review-empty">No se especificaron medidas generales.</p>
-            <div v-if="atributosGenerales.length">
+            <div v-if="atributosGenerales.length" class="review-subsection">
               <h5>Características generales</h5>
               <div class="review-attributes">
                 <p v-for="attr in atributosGenerales" :key="attr.codigo || attr.nombre">
-                  {{ attr.nombre }}:
+                  <span>{{ attr.nombre }}:</span>
                   <strong>{{ attr.valor || 'Pendiente' }} {{ attr.unidad ?? '' }}</strong>
                 </p>
               </div>
@@ -2427,65 +2484,91 @@ onMounted(loadCatalog)
           </article>
           <article class="review-card review-card--full">
             <header>
-              <h4>
-                <Layers3 v-if="studio" :size="18" aria-hidden="true" />Estructura y componentes
-              </h4>
+              <div class="review-card__heading">
+                <h4>
+                  <Layers3 v-if="studio" :size="18" aria-hidden="true" />Estructura y componentes
+                </h4>
+                <div class="review-metrics">
+                  <span v-if="conjuntos.length > 0">
+                    {{ conjuntos.length }} {{ conjuntos.length === 1 ? 'conjunto' : 'conjuntos' }}
+                  </span>
+                  <span>
+                    {{ componentes.length }}
+                    {{ componentes.length === 1 ? 'componente' : 'componentes' }}
+                  </span>
+                </div>
+              </div>
               <button
                 type="button"
+                class="review-edit-btn"
                 :aria-label="studio ? 'Editar estructura y componentes' : undefined"
                 @click="irASeccion('estructura')"
               >
-                <Pencil :size="15" aria-hidden="true" /> Editar
+                <Pencil :size="14" aria-hidden="true" /> Editar
               </button>
             </header>
-            <div class="review-metrics">
-              <span>{{ conjuntos.length }} conjuntos</span
-              ><span>{{ componentes.length }} componentes</span>
-            </div>
             <p v-if="!componentes.length" class="review-empty">
               No se agregaron componentes técnicos.
             </p>
             <details v-for="grupo in gruposArbol" :key="grupo.id" class="review-group" open>
               <summary>
-                {{ grupo.nombre }} <small>{{ grupo.piezas.length }} componentes</small>
+                <span>{{ grupo.nombre }}</span>
+                <small v-if="conjuntos.length > 0">
+                  {{ grupo.piezas.length }}
+                  {{ grupo.piezas.length === 1 ? 'componente' : 'componentes' }}
+                </small>
               </summary>
-              <div
-                v-for="item in grupo.piezas"
-                :key="item.pieza.uid || item.index"
-                class="review-piece"
-              >
-                <div>
-                  <strong>{{ item.pieza.nombre || 'Componente pendiente de nombre' }}</strong
-                  ><span>{{
-                    item.pieza.cantidad_interna == null
-                      ? studio
-                        ? 'Cantidad no especificada'
-                        : '— por mueble'
-                      : `${item.pieza.cantidad_interna} por mueble`
-                  }}</span>
+              <div class="review-group__pieces">
+                <div
+                  v-for="(item, pieceIdx) in grupo.piezas"
+                  :key="item.pieza.uid || item.index"
+                  class="review-piece"
+                >
+                  <div class="review-piece__header">
+                    <div class="review-piece__title">
+                      <span class="review-piece__index" aria-hidden="true">{{
+                        String(pieceIdx + 1).padStart(2, '0')
+                      }}</span>
+                      <strong>{{ item.pieza.nombre || 'Componente pendiente de nombre' }}</strong>
+                    </div>
+                    <span
+                      class="review-piece__qty"
+                      :class="{ 'review-piece__qty--muted': item.pieza.cantidad_interna == null }"
+                      >{{
+                        item.pieza.cantidad_interna == null
+                          ? studio
+                            ? 'Cantidad no especificada'
+                            : '— por mueble'
+                          : `${item.pieza.cantidad_interna} por mueble`
+                      }}</span
+                    >
+                  </div>
+                  <dl v-if="piezaTieneDetalles(item.pieza)" class="review-piece-attributes">
+                    <div v-if="item.pieza.material">
+                      <dt>Material</dt>
+                      <dd>{{ item.pieza.material }}</dd>
+                    </div>
+                    <div v-if="item.pieza.espesor">
+                      <dt>Espesor</dt>
+                      <dd>{{ item.pieza.espesor }}</dd>
+                    </div>
+                    <div v-if="item.pieza.color">
+                      <dt>Color</dt>
+                      <dd>{{ item.pieza.color }}</dd>
+                    </div>
+                    <div v-if="item.pieza.dimensiones">
+                      <dt>Dimensiones</dt>
+                      <dd>{{ readableDimension(item.pieza.dimensiones) }}</dd>
+                    </div>
+                    <div
+                      v-for="attr in item.pieza.atributos ?? []"
+                      :key="attr.codigo || attr.nombre"
+                    >
+                      <dt>{{ attr.nombre }}</dt>
+                      <dd>{{ attr.valor }} {{ attr.unidad ?? '' }}</dd>
+                    </div>
+                  </dl>
                 </div>
-                <dl class="review-piece-attributes">
-                  <div v-if="item.pieza.material">
-                    <dt>Material</dt>
-                    <dd>{{ item.pieza.material }}</dd>
-                  </div>
-                  <div v-if="item.pieza.espesor">
-                    <dt>Espesor</dt>
-                    <dd>{{ item.pieza.espesor }}</dd>
-                  </div>
-                  <div v-if="item.pieza.color">
-                    <dt>Color</dt>
-                    <dd>{{ item.pieza.color }}</dd>
-                  </div>
-                  <div v-if="item.pieza.dimensiones">
-                    <dt>Dimensiones</dt>
-                    <dd>{{ readableDimension(item.pieza.dimensiones) }}</dd>
-                  </div>
-                  <div v-for="attr in item.pieza.atributos ?? []" :key="attr.codigo || attr.nombre">
-                    <dt>{{ attr.nombre }}</dt>
-                    <dd>{{ attr.valor }} {{ attr.unidad ?? '' }}</dd>
-                  </div>
-                </dl>
               </div>
             </details>
           </article>
@@ -2496,27 +2579,33 @@ onMounted(loadCatalog)
               </h4>
               <button
                 type="button"
+                class="review-edit-btn"
                 :aria-label="studio ? 'Editar accesorios y observaciones' : undefined"
                 @click="irASeccion('accesorios')"
               >
-                <Pencil :size="15" aria-hidden="true" /> Editar
+                <Pencil :size="14" aria-hidden="true" /> Editar
               </button>
             </header>
-            <ul v-if="accesorios.filter((a) => a.trim()).length" class="review-accessories">
-              <li v-for="(acc, index) in accesorios.filter((a) => a.trim())" :key="index">
-                <CheckCircle2 :size="16" aria-hidden="true" /> {{ acc }}
+            <ul v-if="accesoriosRegistrados.length" class="review-accessories">
+              <li v-for="(acc, index) in accesoriosRegistrados" :key="index">
+                <CheckCircle2 :size="15" aria-hidden="true" />
+                <span>{{ acc }}</span>
               </li>
             </ul>
             <p v-else class="review-empty">Sin accesorios registrados.</p>
-            <h5>Observaciones</h5>
-            <p>{{ form.observaciones || 'Sin observaciones adicionales.' }}</p>
+            <div class="review-note-box">
+              <h5>Observaciones</h5>
+              <p :class="{ 'review-empty': !form.observaciones.trim() }">
+                {{ form.observaciones || 'Sin observaciones adicionales.' }}
+              </p>
+            </div>
             <div v-if="base.advertencias?.length" class="review-history">
               <h5>Advertencias de la información anterior</h5>
               <ul>
                 <li v-for="warning in base.advertencias" :key="warning">{{ warning }}</li>
               </ul>
             </div>
-            <details v-if="base.descripcion_original">
+            <details v-if="base.descripcion_original" class="review-original-desc">
               <summary>Ver descripción técnica original conservada</summary>
               <p>{{ base.descripcion_original }}</p>
             </details>
@@ -2526,10 +2615,11 @@ onMounted(loadCatalog)
               <h4><Wallet v-if="studio" :size="18" aria-hidden="true" />Datos comerciales</h4>
               <button
                 type="button"
+                class="review-edit-btn"
                 :aria-label="studio ? 'Editar datos comerciales' : undefined"
                 @click="irASeccion('comercial')"
               >
-                <Pencil :size="15" aria-hidden="true" /> Editar
+                <Pencil :size="14" aria-hidden="true" /> Editar
               </button>
             </header>
             <div class="review-price-grid">
@@ -2538,25 +2628,40 @@ onMounted(loadCatalog)
                 ><strong
                   >{{ cantidadValida ? comercial.cantidad : 'Pendiente' }}
                   {{
-                    unidades?.find((u) => String(u.id) === comercial.unidad)?.nombre ?? ''
+                    cantidadValida
+                      ? (unidades?.find((u) => String(u.id) === comercial.unidad)?.nombre ?? '')
+                      : ''
                   }}</strong
                 >
               </div>
               <div>
                 <span>Precio unitario</span
                 ><strong>{{
-                  precioValido ? comercial.precio_unitario + ' ' + (moneda ?? 'BOB') : 'Pendiente'
+                  precioValido
+                    ? Number(comercial.precio_unitario).toFixed(2) + ' ' + (moneda ?? 'BOB')
+                    : 'Pendiente'
                 }}</strong>
               </div>
               <div>
                 <span>Descuento</span
                 ><strong>{{
-                  descuentoValido ? comercial.descuento + ' ' + (moneda ?? 'BOB') : 'Pendiente'
+                  descuentoValido
+                    ? (Number(comercial.descuento) > 0 ? '− ' : '') +
+                      Number(comercial.descuento).toFixed(2) +
+                      ' ' +
+                      (moneda ?? 'BOB')
+                    : 'Pendiente'
                 }}</strong>
               </div>
             </div>
-            <p v-if="comercial.descripcion">Descripción comercial: {{ comercial.descripcion }}</p>
-            <div class="review-price-total">
+            <div v-if="comercial.descripcion.trim()" class="review-note-box">
+              <h5>Descripción comercial</h5>
+              <p>{{ comercial.descripcion }}</p>
+            </div>
+            <div
+              class="review-price-total"
+              :class="{ 'review-price-total--ready': totalEstimado !== null }"
+            >
               <span>Total estimado del mueble</span
               ><strong>{{
                 totalEstimado === null
@@ -2568,19 +2673,26 @@ onMounted(loadCatalog)
               El total definitivo se confirmará cuando guardes la proforma.
             </p>
           </article>
-          <p class="review-final-note">
-            El mueble se añadirá a esta proforma. Después podrás guardar la proforma o emitirla.
-          </p>
         </section>
       </div>
     </div>
     <p v-if="error || externalError" role="alert">{{ error || externalError }}</p>
     <div v-if="!studio || activeSection === 'revision'" class="actions review-actions">
-      <Button variant="success" type="submit" :disabled="processing">
-        <Save :size="17" aria-hidden="true" />
-        {{ studio ? 'Agregar mueble a la proforma' : 'Guardar especificación' }}
-      </Button>
-      <Button v-if="!studio" variant="secondary" @click="emit('cancel')">Cancelar</Button>
+      <div v-if="studio" class="review-actions__copy">
+        <strong>{{
+          revisionCompleta
+            ? 'Listo para incorporar a la proforma'
+            : 'Completa los datos pendientes antes de continuar'
+        }}</strong>
+        <p>El mueble se añadirá a esta proforma. Después podrás guardar la proforma o emitirla.</p>
+      </div>
+      <div class="review-actions__buttons">
+        <Button variant="success" type="submit" :disabled="processing">
+          <Save :size="17" aria-hidden="true" />
+          {{ studio ? 'Agregar mueble a la proforma' : 'Guardar especificación' }}
+        </Button>
+        <Button v-if="!studio" variant="secondary" @click="emit('cancel')">Cancelar</Button>
+      </div>
     </div>
   </form>
 </template>
@@ -3854,7 +3966,7 @@ details.card[open] > summary {
 .configurator--studio #revision {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1.2rem;
+  gap: 1.15rem;
   border: 0;
   padding: 0;
   background: transparent;
@@ -3862,61 +3974,126 @@ details.card[open] > summary {
 .configurator--studio #revision > .review-hero,
 .configurator--studio #revision > .review-alert,
 .configurator--studio #revision > .review-pending,
-.configurator--studio #revision > .review-card--full,
-.configurator--studio #revision > .review-final-note {
+.configurator--studio #revision > .review-card--full {
   grid-column: 1 / -1;
 }
 .configurator--studio .review-hero {
   display: flex;
   justify-content: space-between;
-  align-items: start;
-  gap: 1rem;
-  padding: 1.6rem;
+  align-items: stretch;
+  gap: 1.25rem;
+  padding: clamp(1.1rem, 2.2vw, 1.5rem);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
 }
+.configurator--studio .review-hero__identity {
+  display: grid;
+  align-content: start;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.configurator--studio .review-hero__eyebrow-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
 .configurator--studio .review-eyebrow {
   margin: 0;
-  color: var(--color-text-secondary);
-  font-size: 0.67rem;
+  color: var(--color-primary-accent);
+  font-size: 0.68rem;
   font-weight: 750;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.08em;
+}
+.configurator--studio .review-eyebrow-sep {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
 }
 .configurator--studio .review-hero h3 {
-  margin: 0.3rem 0 0.65rem;
-  font-size: 0.87rem;
+  display: inline;
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 650;
   color: var(--color-text-secondary);
 }
 .configurator--studio .review-hero h4 {
-  margin: 0 0 0.35rem;
-  font-size: clamp(1.25rem, 2vw, 1.65rem);
-}
-.configurator--studio .review-hero p:last-child {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: clamp(1.25rem, 2.1vw, 1.65rem);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.configurator--studio .review-hero__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.15rem;
+}
+.configurator--studio .review-hero__pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
   color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.configurator--studio .review-hero__summary {
+  display: grid;
+  justify-items: end;
+  align-content: space-between;
+  gap: 0.65rem;
+  flex-shrink: 0;
 }
 .configurator--studio .review-check {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.4rem 0.7rem;
+  padding: 0.35rem 0.72rem;
   border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-success) 32%, var(--color-border));
   background: var(--color-success-soft);
   color: var(--color-success);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 700;
   white-space: nowrap;
 }
 .configurator--studio .review-check--pending {
+  border-color: color-mix(in srgb, var(--color-danger) 35%, var(--color-border));
   background: var(--color-danger-soft);
   color: var(--color-danger);
 }
+.configurator--studio .review-hero__total {
+  display: grid;
+  justify-items: end;
+  gap: 0.18rem;
+  padding: 0.58rem 0.9rem;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  text-align: right;
+}
+.configurator--studio .review-hero__total--ready {
+  background: var(--color-surface-raised);
+  border-color: color-mix(in srgb, var(--color-primary-accent) 38%, var(--color-border-strong));
+}
+.configurator--studio .review-hero__total span {
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.configurator--studio .review-hero__total strong {
+  font-size: clamp(1.15rem, 1.8vw, 1.45rem);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
 .configurator--studio .review-card {
   display: grid;
-  gap: 1rem;
-  padding: clamp(1rem, 2vw, 1.6rem);
+  align-content: start;
+  gap: 0.95rem;
+  padding: clamp(1rem, 2vw, 1.45rem);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
@@ -3926,38 +4103,67 @@ details.card[open] > summary {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 1rem;
+  gap: 0.85rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.configurator--studio .review-card__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
 }
 .configurator--studio .review-card h4 {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
-  font-size: 1.02rem;
+  gap: 0.5rem;
+  font-size: 0.95rem;
   margin: 0;
 }
 .configurator--studio .review-card h4 svg {
   flex: none;
   color: var(--color-primary-accent);
 }
-.configurator--studio .review-card header button:focus-visible {
+.configurator--studio .review-edit-btn {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 0.38rem;
+  align-items: center;
+  padding: 0.34rem 0.72rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+.configurator--studio .review-edit-btn svg {
+  color: var(--color-primary-accent);
+}
+.configurator--studio .review-edit-btn:hover {
+  background: var(--color-surface-raised);
+  border-color: var(--color-primary-accent);
+}
+.configurator--studio .review-edit-btn:focus-visible {
   outline: 2px solid var(--color-primary);
-  outline-offset: 3px;
+  outline-offset: 2px;
+}
+.configurator--studio .review-subsection {
+  display: grid;
+  gap: 0.55rem;
+  min-width: 0;
 }
 .configurator--studio .review-card h5 {
-  font-size: 0.83rem;
-  margin: 0.2rem 0 0.25rem;
-}
-.configurator--studio .review-card header button {
-  display: flex;
-  gap: 0.4rem;
-  align-items: center;
-  color: var(--color-primary-accent);
-  background: transparent;
-  border: 0;
-  font: inherit;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 700;
-  cursor: pointer;
+  color: var(--color-text-secondary);
+  margin: 0;
 }
 .configurator--studio .review-info,
 .configurator--studio .review-measures,
@@ -3966,109 +4172,182 @@ details.card[open] > summary {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.6rem;
 }
-.configurator--studio .review-info {
+.configurator--studio .review-info,
+.configurator--studio .review-price-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.configurator--studio .review-price-grid > div:nth-child(3) {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
 }
 .configurator--studio .review-info > div,
 .configurator--studio .review-measures > div,
 .configurator--studio .review-price-grid > div {
   display: grid;
-  gap: 0.4rem;
+  align-content: start;
+  gap: 0.32rem;
   border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
   border-radius: var(--radius-control);
-  padding: 0.8rem;
+  padding: 0.75rem 0.85rem;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+.configurator--studio .review-price-grid strong {
+  font-variant-numeric: tabular-nums;
 }
 .configurator--studio .review-card span,
 .configurator--studio .review-card dt {
   color: var(--color-text-secondary);
-  font-size: 0.75rem;
+  font-size: 0.74rem;
 }
 .configurator--studio .review-card strong {
   font-size: 0.92rem;
 }
 .configurator--studio .review-empty {
+  margin: 0;
   color: var(--color-text-secondary);
-  font-size: 0.83rem;
+  font-size: 0.82rem;
 }
 .configurator--studio .review-attributes {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem;
+  gap: 0.55rem;
   font-size: 0.8rem;
 }
 .configurator--studio .review-attributes p {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  border: 1px solid var(--color-border);
   background: var(--color-surface-muted);
-  padding: 0.5rem 0.75rem;
+  padding: 0.45rem 0.75rem;
   border-radius: var(--radius-control);
   margin: 0;
 }
 .configurator--studio .review-metrics {
   display: flex;
-  gap: 0.7rem;
+  gap: 0.45rem;
   flex-wrap: wrap;
 }
 .configurator--studio .review-metrics span {
+  border: 1px solid var(--color-border);
   background: var(--color-surface-muted);
+  color: var(--color-text-secondary);
   border-radius: 999px;
-  padding: 0.4rem 0.7rem;
-  font-size: 0.74rem;
+  padding: 0.2rem 0.58rem;
+  font-size: 0.72rem;
+  font-weight: 650;
 }
 .configurator--studio .review-group {
   border: 1px solid var(--color-border);
-  padding: 1rem;
+  background: var(--color-surface-muted);
+  padding: 0.9rem 1rem;
   border-radius: var(--radius-control);
   min-width: 0;
 }
 .configurator--studio .review-group summary {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   cursor: pointer;
   font-weight: 700;
-  font-size: 0.87rem;
+  font-size: 0.86rem;
   gap: 1rem;
+}
+.configurator--studio .review-group summary span {
+  color: var(--color-text);
+  font-size: 0.86rem;
 }
 .configurator--studio .review-group summary small {
   color: var(--color-text-secondary);
-  font-weight: 400;
+  font-weight: 600;
+  font-size: 0.74rem;
+}
+.configurator--studio .review-group[open] summary {
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.configurator--studio .review-group__pieces {
+  display: grid;
 }
 .configurator--studio .review-piece {
   display: grid;
-  gap: 0.45rem;
-  padding: 0.9rem 0;
+  gap: 0.55rem;
+  padding: 0.8rem 0;
   border-bottom: 1px solid var(--color-border);
 }
 .configurator--studio .review-piece:last-child {
+  padding-bottom: 0.15rem;
   border-bottom: 0;
 }
-.configurator--studio .review-piece > div:first-child {
+.configurator--studio .review-piece__header {
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.65rem;
   align-items: center;
+}
+.configurator--studio .review-piece__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.configurator--studio .review-piece__index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.65rem;
+  padding: 0.12rem 0.38rem;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.configurator--studio .review-piece__qty {
+  padding: 0.2rem 0.58rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font-size: 0.73rem;
+  font-weight: 600;
+}
+.configurator--studio .review-piece__qty--muted {
+  color: var(--color-text-secondary);
+  font-weight: 500;
 }
 .configurator--studio .review-piece-attributes {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr));
+  gap: 0.55rem;
   margin: 0;
 }
 .configurator--studio .review-piece-attributes > div {
   display: grid;
-  gap: 0.25rem;
-  padding: 0.5rem;
-  background: var(--color-surface-muted);
+  gap: 0.2rem;
+  padding: 0.52rem 0.68rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
   border-radius: var(--radius-control);
 }
 .configurator--studio .review-piece-attributes dd {
   margin: 0;
-  font-size: 0.82rem;
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--color-text);
   overflow-wrap: anywhere;
 }
 .configurator--studio .review-accessories {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.5rem;
   list-style: none;
   padding: 0;
   margin: 0;
@@ -4076,15 +4355,57 @@ details.card[open] > summary {
 .configurator--studio .review-accessories li {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  font-size: 0.84rem;
+  gap: 0.55rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-control);
+  font-size: 0.83rem;
+}
+.configurator--studio .review-accessories li span {
+  color: var(--color-text);
+  font-size: 0.83rem;
+  overflow-wrap: anywhere;
 }
 .configurator--studio .review-accessories svg {
   color: var(--color-success);
   flex-shrink: 0;
 }
+.configurator--studio .review-note-box {
+  display: grid;
+  gap: 0.32rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-control);
+}
+.configurator--studio .review-note-box p {
+  margin: 0;
+  font-size: 0.83rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.configurator--studio .review-original-desc {
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-control);
+  font-size: 0.8rem;
+}
+.configurator--studio .review-original-desc summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+.configurator--studio .review-original-desc p {
+  margin: 0.5rem 0 0;
+  color: var(--color-text);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
 .configurator--studio .review-history {
   padding: 0.8rem;
+  border: 1px solid var(--color-border);
   background: var(--color-surface-muted);
   border-radius: var(--radius-control);
 }
@@ -4094,24 +4415,29 @@ details.card[open] > summary {
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--color-border);
   background: var(--color-surface-muted);
   border-radius: var(--radius-control);
 }
+.configurator--studio .review-price-total--ready {
+  background: var(--color-surface-raised);
+  border-color: color-mix(in srgb, var(--color-primary-accent) 40%, var(--color-border-strong));
+}
 .configurator--studio .review-price-total strong {
-  font-size: 1.75rem;
+  font-size: 1.65rem;
   font-variant-numeric: tabular-nums;
 }
 .configurator--studio .review-price-hint {
-  font-size: 0.77rem;
+  font-size: 0.76rem;
   color: var(--color-text-secondary);
   margin: 0;
 }
 .configurator--studio .review-alert,
 .configurator--studio .review-pending {
   display: grid;
-  gap: 0.65rem;
-  padding: 1.1rem;
+  gap: 0.75rem;
+  padding: 1.1rem 1.25rem;
   border: 1px solid var(--color-danger);
   border-radius: var(--radius-card);
   background: var(--color-surface);
@@ -4119,13 +4445,21 @@ details.card[open] > summary {
 .configurator--studio .review-pending {
   border-color: var(--color-border-strong);
 }
+.configurator--studio .review-alert__header {
+  display: grid;
+  gap: 0.25rem;
+}
 .configurator--studio .review-alert h4,
 .configurator--studio .review-pending h4 {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.55rem;
   margin: 0;
   font-size: 0.96rem;
+}
+.configurator--studio .review-alert h4 svg {
+  color: var(--color-danger);
+  flex-shrink: 0;
 }
 .configurator--studio .review-alert p,
 .configurator--studio .review-pending p {
@@ -4133,30 +4467,88 @@ details.card[open] > summary {
   font-size: 0.8rem;
   margin: 0;
 }
+.configurator--studio .review-alert__list {
+  display: grid;
+  gap: 0.45rem;
+}
 .configurator--studio .review-alert button {
   display: flex;
-  gap: 0.6rem;
+  justify-content: space-between;
+  gap: 0.75rem;
   align-items: center;
+  width: 100%;
   text-align: left;
-  border: 0;
-  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 30%, var(--color-border));
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
   color: var(--color-text);
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 0.81rem;
   cursor: pointer;
-  padding: 0.4rem 0.1rem;
+  padding: 0.55rem 0.8rem;
 }
-.configurator--studio .review-final-note {
-  color: var(--color-text-secondary);
-  font-size: 0.78rem;
+.configurator--studio .review-alert button:hover {
+  background: var(--color-surface-raised);
+  border-color: var(--color-danger);
+}
+.configurator--studio .review-alert__issue {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--color-text);
+  font-size: 0.81rem;
+}
+.configurator--studio .review-alert__issue span {
+  color: var(--color-text);
+  font-size: 0.81rem;
+}
+.configurator--studio .review-alert__issue svg {
+  color: var(--color-danger);
+  flex-shrink: 0;
+}
+.configurator--studio .review-alert__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  color: var(--color-primary-accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.configurator--studio .review-alert__cta span {
+  color: var(--color-primary-accent);
+  font-size: 0.75rem;
 }
 .configurator--studio .review-actions {
   display: flex;
-  justify-content: end;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
   background: var(--color-surface);
-  padding: 1rem;
+  padding: 1rem 1.25rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
+}
+.configurator--studio .review-actions__copy {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+.configurator--studio .review-actions__copy strong {
+  font-size: 0.88rem;
+  color: var(--color-text);
+}
+.configurator--studio .review-actions__copy p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+}
+.configurator--studio .review-actions__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-left: auto;
 }
 @media (max-width: 75rem) {
   .configurator--studio .studio-component-layout {
@@ -4210,6 +4602,23 @@ details.card[open] > summary {
   }
   .configurator--studio .review-hero {
     flex-wrap: wrap;
+  }
+  .configurator--studio .review-hero__summary {
+    width: 100%;
+    justify-items: start;
+  }
+  .configurator--studio .review-hero__total {
+    width: 100%;
+    justify-items: start;
+    text-align: left;
+  }
+  .configurator--studio .review-actions__buttons {
+    width: 100%;
+    margin-left: 0;
+  }
+  .configurator--studio .review-actions__buttons :deep(button) {
+    width: 100%;
+    justify-content: center;
   }
   .configurator--studio .commercial-fields,
   .configurator--studio .commercial-core-grid {

@@ -38,13 +38,21 @@ Objetivo: optimizar jerarquía visual, contraste de capas, distribución y micro
 - Reordenar y separar los controles en 2 sub-bloques con jerarquía de 3 capas (`--color-surface-muted` + campos `--color-surface-raised`): primero el bloque principal de cotización (`Cantidad cotizada` normalizando enteros como `1.0000` → `1` al iniciar, `Unidad comercial`, `Precio unitario negociado` y `Descuento monetario total de línea`), y debajo el bloque secundario opcional (`Descripción comercial opcional` con `placeholder` y guía clara para diferenciarlo de las notas de taller).
 - Enriquecer `Resumen de cotización` tipo recibo con desglose vivo (`cantidad × unitario`), decimales tabulares uniformes, resaltado de descuento cuando es mayor a cero, recuadro elevado (`--color-surface-raised`) para `Total estimado del mueble` y contenedor estilizado para `Revisión de precio total dictado` cuando provenga de captura por voz.
 
+### S6 — Paso 06 Revisar
+
+- Fijar la columna izquierda de galería (`position: sticky` en escritorio, `static` en móvil) en `MuebleStudio.vue`, aplicando jerarquía de 3 capas a la cabecera con contador en cápsula, lienzo `.hero`/`.empty`, miniaturas y botón `Gestionar imágenes` de ancho completo con ícono.
+- Transformar `.review-hero` en `EspecificacionForm.vue` en una cabecera ejecutiva con síntesis del mueble (tipo, piezas, accesorios) a la izquierda y estado de validación + importe total estimado tabular a la derecha para lectura comercial inmediata sin hacer scroll.
+- Estilizar los botones `Editar` de las 4 tarjetas de revisión como controles secundarios claros con borde y superficie propia, aplicar jerarquía de 3 capas (`--color-surface` → `--color-surface-muted` → `--color-surface-raised`) en grillas de datos, medidas capitalizadas, piezas numeradas (`01`, `02`), accesorios, notas enmarcadas y resumen comercial, y ocultar el contador irrelevante `0 conjuntos` cuando no existen conjuntos.
+- Unificar la nota final suelta dentro de la barra `.review-actions` para cerrar el flujo con contexto claro a la izquierda y la acción principal `Agregar mueble a la proforma` a la derecha.
+
 ## Tasks
 
 - T1 — S1 — inline — `aeaeea3` — Paso 01 General completado y verificado.
 - T2 — S2 — inline — `308992e` — Paso 02 Estructura completado y verificado.
 - T3 — S3 — inline — `de4f8db` — Paso 03 Accesorios completado y verificado.
 - T4 — S4 — inline — `528d5db` — Paso 04 Imágenes completado y verificado.
-- T5 — S5 — inline — verificado — Paso 05 Precio implementado y verificado con pruebas unitarias, E2E, contraste WCAG AA y responsividad móvil (360px).
+- T5 — S5 — inline — `168eefa` — Paso 05 Precio completado y verificado.
+- T6 — S6 — inline — verificado — Paso 06 Revisar implementado y verificado con pruebas unitarias, E2E, contraste WCAG AA y responsividad móvil (360px).
 
 ## Log
 
@@ -55,3 +63,4 @@ Objetivo: optimizar jerarquía visual, contraste de capas, distribución y micro
 - L5 — En `EspecificacionForm.vue` (Paso 03 Accesorios) se corrigió la cabecera desalineada de `Notas para fabricación` agrupando ícono + título y badge `Opcional`, se llevó `+ Añadir accesorio` fijo a la cabecera de `Accesorios incluidos`, se transformó la lista en una grilla de 2 columnas con numeración (`01`, `02`), fila de edición de ancho completo con atajos `Enter`/`Escape`, chips de accesorios frecuentes de un clic y jerarquía de 3 capas en el bloque de observaciones (incluyendo `:deep(.textarea-field textarea)` con `--color-surface-raised`).
 - L6 — En `MuebleStudio.vue` e `ImageGallery.vue` (Paso 04 Imágenes) se envolvió la galería en una tarjeta `--color-surface` con jerarquía de 3 capas, se señalizó la portada principal en `.hero` y en miniaturas (`Star` + borde de acento), se enriqueció el estado vacío (`0/8`) y la guía contextual del panel de carga, y se reestructuró el `Visor de imágenes` llevando `.viewer-file` a una franja superior clara con badge `Imagen principal` / `Referencia adicional` y agrupando `.viewer-toolbar` con confirmación `Portada actual`. También se ajustó el contraste en modo claro de migas y numeración de pasos en `MuebleStudio.vue`.
 - L7 — En `EspecificacionForm.vue` (Paso 05 Precio) se alineó la cabecera `Condiciones de cotización` con badge vivo (`Precio obligatorio` / `Importe listo`), se normalizó la cantidad inicial entera (`1.0000` → `1`), se reordenaron y agruparon los campos en dos sub-bloques con 3 capas (negociación principal arriba y glosa opcional para proforma debajo), se rediseñó `Resumen de cotización` tipo recibo con fórmula viva y recuadro elevado para el total estimado, y se estilizó el aviso de importe dictado por voz.
+- L8 — Inicio de Paso 06 Revisar: galería lateral sticky con 3 capas, cabecera ejecutiva con importe total estimado y síntesis de piezas/accesorios, controles `Editar` como píldoras secundarias, eliminación de `0 conjuntos` cuando no aplica, numeración y atributos compactos en piezas, recuadros para observaciones/glosa y barra final `.review-actions` integrada.

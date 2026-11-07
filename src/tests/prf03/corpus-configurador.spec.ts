@@ -94,15 +94,33 @@ describe('PRF-03 corpus representativo conservado por el configurador visual', (
         ...opciones,
         studio: true,
         activeSection: 'revision',
+        detalle: {
+          nombre: 'Mesa directorio',
+          cantidad: '2.0000',
+          unidad: 20,
+          precio_unitario: '3650.00',
+          descuento: '0.00',
+        },
         especificacion: {
           tipo_mueble: 5,
-          datos_tecnicos: { componentes: [{ uid: 'p1', nombre: 'Tablero', material: 'Melamina' }] },
+          datos_tecnicos: {
+            caracteristicas_generales: { dimensiones: { ancho: { valor: '1.20', unidad: 'm' } } },
+            componentes: [{ uid: 'p1', nombre: 'Tablero', material: 'Melamina' }],
+            accesorios: ['Pasacables'],
+          },
         } as EspecificacionMueble,
       },
     })
+    expect(wrapper.get('.review-hero').text()).toContain('Mesa directorio')
+    expect(wrapper.get('.review-hero').text()).toContain('1 pieza')
+    expect(wrapper.get('.review-hero').text()).toContain('1 accesorio')
+    expect(wrapper.get('.review-hero').text()).toContain('7300.00 BOB')
+    expect(wrapper.get('#revision').text()).not.toContain('0 conjuntos')
+    expect(wrapper.get('#revision').text()).toContain('Ancho')
     expect(wrapper.get('#revision').text()).toContain('Cantidad no especificada')
     expect(wrapper.get('#revision').text()).toContain('Melamina')
     expect(wrapper.find('[aria-label="Editar estructura y componentes"]').exists()).toBe(true)
+    expect(wrapper.get('.review-actions').text()).toContain('Listo para incorporar a la proforma')
     wrapper.unmount()
   })
   it('organiza datos comerciales junto al resumen sin cambiar importes cotizados', () => {

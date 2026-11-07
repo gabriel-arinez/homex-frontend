@@ -489,13 +489,13 @@ async function seleccionarApartado(id: typeof seccion.value) {
           @status="onGalleryStatus"
           @busy="galleryBusy = $event"
         />
-        <p v-else>Sin imágenes de referencia.</p>
+        <p v-else class="studio-review-gallery__empty">Sin imágenes de referencia.</p>
         <Button
           v-if="seccion === 'revision'"
           type="button"
           variant="secondary"
           @click="seccion = 'imagenes'"
-          >Gestionar imágenes</Button
+          ><ImagePlus :size="16" aria-hidden="true" />Gestionar imágenes</Button
         >
       </section>
       <fieldset
@@ -721,6 +721,8 @@ async function seleccionarApartado(id: typeof seccion.value) {
   min-width: 0;
 }
 .studio-review-layout > .studio-review-gallery {
+  position: sticky;
+  top: 1rem;
   display: grid;
   gap: var(--space-3);
   min-width: 0;
@@ -729,18 +731,71 @@ async function seleccionarApartado(id: typeof seccion.value) {
   border-radius: var(--radius-card);
   background: var(--color-surface);
 }
+.studio-review-layout > .studio-review-gallery :deep(h3) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: 0;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.96rem;
+}
+.studio-review-layout > .studio-review-gallery :deep(h3 small) {
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
 .studio-review-layout > .studio-review-gallery :deep(.hero) {
   height: 15rem;
+  padding: var(--space-2);
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+}
+.studio-review-layout > .studio-review-gallery :deep(.hero:hover) {
+  border-color: var(--color-border-strong);
+}
+.studio-review-layout > .studio-review-gallery :deep(.empty),
+.studio-review-gallery__empty {
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  text-align: center;
+}
+.studio-review-layout > .studio-review-gallery :deep(.thumbs:empty) {
+  display: none;
 }
 .studio-review-layout > .studio-review-gallery :deep(.thumbs) {
   padding-bottom: var(--space-1);
 }
+.studio-review-layout > .studio-review-gallery :deep(.thumbs button) {
+  padding: 0.2rem;
+  background: var(--color-surface-raised);
+  border-color: var(--color-border-strong);
+}
 .studio-review-layout > .studio-review-gallery > button {
-  justify-self: start;
+  justify-self: stretch;
+  width: 100%;
+  justify-content: center;
+  background: var(--color-surface-raised);
+  border-color: var(--color-border-strong);
 }
 @media (max-width: 60rem) {
   .studio-review-layout {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .studio-review-layout > .studio-review-gallery {
+    position: static;
   }
   .studio-review-layout > .studio-review-gallery :deep(.hero) {
     height: min(40vh, 16rem);
