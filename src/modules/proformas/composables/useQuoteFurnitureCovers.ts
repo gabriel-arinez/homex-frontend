@@ -15,6 +15,7 @@ type ReferenciaMueble = {
  */
 export function useQuoteFurnitureCovers() {
   const covers = ref<Record<string, GalleryImage | null>>({})
+  const galleries = ref<Record<string, GalleryImage[]>>({})
   const loaded = new Set<string>()
   const inFlight = new Map<string, Promise<void>>()
 
@@ -28,6 +29,11 @@ export function useQuoteFurnitureCovers() {
   function coverFor(line: ReferenciaMueble, quoteId?: number | null): GalleryImage | null {
     const key = keyOf(line, quoteId)
     return key ? (covers.value[key] ?? null) : null
+  }
+
+  function galleryFor(line: ReferenciaMueble, quoteId?: number | null): GalleryImage[] {
+    const key = keyOf(line, quoteId)
+    return key ? (galleries.value[key] ?? []) : []
   }
 
   async function fetchCover(line: ReferenciaMueble, quoteId?: number | null) {
@@ -54,6 +60,7 @@ export function useQuoteFurnitureCovers() {
           : quoteId && line.id
             ? await proformasService.attachments(quoteId, line.id)
             : []
+        galleries.value = { ...galleries.value, [key]: pictures }
         // Se muestra una única portada, nunca la galería completa en una fila.
         const cover = pictures.find((picture) => picture.principal) ?? pictures[0] ?? null
         covers.value = { ...covers.value, [key]: cover }
@@ -61,6 +68,7 @@ export function useQuoteFurnitureCovers() {
       } catch {
         // Sin autorización o sin imagen disponible, no exponer enlaces alternativos.
         covers.value = { ...covers.value, [key]: null }
+        galleries.value = { ...galleries.value, [key]: [] }
       } finally {
         inFlight.delete(key)
       }
@@ -86,5 +94,5 @@ export function useQuoteFurnitureCovers() {
     }
   }
 
-  return { coverFor, ensureLines, refreshLine }
+  return { coverFor, galleryFor, ensureLines, refreshLine }
 }

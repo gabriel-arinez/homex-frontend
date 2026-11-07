@@ -7,6 +7,7 @@ import { useSessionStore } from '@/app/stores/useSessionStore'
 import ProductosListView from '@/modules/productos/views/ProductosListView.vue'
 import { productosService } from '@/modules/productos/services/productosService'
 import { proformasService } from '@/modules/proformas/services/proformasService'
+import { galleryService } from '@/shared/media/gallery'
 
 const catalog = (id: number, codigo: string, nombre: string, concepto = 'CATEGORIA_PRODUCTO') =>
   ({ id, codigo, nombre, concepto_codigo: concepto }) satisfies ValorCatalogoPublico
@@ -32,6 +33,7 @@ const sample: Producto = {
 }
 
 function mockServices() {
+  vi.spyOn(galleryService, 'list').mockResolvedValue({ imagenes: [], limite: 8 })
   const list = vi.spyOn(productosService, 'list').mockResolvedValue({
     count: 1,
     next: null,
@@ -84,7 +86,7 @@ afterEach(() => {
 })
 
 describe('Bandeja administrativa de productos', () => {
-  it('presenta una tabla por defecto, unidades comprensibles y un solo ojo de consulta', async () => {
+  it('presenta tabla y tarjetas con vista rápida y navegación a la ficha completa', async () => {
     mockServices()
     const { wrapper } = await makeMounted()
     try {
@@ -94,11 +96,24 @@ describe('Bandeja administrativa de productos', () => {
       expect(wrapper.text()).toContain('Pendiente: 1')
       expect(wrapper.findAll('[aria-label="Ver producto Silla de visita azul"]')).toHaveLength(1)
       expect(wrapper.text()).not.toContain('Nuevo producto')
+      await wrapper.get('[aria-label="Vista rápida de Silla de visita azul"]').trigger('click')
+      await flushPromises()
+      expect(document.body.textContent).toContain('Información comercial actual')
+      expect(document.body.querySelector('.full-detail')?.getAttribute('href')).toBe(
+        '/productos/13',
+      )
+      await document.body.querySelector<HTMLButtonElement>('.viewer-footer button')?.click()
       await wrapper.get('[aria-label="Vista del catálogo"] button:first-child').trigger('click')
       await flushPromises()
       expect(wrapper.findAll('.product-card')).toHaveLength(1)
       expect(wrapper.get('.product-name').text()).toContain('Silla de visita azul')
       expect(wrapper.get('.product-visual').text()).toContain('Sin imagen')
+      await wrapper.get('[aria-label="Vista rápida de Silla de visita azul"]').trigger('click')
+      await flushPromises()
+      expect(document.body.textContent).toContain('Silla de visita azul')
+      expect(document.body.querySelector('.full-detail')?.getAttribute('href')).toBe(
+        '/productos/13',
+      )
     } finally {
       wrapper.unmount()
     }

@@ -13,6 +13,7 @@ import Pagination from '@/shared/ui/Pagination.vue'
 import SearchField from '@/shared/ui/SearchField.vue'
 import Select from '@/shared/ui/Select.vue'
 import TextField from '@/shared/ui/TextField.vue'
+import { dateRangeError, localToday } from '@/shared/validation/dateRange'
 
 const emit = defineEmits<{ openMenu: [] }>()
 const rows = ref<MovimientoStock[]>([])
@@ -28,6 +29,8 @@ const pedido = ref('')
 const producto = ref('')
 const fechaDesde = ref('')
 const fechaHasta = ref('')
+const today = localToday()
+const dateError = computed(() => dateRangeError(fechaDesde.value, fechaHasta.value, localToday()))
 const page = ref(1)
 const pageSize = 20
 let requestId = 0
@@ -91,6 +94,12 @@ async function loadReferences() {
 }
 async function load() {
   const currentRequest = ++requestId
+  if (dateError.value) {
+    rows.value = []
+    total.value = 0
+    loading.value = false
+    return
+  }
   loading.value = true
   error.value = ''
   try {
@@ -168,9 +177,23 @@ const columns = [
         type="number"
         min="1"
       />
-      <TextField v-model="fechaDesde" name="fecha-desde" label="Desde" type="date" />
-      <TextField v-model="fechaHasta" name="fecha-hasta" label="Hasta" type="date" />
+      <TextField
+        v-model="fechaDesde"
+        name="fecha-desde"
+        label="Desde"
+        type="date"
+        :max="fechaHasta && fechaHasta < today ? fechaHasta : today"
+      />
+      <TextField
+        v-model="fechaHasta"
+        name="fecha-hasta"
+        label="Hasta"
+        type="date"
+        :min="fechaDesde || undefined"
+        :max="today"
+      />
     </FilterBar>
+    <p v-if="dateError" class="error" role="alert">{{ dateError }}</p>
     <p v-if="referenceError" class="error" role="alert">
       {{ referenceError }}
       <button type="button" @click="loadReferences">Reintentar tipos</button>

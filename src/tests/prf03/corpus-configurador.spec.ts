@@ -88,6 +88,80 @@ const corpus = [
   },
 ]
 describe('PRF-03 corpus representativo conservado por el configurador visual', () => {
+  it('organiza la revisión con acciones identificables y conserva datos incompletos', () => {
+    const wrapper = mount(EspecificacionForm, {
+      props: {
+        ...opciones,
+        studio: true,
+        activeSection: 'revision',
+        especificacion: {
+          tipo_mueble: 5,
+          datos_tecnicos: { componentes: [{ uid: 'p1', nombre: 'Tablero', material: 'Melamina' }] },
+        } as EspecificacionMueble,
+      },
+    })
+    expect(wrapper.get('#revision').text()).toContain('Cantidad no especificada')
+    expect(wrapper.get('#revision').text()).toContain('Melamina')
+    expect(wrapper.find('[aria-label="Editar estructura y componentes"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+  it('organiza datos comerciales junto al resumen sin cambiar importes cotizados', () => {
+    const wrapper = mount(EspecificacionForm, {
+      props: {
+        ...opciones,
+        studio: true,
+        activeSection: 'comercial',
+        detalle: {
+          nombre: 'Mesa',
+          cantidad: '2',
+          unidad: 20,
+          precio_unitario: '125.50',
+          descuento: '10.00',
+        },
+      },
+    })
+    expect(wrapper.find('.commercial-layout .commercial-fields').exists()).toBe(true)
+    expect(wrapper.get('.commercial-total').text()).toContain('Resumen de cotización')
+    expect(wrapper.get('.commercial-total').text()).toContain('241.00 BOB')
+    expect((wrapper.get('[name="mueble-precio"]').element as HTMLInputElement).value).toBe('125.50')
+    wrapper.unmount()
+  })
+  it('orienta el apartado de accesorios y observaciones cuando está vacío', () => {
+    const wrapper = mount(EspecificacionForm, {
+      props: { ...opciones, studio: true, activeSection: 'accesorios' },
+    })
+    expect(wrapper.get('#accesorios').text()).toContain('Todavía no hay accesorios')
+    expect(wrapper.get('.observaciones-heading svg').attributes('aria-hidden')).toBe('true')
+    expect(wrapper.find('[name="observaciones-especificacion"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+  it('presenta la pieza seleccionada sin un desplegable nativo sin título', () => {
+    const wrapper = mount(EspecificacionForm, {
+      props: {
+        ...opciones,
+        studio: true,
+        activeSection: 'estructura',
+        especificacion: {
+          tipo_mueble: 5,
+          datos_tecnicos: { componentes: [{ uid: 'p1', nombre: 'Tablero', cantidad_interna: 2 }] },
+        } as EspecificacionMueble,
+      },
+    })
+    expect(wrapper.find('.studio-component-detail > details.card').exists()).toBe(false)
+    expect(wrapper.get('.studio-component-detail').text()).toContain('Tablero')
+    expect(wrapper.get('[name="componente-0-cantidad"]').attributes('min')).toBe('1')
+    wrapper.unmount()
+  })
+  it('orienta la identificación y las medidas en el estudio sin alterar sus campos', () => {
+    const wrapper = mount(EspecificacionForm, {
+      props: { ...opciones, studio: true, activeSection: 'general' },
+    })
+    expect(wrapper.get('#identificacion h3 svg').attributes('aria-hidden')).toBe('true')
+    expect(wrapper.get('#dimensiones h3 svg').attributes('aria-hidden')).toBe('true')
+    expect(wrapper.text()).toContain('Identifica el mueble con un nombre claro')
+    expect(wrapper.find('#mueble-nombre-comercial').exists()).toBe(true)
+    wrapper.unmount()
+  })
   for (const caso of corpus) {
     it(`${caso.nombre}: no altera dimensiones, asociaciones ni JSON desconocido al guardar y reabrir`, async () => {
       const especificacion = {

@@ -164,6 +164,7 @@ describe('PRF-02 catálogo contextual', () => {
     )
     const wrapper = mount(CatalogoContextual, {
       props: { categorias: [silla], familias: [], existingProductIds: [41] },
+      attachTo: document.body,
     })
     await flushPromises()
     const seleccionar = wrapper
@@ -180,10 +181,18 @@ describe('PRF-02 catálogo contextual', () => {
       http.get('http://localhost:8000/api/v1/catalogo/productos/', () =>
         HttpResponse.json({ count: 1, next: null, previous: null, results: [sku] }),
       ),
+      http.get('http://localhost:8000/api/v1/catalogo/productos/41/imagenes/', () =>
+        HttpResponse.json({ imagenes: [], limite: 8 }),
+      ),
     )
     const wrapper = mount(CatalogoContextual, {
       props: { categorias: [silla], familias: [], existingProductIds: [] },
       attachTo: document.body,
+      global: {
+        stubs: {
+          RouterLink: { props: ['to'], template: '<a class="full-detail" :href="to"><slot /></a>' },
+        },
+      },
     })
     try {
       await flushPromises()
@@ -194,17 +203,51 @@ describe('PRF-02 catálogo contextual', () => {
       await openPreview!.trigger('click')
       await flushPromises()
       const select = document.body.querySelector<HTMLButtonElement>(
-        '.preview-actions button:last-child',
+        '.viewer-footer .context-action',
       )
       expect(select).not.toBeNull()
+      expect(document.body.querySelector('.full-detail')?.getAttribute('href')).toBe(
+        '/productos/41',
+      )
       select!.click()
       await flushPromises()
       expect(wrapper.emitted('select')).toHaveLength(1)
       expect(wrapper.emitted('select')?.[0]?.[0]).toMatchObject({ id: 41 })
-      expect(document.body.querySelector('.preview-actions')).toBeNull()
+      expect(document.body.querySelector('.viewer-footer')).toBeNull()
     } finally {
       wrapper.unmount()
     }
+  })
+
+  it('muestra Ir a línea cuando el producto ya está en la proforma', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/catalogo/productos/', () =>
+        HttpResponse.json({ count: 1, next: null, previous: null, results: [sku] }),
+      ),
+      http.get('http://localhost:8000/api/v1/catalogo/productos/41/imagenes/', () =>
+        HttpResponse.json({ imagenes: [], limite: 8 }),
+      ),
+    )
+    const wrapper = mount(CatalogoContextual, {
+      props: { categorias: [silla], familias: [], existingProductIds: [41] },
+      global: {
+        stubs: {
+          RouterLink: { props: ['to'], template: '<a :href="to"><slot /></a>' },
+        },
+      },
+    })
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Ver ficha'))!
+      .trigger('click')
+    await flushPromises()
+    const action = document.body.querySelector<HTMLButtonElement>('.context-action')
+    expect(action?.textContent).toContain('Ir a línea')
+    action?.click()
+    expect(wrapper.emitted('duplicate')?.[0]?.[0]).toBe(41)
+    expect(wrapper.emitted('select')).toBeUndefined()
+    wrapper.unmount()
   })
 
   it('alterna entre cuadrícula y tabla, muestra miniaturas y respeta la opción de ocultarlas', async () => {

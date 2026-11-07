@@ -25,6 +25,7 @@ describe('portada privada de muebles a pedido', () => {
     await covers.ensureLines([line], 578)
     expect(covers.coverFor(line, 578)?.id).toBe(42)
     expect(covers.coverFor(line, 578)?.url).toBe('/api/v1/imagenes-privadas/42/')
+    expect(covers.galleryFor(line, 578).map((image) => image.id)).toEqual([41, 42])
     await covers.ensureLines([line], 578)
     expect(spy).toHaveBeenCalledTimes(1)
   })

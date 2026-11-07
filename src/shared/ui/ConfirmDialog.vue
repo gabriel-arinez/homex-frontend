@@ -1,9 +1,16 @@
 <script setup lang="ts">
 import { useId } from 'vue'
-import { AlertTriangle, ArrowLeft, Trash2 } from '@lucide/vue'
+import { AlertTriangle, ArrowLeft, Trash2, Check } from '@lucide/vue'
 import Modal from './Modal.vue'
 import Button from './Button.vue'
-defineProps<{ open: boolean; title: string; description: string; confirmLabel?: string }>()
+defineProps<{
+  open: boolean
+  title: string
+  description: string
+  confirmLabel?: string
+  danger?: boolean
+  variant?: 'danger' | 'success' | 'info' | 'primary'
+}>()
 const emit = defineEmits<{ close: []; confirm: [] }>()
 const titleId = useId()
 </script>
@@ -20,8 +27,35 @@ const titleId = useId()
           <ArrowLeft :size="16" aria-hidden="true" />
           {{ title === 'Descartar línea' ? 'Seguir editando' : 'Cancelar' }}
         </Button>
-        <Button variant="danger" @click="emit('confirm')">
-          <Trash2 :size="16" aria-hidden="true" />
+        <Button
+          :variant="
+            variant ??
+            (danger ||
+            title.toLowerCase().startsWith('descartar') ||
+            title.toLowerCase().startsWith('salir') ||
+            title.toLowerCase().startsWith('eliminar') ||
+            title.toLowerCase().startsWith('anular') ||
+            title.toLowerCase().startsWith('cancelar')
+              ? 'danger'
+              : 'success')
+          "
+          @click="emit('confirm')"
+        >
+          <Trash2
+            v-if="
+              (variant === 'danger' ||
+                (!variant &&
+                  (danger ||
+                    title.toLowerCase().startsWith('descartar') ||
+                    title.toLowerCase().startsWith('salir') ||
+                    title.toLowerCase().startsWith('eliminar') ||
+                    title.toLowerCase().startsWith('anular') ||
+                    title.toLowerCase().startsWith('cancelar'))))
+            "
+            :size="16"
+            aria-hidden="true"
+          />
+          <Check v-else :size="16" aria-hidden="true" />
           {{ confirmLabel ?? 'Confirmar' }}
         </Button>
       </div>

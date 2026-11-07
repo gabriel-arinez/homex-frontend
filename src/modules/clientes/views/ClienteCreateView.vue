@@ -7,6 +7,7 @@ import { validateClient } from '@/shared/validation/commercialFields'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import ClienteFormFields, { type ClienteFormModel } from '../components/ClienteFormFields.vue'
 import { clientesService } from '../services/clientesService'
+import { UserPlus } from '@lucide/vue'
 import Button from '@/shared/ui/Button.vue'
 import Card from '@/shared/ui/Card.vue'
 import ConfirmDialog from '@/shared/ui/ConfirmDialog.vue'
@@ -153,9 +154,15 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         />
         <p v-if="error" class="form-error" role="alert">{{ error }}</p>
         <div class="actions">
-          <Button type="submit" :processing="saving" processing-label="Registrando…"
-            >Registrar cliente</Button
+          <Button
+            variant="info"
+            type="submit"
+            :processing="saving"
+            processing-label="Registrando…"
           >
+            <UserPlus :size="17" aria-hidden="true" />
+            Registrar cliente
+          </Button>
           <Button variant="secondary" :disabled="saving" @click="router.push('/clientes')"
             >Cancelar</Button
           >

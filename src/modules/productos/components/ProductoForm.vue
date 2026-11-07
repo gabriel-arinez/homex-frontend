@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { dateRangeError } from '@/shared/validation/dateRange'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import type {
   CamposCatalogo,
@@ -9,8 +10,8 @@ import type {
 } from '@/generated/api'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import CapturaCatalogo from './CapturaCatalogo.vue'
-import { Armchair, Check, FileText, Layers, Mic, Package, Save, Tag, Trash2, X } from '@lucide/vue'
-import { useFocusTrap } from '@/shared/composables/useFocusTrap'
+import { Armchair, Check, FileText, Layers, Mic, Package, Save, Tag, Trash2 } from '@lucide/vue'
+import VoiceDrawer from '@/modules/capturas/components/VoiceDrawer.vue'
 import Modal from '@/shared/ui/Modal.vue'
 import ImageGallery from '@/shared/media/ImageGallery.vue'
 import type { LocalImage } from '@/shared/media/gallery'
@@ -45,8 +46,6 @@ function updateRecording(active: boolean, paused: boolean, elapsed: number) {
   recordingPaused.value = paused
   recordingElapsed.value = elapsed
 }
-const voicePanel = ref<HTMLElement | null>(null)
-useFocusTrap(voicePanel, voiceOpen)
 const voiceCandidates = ref<Array<[string, unknown]>>([])
 const voiceConflicts = ref<
   Array<{ key: string; current: string; suggested: string; selected: boolean }>
@@ -383,7 +382,7 @@ function submit(): boolean {
         'Revisa los precios de la promoción. El promocional no puede superar al anterior.',
       ]
     }
-    if (form.fecha_inicio && form.fecha_fin && form.fecha_fin < form.fecha_inicio)
+    if (dateRangeError(form.fecha_inicio || '', form.fecha_fin || ''))
       fields.value.promocion = ['La fecha final no puede ser anterior al inicio.']
   }
   if (Object.keys(fields.value).length) {
@@ -827,12 +826,14 @@ onMounted(load)
                   name="inicio"
                   label="Fecha de inicio"
                   type="date"
+                  :max="form.fecha_fin || undefined"
                 />
                 <TextField
                   v-model="form.fecha_fin"
                   name="fin"
                   label="Fecha de finalización"
                   type="date"
+                  :min="form.fecha_inicio || undefined"
                 />
               </div>
               <p v-if="fieldError('promocion')" class="field-error" role="alert">
@@ -933,6 +934,7 @@ onMounted(load)
           >Cancelar</Button
         >
         <Button
+          variant="success"
           type="submit"
           :processing="processing"
           processing-label="Guardando producto…"
@@ -945,43 +947,23 @@ onMounted(load)
     </footer>
   </form>
 
-  <Teleport to="body">
-    <div v-show="voiceOpen" class="voice-backdrop" @mousedown.self="voiceOpen = false">
-      <aside
-        ref="voicePanel"
-        class="voice-drawer"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="voice-title"
-        @keydown.esc="voiceOpen = false"
-      >
-        <header class="drawer-header">
-          <div>
-            <p class="eyebrow">ASISTENCIA COMERCIAL</p>
-            <h2 id="voice-title">Completar por voz</h2>
-            <p class="muted">Describe tu producto y revisa la propuesta antes de aplicarla.</p>
-          </div>
-          <button
-            type="button"
-            class="drawer-close"
-            aria-label="Cerrar asistente de voz"
-            @click="voiceOpen = false"
-          >
-            <X :size="20" aria-hidden="true" />
-          </button>
-        </header>
-        <CapturaCatalogo
-          v-if="categoria === 'SILLA' || categoria === 'PISO_FLOTANTE' || categoria === 'OTRO'"
-          :key="categoria"
-          :categoria="categoria"
-          :opciones="opciones"
-          @apply="applyVoice"
-          @recording-state="updateRecording"
-          @processing-state="assistantProcessing = $event"
-        />
-      </aside>
-    </div>
-  </Teleport>
+  <VoiceDrawer
+    :open="voiceOpen"
+    title="Completar por voz"
+    description="Describe tu producto y revisa la propuesta antes de aplicarla."
+    close-label="Cerrar asistente de voz"
+    @close="voiceOpen = false"
+  >
+    <CapturaCatalogo
+      v-if="categoria === 'SILLA' || categoria === 'PISO_FLOTANTE' || categoria === 'OTRO'"
+      :key="categoria"
+      :categoria="categoria"
+      :opciones="opciones"
+      @apply="applyVoice"
+      @recording-state="updateRecording"
+      @processing-state="assistantProcessing = $event"
+    />
+  </VoiceDrawer>
   <Modal
     :open="voiceConflicts.length > 0"
     title="Revisar cambios sugeridos"
@@ -1396,69 +1378,6 @@ textarea {
   flex-wrap: wrap;
   gap: var(--space-3);
 }
-.voice-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 120;
-  display: flex;
-  justify-content: flex-end;
-  background: var(--color-overlay);
-}
-.voice-mini {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.8rem;
-  min-height: 2.75rem;
-  padding: 0.65rem 1rem;
-  border: 1px solid var(--color-primary);
-  border-radius: var(--radius-control);
-  background: var(--color-primary-soft);
-  color: var(--color-text);
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-}
-.voice-mini svg {
-  color: var(--color-primary);
-}
-.voice-drawer {
-  display: flex;
-  flex-direction: column;
-  width: min(44rem, 100%);
-  height: 100dvh;
-  overflow-y: auto;
-  background: var(--color-surface-raised);
-  border-left: 1px solid var(--color-border);
-}
-.drawer-header {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-5);
-  border-bottom: 1px solid var(--color-border);
-}
-.drawer-header h2 {
-  margin: 0.2rem 0;
-  font-size: 1.45rem;
-}
-.drawer-header p {
-  margin: 0;
-  font-size: 0.85rem;
-}
-.drawer-close {
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  color: var(--color-text);
-  background: transparent;
-  cursor: pointer;
-}
 .conflict-list {
   display: grid;
   gap: var(--space-3);
@@ -1519,9 +1438,6 @@ textarea {
   }
   .sticky-actions p {
     display: none;
-  }
-  .voice-drawer {
-    width: 100%;
   }
   .extra-row {
     display: grid;

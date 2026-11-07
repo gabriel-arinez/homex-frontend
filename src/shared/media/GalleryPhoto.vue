@@ -3,6 +3,7 @@ import { onBeforeUnmount, ref, watch } from 'vue'
 import { apiRequest } from '@/shared/api'
 import { mediaUrl } from './gallery'
 const props = defineProps<{ src: string; alt: string }>()
+const emit = defineEmits<{ load: []; error: [] }>()
 const source = ref(''),
   error = ref(false)
 let version = 0,
@@ -28,7 +29,10 @@ watch(
       objectUrl = URL.createObjectURL(blob)
       source.value = objectUrl
     } catch {
-      if (current === version) error.value = true
+      if (current === version) {
+        error.value = true
+        emit('error')
+      }
     }
   },
   { immediate: true },
@@ -39,12 +43,15 @@ onBeforeUnmount(() => {
 })
 </script>
 <template>
-  <img v-if="source && !error" :src="source" :alt="alt" @error="error = true" /><span
-    v-else
-    role="img"
-    :aria-label="alt"
-    >{{ error ? 'No se pudo cargar la imagen' : 'Cargando imagen…' }}</span
-  >
+  <img
+    v-if="source && !error"
+    :src="source"
+    :alt="alt"
+    @load="emit('load')"
+    @error="((error = true), emit('error'))"
+  /><span v-else role="img" :aria-label="alt">{{
+    error ? 'No se pudo cargar la imagen' : 'Cargando imagen…'
+  }}</span>
 </template>
 <style scoped>
 img {

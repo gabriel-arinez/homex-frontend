@@ -44,6 +44,7 @@ import {
   Trash2,
   Wrench,
   Save,
+  Send,
 } from '@lucide/vue'
 import Button from '@/shared/ui/Button.vue'
 import Card from '@/shared/ui/Card.vue'
@@ -64,12 +65,13 @@ import { loadPending, savePending } from '@/shared/media/pending'
 import { galleryService } from '@/shared/media/gallery'
 import MuebleStudio from '../components/MuebleStudio.vue'
 import { mapearCapturaAsistida } from '../services/capturaAsistidaMapper'
-import { leerDatosTecnicos, tecnicaIgual } from '../services/muebleTecnico'
+import { tecnicaIgual } from '../services/muebleTecnico'
 import { proformasService } from '../services/proformasService'
 import { retornoAProformas } from '../utils/navegacionProformas'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { productosService } from '@/modules/productos/services/productosService'
 import ProductImage from '@/modules/productos/components/ProductImage.vue'
+import ProductoVistaRapida from '@/modules/productos/components/ProductoVistaRapida.vue'
 import GalleryPhoto from '@/shared/media/GalleryPhoto.vue'
 import { useQuoteFurnitureCovers } from '../composables/useQuoteFurnitureCovers'
 import { useQuoteProductImages } from '../composables/useQuoteProductImages'
@@ -124,6 +126,7 @@ function conditionError(field: keyof ReturnType<typeof validateQuoteConditions>)
   )
 }
 const dirty = ref(false)
+const savedContent = ref('')
 const conflicted = ref(false)
 const persisted = ref<Proforma | null>(null)
 const tipos = ref<ValorCatalogoPublico[]>([])
@@ -144,6 +147,8 @@ const editingLine = ref<number | null>(null)
 const menuLineId = ref<string | null>(null)
 const readingLineId = ref<string | null>(null)
 const readMaster = ref<Producto | null>(null)
+const readLoading = ref(false)
+const readError = ref('')
 let readRequestId = 0
 const specLine = ref<number | null>(null)
 const draftingFurniture = ref<LineaLocal | null>(null)
@@ -334,6 +339,7 @@ const {
 watch(existingProductIds, (ids) => void ensureQuoteImages(ids), { immediate: true })
 const {
   coverFor: furnitureCoverFor,
+  galleryFor: furnitureGalleryFor,
   ensureLines: ensureFurnitureCovers,
   refreshLine: refreshFurnitureCover,
 } = useQuoteFurnitureCovers()
@@ -509,36 +515,58 @@ const fieldErrorMessages = computed(() => {
 const readingLine = computed(
   () => lineas.value.find((line) => line.localId === readingLineId.value) ?? null,
 )
-const readingTechnical = computed(() =>
-  leerDatosTecnicos(readingLine.value?.especificacion?.datos_tecnicos),
+const readingLineForViewer = computed(() => {
+  const line = readingLine.value
+  if (!line) return null
+  const estimated = totalEstimadoLinea(line)
+  return {
+    ...line,
+    tipo_item_info: tipos.value.find((item) => item.id === line.tipo_item) ?? {
+      nombre: 'No especificado',
+    },
+    unidad_info: unidades.value.find((item) => item.id === line.unidad) ?? {
+      nombre: 'No especificada',
+    },
+    total: estimated === null ? 'Pendiente' : money(estimated),
+  } as unknown as DetalleProforma
+})
+const readingFurnitureGallery = computed(() => {
+  const line = readingLine.value
+  return line ? furnitureGalleryFor(line, proformaId.value) : []
+})
+const readingProductGalleryEndpoint = computed(() =>
+  readingLine.value?.producto
+    ? `/api/v1/catalogo/productos/${readingLine.value.producto}/imagenes/`
+    : '',
 )
-function readableTechnical(value: unknown): string {
-  if (value === null || value === undefined) return 'No especificado'
-  if (Array.isArray(value)) return value.map(readableTechnical).join(', ')
-  if (typeof value === 'object')
-    return Object.entries(value as Record<string, unknown>)
-      .map(([key, v]) => `${key.replace(/_/g, ' ')}: ${readableTechnical(v)}`)
-      .join(' · ')
-  return String(value)
-}
 async function openLineRead(id: string) {
   readingLineId.value = id
   menuLineId.value = null
   readMaster.value = null
+  readError.value = ''
   const token = ++readRequestId
   const productId = readingLine.value?.producto
-  if (!productId) return
+  if (!productId) {
+    if (readingLine.value) void ensureFurnitureCovers([readingLine.value], proformaId.value)
+    return
+  }
+  readLoading.value = true
   try {
     const product = await productosService.get(productId)
     if (token === readRequestId) readMaster.value = product
   } catch {
-    // La línea negociada debe poder consultarse aunque el maestro no esté disponible.
+    if (token === readRequestId)
+      readError.value = 'No se pudieron cargar los datos actuales del catálogo.'
+  } finally {
+    if (token === readRequestId) readLoading.value = false
   }
 }
 function closeLineRead() {
   readRequestId++
   readingLineId.value = null
   readMaster.value = null
+  readLoading.value = false
+  readError.value = ''
 }
 function editReadLine() {
   const index = lineas.value.findIndex((line) => line.localId === readingLineId.value)
@@ -623,6 +651,9 @@ function money(value: number) {
     currency: header.moneda_codigo,
   }).format(value)
 }
+function unitName(unitId: number) {
+  return unidades.value.find((unit) => unit.id === unitId)?.nombre ?? 'unidad'
+}
 function localId() {
   return crypto.randomUUID()
 }
@@ -664,6 +695,7 @@ function fill(value: Proforma) {
   clienteSeleccionado.value = value.cliente_resumen ?? null
   lineas.value = value.detalles.map(normalizeLine)
   removedLines.value = []
+  savedContent.value = currentContent()
   dirty.value = false
 }
 async function load() {
@@ -1225,6 +1257,23 @@ function body(emitir: boolean): ProformaIntegralWritable {
     detalles,
   }
 }
+function currentContent() {
+  const data = body(false)
+  return JSON.stringify([
+    data.cliente,
+    data.cliente_nuevo,
+    data.titulo,
+    data.moneda_codigo,
+    data.plazo_entrega,
+    data.validez_oferta,
+    data.porcentaje_adelanto,
+    data.observaciones,
+    data.detalles,
+  ])
+}
+const hasRealChanges = computed(
+  () => Boolean(savedContent.value) && currentContent() !== savedContent.value,
+)
 async function requestReview() {
   if (!canEmit.value || saving.value) return
   const confirmed = await askConfirmation(
@@ -1337,6 +1386,7 @@ onBeforeRouteLeave(async () => {
 onMounted(async () => {
   window.addEventListener('beforeunload', beforeUnload)
   await Promise.all([loadReferences(), load()])
+  if (!persisted.value) savedContent.value = currentContent()
   restoreContextualDraft()
   editorReady.value = true
 })
@@ -1509,7 +1559,12 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               @cancel="additionMode = 'none'"
             />
           </div>
-          <Card v-for="(line, index) in lineas" :key="line.localId" class="line-card">
+          <Card
+            v-for="(line, index) in lineas"
+            :key="line.localId"
+            class="line-card"
+            @click="openLineRead(line.localId)"
+          >
             <span class="line-index" aria-hidden="true">{{
               String(index + 1).padStart(2, '0')
             }}</span>
@@ -1519,7 +1574,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               tabindex="0"
               role="button"
               :aria-label="'Ver detalle completo de ' + line.nombre"
-              @click="openLineRead(line.localId)"
               @keydown.enter.prevent="openLineRead(line.localId)"
               @keydown.space.prevent="openLineRead(line.localId)"
             >
@@ -1528,7 +1582,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   <ProductImage
                     :image="quoteImages[line.producto] ?? null"
                     :alt="line.nombre"
-                    sizes="64px"
+                    sizes="96px"
                   />
                 </div>
                 <div v-else-if="furnitureCoverSource(line)" class="line-thumbnail">
@@ -1539,20 +1593,45 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 </div>
                 <strong>{{ line.nombre }}</strong>
               </div>
-              <p v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
-                Importe histórico negociado: {{ money(Number(line.importe_negociado || 0)) }}
-              </p>
-              <p v-else-if="totalEstimadoLinea(line) !== null">
-                {{ line.cantidad }} × {{ money(Number(line.precio_unitario)) }}
-                <span v-if="Number(line.descuento) === 0">· Sin descuento</span>
-              </p>
-              <p v-else class="pending-value">Precio pendiente</p>
             </div>
-            <strong v-if="totalEstimadoLinea(line) !== null">
-              {{ money(totalEstimadoLinea(line)!) }}
-            </strong>
-            <strong v-else class="pending-value">Importe pendiente</strong>
-            <div class="line-menu" @keydown.esc="menuLineId = null">
+            <div v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'" class="line-metrics">
+              <div class="line-metric">
+                <span>Modalidad</span><strong>Importe histórico negociado</strong>
+              </div>
+              <div class="line-metric">
+                <span>Importe negociado</span>
+                <strong>{{ money(Number(line.importe_negociado || 0)) }}</strong>
+              </div>
+              <div v-if="Number(line.descuento) > 0" class="line-metric">
+                <span>Descuento aplicado</span>
+                <strong>{{ money(Number(line.descuento)) }}</strong>
+              </div>
+            </div>
+            <div v-else-if="totalEstimadoLinea(line) !== null" class="line-metrics">
+              <div class="line-metric">
+                <span>Cantidad</span
+                ><strong>{{ line.cantidad }} {{ unitName(line.unidad) }}</strong>
+              </div>
+              <div class="line-metric">
+                <span>Precio por unidad</span>
+                <strong>{{ money(Number(line.precio_unitario)) }}</strong>
+              </div>
+              <div class="line-metric">
+                <span>Descuento</span>
+                <strong>{{
+                  Number(line.descuento ?? 0) === 0 ? 'Ninguno' : money(Number(line.descuento))
+                }}</strong>
+              </div>
+            </div>
+            <p v-else class="line-metrics pending-value">Precio pendiente</p>
+            <div class="line-total">
+              <span>Importe de línea</span>
+              <strong v-if="totalEstimadoLinea(line) !== null">
+                {{ money(totalEstimadoLinea(line)!) }}
+              </strong>
+              <strong v-else class="pending-value">Pendiente</strong>
+            </div>
+            <div class="line-menu" @click.stop @keydown.esc="menuLineId = null">
               <button
                 type="button"
                 class="menu-trigger"
@@ -2011,8 +2090,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             </div>
             <div class="editor-actions__operations">
               <Button
-                variant="secondary"
+                variant="success"
                 class="editor-save-draft"
+                :disabled="!hasRealChanges"
                 :processing="saving"
                 @click="persist(false)"
               >
@@ -2021,11 +2101,14 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               </Button>
               <Button
                 v-if="!isReview"
+                variant="info"
                 :disabled="!canEmit"
                 :processing="saving"
                 @click="requestReview"
-                >Enviar a revisión</Button
               >
+                <Send :size="17" aria-hidden="true" />
+                Enviar a revisión
+              </Button>
               <Button
                 v-if="persisted"
                 variant="secondary"
@@ -2037,116 +2120,22 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         </footer>
       </template>
 
-      <Modal
+      <ProductoVistaRapida
         :open="Boolean(readingLine)"
-        :title="readingLine?.nombre ?? 'Detalle de línea'"
+        :line="readingLineForViewer"
+        :product="readMaster"
+        :gallery="readingFurnitureGallery"
+        :gallery-endpoint="readingProductGalleryEndpoint"
+        :product-loading="readLoading"
+        :product-error="readError"
+        :action-label="
+          readingLine && readingLine.modo_calculo !== 'TOTAL_NEGOCIADO' ? 'Editar línea' : ''
+        "
+        :detail-to="readMaster ? `/productos/${readMaster.id}` : ''"
         @close="closeLineRead"
-      >
-        <div v-if="readingLine" class="read-line">
-          <p>
-            <strong>Tipo:</strong> {{ tipos.find((x) => x.id === readingLine?.tipo_item)?.nombre }}
-          </p>
-          <p>
-            <strong>SKU:</strong>
-            {{
-              readMaster?.sku ||
-              (readingLine.producto
-                ? 'Producto #' + readingLine.producto
-                : 'Variante pendiente / mueble a pedido')
-            }}
-          </p>
-          <p>
-            <strong>Descripción:</strong>
-            {{ readingLine.descripcion || 'Sin descripción adicional' }}
-          </p>
-          <p>
-            <strong>Cantidad:</strong> {{ readingLine.cantidad }}
-            {{ unidades.find((x) => x.id === readingLine?.unidad)?.nombre }}
-          </p>
-          <p v-if="readingLine.familia_producto && !readingLine.producto" role="status">
-            Variante pendiente; no se reserva stock.
-          </p>
-          <p v-if="readingLine.modo_calculo === 'TOTAL_NEGOCIADO'">
-            <strong>Importe negociado histórico:</strong> {{ readingLine.importe_negociado }}
-          </p>
-          <p v-else>
-            <strong>Precio unitario cotizado:</strong>
-            {{ money(Number(readingLine.precio_unitario)) }}
-          </p>
-          <p><strong>Descuento:</strong> {{ money(Number(readingLine.descuento)) }}</p>
-          <p>
-            <strong>Importe estimado:</strong>
-            {{
-              totalEstimadoLinea(readingLine) === null
-                ? 'Pendiente'
-                : money(totalEstimadoLinea(readingLine)!)
-            }}
-          </p>
-          <template v-if="readMaster">
-            <h3>Datos actuales del catálogo · solo lectura</h3>
-            <p>{{ readMaster.nombre }} · {{ readMaster.categoria_info?.nombre }}</p>
-            <p>Precio vigente de referencia BOB: {{ readMaster.precio_vigente }}</p>
-            <p>Disponibilidad referencial: {{ readMaster.disponibilidad_referencial }}</p>
-            <p v-if="readMaster.silla">Silla: {{ readMaster.silla.modelo }}</p>
-            <p v-if="readMaster.piso">
-              Piso: {{ readMaster.piso.modelo }} · {{ readMaster.piso.espesor_mm }} mm
-            </p>
-          </template>
-          <template v-if="readingLine.especificacion">
-            <h3>Ficha técnica · solo lectura</h3>
-            <p v-if="readingLine.especificacion.tipo_mueble">
-              Tipo de mueble:
-              {{
-                tiposMueble.find((t) => t.id === readingLine?.especificacion?.tipo_mueble)
-                  ?.nombre ?? 'Histórico'
-              }}
-            </p>
-            <p v-if="readingLine.especificacion.observaciones">
-              Observaciones: {{ readingLine.especificacion.observaciones }}
-            </p>
-            <h4>Características y dimensiones</h4>
-            <p>{{ readableTechnical(readingTechnical.caracteristicas_generales) }}</p>
-            <h4>Conjuntos</h4>
-            <ul>
-              <li v-for="g in readingTechnical.conjuntos ?? []" :key="g.uid">{{ g.nombre }}</li>
-            </ul>
-            <h4>Componentes</h4>
-            <ul>
-              <li v-for="(c, i) in readingTechnical.componentes ?? []" :key="c.uid ?? i">
-                <strong>{{ c.nombre }}</strong>
-                <span v-if="c.cantidad_interna"> · {{ c.cantidad_interna }} por mueble</span>
-                <span v-if="c.material"> · {{ c.material }}</span>
-                <span v-if="c.espesor"> · {{ c.espesor }}</span>
-                <span v-if="c.color"> · {{ c.color }}</span>
-                <span v-if="c.dimensiones"> · {{ readableTechnical(c.dimensiones) }}</span>
-                <span v-for="a in c.atributos ?? []" :key="a.codigo || a.nombre">
-                  · {{ a.nombre }}: {{ a.valor }} {{ a.unidad ?? '' }}
-                </span>
-              </li>
-            </ul>
-            <h4>Accesorios</h4>
-            <ul>
-              <li v-for="(a, i) in readingTechnical.accesorios ?? []" :key="i">{{ a }}</li>
-            </ul>
-            <h4 v-if="readingTechnical.advertencias?.length">Información pendiente histórica</h4>
-            <ul>
-              <li v-for="(a, i) in readingTechnical.advertencias ?? []" :key="i">{{ a }}</li>
-            </ul>
-            <p v-if="readingTechnical.descripcion_original">
-              Descripción original: {{ readingTechnical.descripcion_original }}
-            </p>
-          </template>
-          <div class="actions">
-            <Button
-              v-if="readingLine.modo_calculo !== 'TOTAL_NEGOCIADO'"
-              variant="secondary"
-              @click="editReadLine"
-              >Editar</Button
-            >
-            <Button variant="secondary" @click="closeLineRead">Cerrar</Button>
-          </div>
-        </div>
-      </Modal>
+        @retry="readingLine && void openLineRead(readingLine.localId)"
+        @action="editReadLine"
+      />
       <Modal
         wide
         :open="lineModal"
@@ -2550,13 +2539,14 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   margin-top: var(--space-2);
 }
 .line-card {
-  display: flex;
+  display: grid;
   position: relative;
   min-width: 0;
   align-items: center;
-  justify-content: space-between;
+  grid-template-columns: auto minmax(14rem, 0.9fr) minmax(24rem, 1.5fr) auto auto;
   gap: var(--space-4);
   padding: var(--space-4);
+  cursor: pointer;
   border-color: var(--quote-border);
   box-shadow: 0 1px 2px rgb(0 0 0 / 3%);
 }
@@ -2577,7 +2567,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 }
 .line-summary {
   min-width: 0;
-  flex: 1;
   cursor: pointer;
 }
 .line-summary strong {
@@ -2590,12 +2579,44 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   color: var(--color-text-secondary);
   font-size: 0.83rem;
 }
+.line-metrics {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-5);
+}
+.line-metric {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.line-metric > span,
+.line-total > span {
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.line-metric > strong {
+  overflow-wrap: anywhere;
+  font-size: 0.82rem;
+}
 .line-summary:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 4px;
   border-radius: 2px;
 }
-.line-card > strong {
+.line-total {
+  display: grid;
+  justify-items: end;
+  gap: 0.2rem;
+  min-width: 8.5rem;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-raised);
+  text-align: right;
+}
+.line-total strong {
   flex: 0 0 auto;
   color: var(--color-text);
   white-space: nowrap;
@@ -2603,7 +2624,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 .line-menu {
   position: relative;
   z-index: 30;
-  flex: 0 0 auto;
 }
 .menu-trigger {
   display: grid;
@@ -2960,6 +2980,26 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   text-align: center;
 }
 @media (max-width: 64rem) {
+  .line-card {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+  }
+  .line-summary {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .line-metrics {
+    grid-column: 2;
+    grid-row: 2;
+    margin-top: var(--space-3);
+  }
+  .line-total {
+    grid-column: 3;
+    grid-row: 1 / 3;
+  }
+  .line-menu {
+    grid-column: 4;
+    grid-row: 1 / 3;
+  }
   .steps button {
     justify-content: center;
     padding: var(--space-3);
@@ -3061,17 +3101,26 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     width: 100%;
   }
   .line-card {
-    flex-wrap: wrap;
-    align-items: flex-start;
+    grid-template-columns: auto minmax(0, 1fr) auto;
   }
   .line-summary {
-    flex-basis: calc(100% - 4rem);
+    grid-column: 2 / 4;
+    grid-row: 1;
   }
-  .line-card > strong {
+  .line-metrics {
+    grid-column: 2 / 4;
+    grid-row: 2;
     margin-left: 3rem;
   }
+  .line-total {
+    grid-column: 2;
+    grid-row: 3;
+    justify-self: start;
+  }
   .line-menu {
-    margin-left: auto;
+    grid-column: 3;
+    grid-row: 3;
+    justify-self: end;
   }
   .editor-actions {
     position: static;
@@ -3409,14 +3458,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   }
 }
 .editor-actions :deep(.button.editor-save-draft) {
-  color: var(--color-primary-accent);
-  background: var(--color-primary-soft);
-  border-color: var(--color-primary);
   box-shadow: none;
-}
-.editor-actions :deep(.button.editor-save-draft:hover:not(:disabled)) {
-  background: var(--color-surface-hover);
-  border-color: var(--color-primary);
 }
 .line-heading {
   display: flex;
@@ -3428,8 +3470,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   overflow-wrap: anywhere;
 }
 .line-thumbnail {
-  width: 4rem;
-  height: 4rem;
+  width: 6rem;
+  height: 6rem;
   flex: none;
   overflow: hidden;
   border: 1px solid var(--color-border);

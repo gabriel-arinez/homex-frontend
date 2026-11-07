@@ -163,6 +163,13 @@ async function mockBackend(page: Page, canCreate = false) {
       }),
     })
   })
+  await page.route(/\/api\/v1\/catalogo\/productos\/\d+\/imagenes\/$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ imagenes: [], limite: 8 }),
+    }),
+  )
   return seen
 }
 async function noOverflow(page: Page) {
@@ -199,6 +206,34 @@ test('@a11y FE03 nueva bandeja de productos muestra lista, categorías y precios
     (item) => item.impact === 'serious' || item.impact === 'critical',
   )
   expect(violations).toEqual([])
+})
+
+test('@a11y vista rápida de productos conserva foco, responde en móvil y respeta tema oscuro', async ({
+  page,
+}) => {
+  await mockBackend(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/productos')
+  const trigger = page.getByRole('button', { name: /Vista rápida de Silla ejecutiva/ })
+  await trigger.click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByText('Precio vigente del catálogo')).toBeVisible()
+  await expect(dialog.getByRole('link', { name: 'Ver ficha completa' })).toHaveAttribute(
+    'href',
+    '/productos/11',
+  )
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth))
+    .toBeLessThanOrEqual(1)
+  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+  const violations = (await new AxeBuilder({ page }).analyze()).violations.filter(
+    (item) => item.impact === 'serious' || item.impact === 'critical',
+  )
+  expect(violations).toEqual([])
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+  await expect(trigger).toBeFocused()
 })
 
 test('FE03 filtros por categoría y atributos conservan búsqueda y vista en URL', async ({

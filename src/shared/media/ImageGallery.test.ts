@@ -26,6 +26,138 @@ describe('Galería reutilizable', () => {
     vi.spyOn(URL, 'createObjectURL').mockImplementation(() => 'blob:preview')
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
   })
+  it('sube automáticamente los archivos seleccionados en la variante de muebles', async () => {
+    vi.spyOn(galleryService, 'list').mockResolvedValue(gallery([]))
+    const upload = vi.spyOn(galleryService, 'upload').mockResolvedValue(gallery([image(1, true)]))
+    const wrapper = mount(ImageGallery, {
+      props: { endpoint: '/gallery/', streamlined: true },
+      global: { stubs },
+    })
+    await flushPromises()
+    Object.defineProperty(wrapper.get('input[type=file]').element, 'files', {
+      value: [new File(['red'], 'red.png', { type: 'image/png' })],
+    })
+    await wrapper.get('input[type=file]').trigger('change')
+    await vi.waitFor(() => expect(upload).toHaveBeenCalledTimes(1))
+    expect(wrapper.text()).not.toContain('Confirmar carga / Reintentar')
+    expect(wrapper.find('.drop-zone').exists()).toBe(true)
+    wrapper.unmount()
+  })
+  it('conserva los archivos fallidos y ofrece reintento en la variante de muebles', async () => {
+    vi.spyOn(galleryService, 'list').mockResolvedValue(gallery([]))
+    const upload = vi
+      .spyOn(galleryService, 'upload')
+      .mockRejectedValueOnce(new Error('Sin conexión'))
+      .mockResolvedValueOnce(gallery([image(1, true)]))
+    const wrapper = mount(ImageGallery, {
+      props: { endpoint: '/gallery/', streamlined: true },
+      global: { stubs },
+    })
+    await flushPromises()
+    Object.defineProperty(wrapper.get('input[type=file]').element, 'files', {
+      value: [new File(['red'], 'red.png', { type: 'image/png' })],
+    })
+    await wrapper.get('input[type=file]').trigger('change')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Sin conexión'))
+    expect(wrapper.text()).toContain('Reintentar carga')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Reintentar carga')!
+      .trigger('click')
+    await vi.waitFor(() => expect(upload).toHaveBeenCalledTimes(2))
+    wrapper.unmount()
+  })
+  it('permite gestionar la imagen seleccionada desde el visor y conserva la selección al reordenar', async () => {
+    vi.spyOn(galleryService, 'list').mockResolvedValue(gallery([image(1, true), image(2)]))
+    const change = vi
+      .spyOn(galleryService, 'change')
+      .mockResolvedValueOnce(gallery([image(1), image(2, true)]))
+      .mockResolvedValueOnce(gallery([image(2, true), image(1)]))
+      .mockResolvedValueOnce(gallery([image(1, true)]))
+    const wrapper = mount(ImageGallery, {
+      props: { endpoint: '/gallery/', streamlined: true },
+      global: { stubs },
+    })
+    await flushPromises()
+    await wrapper.get('[aria-label="Ver Foto 2"]').trigger('click')
+    expect(wrapper.find('.viewer-toolbar .viewer-management').exists()).toBe(true)
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Establecer principal'))!
+      .trigger('click')
+    await flushPromises()
+    expect(change).toHaveBeenNthCalledWith(1, '/gallery/', { principal: 2 })
+    await wrapper.get('[aria-label="Mover imagen antes"]').trigger('click')
+    await flushPromises()
+    expect(change).toHaveBeenNthCalledWith(2, '/gallery/', { orden: [2, 1] })
+    expect(wrapper.get('.viewer-file strong').text()).toBe('Foto 2')
+    await wrapper.get('[aria-label="Eliminar imagen"]').trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Eliminar')!
+      .trigger('click')
+    await flushPromises()
+    expect(change).toHaveBeenNthCalledWith(3, '/gallery/', { eliminar: 2 })
+    wrapper.unmount()
+  })
+  it('no ofrece acciones de gestión cuando la galería es de solo lectura', async () => {
+    vi.spyOn(galleryService, 'list').mockResolvedValue(gallery([image(1, true)]))
+    const wrapper = mount(ImageGallery, {
+      props: { endpoint: '/gallery/', streamlined: true, editable: false },
+      global: { stubs },
+    })
+    await flushPromises()
+    await wrapper.get('.hero').trigger('click')
+    expect(wrapper.find('.viewer-management').exists()).toBe(false)
+    expect(wrapper.find('.drop-zone').exists()).toBe(false)
+    wrapper.unmount()
+  })
+  it('interrumpe la cola anterior si cambia la galería durante una carga', async () => {
+    vi.spyOn(galleryService, 'list').mockImplementation(async (path) =>
+      path === '/new/' ? gallery([image(9, true)]) : gallery([]),
+    )
+    let finish!: (value: GalleryData) => void
+    const upload = vi.spyOn(galleryService, 'upload').mockImplementation(
+      () =>
+        new Promise<GalleryData>((resolve) => {
+          finish = resolve
+        }),
+    )
+    const wrapper = mount(ImageGallery, {
+      props: { endpoint: '/old/', streamlined: true },
+      global: { stubs },
+    })
+    await flushPromises()
+    Object.defineProperty(wrapper.get('input[type=file]').element, 'files', {
+      value: [
+        new File(['red'], 'red.png', { type: 'image/png' }),
+        new File(['blue'], 'blue.png', { type: 'image/png' }),
+      ],
+    })
+    await wrapper.get('input[type=file]').trigger('change')
+    await vi.waitFor(() => expect(upload).toHaveBeenCalledTimes(1))
+    await wrapper.setProps({ endpoint: '/new/' })
+    await flushPromises()
+    finish(gallery([image(1, true)]))
+    await flushPromises()
+    expect(upload).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('.hero img').attributes('alt')).toBe('Foto 9')
+    wrapper.unmount()
+  })
+  it('acepta imágenes arrastradas y las carga automáticamente', async () => {
+    vi.spyOn(galleryService, 'list').mockResolvedValue(gallery([]))
+    const upload = vi.spyOn(galleryService, 'upload').mockResolvedValue(gallery([image(1, true)]))
+    const wrapper = mount(ImageGallery, {
+      props: { endpoint: '/gallery/', streamlined: true },
+      global: { stubs },
+    })
+    await flushPromises()
+    await wrapper.get('.drop-zone').trigger('drop', {
+      dataTransfer: { files: [new File(['red'], 'red.png', { type: 'image/png' })] },
+    })
+    await vi.waitFor(() => expect(upload).toHaveBeenCalledTimes(1))
+    wrapper.unmount()
+  })
   it('cambia portada y orden sin volver a subir archivos', async () => {
     vi.spyOn(galleryService, 'list').mockResolvedValue(gallery([image(1, true), image(2)]))
     const change = vi

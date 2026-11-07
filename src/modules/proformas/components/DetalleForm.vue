@@ -7,6 +7,7 @@ import type {
   Producto,
   ValorCatalogoPublico,
 } from '@/generated/api'
+import { Save } from '@lucide/vue'
 import ProductoSelector from './ProductoSelector.vue'
 import ProductImage from '@/modules/productos/components/ProductImage.vue'
 import Button from '@/shared/ui/Button.vue'
@@ -324,8 +325,15 @@ async function submit() {
     />
     <p v-if="error || externalError" role="alert">{{ error || externalError }}</p>
     <div class="actions">
-      <Button type="submit" :processing="saving || processing" processing-label="Guardando…"
-        >Guardar línea</Button
+      <Button
+        variant="success"
+        type="submit"
+        :processing="saving || processing"
+        processing-label="Guardando…"
+      >
+        <Save :size="17" aria-hidden="true" />
+        Guardar línea
+      </Button
       ><Button variant="secondary" :disabled="saving || processing" @click="emit('cancel')"
         >Cancelar</Button
       >

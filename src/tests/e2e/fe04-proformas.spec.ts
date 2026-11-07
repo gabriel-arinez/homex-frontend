@@ -341,13 +341,178 @@ async function noOverflow(page: Page) {
 
 async function studioStep(
   page: Page,
-  name: 'General' | 'Estructura' | 'Accesorios' | 'Precio' | 'Revisar',
+  name: 'General' | 'Estructura' | 'Accesorios' | 'Imágenes' | 'Precio' | 'Revisar',
 ) {
   await page
     .getByRole('navigation', { name: 'Apartados del mueble a pedido' })
     .getByRole('button', { name: new RegExp(name) })
     .click()
 }
+
+test('FURNITURE STUDIO ubica los controles de imágenes al lado y los apila en móvil', async ({
+  page,
+}) => {
+  await mockBackend(page)
+  await page.route('**/api/v1/galerias/', (route) =>
+    route.fulfill({ json: { id: 'test-gallery' } }),
+  )
+  let uploads = 0
+  const galleryImages = [
+    {
+      id: 9,
+      nombre: 'Referencia.png',
+      url: '/api/v1/imagenes-privadas/9/',
+      principal: true,
+      posicion: 0,
+    },
+  ]
+  await page.route('**/api/v1/galerias/test-gallery/imagenes/', (route) => {
+    if (route.request().method() === 'POST') {
+      uploads++
+      galleryImages.push({
+        id: 10,
+        nombre: 'nueva.png',
+        url: '/api/v1/imagenes-privadas/9/',
+        principal: false,
+        posicion: 1,
+      })
+    }
+    if (route.request().method() === 'PATCH') {
+      const change = route.request().postDataJSON() as {
+        principal?: number
+        orden?: number[]
+        eliminar?: number
+      }
+      if (change.principal !== undefined)
+        galleryImages.forEach((item) => (item.principal = item.id === change.principal))
+      if (change.orden)
+        galleryImages.sort((a, b) => change.orden!.indexOf(a.id) - change.orden!.indexOf(b.id))
+      if (change.eliminar !== undefined) {
+        const index = galleryImages.findIndex((item) => item.id === change.eliminar)
+        if (index >= 0) galleryImages.splice(index, 1)
+      }
+    }
+    return route.fulfill({
+      json: {
+        limite: 8,
+        imagenes: galleryImages,
+      },
+    })
+  })
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.goto('/proformas/nueva')
+  await page.getByRole('button', { name: 'Añadir ítem' }).click()
+  await page.getByRole('button', { name: 'Mueble a pedido' }).click()
+  await studioStep(page, 'Imágenes')
+  const gallery = page.getByRole('region', { name: 'Imágenes del mueble' })
+  const hero = gallery.getByRole('button', { name: 'Ampliar imagen principal' })
+  const controls = gallery.locator('.actions > button').filter({ hasText: 'Agregar imágenes' })
+  await expect(gallery.locator('.drop-zone')).toContainText('Arrastra imágenes aquí')
+  await expect(gallery.getByRole('button', { name: 'Gestionar imágenes' })).toHaveCount(0)
+  await expect(hero).toBeVisible()
+  const heroBox = await hero.boundingBox()
+  const controlsBox = await controls.boundingBox()
+  const pageThumbs = gallery.locator('.thumbs').first()
+  const thumbsBox = await pageThumbs.boundingBox()
+  expect(thumbsBox!.x + thumbsBox!.width).toBeLessThanOrEqual(heroBox!.x + 1)
+  expect(Math.abs(thumbsBox!.y - heroBox!.y)).toBeLessThan(2)
+  expect(controlsBox!.x).toBeGreaterThan(heroBox!.x + heroBox!.width - 1)
+  await hero.click()
+  const viewer = page.getByRole('dialog', { name: 'Visor de imágenes' })
+  const viewerImage = await viewer.locator('.large').boundingBox()
+  const viewerThumbs = await viewer.locator('.thumbs').boundingBox()
+  expect(viewerThumbs!.x).toBeGreaterThanOrEqual(viewerImage!.x + viewerImage!.width - 1)
+  await expect(viewer.getByRole('group', { name: 'Gestionar imagen seleccionada' })).toBeVisible()
+  const navigationBox = await viewer.getByRole('button', { name: 'Anterior' }).boundingBox()
+  const zoomBox = await viewer.getByRole('button', { name: 'Aumentar zoom' }).boundingBox()
+  const deleteBox = await viewer.getByRole('button', { name: 'Eliminar imagen' }).boundingBox()
+  expect(Math.abs(navigationBox!.y - zoomBox!.y)).toBeLessThan(2)
+  expect(Math.abs(navigationBox!.y - deleteBox!.y)).toBeLessThan(2)
+  await viewer.getByRole('button', { name: 'Eliminar imagen' }).click()
+  await page
+    .getByRole('dialog', { name: 'Eliminar imagen' })
+    .getByRole('button', { name: 'Cancelar' })
+    .click()
+  await expect(viewer).toBeVisible()
+  await viewer.getByLabel('Zoom', { exact: true }).fill('3')
+  const viewport = viewer.locator('.large')
+  await expect(viewer.locator('.zoom-canvas')).toBeVisible()
+  const dimensions = await viewport.evaluate((element) => ({
+    width: element.clientWidth,
+    height: element.clientHeight,
+    scrollWidth: element.scrollWidth,
+    scrollHeight: element.scrollHeight,
+  }))
+  expect(dimensions.scrollWidth).toBeGreaterThan(dimensions.width)
+  expect(dimensions.scrollHeight).toBeGreaterThan(dimensions.height)
+  await viewport.focus()
+  await page.keyboard.press('ArrowRight')
+  await expect.poll(() => viewport.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0)
+  await viewport.evaluate((element) => {
+    element.scrollLeft = 150
+    element.scrollTop = 150
+  })
+  const box = await viewport.boundingBox()
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(box!.x + box!.width / 2 + 70, box!.y + box!.height / 2 + 70, { steps: 4 })
+  await page.mouse.up()
+  expect(await viewport.evaluate((element) => element.scrollLeft)).toBeLessThan(150)
+  expect(await viewport.evaluate((element) => element.scrollTop)).toBeLessThan(150)
+  await viewer.getByLabel('Zoom', { exact: true }).focus()
+  await page.keyboard.press('ArrowLeft')
+  await expect(viewer.getByLabel('Zoom', { exact: true })).toHaveValue('2.75')
+  await expect(viewer.getByText('1 / 1', { exact: true })).toBeVisible()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await noOverflow(page)
+  const mobileViewerImage = await viewer.locator('.large').boundingBox()
+  const mobileViewerThumbs = await viewer.locator('.thumbs').boundingBox()
+  expect(mobileViewerThumbs!.y).toBeGreaterThanOrEqual(
+    mobileViewerImage!.y + mobileViewerImage!.height - 1,
+  )
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await viewer.getByLabel('Cerrar').click()
+  await gallery.getByLabel('Agregar imágenes', { exact: true }).setInputFiles({
+    name: 'nueva.png',
+    mimeType: 'image/png',
+    buffer: readFileSync('src/tests/fixtures/galerias/green.png'),
+  })
+  await expect.poll(() => uploads).toBe(1)
+  await expect(gallery.locator('h3')).toContainText('2/8')
+  await expect(gallery.getByRole('button', { name: 'Confirmar carga / Reintentar' })).toHaveCount(0)
+  await gallery.getByRole('button', { name: 'Ver nueva.png' }).click()
+  await viewer.getByRole('button', { name: 'Establecer principal' }).click()
+  await expect(viewer.locator('.viewer-file')).toContainText('Imagen principal')
+  await viewer.getByRole('button', { name: 'Mover imagen antes' }).click()
+  await expect(viewer.locator('.viewer-file strong')).toHaveText('nueva.png')
+  await viewer.getByRole('button', { name: 'Eliminar imagen' }).click()
+  await page
+    .getByRole('dialog', { name: 'Eliminar imagen' })
+    .getByRole('button', { name: 'Eliminar', exact: true })
+    .click()
+  await expect(gallery.locator('h3')).toContainText('1/8')
+  await viewer.getByLabel('Cerrar').click()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await noOverflow(page)
+  const mobileHero = await hero.boundingBox()
+  const mobilePageThumbs = await pageThumbs.boundingBox()
+  const mobileControls = await controls.boundingBox()
+  expect(mobilePageThumbs!.y).toBeGreaterThanOrEqual(mobileHero!.y + mobileHero!.height - 1)
+  expect(mobileControls!.y).toBeGreaterThan(mobileHero!.y + mobileHero!.height - 1)
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await studioStep(page, 'Revisar')
+  const reviewGallery = page.locator('.studio-review-layout > .studio-review-gallery')
+  const reviewDetails = page.locator('.studio-review-layout > .studio-content')
+  await expect(reviewGallery).toBeVisible()
+  const galleryPosition = await reviewGallery.boundingBox()
+  const detailsPosition = await reviewDetails.boundingBox()
+  expect(detailsPosition!.x).toBeGreaterThan(galleryPosition!.x + galleryPosition!.width - 1)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await noOverflow(page)
+  const mobileGallery = await reviewGallery.boundingBox()
+  const mobileDetails = await reviewDetails.boundingBox()
+  expect(mobileDetails!.y).toBeGreaterThanOrEqual(mobileGallery!.y + mobileGallery!.height - 1)
+})
 
 test('FURNITURE STUDIO abre una pagina propia, conserva cambios entre apartados y no persiste al incorporar', async ({
   page,
@@ -372,7 +537,25 @@ test('FURNITURE STUDIO abre una pagina propia, conserva cambios entre apartados 
   await studioStep(page, 'Estructura')
   await page.getByRole('button', { name: 'Agregar componente' }).click()
   await page.locator('#componente-nombre-0').fill('Tablero superior')
+  await expect(page.locator('.component-identity')).toContainText('Tablero superior')
+  await expect(page.locator('.studio-component-detail > details.card')).toHaveCount(0)
+  await expect(page.locator('input[name="componente-0-cantidad"]')).toBeVisible()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await noOverflow(page)
+  await page.setViewportSize({ width: 1280, height: 720 })
   await page.locator('#componente-espesor-0').fill('18 mm')
+  await studioStep(page, 'Accesorios')
+  await expect(page.getByText('Todavía no hay accesorios.', { exact: false })).toBeVisible()
+  await page.getByRole('button', { name: 'Añadir accesorio' }).click()
+  await page.getByLabel('Descripción del accesorio').fill('Tirador metálico')
+  await page.getByRole('button', { name: 'Listo' }).click()
+  await page.getByRole('button', { name: 'Quitar accesorio Tirador metálico' }).click()
+  await page.getByRole('button', { name: 'Deshacer', exact: true }).click()
+  await expect(page.locator('#accesorios').getByText('Tirador metálico')).toBeVisible()
+  await page.getByLabel('Observaciones y detalles adicionales').fill('Color a elección')
+  await page.setViewportSize({ width: 390, height: 844 })
+  await noOverflow(page)
+  await page.setViewportSize({ width: 1280, height: 720 })
   await studioStep(page, 'General')
   await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue(
     'Escritorio personalizado',
@@ -389,6 +572,18 @@ test('FURNITURE STUDIO abre una pagina propia, conserva cambios entre apartados 
   )
   await studioStep(page, 'Precio')
   await page.getByLabel('Precio unitario negociado (BOB)').fill('350.00')
+  const commercialFields = page.locator('#comercial .commercial-fields')
+  const commercialTotal = page.locator('#comercial .commercial-total')
+  await expect(commercialTotal).toContainText('Resumen de cotización')
+  const fieldsBox = await commercialFields.boundingBox()
+  const totalBox = await commercialTotal.boundingBox()
+  expect(totalBox!.x).toBeGreaterThan(fieldsBox!.x + fieldsBox!.width - 1)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await noOverflow(page)
+  const mobileFields = await commercialFields.boundingBox()
+  const mobileTotal = await commercialTotal.boundingBox()
+  expect(mobileTotal!.y).toBeGreaterThanOrEqual(mobileFields!.y + mobileFields!.height - 1)
+  await page.setViewportSize({ width: 1280, height: 720 })
   await studioStep(page, 'Revisar')
   await expect(page.getByRole('heading', { name: 'Revisar mueble' })).toBeVisible()
   await studioStep(page, 'Revisar')
@@ -398,6 +593,8 @@ test('FURNITURE STUDIO abre una pagina propia, conserva cambios entre apartados 
 })
 
 test('FE04 crea con unitario y descuento, revisa y aprueba', async ({ page }) => {
+  const longLineName = 'Mesa de reunión modular para diez personas con almacenamiento integrado'
+  const renamedLine = `${longLineName} ejecutivo`
   await mockBackend(page)
   await page.goto('/proformas')
   await page.getByRole('button', { name: 'Nueva proforma' }).click()
@@ -405,7 +602,7 @@ test('FE04 crea con unitario y descuento, revisa y aprueba', async ({ page }) =>
   await expect(page.getByRole('heading', { name: 'Nueva proforma' })).toBeVisible()
   await page.getByRole('button', { name: 'Añadir ítem' }).click()
   await page.getByRole('button', { name: 'Mueble a pedido' }).click()
-  await page.getByLabel('Nombre comercial del mueble').fill('Tres escritorios')
+  await page.getByLabel('Nombre comercial del mueble').fill(longLineName)
   await studioStep(page, 'Precio')
   await page.getByLabel('Cantidad cotizada').fill('3')
   await page.locator('#mueble-unidad').selectOption('20')
@@ -418,14 +615,51 @@ test('FE04 crea con unitario y descuento, revisa y aprueba', async ({ page }) =>
   await page.locator('#componente-espesor-0').fill('25 mm')
   await studioStep(page, 'Revisar')
   await page.getByRole('button', { name: 'Agregar mueble a la proforma' }).click()
-  await expect(page.getByText(/3 ×/)).toContainText('Bs 34,00')
-  await page.getByRole('button', { name: 'Acciones de Tres escritorios' }).click()
+  const quoteLine = page.locator('.line-card').filter({ hasText: longLineName })
+  await expect(quoteLine).toContainText('Cantidad')
+  await expect(quoteLine).toContainText('Precio por unidad')
+  await expect(quoteLine).toContainText(/Bs\s*34,00/)
+  await expect(quoteLine).toContainText('Descuento')
+  await expect(quoteLine).toContainText(/Bs\s*2,00/)
+  await expect(quoteLine).toContainText('Importe de línea')
+  await expect(quoteLine).toContainText(/Bs\s*100,00/)
+  const nameElement = quoteLine.locator('.line-heading strong')
+  const nameBox = await nameElement.boundingBox()
+  const metricsBox = await quoteLine.locator('.line-metrics').boundingBox()
+  expect(nameBox).not.toBeNull()
+  expect(metricsBox).not.toBeNull()
+  expect(metricsBox!.x).toBeGreaterThan(nameBox!.x + nameBox!.width)
+  expect(nameBox!.height).toBeGreaterThan(24)
+  await quoteLine.locator('.line-metrics').click()
+  const quickView = page.getByRole('dialog')
+  await expect(quickView).toBeVisible()
+  const dialogBox = await quickView.boundingBox()
+  const mediaBox = await quickView.locator('.media-frame').boundingBox()
+  expect(dialogBox?.width).toBeGreaterThan(1200)
+  expect(mediaBox?.width).toBeGreaterThan(480)
+  await quickView.locator('button[aria-label="Cerrar"]').click()
+  await expect(quickView).not.toBeVisible()
+  const desktopViewport = page.viewportSize()
+  await page.setViewportSize({ width: 390, height: 900 })
+  const mobileNameBox = await nameElement.boundingBox()
+  const mobileMetricsBox = await quoteLine.locator('.line-metrics').boundingBox()
+  const mobileCardBox = await quoteLine.boundingBox()
+  expect(mobileNameBox).not.toBeNull()
+  expect(mobileMetricsBox).not.toBeNull()
+  expect(mobileCardBox).not.toBeNull()
+  expect(mobileMetricsBox!.y).toBeGreaterThan(mobileNameBox!.y)
+  expect(mobileMetricsBox!.x + mobileMetricsBox!.width).toBeLessThanOrEqual(
+    mobileCardBox!.x + mobileCardBox!.width,
+  )
+  if (desktopViewport) await page.setViewportSize(desktopViewport)
+  await page.getByRole('button', { name: `Acciones de ${longLineName}` }).click()
+  await expect(quickView).not.toBeVisible()
   await page.getByRole('menuitem', { name: 'Editar' }).click()
-  await page.getByLabel('Nombre comercial del mueble').fill('Tres escritorios ejecutivos')
+  await page.getByLabel('Nombre comercial del mueble').fill(renamedLine)
   await studioStep(page, 'Revisar')
   await page.getByRole('button', { name: 'Agregar mueble a la proforma' }).click()
-  await expect(page.getByText('Tres escritorios ejecutivos', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: 'Acciones de Tres escritorios ejecutivos' }).click()
+  await expect(page.getByText(renamedLine, { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: `Acciones de ${renamedLine}` }).click()
   await page.getByRole('menuitem', { name: 'Ficha técnica' }).click()
   await page.getByRole('combobox', { name: 'Tipo de mueble (opcional)' }).fill('Escritorio')
   await page
@@ -436,7 +670,7 @@ test('FE04 crea con unitario y descuento, revisa y aprueba', async ({ page }) =>
   await page.locator('#componente-dimensiones-0').fill('ancho 1.2 m')
   await studioStep(page, 'Revisar')
   await page.getByRole('button', { name: 'Agregar mueble a la proforma' }).click()
-  await page.getByRole('button', { name: 'Acciones de Tres escritorios ejecutivos' }).click()
+  await page.getByRole('button', { name: `Acciones de ${renamedLine}` }).click()
   await page.getByRole('menuitem', { name: 'Ficha técnica' }).click()
   await studioStep(page, 'Estructura')
   await expect(page.locator('#componente-nombre-0')).toHaveValue('Mesón')
@@ -934,6 +1168,18 @@ test('PRF-02 selecciona catálogo, consulta detalle y deshace sin escribir profo
   await page.getByRole('button', { name: 'Producto de catálogo' }).click()
   await expect(page.getByText('S-01', { exact: false })).toBeVisible()
 
+  const catalogCard = page.locator('.producto').filter({ hasText: 'Silla ejecutiva' })
+  await catalogCard.getByRole('button', { name: 'Ver ficha' }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  const catalogMedia = await page.getByRole('dialog').locator('.media-frame').boundingBox()
+  expect(catalogMedia?.width).toBeGreaterThan(480)
+  await page.getByRole('dialog').getByLabel('Cerrar').click()
+  await page.getByRole('button', { name: 'Lista' }).click()
+  const catalogRow = page.locator('.catalog-table tr').filter({ hasText: 'Silla ejecutiva' })
+  const catalogThumbnail = await catalogRow.locator('.thumbnail').boundingBox()
+  expect(catalogThumbnail?.width).toBe(96)
+  await page.getByRole('button', { name: 'Cuadrícula' }).click()
+
   await page.getByRole('button', { name: 'Seleccionar para cotizar' }).click()
   await expect(page.getByLabel('Nombre comercial')).toHaveValue('Silla ejecutiva')
   await expect(page.getByLabel('Precio unitario (BOB)')).toHaveValue('1200.00')
@@ -944,13 +1190,22 @@ test('PRF-02 selecciona catálogo, consulta detalle y deshace sin escribir profo
   await page.getByRole('button', { name: 'Seleccionar para cotizar' }).click()
   await page.getByLabel('Cantidad', { exact: true }).fill('2')
   await page.getByRole('button', { name: 'Guardar línea' }).click()
-  await expect(page.locator('.line-card').getByText('Silla ejecutiva')).toBeVisible()
+  const quoteLine = page.locator('.line-card').filter({ hasText: 'Silla ejecutiva' })
+  await expect(quoteLine.getByText('Silla ejecutiva')).toBeVisible()
+  const thumbnailBox = await quoteLine.locator('.line-thumbnail').boundingBox()
+  expect(thumbnailBox?.width).toBe(96)
   expect(writes).toBe(0)
 
   await page.getByRole('button', { name: 'Ver detalle completo de Silla ejecutiva' }).click()
-  await expect(
-    page.getByRole('dialog').getByText('Precio unitario cotizado:', { exact: false }),
-  ).toBeVisible()
+  await expect(page.getByRole('dialog').getByText('Resumen de la línea')).toBeVisible()
+  await expect(page.getByRole('dialog').getByText('Ficha técnica')).toHaveCount(0)
+  const summary = page.getByRole('dialog').locator('.line-summary-metrics')
+  const summaryBox = await summary.boundingBox()
+  const totalBox = await summary.locator('.line-summary-total').boundingBox()
+  expect(totalBox?.width).toBe(summaryBox?.width)
+  const quantityLabel = await summary.locator('dt').first().boundingBox()
+  const quantityValue = await summary.locator('dd').first().boundingBox()
+  expect(quantityValue!.y).toBeGreaterThan(quantityLabel!.y)
   await page.getByRole('dialog').getByRole('button', { name: 'Cerrar' }).last().click()
   await page.getByRole('button', { name: 'Acciones de Silla ejecutiva' }).click()
   await page.getByRole('menuitem', { name: 'Eliminar' }).click()
@@ -1038,7 +1293,8 @@ for (const width of [360, 768, 1440]) {
     expect(captures).toBe(0)
     await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Mueble previo')
     await page
-      .locator('.studio-voice-panel input[type="file"]')
+      .getByRole('dialog', { name: 'Completar mueble por voz' })
+      .locator('input[type="file"]')
       .setInputFiles({ name: '24.wav', mimeType: 'audio/wav', buffer: Buffer.from('fixture') })
     await expect(page.getByRole('heading', { name: 'Propuesta obtenida por voz' })).toBeVisible()
     await expect(page.getByText('unidad del ancho', { exact: false }).first()).toBeVisible()
@@ -1072,6 +1328,11 @@ for (const width of [360, 768, 1440]) {
     // El asistente persiste minimizado tras aplicar la propuesta: abrirlo para revisar el ASR.
     await page.getByRole('button', { name: 'Completar por voz' }).click()
     await expect(page.getByRole('dialog', { name: 'Completar mueble por voz' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Descripción por voz' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Revisar transcripción' })).toBeVisible()
+    await expect(
+      page.getByRole('textbox', { name: 'Transcripción / texto corregido' }),
+    ).toBeVisible()
     await page.getByText('Ver transcripción original', { exact: true }).click()
     await expect(
       page.locator('details').filter({ hasText: 'Ver transcripción original' }),
@@ -1084,9 +1345,9 @@ for (const width of [360, 768, 1440]) {
         version_proyeccion: terminal === 'VERSION' ? 'PRF04_1' : 'PRF04_2',
       }
       await page
-        .getByLabel('Corregir texto para una nueva interpretación')
+        .getByRole('textbox', { name: 'Transcripción / texto corregido' })
         .fill(`Corrección ${terminal}`)
-      await page.getByRole('button', { name: 'Interpretar texto corregido' }).click()
+      await page.getByRole('button', { name: 'Reinterpretar texto' }).click()
       await expect(
         page.getByRole('alert').filter({ hasText: 'No se obtuvo una propuesta utilizable' }),
       ).toBeVisible()
@@ -1295,17 +1556,35 @@ test('@a11y FE04 bandeja de proformas usa menú único y visualización de solo 
   await actions.click()
   await expect(page.getByRole('menuitem', { name: 'Continuar edición' })).toBeVisible()
   await expect(page.getByRole('menuitem', { name: 'Ver resumen y gestión' })).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: 'Anular proforma' })).toBeVisible()
   const accessibility = await new AxeBuilder({ page }).include('.proforma-table').analyze()
   expect(accessibility.violations).toEqual([])
   await page.keyboard.press('Escape')
   await expect(page.getByRole('menuitem', { name: 'Continuar edición' })).toHaveCount(0)
 
-  await page.getByRole('button', { name: 'Más filtros' }).click()
-  await page.locator('#moneda-proforma-filtro').selectOption('USD')
-  await expect(page).toHaveURL(/moneda=USD/)
+  await expect(page.getByRole('button', { name: 'Más filtros' })).toHaveCount(0)
+  await expect(page.locator('input[name="fecha-desde-proforma"]')).toBeVisible()
+  await expect(page.locator('input[name="fecha-hasta-proforma"]')).toBeVisible()
   await page.setViewportSize({ width: 390, height: 844 })
   await noOverflow(page)
   await expect(page.getByRole('button', { name: 'Acciones de la proforma #101' })).toBeVisible()
+})
+
+test('FE04 acciones de bandeja solicitan confirmación antes de anular', async ({ page }) => {
+  await mockBackend(page)
+  let cancellations = 0
+  await page.route('**/api/v1/proformas/1/anular/', async (route) => {
+    cancellations++
+    await route.fulfill({ status: 500 })
+  })
+  await page.goto('/proformas')
+  await page.getByRole('button', { name: 'Acciones de la proforma #101' }).click()
+  await page.getByRole('menuitem', { name: 'Anular proforma' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('heading', { name: 'Anular proforma' })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Cancelar' }).click()
+  await expect(dialog).toHaveCount(0)
+  expect(cancellations).toBe(0)
 })
 
 test('FE04 muestra creación real y alinea totales; histórico sin hora inventada', async ({

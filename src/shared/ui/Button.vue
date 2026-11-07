@@ -1,7 +1,7 @@
 <script setup lang="ts">
 withDefaults(
   defineProps<{
-    variant?: 'primary' | 'secondary' | 'danger'
+    variant?: 'primary' | 'secondary' | 'danger' | 'success' | 'info'
     type?: 'button' | 'submit' | 'reset'
     disabled?: boolean
     processing?: boolean
@@ -72,5 +72,25 @@ withDefaults(
 .button--danger {
   color: var(--color-danger);
   background: var(--color-danger-soft);
+  border-color: var(--color-danger);
+}
+.button--danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-danger-soft) 80%, var(--color-danger));
+}
+.button--success {
+  color: var(--color-success);
+  background: var(--color-success-soft);
+  border-color: var(--color-success);
+}
+.button--success:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-success-soft) 80%, var(--color-success));
+}
+.button--info {
+  color: var(--color-info);
+  background: var(--color-info-soft);
+  border-color: var(--color-info);
+}
+.button--info:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-info-soft) 80%, var(--color-info));
 }
 </style>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { Send } from '@lucide/vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
 import Card from '@/shared/ui/Card.vue'
 import Button from '@/shared/ui/Button.vue'
@@ -84,9 +85,10 @@ async function submit() {
           >. Reintentar el mismo envío reutiliza la operación.
         </p>
         <p v-if="error" role="alert" class="error">{{ error }}</p>
-        <Button type="submit" :disabled="!valid || processing">{{
-          processing ? 'Enviando…' : 'Enviar a procesamiento'
-        }}</Button>
+        <Button variant="info" type="submit" :disabled="!valid || processing">
+          <Send :size="17" aria-hidden="true" />
+          {{ processing ? 'Enviando…' : 'Enviar a procesamiento' }}
+        </Button>
       </form></Card
     >
   </div>

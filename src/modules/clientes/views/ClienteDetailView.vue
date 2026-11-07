@@ -7,6 +7,7 @@ import { ApiError } from '@/shared/api'
 import { validateClient } from '@/shared/validation/commercialFields'
 import ClienteFormFields, { type ClienteFormModel } from '../components/ClienteFormFields.vue'
 import { clientesService, nombreCliente } from '../services/clientesService'
+import { Save } from '@lucide/vue'
 import Button from '@/shared/ui/Button.vue'
 import ConfirmDialog from '@/shared/ui/ConfirmDialog.vue'
 import Card from '@/shared/ui/Card.vue'
@@ -256,7 +257,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           Descartar cambios y recargar ficha
         </Button>
         <div class="actions">
-          <Button type="submit" :processing="saving" processing-label="Guardando…">Guardar</Button>
+          <Button variant="success" type="submit" :processing="saving" processing-label="Guardando…">
+            <Save :size="17" aria-hidden="true" />
+            Guardar
+          </Button>
           <Button variant="secondary" :disabled="saving" @click="cancelEdit">Cancelar</Button>
         </div>
       </form>

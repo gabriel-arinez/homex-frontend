@@ -90,8 +90,11 @@ describe('Voz en creación de catálogo', () => {
     })
     await w.get('.source-record').trigger('click')
     await flushPromises()
-    expect(w.text()).toContain('Finalizar grabación')
-    await w.get('.source-record').trigger('click')
+    expect(w.findAll('.source-record')).toHaveLength(0)
+    expect(w.text()).toContain('Finalizar')
+    expect(w.text()).toContain('Pausar')
+    expect(w.text()).toContain('Cancelar')
+    await w.get('button[aria-label="Finalizar grabación"]').trigger('click')
     await flushPromises()
     expect(catalogoCapturaService.create).toHaveBeenCalledTimes(1)
     expect(catalogoCapturaService.create).toHaveBeenCalledWith(

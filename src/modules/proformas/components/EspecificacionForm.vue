@@ -14,7 +14,24 @@ import TextField from '@/shared/ui/TextField.vue'
 import TextAreaField from '@/shared/ui/TextAreaField.vue'
 import Toast from '@/shared/ui/Toast.vue'
 import MuebleOptionPicker from './MuebleOptionPicker.vue'
-import { Pencil, AlertCircle, CheckCircle2, Layers3, Plus } from '@lucide/vue'
+import {
+  Pencil,
+  ArrowUp,
+  ArrowDown,
+  MessageSquareText,
+  AlertCircle,
+  CheckCircle2,
+  Layers3,
+  Plus,
+  Save,
+  Tag,
+  Ruler,
+  SlidersHorizontal,
+  Package,
+  Wrench,
+  Wallet,
+  Calculator,
+} from '@lucide/vue'
 import { asignarEspesorPendiente, pendienteResuelto } from '../services/pendientesAsistencia'
 import { proformasService } from '../services/proformasService'
 import {
@@ -1012,7 +1029,10 @@ onMounted(loadCatalog)
           </ul>
         </aside>
         <section id="identificacion" v-show="!studio || activeSection === 'general'">
-          <h3>Identificación</h3>
+          <h3><Tag v-if="studio" :size="19" aria-hidden="true" />Identificación</h3>
+          <p v-if="studio" class="section-guidance">
+            Identifica el mueble con un nombre claro para reconocerlo en la proforma.
+          </p>
           <div class="studio-identification-fields">
             <TextField
               v-model="comercial.nombre"
@@ -1077,7 +1097,9 @@ onMounted(loadCatalog)
           class="dimensions-section"
           v-show="!studio || activeSection === 'general'"
         >
-          <h3>Dimensiones generales opcionales</h3>
+          <h3>
+            <Ruler v-if="studio" :size="19" aria-hidden="true" />Dimensiones generales opcionales
+          </h3>
           <p>Cada medida conserva su unidad y los datos técnicos originales.</p>
           <div class="measure-grid">
             <div v-for="medida in medidas" :key="medida.clave" class="inline measure-row">
@@ -1158,7 +1180,13 @@ onMounted(loadCatalog)
           />
         </section>
         <section v-show="!studio || activeSection === 'general'">
-          <h3>Características generales</h3>
+          <h3>
+            <SlidersHorizontal v-if="studio" :size="19" aria-hidden="true" />Características
+            generales
+          </h3>
+          <p v-if="studio" class="section-guidance">
+            Añade materiales, acabados u otros detalles generales cuando correspondan.
+          </p>
           <div class="attribute-search">
             <MuebleOptionPicker
               v-if="studio"
@@ -1237,7 +1265,11 @@ onMounted(loadCatalog)
           :class="{ 'studio-group-management': studio }"
         >
           <div class="heading">
-            <h3>Conjuntos ({{ conjuntos.length }}/{{ limites.max_conjuntos }})</h3>
+            <h3>
+              <Layers3 v-if="studio" :size="19" aria-hidden="true" />Conjuntos ({{
+                conjuntos.length
+              }}/{{ limites.max_conjuntos }})
+            </h3>
             <Button
               variant="secondary"
               :disabled="
@@ -1249,6 +1281,9 @@ onMounted(loadCatalog)
               >Añadir conjunto</Button
             >
           </div>
+          <p v-if="studio" class="structure-guidance">
+            Agrupa piezas relacionadas cuando el mueble tenga módulos o secciones.
+          </p>
           <article v-for="(g, gi) in conjuntos" :key="g.uid" class="card studio-group-card">
             <div class="inline">
               <TextField
@@ -1291,7 +1326,11 @@ onMounted(loadCatalog)
         </section>
         <section id="componentes" v-show="!studio || activeSection === 'estructura'">
           <div class="heading">
-            <h3>Componentes ({{ componentes.length }}/{{ limites.max_componentes }})</h3>
+            <h3>
+              <Package v-if="studio" :size="19" aria-hidden="true" />Componentes ({{
+                componentes.length
+              }}/{{ limites.max_componentes }})
+            </h3>
             <Button
               variant="secondary"
               :disabled="
@@ -1303,6 +1342,9 @@ onMounted(loadCatalog)
               >Agregar componente</Button
             >
           </div>
+          <p v-if="studio" class="structure-guidance">
+            Selecciona una pieza para consultar o editar sus datos.
+          </p>
           <div class="studio-component-layout">
             <aside
               v-if="studio"
@@ -1337,26 +1379,35 @@ onMounted(loadCatalog)
               </div>
             </aside>
             <div class="studio-component-detail">
-              <details
+              <component
+                :is="studio ? 'div' : 'details'"
                 v-for="(c, i) in componentes"
                 v-show="!studio || activeComponentUid === (c.uid || String(i))"
                 :key="c.uid || i"
-                class="card"
-                open
+                class="card component-editor"
+                :open="!studio ? true : undefined"
               >
                 <summary v-if="!studio">
                   Componente {{ i + 1 }}: {{ c.nombre || 'Sin nombre' }}
                 </summary>
                 <div class="heading">
-                  <strong>Componente {{ i + 1 }}</strong>
-                  <div>
-                    <button type="button" :disabled="i === 0" @click="move(i, -1)">Subir</button
+                  <div class="component-identity">
+                    <small v-if="studio"
+                      >PIEZA SELECCIONADA · {{ i + 1 }} DE {{ componentes.length }}</small
+                    >
+                    <strong>{{
+                      studio ? c.nombre || 'Componente sin nombre' : `Componente ${i + 1}`
+                    }}</strong>
+                  </div>
+                  <div class="component-reorder">
+                    <button type="button" :disabled="i === 0" @click="move(i, -1)">
+                      <ArrowUp v-if="studio" :size="15" aria-hidden="true" /> Subir</button
                     ><button
                       type="button"
                       :disabled="i === componentes.length - 1"
                       @click="move(i, 1)"
                     >
-                      Bajar
+                      <ArrowDown v-if="studio" :size="15" aria-hidden="true" /> Bajar
                     </button>
                   </div>
                 </div>
@@ -1474,7 +1525,7 @@ onMounted(loadCatalog)
                   <Button variant="secondary" @click="duplicateComponente(i)">Duplicar</Button>
                   <Button variant="secondary" @click="removeComponente(i)">Quitar</Button>
                 </div>
-              </details>
+              </component>
               <div v-if="studio && !componentes.length" class="empty-editor">
                 <h4>Empieza por una pieza</h4>
                 <p>
@@ -1497,11 +1548,17 @@ onMounted(loadCatalog)
         </section>
         <section id="accesorios" v-show="!studio || activeSection === 'accesorios'">
           <div class="heading">
-            <h3>Accesorios incluidos</h3>
+            <h3><Wrench v-if="studio" :size="19" aria-hidden="true" />Accesorios incluidos</h3>
             <span v-if="studio" class="accessory-count"
               >{{ accesorios.filter((a) => a.trim()).length }} registrados</span
             >
           </div>
+          <p v-if="studio" class="accessory-guidance">
+            Registra los accesorios que se incluirán con el mueble.
+          </p>
+          <p v-if="studio && !accesorios.length" class="accessory-empty">
+            Todavía no hay accesorios. Puedes añadirlos si corresponden.
+          </p>
           <div
             v-for="(_, i) in accesorios"
             :key="i"
@@ -1510,7 +1567,9 @@ onMounted(loadCatalog)
           >
             <template v-if="studio && accesorios[i]?.trim() && accesorioEnEdicion !== i">
               <div class="accessory-item-label">
-                <CheckCircle2 :size="18" aria-hidden="true" /><strong>{{ accesorios[i] }}</strong>
+                <Wrench v-if="studio" :size="18" aria-hidden="true" /><strong>{{
+                  accesorios[i]
+                }}</strong>
               </div>
               <Button variant="secondary" @click="accesorioEnEdicion = i"
                 ><Pencil :size="15" aria-hidden="true" /> Editar</Button
@@ -1524,7 +1583,12 @@ onMounted(loadCatalog)
               :error="errorAccesorio(i)"
               @blur="touchedAccesorios[i] = true"
             />
-            <Button variant="secondary" @click="removeAccesorio(i)">Quitar</Button>
+            <Button
+              variant="secondary"
+              :aria-label="studio ? `Quitar accesorio ${accesorios[i] || i + 1}` : undefined"
+              @click="removeAccesorio(i)"
+              >Quitar</Button
+            >
             <Button
               v-if="studio && accesorioEnEdicion === i && accesorios[i]?.trim()"
               variant="secondary"
@@ -1535,6 +1599,7 @@ onMounted(loadCatalog)
           <Button
             variant="secondary"
             :disabled="!studio && accesorios.some((a) => !a.trim())"
+            class="accessory-add"
             @click="addAccesorio"
             ><Plus :size="16" aria-hidden="true" /> Añadir accesorio</Button
           >
@@ -1550,6 +1615,9 @@ onMounted(loadCatalog)
           >
         </section>
         <section v-show="!studio || activeSection === 'accesorios'">
+          <h3 v-if="studio" class="observaciones-heading">
+            <MessageSquareText :size="19" aria-hidden="true" />Notas para fabricación
+          </h3>
           <TextAreaField
             v-model="form.observaciones"
             name="observaciones-especificacion"
@@ -1565,7 +1633,12 @@ onMounted(loadCatalog)
           </div>
         </section>
         <section id="comercial" v-show="!studio || activeSection === 'comercial'">
-          <h3>Datos comerciales de este mueble</h3>
+          <h3>
+            <Wallet v-if="studio" :size="19" aria-hidden="true" />Datos comerciales de este mueble
+          </h3>
+          <p v-if="studio" class="section-guidance">
+            Define la cantidad y el precio cotizado para este mueble.
+          </p>
           <aside v-if="totalDictado" aria-label="Revisión de precio total dictado">
             <p>
               Total reconocido en el dictado:
@@ -1587,73 +1660,81 @@ onMounted(loadCatalog)
               diferencia.
             </label>
           </aside>
-          <div class="grid">
-            <TextField
-              v-model="comercial.descripcion"
-              name="mueble-descripcion"
-              label="Descripción comercial opcional"
-            />
-            <TextField
-              v-model="comercial.cantidad"
-              name="mueble-cantidad"
-              label="Cantidad cotizada *"
-              input-mode="numeric"
-              :error="errorCampo('comercial', 0, touched.cantidad)"
-              @blur="touched.cantidad = true"
-            />
-            <Select
-              v-model="comercial.unidad"
-              name="mueble-unidad"
-              label="Unidad comercial *"
-              :options="
-                (unidades ?? [])
-                  .filter((u) => ['PIEZA', 'JUEGO'].includes(u.codigo))
-                  .map((u) => ({ label: u.nombre, value: String(u.id) }))
-              "
-            />
-            <TextField
-              v-model="comercial.precio_unitario"
-              name="mueble-precio"
-              :label="'Precio unitario negociado (' + (moneda ?? 'BOB') + ') *'"
-              input-mode="decimal"
-              :error="errorCampo('comercial', 2, touched.precio)"
-              @blur="touched.precio = true"
-            />
-            <TextField
-              v-model="comercial.descuento"
-              name="mueble-descuento"
-              label="Descuento monetario total de línea *"
-              input-mode="decimal"
-              :error="errorCampo('comercial', 3, touched.descuento)"
-              @blur="touched.descuento = true"
-            />
-          </div>
-          <div class="commercial-total" role="status">
-            <div>
-              <span>Subtotal</span
-              ><strong>{{
-                cantidadValida && precioValido
-                  ? (Number(comercial.cantidad) * Number(comercial.precio_unitario)).toFixed(2) +
-                    ' ' +
-                    (moneda ?? 'BOB')
-                  : 'Pendiente'
-              }}</strong>
+          <div class="commercial-layout">
+            <div class="grid commercial-fields">
+              <TextField
+                v-model="comercial.descripcion"
+                class="commercial-description"
+                name="mueble-descripcion"
+                label="Descripción comercial opcional"
+              />
+              <TextField
+                v-model="comercial.cantidad"
+                name="mueble-cantidad"
+                label="Cantidad cotizada *"
+                input-mode="numeric"
+                :error="errorCampo('comercial', 0, touched.cantidad)"
+                @blur="touched.cantidad = true"
+              />
+              <Select
+                v-model="comercial.unidad"
+                name="mueble-unidad"
+                label="Unidad comercial *"
+                :options="
+                  (unidades ?? [])
+                    .filter((u) => ['PIEZA', 'JUEGO'].includes(u.codigo))
+                    .map((u) => ({ label: u.nombre, value: String(u.id) }))
+                "
+              />
+              <TextField
+                v-model="comercial.precio_unitario"
+                name="mueble-precio"
+                :label="'Precio unitario negociado (' + (moneda ?? 'BOB') + ') *'"
+                input-mode="decimal"
+                :hint="studio ? 'Importe cotizado por cada unidad.' : undefined"
+                :error="errorCampo('comercial', 2, touched.precio)"
+                @blur="touched.precio = true"
+              />
+              <TextField
+                v-model="comercial.descuento"
+                name="mueble-descuento"
+                label="Descuento monetario total de línea *"
+                input-mode="decimal"
+                :hint="studio ? 'Se descuenta una sola vez del subtotal de la línea.' : undefined"
+                :error="errorCampo('comercial', 3, touched.descuento)"
+                @blur="touched.descuento = true"
+              />
             </div>
-            <div>
-              <span>Descuento</span
-              ><strong>{{
-                descuentoValido ? comercial.descuento + ' ' + (moneda ?? 'BOB') : 'Pendiente'
-              }}</strong>
+            <div class="commercial-total" role="status">
+              <h4 v-if="studio">
+                <Calculator :size="18" aria-hidden="true" />Resumen de cotización
+              </h4>
+              <div>
+                <span>Subtotal</span
+                ><strong>{{
+                  cantidadValida && precioValido
+                    ? (Number(comercial.cantidad) * Number(comercial.precio_unitario)).toFixed(2) +
+                      ' ' +
+                      (moneda ?? 'BOB')
+                    : 'Pendiente'
+                }}</strong>
+              </div>
+              <div>
+                <span>Descuento</span
+                ><strong>{{
+                  descuentoValido ? comercial.descuento + ' ' + (moneda ?? 'BOB') : 'Pendiente'
+                }}</strong>
+              </div>
+              <div class="commercial-total-main">
+                <span>Total estimado del mueble</span
+                ><strong>{{
+                  totalEstimado === null
+                    ? 'Importe pendiente'
+                    : totalEstimado.toFixed(2) + ' ' + (moneda ?? 'BOB')
+                }}</strong>
+              </div>
+              <p>El total definitivo se confirmará al guardar la proforma.</p>
             </div>
-            <div class="commercial-total-main">
-              <span>Total estimado del mueble</span
-              ><strong>{{
-                totalEstimado === null
-                  ? 'Importe pendiente'
-                  : totalEstimado.toFixed(2) + ' ' + (moneda ?? 'BOB')
-              }}</strong>
-            </div>
-            <p>El total definitivo se confirmará al guardar la proforma.</p>
           </div>
         </section>
         <section
@@ -1680,11 +1761,11 @@ onMounted(loadCatalog)
                 !pendientesVisibles.length
               "
               class="review-check"
-              ><CheckCircle2 :size="24" aria-label="Sin datos obligatorios pendientes"
-            /></span>
+              ><CheckCircle2 :size="18" aria-hidden="true" /> Datos completos</span
+            >
             <span v-else class="review-check review-check--pending"
-              ><AlertCircle :size="24" aria-label="Hay información que revisar"
-            /></span>
+              ><AlertCircle :size="18" aria-hidden="true" /> Hay información por revisar</span
+            >
           </header>
           <div
             v-if="Object.values(erroresSecciones).some((lista) => lista.length)"
@@ -1715,10 +1796,14 @@ onMounted(loadCatalog)
               <li v-for="p in pendientesVisibles" :key="p.indice">{{ p.mensaje }}</li>
             </ul>
           </div>
-          <article class="review-card">
+          <article class="review-card review-card--full">
             <header>
-              <h4>Información general</h4>
-              <button type="button" @click="irASeccion('general')">
+              <h4><Tag v-if="studio" :size="18" aria-hidden="true" />Información general</h4>
+              <button
+                type="button"
+                :aria-label="studio ? 'Editar información general' : undefined"
+                @click="irASeccion('general')"
+              >
                 <Pencil :size="15" aria-hidden="true" /> Editar
               </button>
             </header>
@@ -1752,10 +1837,16 @@ onMounted(loadCatalog)
               </div>
             </div>
           </article>
-          <article class="review-card">
+          <article class="review-card review-card--full">
             <header>
-              <h4>Estructura y componentes</h4>
-              <button type="button" @click="irASeccion('estructura')">
+              <h4>
+                <Layers3 v-if="studio" :size="18" aria-hidden="true" />Estructura y componentes
+              </h4>
+              <button
+                type="button"
+                :aria-label="studio ? 'Editar estructura y componentes' : undefined"
+                @click="irASeccion('estructura')"
+              >
                 <Pencil :size="15" aria-hidden="true" /> Editar
               </button>
             </header>
@@ -1777,7 +1868,13 @@ onMounted(loadCatalog)
               >
                 <div>
                   <strong>{{ item.pieza.nombre || 'Componente pendiente de nombre' }}</strong
-                  ><span>{{ item.pieza.cantidad_interna ?? '—' }} por mueble</span>
+                  ><span>{{
+                    item.pieza.cantidad_interna == null
+                      ? studio
+                        ? 'Cantidad no especificada'
+                        : '— por mueble'
+                      : `${item.pieza.cantidad_interna} por mueble`
+                  }}</span>
                 </div>
                 <dl class="review-piece-attributes">
                   <div v-if="item.pieza.material">
@@ -1806,8 +1903,14 @@ onMounted(loadCatalog)
           </article>
           <article class="review-card">
             <header>
-              <h4>Accesorios y observaciones</h4>
-              <button type="button" @click="irASeccion('accesorios')">
+              <h4>
+                <Wrench v-if="studio" :size="18" aria-hidden="true" />Accesorios y observaciones
+              </h4>
+              <button
+                type="button"
+                :aria-label="studio ? 'Editar accesorios y observaciones' : undefined"
+                @click="irASeccion('accesorios')"
+              >
                 <Pencil :size="15" aria-hidden="true" /> Editar
               </button>
             </header>
@@ -1832,8 +1935,12 @@ onMounted(loadCatalog)
           </article>
           <article class="review-card review-commercial">
             <header>
-              <h4>Datos comerciales</h4>
-              <button type="button" @click="irASeccion('comercial')">
+              <h4><Wallet v-if="studio" :size="18" aria-hidden="true" />Datos comerciales</h4>
+              <button
+                type="button"
+                :aria-label="studio ? 'Editar datos comerciales' : undefined"
+                @click="irASeccion('comercial')"
+              >
                 <Pencil :size="15" aria-hidden="true" /> Editar
               </button>
             </header>
@@ -1881,9 +1988,10 @@ onMounted(loadCatalog)
     </div>
     <p v-if="error || externalError" role="alert">{{ error || externalError }}</p>
     <div v-if="!studio || activeSection === 'revision'" class="actions review-actions">
-      <Button type="submit" :disabled="processing">{{
-        studio ? 'Agregar mueble a la proforma' : 'Guardar especificación'
-      }}</Button>
+      <Button variant="success" type="submit" :disabled="processing">
+        <Save :size="17" aria-hidden="true" />
+        {{ studio ? 'Agregar mueble a la proforma' : 'Guardar especificación' }}
+      </Button>
       <Button v-if="!studio" variant="secondary" @click="emit('cancel')">Cancelar</Button>
     </div>
   </form>
@@ -2046,11 +2154,21 @@ details.card[open] > summary {
   background: var(--color-surface);
   border-radius: var(--radius-card);
 }
+.configurator--studio .configurator-fields h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.configurator--studio .configurator-fields h3 svg {
+  flex: none;
+  color: var(--color-primary-accent);
+}
 .configurator--studio .configurator-fields > section > h3 {
   margin-bottom: 0.4rem;
   font-size: 1rem;
 }
 .configurator--studio .configurator-fields > section > p {
+  margin: 0;
   color: var(--color-text-secondary);
   font-size: 0.83rem;
 }
@@ -2067,6 +2185,10 @@ details.card[open] > summary {
   margin: var(--space-3) 0;
 }
 .configurator--studio .dimensions-section .measure-row {
+  padding: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(5.8rem, 0.38fr);
   gap: 0.6rem;
@@ -2192,7 +2314,7 @@ details.card[open] > summary {
 .configurator--studio .studio-component-detail {
   min-width: 0;
 }
-.configurator--studio .studio-component-detail details.card {
+.configurator--studio .studio-component-detail .component-editor {
   background: var(--color-surface-muted);
   min-width: 0;
   margin: 0;
@@ -2200,6 +2322,63 @@ details.card[open] > summary {
 .configurator--studio .studio-component-detail .heading {
   gap: 0.5rem;
   align-items: center;
+}
+.configurator--studio .structure-guidance {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+}
+.configurator--studio .component-identity {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.configurator--studio .component-identity small {
+  color: var(--color-text-secondary);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.configurator--studio .component-reorder {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.configurator--studio .component-reorder button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 2.25rem;
+  padding: 0.4rem 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.8rem;
+}
+.configurator--studio .component-reorder button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.configurator--studio .number-field {
+  display: grid;
+  align-content: start;
+  gap: 0.4rem;
+  min-width: 0;
+  font-weight: 600;
+}
+.configurator--studio .number-field input {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 0.6rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
 }
 .configurator--studio .studio-component-detail .grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2267,6 +2446,20 @@ details.card[open] > summary {
   font-weight: 700;
   cursor: pointer;
 }
+.configurator--studio .accessory-guidance,
+.configurator--studio .accessory-empty {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+}
+.configurator--studio .accessory-empty {
+  padding: 1rem;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-control);
+}
+.configurator--studio .accessory-add {
+  justify-self: start;
+}
 .configurator--studio .accessory-count {
   color: var(--color-text-secondary);
   font-size: 0.78rem;
@@ -2276,7 +2469,7 @@ details.card[open] > summary {
   flex-wrap: wrap;
   gap: 0.8rem;
   align-items: center;
-  max-width: 55rem;
+  min-width: 0;
   background: var(--color-surface-muted);
   border: 1px solid var(--color-border);
   padding: 0.75rem;
@@ -2294,12 +2487,29 @@ details.card[open] > summary {
   min-width: 0;
 }
 .configurator--studio .accessory-item-label svg {
-  color: var(--color-success);
+  color: var(--color-primary-accent);
   flex-shrink: 0;
 }
 .configurator--studio .accessory-item-label strong {
   overflow-wrap: anywhere;
   font-size: 0.85rem;
+}
+.commercial-layout {
+  display: contents;
+}
+.configurator--studio .commercial-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(18rem, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+.configurator--studio .commercial-fields {
+  align-items: start;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.configurator--studio .commercial-description {
+  grid-column: 1 / -1;
 }
 .configurator--studio .commercial-total {
   display: grid;
@@ -2308,7 +2518,18 @@ details.card[open] > summary {
   border-radius: var(--radius-card);
   border: 1px solid var(--color-border);
   background: var(--color-surface-muted);
-  max-width: 45rem;
+  min-width: 0;
+  max-width: none;
+}
+.configurator--studio .commercial-total h4 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  font-size: 0.95rem;
+}
+.configurator--studio .commercial-total h4 svg {
+  color: var(--color-primary-accent);
 }
 .configurator--studio .commercial-total > div {
   display: flex;
@@ -2336,10 +2557,18 @@ details.card[open] > summary {
 }
 .configurator--studio #revision {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.2rem;
   border: 0;
   padding: 0;
   background: transparent;
+}
+.configurator--studio #revision > .review-hero,
+.configurator--studio #revision > .review-alert,
+.configurator--studio #revision > .review-pending,
+.configurator--studio #revision > .review-card--full,
+.configurator--studio #revision > .review-final-note {
+  grid-column: 1 / -1;
 }
 .configurator--studio .review-hero {
   display: flex;
@@ -2373,9 +2602,19 @@ details.card[open] > summary {
   color: var(--color-text-secondary);
 }
 .configurator--studio .review-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  background: var(--color-success-soft);
   color: var(--color-success);
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 .configurator--studio .review-check--pending {
+  background: var(--color-danger-soft);
   color: var(--color-danger);
 }
 .configurator--studio .review-card {
@@ -2394,8 +2633,19 @@ details.card[open] > summary {
   gap: 1rem;
 }
 .configurator--studio .review-card h4 {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
   font-size: 1.02rem;
   margin: 0;
+}
+.configurator--studio .review-card h4 svg {
+  flex: none;
+  color: var(--color-primary-accent);
+}
+.configurator--studio .review-card header button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
 }
 .configurator--studio .review-card h5 {
   font-size: 0.83rem;
@@ -2621,6 +2871,9 @@ details.card[open] > summary {
   }
 }
 @media (max-width: 55rem) {
+  .configurator--studio .commercial-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .configurator--studio .studio-component-layout {
     grid-template-columns: 1fr;
   }
@@ -2636,6 +2889,15 @@ details.card[open] > summary {
   }
 }
 @media (max-width: 38rem) {
+  .configurator--studio #revision {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .configurator--studio .review-hero {
+    flex-wrap: wrap;
+  }
+  .configurator--studio .commercial-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .configurator--studio .dimensions-section .measure-grid,
   .configurator--studio .review-price-grid,
   .configurator--studio .review-info {
@@ -2660,7 +2922,7 @@ details.card[open] > summary {
 }
 .configurator--studio .studio-identification-fields {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.1rem;
   align-items: start;
 }

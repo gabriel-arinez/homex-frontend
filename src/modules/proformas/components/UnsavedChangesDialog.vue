@@ -50,7 +50,7 @@ const titleId = useId()
           <Button variant="danger" :disabled="saving" @click="emit('discard')">
             <LogOut :size="16" aria-hidden="true" /> Salir sin guardar
           </Button>
-          <Button class="save-action" :processing="saving" @click="emit('save')">
+          <Button variant="success" class="save-action" :processing="saving" @click="emit('save')">
             <Save :size="17" aria-hidden="true" />
             {{ inReview ? 'Guardar cambios y salir' : 'Guardar borrador y salir' }}
           </Button>
@@ -103,24 +103,18 @@ const titleId = useId()
   width: 100%;
   display: flex;
   justify-content: space-between;
+  align-items: center;
   flex-wrap: wrap;
   gap: var(--space-3);
 }
 .leave-actions__decisions {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: var(--space-2);
 }
 .leave-actions :deep(.button) {
   min-height: 2.75rem;
-}
-.save-action {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: #fff;
-}
-.save-action:hover:not(:disabled) {
-  background: var(--color-primary-hover, var(--color-primary));
 }
 @media (max-width: 40rem) {
   .leave-actions,
