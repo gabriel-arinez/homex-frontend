@@ -340,8 +340,17 @@ async function seleccionarApartado(id: typeof seccion.value) {
           }}
         </h2>
       </div>
-      <p v-if="seccion === 'revision'">
-        Comprueba los detalles antes de añadir el mueble a la proforma.
+      <p class="studio-section-description">
+        {{
+          {
+            general: 'Identifica el mueble y registra sus medidas y características principales.',
+            estructura: 'Organiza los conjuntos y componentes que forman el mueble.',
+            accesorios: 'Añade los accesorios e indicaciones necesarias para su fabricación.',
+            imagenes: 'Adjunta imágenes de referencia si están disponibles.',
+            comercial: 'Define la cantidad, el precio y el descuento de la cotización.',
+            revision: 'Comprueba los detalles antes de añadir el mueble a la proforma.',
+          }[seccion]
+        }}
       </p>
     </div>
     <section
@@ -449,55 +458,67 @@ async function seleccionarApartado(id: typeof seccion.value) {
       </div>
     </section>
     <!-- La ficha anterior no debe mostrar validaciones mientras se revisa una propuesta sin aplicar. -->
-    <section
+    <div
       v-if="!propuestaPorConfirmar"
-      v-show="seccion === 'imagenes' || seccion === 'revision'"
+      class="studio-body"
+      :class="{ 'studio-review-layout': seccion === 'revision' }"
     >
-      <p v-if="galleryError" role="alert">
-        {{ galleryError }}
-        <Button type="button" variant="secondary" @click="ensureGallery">Reintentar</Button>
-      </p>
-      <ImageGallery
-        v-if="galleryId"
-        ref="galleryRef"
-        preserve-pending
-        :endpoint="`/api/v1/galerias/${galleryId}/imagenes/`"
-        :editable="seccion === 'imagenes'"
-        title="Imágenes del mueble"
-        @changed="onGalleryChanged"
-        @status="onGalleryStatus"
-        @busy="galleryBusy = $event"
-      />
-      <p v-else>Sin imágenes de referencia.</p>
-      <Button
-        v-if="seccion === 'revision'"
-        type="button"
-        variant="secondary"
-        @click="seccion = 'imagenes'"
-        >Gestionar imágenes</Button
+      <section
+        v-show="seccion === 'imagenes' || seccion === 'revision'"
+        class="studio-review-gallery"
       >
-    </section>
-    <fieldset v-if="!propuestaPorConfirmar" class="studio-content" :disabled="processing">
-      <EspecificacionForm
-        :key="formVersion"
-        :tipos="tipos"
-        :especificacion="especificacion"
-        :detalle="detalle"
-        :unidades="unidades"
-        :pendientes-asistencia="pendientesAsistencia"
-        :moneda="moneda"
-        :processing="processing"
-        :external-error="externalError"
-        studio
-        :active-section="seccion === 'imagenes' ? 'imagenes' : seccion"
-        @save="saveWithGallery"
-        @changed="emit('changed')"
-        @cancel="requestCloseStudio"
-        @request-section="editarDesdeRevision($event)"
-        @section-status="estadoApartados = { ...$event, imagenes: imageStepStatus }"
-        @type-created="emit('typeCreated', $event)"
-      />
-    </fieldset>
+        <p v-if="galleryError" role="alert">
+          {{ galleryError }}
+          <Button type="button" variant="secondary" @click="ensureGallery">Reintentar</Button>
+        </p>
+        <ImageGallery
+          v-if="galleryId"
+          ref="galleryRef"
+          :class="{
+            'studio-gallery--editing': seccion === 'imagenes',
+            'studio-gallery--has-images':
+              seccion === 'imagenes' && galleryStatus.confirmed + galleryStatus.pending > 0,
+          }"
+          preserve-pending
+          :streamlined="seccion === 'imagenes'"
+          :endpoint="`/api/v1/galerias/${galleryId}/imagenes/`"
+          :editable="seccion === 'imagenes'"
+          title="Imágenes del mueble"
+          @changed="onGalleryChanged"
+          @status="onGalleryStatus"
+          @busy="galleryBusy = $event"
+        />
+        <p v-else>Sin imágenes de referencia.</p>
+        <Button
+          v-if="seccion === 'revision'"
+          type="button"
+          variant="secondary"
+          @click="seccion = 'imagenes'"
+          >Gestionar imágenes</Button
+        >
+      </section>
+      <fieldset class="studio-content" :disabled="processing">
+        <EspecificacionForm
+          :key="formVersion"
+          :tipos="tipos"
+          :especificacion="especificacion"
+          :detalle="detalle"
+          :unidades="unidades"
+          :pendientes-asistencia="pendientesAsistencia"
+          :moneda="moneda"
+          :processing="processing"
+          :external-error="externalError"
+          studio
+          :active-section="seccion === 'imagenes' ? 'imagenes' : seccion"
+          @save="saveWithGallery"
+          @changed="emit('changed')"
+          @cancel="requestCloseStudio"
+          @request-section="editarDesdeRevision($event)"
+          @section-status="estadoApartados = { ...$event, imagenes: imageStepStatus }"
+          @type-created="emit('typeCreated', $event)"
+        />
+      </fieldset>
+    </div>
     <footer v-if="!propuestaPorConfirmar" class="studio-page-footer">
       <Button type="button" variant="secondary" :disabled="indice === 0" @click="retroceder"
         >Anterior</Button
@@ -590,7 +611,7 @@ async function seleccionarApartado(id: typeof seccion.value) {
   gap: 0.65rem;
   align-items: center;
   min-width: 0;
-  min-height: 3.65rem;
+  min-height: 4.25rem;
   text-align: left;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
@@ -611,6 +632,7 @@ async function seleccionarApartado(id: typeof seccion.value) {
   background: var(--color-primary-soft);
   color: var(--color-primary-accent);
   border-color: var(--color-primary);
+  box-shadow: inset 0 -3px 0 var(--color-primary);
 }
 .studio-step-icon {
   flex-shrink: 0;
@@ -674,6 +696,144 @@ async function seleccionarApartado(id: typeof seccion.value) {
   margin: 0;
   border: 0;
   padding: 0;
+}
+.studio-body {
+  display: contents;
+}
+.studio-review-layout {
+  display: grid;
+  grid-template-columns: minmax(15rem, 20rem) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+  min-width: 0;
+}
+.studio-review-layout > .studio-review-gallery {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+.studio-review-layout > .studio-review-gallery :deep(.hero) {
+  height: 15rem;
+}
+.studio-review-layout > .studio-review-gallery :deep(.thumbs) {
+  padding-bottom: var(--space-1);
+}
+.studio-review-layout > .studio-review-gallery > button {
+  justify-self: start;
+}
+@media (max-width: 60rem) {
+  .studio-review-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .studio-review-layout > .studio-review-gallery :deep(.hero) {
+    height: min(40vh, 16rem);
+  }
+}
+:deep(.studio-gallery--editing) {
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 20rem);
+  grid-template-rows: auto auto auto auto auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-3) var(--space-5);
+}
+:deep(.studio-gallery--editing > h3) {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+:deep(.studio-gallery--editing > .hero),
+:deep(.studio-gallery--editing > .empty) {
+  grid-column: 1;
+  grid-row: 2 / 7;
+  min-width: 0;
+}
+:deep(.studio-gallery--editing > .hero) {
+  height: clamp(20rem, 42vh, 28rem);
+}
+:deep(.studio-gallery--editing > .empty) {
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  min-height: 16rem;
+}
+:deep(.studio-gallery--editing > .thumbs) {
+  grid-column: 1;
+  grid-row: 7;
+}
+:deep(.studio-gallery--editing > .actions) {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+:deep(.studio-gallery--editing > .hint) {
+  grid-column: 2;
+  grid-row: 3;
+}
+:deep(.studio-gallery--editing > [role='alert']) {
+  grid-column: 2;
+  grid-row: 4;
+}
+:deep(.studio-gallery--editing > .pending) {
+  grid-column: 2;
+  grid-row: 5;
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+}
+:deep(.studio-gallery--editing > [role='status']) {
+  grid-column: 2;
+  grid-row: 6;
+}
+:deep(.studio-gallery--editing.studio-gallery--has-images) {
+  grid-template-columns: 4.5rem minmax(0, 1fr) minmax(16rem, 20rem);
+}
+:deep(.studio-gallery--has-images > .hero) {
+  grid-column: 2;
+}
+:deep(.studio-gallery--has-images > .thumbs) {
+  grid-column: 1;
+  grid-row: 2 / 7;
+  flex-direction: column;
+  max-height: clamp(20rem, 42vh, 28rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+:deep(.studio-gallery--has-images > .thumbs button) {
+  width: 4rem;
+}
+:deep(.studio-gallery--has-images > .actions),
+:deep(.studio-gallery--has-images > .hint),
+:deep(.studio-gallery--has-images > .pending),
+:deep(.studio-gallery--has-images > [role='alert']),
+:deep(.studio-gallery--has-images > [role='status']) {
+  grid-column: 3;
+}
+@media (max-width: 48rem) {
+  :deep(.studio-gallery--editing) {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  :deep(.studio-gallery--editing > .hero) {
+    height: 16rem;
+  }
+  :deep(.studio-gallery--editing > .empty) {
+    min-height: 12rem;
+  }
+  :deep(.studio-gallery--has-images > .thumbs) {
+    flex-direction: row;
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
 }
 .studio-page-footer {
   display: flex;
