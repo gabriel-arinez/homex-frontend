@@ -12,18 +12,19 @@ export const CLIENT_LIMITS = {
 } as const
 
 export const QUOTE_LIMITS = {
-  titulo: 250,
+  titulo: 180,
   plazo_entrega: 45,
   observaciones: 250,
-  validez_oferta: 99,
+  validez_oferta: 100,
 } as const
 
-export type InputRule = 'name' | 'digits' | 'decimal' | 'search'
+export type InputRule = 'name' | 'digits' | 'decimal' | 'search' | 'delivery'
 
 export function cleanInput(value: string, rule?: InputRule, maxLength?: number): string {
   let text = value
   if (rule === 'name') text = text.replace(/[^\p{L}\p{M} '\u2019-]/gu, '')
   if (rule === 'digits') text = text.replace(/\D/g, '')
+  if (rule === 'delivery') text = text.replace(/[^\p{L}\p{M}0-9 '\u2019]/gu, '')
   if (rule === 'decimal') {
     text = text.replace(/[^\d.,]/g, '').replace(',', '.')
     const dot = text.indexOf('.')
@@ -80,18 +81,43 @@ export type QuoteConditions = {
   observaciones: string
 }
 
-export function validateQuoteConditions(data: QuoteConditions): Record<string, string> {
+export function validateQuoteConditions(
+  data: QuoteConditions,
+  options?: { forEmission?: boolean },
+): Record<string, string> {
   const errors: Record<string, string> = {}
-  if (Array.from(data.titulo).length > QUOTE_LIMITS.titulo) errors.titulo = 'Máximo 250 caracteres.'
-  if (Array.from(data.plazo_entrega).length > QUOTE_LIMITS.plazo_entrega)
-    errors.plazo_entrega = 'Máximo 45 caracteres.'
-  if (Array.from(data.observaciones).length > QUOTE_LIMITS.observaciones)
-    errors.observaciones = 'Máximo 250 caracteres.'
+  const forEmission = Boolean(options?.forEmission)
+
+  if (Array.from(data.titulo).length > QUOTE_LIMITS.titulo) {
+    errors.titulo = `Máximo ${QUOTE_LIMITS.titulo} caracteres.`
+  }
+
+  const delivery = data.plazo_entrega.trim()
+  if (Array.from(data.plazo_entrega).length > QUOTE_LIMITS.plazo_entrega) {
+    errors.plazo_entrega = `Máximo ${QUOTE_LIMITS.plazo_entrega} caracteres.`
+  } else if (!delivery) {
+    if (forEmission) errors.plazo_entrega = 'Ingresa el plazo de entrega.'
+  } else if (!/^[\p{L}\p{M}0-9 '\u2019]+$/u.test(delivery)) {
+    errors.plazo_entrega = 'Usa solo letras, números y espacios (máximo 45 caracteres).'
+  }
+
   const advance = data.porcentaje_adelanto.trim()
-  if (advance && (!/^\d+(?:\.\d{1,2})?$/.test(advance) || Number(advance) > 100))
-    errors.porcentaje_adelanto = 'Ingresa un porcentaje de 0 a 100, con hasta 2 decimales.'
+  if (!advance) {
+    if (forEmission) errors.porcentaje_adelanto = 'Ingresa el porcentaje de adelanto (0 a 100 %).'
+  } else if (!/^\d{1,3}$/.test(advance) || Number(advance) < 0 || Number(advance) > 100) {
+    errors.porcentaje_adelanto = 'El adelanto debe ser un número entero entre 0 y 100.'
+  }
+
   const validity = data.validez_oferta.trim()
-  if (validity && (!/^\d+$/.test(validity) || Number(validity) < 1 || Number(validity) > 99))
-    errors.validez_oferta = 'Ingresa entre 1 y 99 días.'
+  if (!validity) {
+    if (forEmission) errors.validez_oferta = 'Ingresa los días de validez de la oferta (1 a 100).'
+  } else if (!/^\d{1,3}$/.test(validity) || Number(validity) < 1 || Number(validity) > 100) {
+    errors.validez_oferta = 'Ingresa un plazo de validez entre 1 y 100 días.'
+  }
+
+  if (Array.from(data.observaciones).length > QUOTE_LIMITS.observaciones) {
+    errors.observaciones = `Máximo ${QUOTE_LIMITS.observaciones} caracteres.`
+  }
+
   return errors
 }

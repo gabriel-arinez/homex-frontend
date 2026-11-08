@@ -127,13 +127,14 @@ watch(success, (message) => {
 })
 const fields = ref<Record<string, string[]>>({})
 const validationAttempted = ref(false)
+const emissionAttempted = ref(false)
 const localErrors = ref<Record<string, string>>({})
 const conditionsTouched = ref<Record<string, boolean>>({})
 function conditionError(field: keyof ReturnType<typeof validateQuoteConditions>): string {
   return (
     localErrors.value[field] ||
     (conditionsTouched.value[field] || validationAttempted.value
-      ? validateQuoteConditions(header)[field] || ''
+      ? validateQuoteConditions(header, { forEmission: emissionAttempted.value })[field] || ''
       : '')
   )
 }
@@ -371,7 +372,7 @@ const isClientStepComplete = computed(() => {
   return false
 })
 const isConditionsStepComplete = computed(() => {
-  return Object.keys(validateQuoteConditions(header)).length === 0
+  return Object.keys(validateQuoteConditions(header, { forEmission: true })).length === 0
 })
 function isStepComplete(index: number): boolean {
   if (index === 0) return lineas.value.length > 0
@@ -497,7 +498,7 @@ const emissionIssues = computed<EmissionIssue[]>(() => {
       action: 'Completar ficha',
     })
   }
-  const errors = validateQuoteConditions(header)
+  const errors = validateQuoteConditions(header, { forEmission: true })
   const firstError = Object.entries(errors)[0]
   if (firstError) {
     const fields: Record<string, string> = {
@@ -653,7 +654,7 @@ watch(
   header,
   () => {
     if (!validationAttempted.value) return
-    const condition = validateQuoteConditions(header)
+    const condition = validateQuoteConditions(header, { forEmission: emissionAttempted.value })
     localErrors.value = {
       ...Object.fromEntries(
         Object.entries(localErrors.value).filter(([field]) => field.startsWith('cliente_nuevo.')),
@@ -1345,7 +1346,17 @@ const hasRealChanges = computed(
   () => Boolean(savedContent.value) && currentContent() !== savedContent.value,
 )
 async function requestReview() {
-  if (!canEmit.value || saving.value) return
+  if (saving.value) return
+  if (!canEmit.value) {
+    emissionAttempted.value = true
+    validationAttempted.value = true
+    localErrors.value = validateQuoteConditions(header, { forEmission: true })
+    if (Object.keys(localErrors.value).length) {
+      error.value = 'Revisa las condiciones requeridas antes de enviar a revisión.'
+      currentStep.value = 2
+    }
+    return
+  }
   const confirmed = await askConfirmation(
     'La proforma se guardará y pasará a revisión. Todavía no se creará un pedido; la aprobación es una acción posterior.',
     'Enviar proforma a revisión',
@@ -1356,7 +1367,8 @@ async function requestReview() {
 async function persist(emitir: boolean, skipNavigation = false): Promise<boolean> {
   if (saving.value || (emitir && (isReview.value || !canEmit.value))) return false
   validationAttempted.value = true
-  localErrors.value = validateQuoteConditions(header)
+  if (emitir) emissionAttempted.value = true
+  localErrors.value = validateQuoteConditions(header, { forEmission: emitir })
   if (clienteMode.value === 'nuevo') {
     if (!nuevoCliente.tipo_cliente) {
       localErrors.value['cliente_nuevo.tipo_cliente'] = 'Selecciona el tipo de cliente.'
@@ -1892,9 +1904,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 label="Título"
                 :max-length="QUOTE_LIMITS.titulo"
                 :error="conditionError('titulo')"
+                hint="Describe brevemente el trabajo o pedido cotizado."
                 @blur="conditionsTouched.titulo = true"
               />
-              <small>Un título breve que identifique esta cotización.</small>
             </div>
             <fieldset class="currency-choice form-grid__full">
               <legend>Moneda</legend>
@@ -1934,21 +1946,22 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 name="adelanto"
                 label="Adelanto (%)"
                 type="text"
-                input-mode="decimal"
-                input-rule="decimal"
-                :max-length="6"
+                input-mode="numeric"
+                input-rule="digits"
+                :max-length="3"
                 :error="conditionError('porcentaje_adelanto')"
+                hint="Porcentaje inicial para confirmar el trabajo (0 a 100 %). El cero es válido."
                 @blur="conditionsTouched.porcentaje_adelanto = true"
-                hint="Opcional: 0–100 %, hasta 2 decimales."
               />
               <TextField
                 v-model="header.plazo_entrega"
                 name="plazo"
                 label="Plazo de entrega"
+                input-rule="delivery"
                 :max-length="QUOTE_LIMITS.plazo_entrega"
                 :error="conditionError('plazo_entrega')"
+                hint="Tiempo estimado de entrega o fabricación (ej. 15 días hábiles)."
                 @blur="conditionsTouched.plazo_entrega = true"
-                hint="Máximo 45 caracteres."
               />
               <TextField
                 v-model="header.validez_oferta"
@@ -1959,8 +1972,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 input-rule="digits"
                 :max-length="3"
                 :error="conditionError('validez_oferta')"
+                hint="Días de vigencia de los precios cotizados (1 a 100 días)."
                 @blur="conditionsTouched.validez_oferta = true"
-                hint="Opcional: entre 1 y 99 días."
               />
             </div>
             <label class="quote-textarea form-grid__full" for="quote-observaciones">
@@ -1973,7 +1986,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 :maxlength="QUOTE_LIMITS.observaciones"
                 @blur="conditionsTouched.observaciones = true"
                 :aria-invalid="Boolean(conditionError('observaciones'))"
-                placeholder="Condiciones adicionales para esta cotización..."
+                placeholder="Condiciones adicionales, garantías o notas para el cliente..."
               />
               <small v-if="conditionError('observaciones')" class="condition-error" role="alert">{{
                 conditionError('observaciones')

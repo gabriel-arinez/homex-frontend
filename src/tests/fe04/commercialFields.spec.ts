@@ -56,29 +56,65 @@ describe('condiciones comerciales', () => {
     validez_oferta: '',
     observaciones: '',
   }
-  it('permite adelanto cero, decimales válidos y valores opcionales', () => {
+  it('limpia símbolos en plazo de entrega con regla delivery', () => {
+    expect(cleanInput('15 días hábiles! #1', 'delivery', 45)).toBe('15 días hábiles 1')
+    expect(cleanInput("D'Alessandro 48h", 'delivery', 45)).toBe("D'Alessandro 48h")
+  })
+  it('permite adelanto cero, enteros de hasta 3 dígitos y valores opcionales en borrador', () => {
     expect(validateQuoteConditions({ ...base, porcentaje_adelanto: '0' })).toEqual({})
     expect(
-      validateQuoteConditions({ ...base, porcentaje_adelanto: '99.99', validez_oferta: '99' }),
+      validateQuoteConditions({
+        ...base,
+        porcentaje_adelanto: '100',
+        validez_oferta: '100',
+        plazo_entrega: '15 días hábiles',
+      }),
     ).toEqual({})
   })
-  it('rechaza adelantos fuera de rango y validez fuera de 1-99', () => {
+  it('rechaza adelantos fuera de rango, decimales y validez fuera de 1-100', () => {
     expect(
       validateQuoteConditions({ ...base, porcentaje_adelanto: '101' }).porcentaje_adelanto,
     ).toBeTruthy()
     expect(
-      validateQuoteConditions({ ...base, porcentaje_adelanto: '1.234' }).porcentaje_adelanto,
+      validateQuoteConditions({ ...base, porcentaje_adelanto: '99.99' }).porcentaje_adelanto,
     ).toBeTruthy()
     expect(validateQuoteConditions({ ...base, validez_oferta: '0' }).validez_oferta).toBeTruthy()
-    expect(validateQuoteConditions({ ...base, validez_oferta: '100' }).validez_oferta).toBeTruthy()
+    expect(validateQuoteConditions({ ...base, validez_oferta: '101' }).validez_oferta).toBeTruthy()
   })
-  it('valida longitud de plazo y observaciones', () => {
+  it('valida longitud máxima de título (180), plazo (45) y observaciones (250)', () => {
     const errors = validateQuoteConditions({
       ...base,
+      titulo: 't'.repeat(181),
       plazo_entrega: 'x'.repeat(46),
       observaciones: 'o'.repeat(251),
     })
+    expect(errors.titulo).toBeTruthy()
     expect(errors.plazo_entrega).toBeTruthy()
     expect(errors.observaciones).toBeTruthy()
+  })
+  it('rechaza símbolos en plazo de entrega', () => {
+    expect(
+      validateQuoteConditions({ ...base, plazo_entrega: '15 días!' }).plazo_entrega,
+    ).toBeTruthy()
+    expect(
+      validateQuoteConditions({ ...base, plazo_entrega: '10# días$' }).plazo_entrega,
+    ).toBeTruthy()
+  })
+  it('exige adelanto, plazo y validez para emisión a revisión manteniendo título opcional', () => {
+    const emissionErrors = validateQuoteConditions(
+      {
+        titulo: '',
+        plazo_entrega: '',
+        porcentaje_adelanto: '',
+        validez_oferta: '',
+        observaciones: '',
+      },
+      { forEmission: true },
+    )
+    expect(emissionErrors.titulo).toBeUndefined()
+    expect(emissionErrors.observaciones).toBeUndefined()
+    expect(emissionErrors.porcentaje_adelanto).toBeTruthy()
+    expect(emissionErrors.plazo_entrega).toBeTruthy()
+    expect(emissionErrors.validez_oferta).toBeTruthy()
   })
 })
