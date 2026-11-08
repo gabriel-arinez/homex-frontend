@@ -641,6 +641,7 @@ test('FE04 crea con unitario y descuento, revisa y aprueba', async ({ page }) =>
   await expect(quickView).not.toBeVisible()
   const desktopViewport = page.viewportSize()
   await page.setViewportSize({ width: 390, height: 900 })
+  await noOverflow(page)
   const mobileNameBox = await nameElement.boundingBox()
   const mobileMetricsBox = await quoteLine.locator('.line-metrics').boundingBox()
   const mobileCardBox = await quoteLine.boundingBox()

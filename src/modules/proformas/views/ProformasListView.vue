@@ -492,7 +492,7 @@ onBeforeUnmount(() => {
 }
 .proforma-filters__main {
   display: grid;
-  grid-template-columns: minmax(15rem, 2fr) repeat(3, minmax(8rem, 1fr)) auto;
+  grid-template-columns: minmax(10rem, 2fr) repeat(3, minmax(0, 1fr)) auto;
   align-items: end;
   gap: 0.85rem;
 }

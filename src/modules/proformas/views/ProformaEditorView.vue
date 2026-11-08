@@ -26,17 +26,21 @@ import {
 import {
   ArrowLeft,
   ArrowRight,
+  Calendar,
   CheckCircle2,
   MessageCircle,
   CircleAlert,
   ChevronDown,
   ChevronRight,
   ChevronUp,
+  CircleDollarSign,
   ClipboardCheck,
   Clock,
+  Coins,
   Info,
   PackageOpen,
   Plus,
+  ReceiptText,
   SlidersHorizontal,
   Sofa,
   UserCheck,
@@ -1904,50 +1908,56 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                     name="moneda"
                     :value="moneda.codigo"
                   />
-                  <span
-                    ><strong>{{
+                  <span class="currency-choice__icon" aria-hidden="true">
+                    <Coins v-if="moneda.codigo === 'BOB'" :size="18" />
+                    <CircleDollarSign v-else :size="18" />
+                  </span>
+                  <span class="currency-choice__copy">
+                    <strong>{{
                       moneda.codigo === 'BOB' ? 'Bolivianos (BOB)' : 'Dólares (USD)'
-                    }}</strong
-                    ><small>{{
+                    }}</strong>
+                    <small>{{
                       moneda.codigo === 'BOB' ? 'Moneda nacional' : 'Cotización en dólares'
-                    }}</small></span
-                  >
+                    }}</small>
+                  </span>
                 </label>
               </div>
             </fieldset>
-            <TextField
-              v-model="header.porcentaje_adelanto"
-              name="adelanto"
-              label="Adelanto (%)"
-              type="text"
-              input-mode="decimal"
-              input-rule="decimal"
-              :max-length="6"
-              :error="conditionError('porcentaje_adelanto')"
-              @blur="conditionsTouched.porcentaje_adelanto = true"
-              hint="Opcional: 0–100 %, hasta 2 decimales."
-            />
-            <TextField
-              v-model="header.plazo_entrega"
-              name="plazo"
-              label="Plazo de entrega"
-              :max-length="QUOTE_LIMITS.plazo_entrega"
-              :error="conditionError('plazo_entrega')"
-              @blur="conditionsTouched.plazo_entrega = true"
-              hint="Máximo 45 caracteres."
-            />
-            <TextField
-              v-model="header.validez_oferta"
-              name="validez"
-              label="Validez de la oferta (días)"
-              type="text"
-              input-mode="numeric"
-              input-rule="digits"
-              :max-length="3"
-              :error="conditionError('validez_oferta')"
-              @blur="conditionsTouched.validez_oferta = true"
-              hint="Opcional: entre 1 y 99 días."
-            />
+            <div class="form-grid__triplet form-grid__full">
+              <TextField
+                v-model="header.porcentaje_adelanto"
+                name="adelanto"
+                label="Adelanto (%)"
+                type="text"
+                input-mode="decimal"
+                input-rule="decimal"
+                :max-length="6"
+                :error="conditionError('porcentaje_adelanto')"
+                @blur="conditionsTouched.porcentaje_adelanto = true"
+                hint="Opcional: 0–100 %, hasta 2 decimales."
+              />
+              <TextField
+                v-model="header.plazo_entrega"
+                name="plazo"
+                label="Plazo de entrega"
+                :max-length="QUOTE_LIMITS.plazo_entrega"
+                :error="conditionError('plazo_entrega')"
+                @blur="conditionsTouched.plazo_entrega = true"
+                hint="Máximo 45 caracteres."
+              />
+              <TextField
+                v-model="header.validez_oferta"
+                name="validez"
+                label="Validez de la oferta (días)"
+                type="text"
+                input-mode="numeric"
+                input-rule="digits"
+                :max-length="3"
+                :error="conditionError('validez_oferta')"
+                @blur="conditionsTouched.validez_oferta = true"
+                hint="Opcional: entre 1 y 99 días."
+              />
+            </div>
             <label class="quote-textarea form-grid__full" for="quote-observaciones">
               <span>Observaciones</span>
               <textarea
@@ -1986,14 +1996,31 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             </div>
           </div>
           <div class="review-grid">
-            <Card class="review-summary-card"
-              ><h3><PackageOpen :size="17" aria-hidden="true" />Productos</h3>
-              <p>{{ lineas.length }} línea(s)</p>
-              <button @click="currentStep = 0">Corregir productos</button></Card
-            >
-            <Card class="review-summary-card"
-              ><h3><UserRound :size="17" aria-hidden="true" />Cliente</h3>
-              <p>
+            <Card class="review-summary-card">
+              <div class="review-summary-card__header">
+                <span class="review-summary-card__icon" aria-hidden="true">
+                  <PackageOpen :size="18" />
+                </span>
+                <span class="review-summary-card__title">Productos</span>
+              </div>
+              <p class="review-summary-card__detail">{{ lineas.length }} línea(s)</p>
+              <button
+                type="button"
+                class="review-summary-card__action"
+                @click="currentStep = 0"
+              >
+                <span>Corregir productos</span>
+                <ChevronRight :size="15" aria-hidden="true" />
+              </button>
+            </Card>
+            <Card class="review-summary-card">
+              <div class="review-summary-card__header">
+                <span class="review-summary-card__icon" aria-hidden="true">
+                  <UserRound :size="18" />
+                </span>
+                <span class="review-summary-card__title">Cliente</span>
+              </div>
+              <p class="review-summary-card__detail">
                 {{
                   clienteMode === 'pendiente'
                     ? 'Pendiente'
@@ -2002,55 +2029,119 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                       : nombreClienteVisible()
                 }}
               </p>
-              <button @click="currentStep = 1">Corregir cliente</button></Card
-            >
-            <Card class="review-summary-card"
-              ><h3><SlidersHorizontal :size="17" aria-hidden="true" />Condiciones</h3>
-              <p>{{ header.plazo_entrega || 'Plazo pendiente' }} · {{ header.moneda_codigo }}</p>
-              <button @click="currentStep = 2">Corregir condiciones</button></Card
-            >
+              <button
+                type="button"
+                class="review-summary-card__action"
+                @click="currentStep = 1"
+              >
+                <span>Corregir cliente</span>
+                <ChevronRight :size="15" aria-hidden="true" />
+              </button>
+            </Card>
+            <Card class="review-summary-card">
+              <div class="review-summary-card__header">
+                <span class="review-summary-card__icon" aria-hidden="true">
+                  <SlidersHorizontal :size="18" />
+                </span>
+                <span class="review-summary-card__title">Condiciones</span>
+              </div>
+              <p class="review-summary-card__detail">
+                {{ header.plazo_entrega || 'Plazo pendiente' }} · {{ header.moneda_codigo }}
+              </p>
+              <button
+                type="button"
+                class="review-summary-card__action"
+                @click="currentStep = 2"
+              >
+                <span>Corregir condiciones</span>
+                <ChevronRight :size="15" aria-hidden="true" />
+              </button>
+            </Card>
           </div>
-          <Card class="commercial-preview"
-            ><div class="preview-brand">
+          <Card class="commercial-preview">
+            <div class="preview-brand">
               <span class="preview-mark">H</span>
               <p class="brand">HOMEX · VISTA PREVIA</p>
             </div>
-            <h3>{{ header.titulo || 'Cotización comercial' }}</h3>
-            <div v-for="line in lineas" :key="line.localId" class="review-line">
-              <div v-if="line.producto" class="review-thumbnail">
-                <ProductImage
-                  :image="quoteImages[line.producto] ?? null"
-                  :alt="line.nombre"
-                  sizes="48px"
-                />
-              </div>
-              <div v-else-if="furnitureCoverSource(line)" class="review-thumbnail">
-                <GalleryPhoto
-                  :src="furnitureCoverSource(line)"
-                  :alt="'Imagen principal de ' + line.nombre"
-                />
-              </div>
-              <span
-                ><strong>{{ line.nombre }}</strong> —
-                <template v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
-                  importe negociado {{ money(Number(line.importe_negociado || 0)) }}
-                </template>
-                <template v-else-if="totalEstimadoLinea(line) !== null">
-                  cantidad {{ line.cantidad }}, precio {{ money(Number(line.precio_unitario)) }}
-                </template>
-                <template v-else>precio pendiente</template>
-                <span v-if="line.descripcion"><br />{{ line.descripcion }}</span></span
-              >
+            <h3 class="commercial-preview__title">{{ header.titulo || 'Cotización comercial' }}</h3>
+            <div v-if="lineas.length === 0" class="commercial-preview__empty">
+              <PackageOpen :size="22" aria-hidden="true" />
+              <p>Aún no has agregado productos a esta cotización.</p>
             </div>
-            <p v-if="header.plazo_entrega"><strong>Plazo:</strong> {{ header.plazo_entrega }}</p>
-            <p v-if="header.validez_oferta">
-              <strong>Validez:</strong> {{ header.validez_oferta }} días
-            </p>
+            <div v-else class="commercial-preview__lines">
+              <div v-for="line in lineas" :key="line.localId" class="review-product-card">
+                <div class="review-product-card__main">
+                  <div v-if="line.producto" class="review-thumbnail">
+                    <ProductImage
+                      :image="quoteImages[line.producto] ?? null"
+                      :alt="line.nombre"
+                      sizes="52px"
+                    />
+                  </div>
+                  <div v-else-if="furnitureCoverSource(line)" class="review-thumbnail">
+                    <GalleryPhoto
+                      :src="furnitureCoverSource(line)"
+                      :alt="'Imagen principal de ' + line.nombre"
+                    />
+                  </div>
+                  <div class="review-product-card__info">
+                    <span class="line-type-badge">{{ itemTypeLabel(line) }}</span>
+                    <strong class="review-product-card__title">{{ line.nombre }}</strong>
+                    <p v-if="line.descripcion" class="review-product-card__desc">{{ line.descripcion }}</p>
+                  </div>
+                </div>
+
+                <div class="review-product-card__details">
+                  <div v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'" class="review-product-card__metric">
+                    <span>Modalidad</span>
+                    <strong>Importe negociado</strong>
+                  </div>
+                  <template v-else-if="totalEstimadoLinea(line) !== null">
+                    <div class="review-product-card__metric">
+                      <span>Cantidad</span>
+                      <strong>{{ formatQuantity(line.cantidad) }} {{ unitName(line.unidad) }}</strong>
+                    </div>
+                    <div class="review-product-card__metric">
+                      <span>Precio unitario</span>
+                      <strong>{{ money(Number(line.precio_unitario)) }}</strong>
+                    </div>
+                    <div v-if="Number(line.descuento) > 0" class="review-product-card__metric">
+                      <span>Descuento</span>
+                      <strong>{{ money(Number(line.descuento)) }}</strong>
+                    </div>
+                  </template>
+                  <div v-else class="review-product-card__metric">
+                    <span class="pending-value">Precio pendiente</span>
+                  </div>
+
+                  <div class="review-product-card__total">
+                    <span>Total de línea</span>
+                    <strong v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
+                      {{ money(Number(line.importe_negociado || 0)) }}
+                    </strong>
+                    <strong v-else-if="totalEstimadoLinea(line) !== null">
+                      {{ money(totalEstimadoLinea(line)!) }}
+                    </strong>
+                    <strong v-else class="pending-value">Pendiente</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-if="header.plazo_entrega || header.validez_oferta" class="commercial-preview__meta">
+              <div v-if="header.plazo_entrega" class="commercial-preview__meta-item">
+                <Clock :size="15" aria-hidden="true" />
+                <span><strong>Plazo:</strong> {{ header.plazo_entrega }}</span>
+              </div>
+              <div v-if="header.validez_oferta" class="commercial-preview__meta-item">
+                <Calendar :size="15" aria-hidden="true" />
+                <span><strong>Validez:</strong> {{ header.validez_oferta }} días</span>
+              </div>
+            </div>
             <div class="whatsapp-share" @input.stop @change.stop>
               <div class="whatsapp-share__summary">
-                <span class="whatsapp-share__icon"
-                  ><MessageCircle :size="20" aria-hidden="true"
-                /></span>
+                <span class="whatsapp-share__icon">
+                  <MessageCircle :size="20" aria-hidden="true" />
+                </span>
                 <div class="whatsapp-share__heading">
                   <strong>Mensaje para WhatsApp</strong>
                   <small>Personaliza el saludo para acompañar el PDF.</small>
@@ -2108,24 +2199,33 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   >
                 </div>
               </div>
-            </div></Card
-          >
+            </div>
+          </Card>
           <div class="totals">
-            <template v-if="persisted && !dirty">
-              <span>Total confirmado por HOMEX</span>
-              <strong>{{ money(Number(persisted.total)) }}</strong>
-              <small>Importe guardado y calculado por el servidor.</small>
-            </template>
-            <template v-else>
-              <span>Estimación local</span>
-              <strong v-if="totalPreview !== null">{{ money(totalPreview) }}</strong>
-              <strong v-else class="pending-value">Total pendiente</strong>
-              <small>El total confirmado será el que devuelva HOMEX al guardar.</small>
-              <small v-if="persisted">
-                Último total guardado: {{ money(Number(persisted.total)) }}. Los cambios actuales
-                aún no se guardaron.
-              </small>
-            </template>
+            <div class="totals__identity">
+              <span class="totals__icon" aria-hidden="true">
+                <ReceiptText :size="22" />
+              </span>
+              <div class="totals__meta">
+                <template v-if="persisted && !dirty">
+                  <span>Total confirmado por HOMEX</span>
+                  <small>Importe guardado y calculado por el servidor.</small>
+                </template>
+                <template v-else>
+                  <span>Estimación local</span>
+                  <small>El total confirmado será el que devuelva HOMEX al guardar.</small>
+                  <small v-if="persisted">
+                    Último total guardado: {{ money(Number(persisted.total)) }}. Los cambios actuales
+                    aún no se guardaron.
+                  </small>
+                </template>
+              </div>
+            </div>
+            <div class="totals__value">
+              <strong v-if="persisted && !dirty" class="totals__amount">{{ money(Number(persisted.total)) }}</strong>
+              <strong v-else-if="totalPreview !== null" class="totals__amount">{{ money(totalPreview) }}</strong>
+              <strong v-else class="totals__amount pending-value">Total pendiente</strong>
+            </div>
           </div>
           <div v-if="emissionIssues.length" class="emission-checklist">
             <div class="emission-checklist__header">
@@ -2178,7 +2278,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             </div>
             <div class="editor-actions__operations">
               <Button
-                variant="secondary"
+                variant="success"
                 class="editor-save-draft"
                 :disabled="!hasRealChanges"
                 :processing="saving"
@@ -2189,7 +2289,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               </Button>
               <Button
                 v-if="!isReview"
-                :variant="currentStep === 3 ? 'primary' : 'secondary'"
+                variant="info"
                 :disabled="!canEmit"
                 :processing="saving"
                 @click="requestReview"
@@ -2934,6 +3034,16 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 .form-grid__full {
   grid-column: 1 / -1;
 }
+.form-grid__triplet {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+@media (max-width: 54rem) {
+  .form-grid__triplet {
+    grid-template-columns: 1fr;
+  }
+}
 .form-grid__full > small {
   display: block;
   margin-top: var(--space-2);
@@ -2951,13 +3061,24 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   min-height: 7.5rem;
   resize: vertical;
   padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
-  background: var(--color-surface);
+  background: var(--color-surface-muted);
   color: var(--color-text);
   font: inherit;
   font-weight: 400;
   line-height: 1.6;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+.quote-textarea textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+  outline: 0;
+}
+.quote-textarea textarea:hover:not(:focus) {
+  border-color: var(--color-border-strong);
 }
 .quote-textarea textarea::placeholder {
   color: var(--color-text-muted);
@@ -2972,56 +3093,141 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 .review-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 .review-summary-card {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-3);
   min-width: 0;
-  padding: var(--space-4);
-  background: var(--quote-muted);
-  border-color: var(--quote-border);
+  padding: 1rem 1.15rem;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
 }
-.review-summary-card h3 {
+.review-summary-card:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-hover);
+}
+.review-summary-card__header {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  margin: 0;
-  font-size: 0.84rem;
+  gap: var(--space-3);
 }
-.review-summary-card h3 svg {
+.review-summary-card__icon {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.5rem;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
   color: var(--color-primary-accent);
 }
-.review-summary-card p {
+.review-summary-card__title {
+  color: var(--color-text);
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+.review-summary-card__detail {
   min-width: 0;
   margin: 0;
   overflow-wrap: anywhere;
   color: var(--color-text-secondary);
+  font-size: 0.86rem;
+  line-height: 1.45;
 }
-.review-summary-card button {
-  justify-self: start;
+.review-summary-card__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: auto;
   padding: 0;
   border: 0;
   background: transparent;
   color: var(--color-primary-accent);
   cursor: pointer;
+  font-size: 0.82rem;
   font-weight: 650;
+  transition:
+    color var(--transition-fast),
+    gap var(--transition-fast);
 }
-.review-summary-card button:hover {
-  text-decoration: underline;
+.review-summary-card__action:hover {
+  color: var(--color-primary);
+  gap: 0.45rem;
+  text-decoration: none;
 }
 .commercial-preview {
   display: grid;
   gap: var(--space-4);
   padding: var(--space-6);
-  border-color: var(--quote-border);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+.commercial-preview__title {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1.2rem;
+  letter-spacing: -0.02em;
+}
+.commercial-preview__empty {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 0.88rem;
+}
+.commercial-preview__empty svg {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+.commercial-preview__empty p {
+  margin: 0;
+}
+.commercial-preview__lines {
+  display: grid;
+  gap: 0;
+}
+.commercial-preview__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+.commercial-preview__meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+}
+.commercial-preview__meta-item svg {
+  color: var(--color-primary-accent);
+}
+.commercial-preview__meta-item strong {
+  color: var(--color-text);
 }
 .preview-brand {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--quote-border);
+  border-bottom: 1px solid var(--color-border);
 }
 .preview-mark {
   display: grid;
@@ -3040,45 +3246,195 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   font-weight: 750;
   letter-spacing: 0.1em;
 }
-.commercial-preview h3 {
-  margin: 0;
-  font-size: 1.2rem;
-  letter-spacing: -0.02em;
+.commercial-preview__lines {
+  display: grid;
+  gap: var(--space-3);
 }
-.review-line {
-  margin: 0;
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--quote-border);
-  line-height: 1.7;
+.review-product-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 0.85rem 1.15rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+}
+.review-product-card:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-hover);
+}
+.review-product-card__main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  flex: 1;
+}
+.review-product-card__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+.review-product-card__title {
+  color: var(--color-text);
+  font-size: 0.94rem;
+  font-weight: 650;
   overflow-wrap: anywhere;
 }
-.review-line strong {
+.review-product-card__desc {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.review-product-card__details {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  flex-shrink: 0;
+}
+.review-product-card__metric {
+  display: grid;
+  gap: 0.15rem;
+  text-align: right;
+  min-width: 0;
+}
+.review-product-card__metric span {
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.review-product-card__metric strong {
   color: var(--color-text);
+  font-size: 0.86rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.review-product-card__total {
+  display: grid;
+  gap: 0.15rem;
+  text-align: right;
+  min-width: 6.5rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+}
+.review-product-card__total span {
+  color: var(--color-text-secondary);
+  font-size: 0.7rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.review-product-card__total strong {
+  color: var(--color-text);
+  font-size: 0.96rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+@media (max-width: 54rem) {
+  .review-product-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+  }
+  .review-product-card__details {
+    justify-content: space-between;
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--color-border);
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+  .review-product-card__metric {
+    text-align: left;
+  }
+  .review-product-card__total {
+    margin-left: auto;
+  }
 }
 .commercial-preview :deep(.button) {
   justify-self: start;
 }
 .totals {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
+  transition: border-color var(--transition-fast);
+}
+.totals:hover {
+  border-color: var(--color-border-strong);
+}
+.totals__identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.totals__icon {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.6rem;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  color: var(--color-primary-accent);
+}
+.totals__meta {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+.totals__meta span {
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.totals__meta small {
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+.totals__value {
   display: grid;
   justify-items: end;
-  gap: var(--space-2);
-  padding: var(--space-6);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  background: var(--color-surface-raised);
-  text-align: right;
+  flex-shrink: 0;
 }
-.totals span {
-  color: var(--color-text-secondary);
-  font-weight: 650;
-}
-.totals strong {
+.totals__amount {
   color: var(--color-text);
-  font-size: clamp(1.5rem, 3vw, 2rem);
-  letter-spacing: -0.04em;
+  font-size: clamp(1.4rem, 2.5vw, 1.85rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
 }
-.totals small {
-  color: var(--color-text-secondary);
+@media (max-width: 48rem) {
+  .totals {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .totals__value {
+    justify-items: start;
+    width: 100%;
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--color-border);
+  }
 }
 .error,
 .warning {
@@ -3282,12 +3638,13 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     grid-row: 1;
   }
   .line-metrics {
-    grid-column: 2 / 4;
+    grid-column: 1 / -1;
     grid-row: 2;
-    margin-left: 3rem;
+    margin-left: 0;
+    gap: var(--space-2) var(--space-3);
   }
   .line-total {
-    grid-column: 2;
+    grid-column: 1 / 3;
     grid-row: 3;
     justify-self: start;
   }
@@ -3334,6 +3691,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 .currency-choice legend {
   margin-bottom: var(--space-2);
   color: var(--color-text);
+  font-size: 0.88rem;
   font-weight: 600;
 }
 .currency-choice__options {
@@ -3345,31 +3703,67 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-4);
+  padding: 0.85rem 1rem;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
   cursor: pointer;
-}
-.currency-choice__option--selected {
-  border-color: var(--color-primary);
-  background: var(--color-primary-soft);
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 .currency-choice__option:hover {
   border-color: var(--color-border-strong);
+  background: var(--color-surface-hover);
+}
+.currency-choice__option--selected {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary-soft) 45%, var(--color-surface));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 30%, transparent);
 }
 .currency-choice__option:focus-within {
   box-shadow: var(--focus-ring);
 }
 .currency-choice__option input {
+  margin: 0;
+  flex: 0 0 auto;
   accent-color: var(--color-primary);
 }
-.currency-choice__option span {
+.currency-choice__icon {
   display: grid;
-  gap: var(--space-1);
-}
-.currency-choice__option small {
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.5rem;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
   color: var(--color-text-secondary);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+.currency-choice__option--selected .currency-choice__icon {
+  background: var(--color-primary-soft);
+  border-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
+  color: var(--color-primary-accent);
+}
+.currency-choice__copy {
+  display: grid;
+  min-width: 0;
+  gap: 0.15rem;
+}
+.currency-choice__copy strong {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.currency-choice__copy small {
+  color: var(--color-text-secondary);
+  font-size: 0.74rem;
+  line-height: 1.35;
 }
 .condition-error {
   color: var(--color-danger);
@@ -3383,8 +3777,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   display: grid;
   gap: var(--space-3);
   margin-top: var(--space-4);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--color-border);
+  padding: 1.15rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
 }
 .whatsapp-share__summary {
   display: flex;
@@ -3398,26 +3794,31 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   width: 2.5rem;
   height: 2.5rem;
   place-items: center;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  background: var(--color-surface-raised);
-  color: var(--color-success);
+  border: 1px solid color-mix(in srgb, #25d366 30%, var(--color-border));
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, #25d366 12%, var(--color-surface));
+  color: #25d366;
 }
 .whatsapp-share__heading {
   display: grid;
   flex: 1;
   min-width: 0;
-  gap: var(--space-1);
+  gap: 0.15rem;
 }
 .whatsapp-share__heading strong {
   color: var(--color-text);
   font-size: 0.9rem;
+  font-weight: 650;
 }
 .whatsapp-share__heading small,
 .whatsapp-share__hint {
   color: var(--color-text-secondary);
   font-size: 0.78rem;
-  line-height: 1.5;
+  line-height: 1.45;
+}
+.whatsapp-share__hint {
+  margin: 0;
+  padding-left: 3.25rem;
 }
 .whatsapp-share__controls {
   display: flex;
@@ -3433,47 +3834,53 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   place-items: center;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
-  background: var(--color-surface);
+  background: var(--color-surface-raised);
   color: var(--color-text-secondary);
   cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast);
 }
 .whatsapp-share__toggle:hover {
   background: var(--color-surface-hover);
   color: var(--color-text);
+  border-color: var(--color-border-strong);
 }
 .whatsapp-share__toggle:focus-visible {
   outline: 2px solid var(--color-primary-accent);
   outline-offset: 2px;
 }
-.whatsapp-share__hint {
-  margin: 0;
-  padding-left: 3.25rem;
-}
 .whatsapp-share__content {
   display: grid;
   gap: var(--space-2);
-  padding-top: var(--space-4);
+  padding-top: var(--space-3);
   border-top: 1px solid var(--color-border);
 }
 .whatsapp-share__content label {
   color: var(--color-text);
+  font-size: 0.84rem;
   font-weight: 600;
 }
 .whatsapp-share__content textarea {
   width: 100%;
-  min-height: 10rem;
+  min-height: 9rem;
   padding: var(--space-3);
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
-  background: var(--color-surface);
+  background: var(--color-surface-muted);
   color: var(--color-text);
   font: inherit;
-  line-height: 1.65;
+  line-height: 1.6;
   resize: vertical;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
-.whatsapp-share__content textarea:focus-visible {
-  outline: 2px solid var(--color-primary-accent);
-  outline-offset: 1px;
+.whatsapp-share__content textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+  outline: 0;
 }
 .whatsapp-share__edit-actions {
   display: flex;
@@ -3487,10 +3894,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 }
 .emission-checklist,
 .emission-ready {
-  padding: var(--space-5);
+  padding: 1.25rem 1.5rem;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  background: var(--color-surface-raised);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
 }
 .emission-checklist {
   display: grid;
@@ -3503,13 +3910,14 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 }
 .emission-checklist__icon {
   display: grid;
-  width: 2.7rem;
-  height: 2.7rem;
+  width: 2.6rem;
+  height: 2.6rem;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
+  border-radius: 0.5rem;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  color: var(--color-warning);
 }
 .emission-checklist__heading {
   flex: 1;
@@ -3518,21 +3926,22 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 .emission-checklist__heading h3 {
   margin: 0;
   color: var(--color-text);
-  font-size: 1rem;
+  font-size: 0.96rem;
+  font-weight: 650;
 }
 .emission-checklist__heading p {
-  margin: var(--space-1) 0 0;
+  margin: 0.15rem 0 0;
   color: var(--color-text-secondary);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
 }
 .emission-checklist__count {
   flex-shrink: 0;
-  padding: 0.35rem 0.7rem;
-  border: 1px solid var(--color-border);
+  padding: 0.3rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 35%, var(--color-border));
   border-radius: 999px;
-  color: var(--color-text-secondary);
-  background: var(--color-surface);
-  font-size: 0.75rem;
+  color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 12%, var(--color-surface));
+  font-size: 0.74rem;
   font-weight: 650;
   white-space: nowrap;
 }
@@ -3547,7 +3956,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-4) 0;
+  padding: 0.85rem 0;
   border-top: 1px solid var(--color-border);
 }
 .emission-checklist li > svg {
@@ -3556,42 +3965,52 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 }
 .emission-checklist__detail {
   display: grid;
-  gap: var(--space-1);
+  gap: 0.15rem;
   flex: 1;
   min-width: 0;
 }
 .emission-checklist__detail strong {
   color: var(--color-text);
   font-size: 0.86rem;
+  font-weight: 600;
 }
 .emission-checklist__detail p {
   margin: 0;
   color: var(--color-text-secondary);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   overflow-wrap: anywhere;
 }
 .emission-checklist li button {
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
-  gap: var(--space-1);
-  padding: var(--space-2);
-  border: 0;
+  gap: 0.25rem;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
-  background: transparent;
-  color: var(--color-primary-accent);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
   cursor: pointer;
-  font-weight: 650;
-  font-size: 0.81rem;
+  font-weight: 600;
+  font-size: 0.8rem;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
 }
 .emission-checklist li button:hover,
 .emission-checklist li button:focus-visible {
+  border-color: var(--color-primary);
   background: var(--color-primary-soft);
+  color: var(--color-primary-accent);
 }
 .emission-ready {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  padding: 1.1rem 1.4rem;
+  border-color: color-mix(in srgb, var(--color-success) 30%, transparent);
+  background: color-mix(in srgb, var(--color-success) 8%, var(--color-surface));
   color: var(--color-text);
 }
 .emission-ready svg {
@@ -3668,9 +4087,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 }
 .review-thumbnail {
   flex: none;
-  width: 3rem;
-  height: 3rem;
+  width: 3.25rem;
+  height: 3.25rem;
   border-radius: var(--radius-control);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
   overflow: hidden;
 }
 .review-thumbnail :deep(.product-image) {
@@ -3681,11 +4102,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 }
 .review-thumbnail :deep(.fallback span) {
   display: none;
-}
-.review-line {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
 }
 .menu-panel [role='menuitem'] {
   display: flex;
