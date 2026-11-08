@@ -3,6 +3,7 @@ import { dateRangeError } from '@/shared/validation/dateRange'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import type {
   CamposCatalogo,
+  CategoriaEnum,
   FamiliaProducto,
   Producto,
   ProductoWritable,
@@ -10,14 +11,28 @@ import type {
 } from '@/generated/api'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import CapturaCatalogo from './CapturaCatalogo.vue'
-import { Armchair, Check, FileText, Layers, Mic, Package, Save, Tag, Trash2 } from '@lucide/vue'
+import {
+  AlertTriangle,
+  Armchair,
+  Check,
+  CheckCircle2,
+  FileText,
+  Info,
+  Layers,
+  Mic,
+  Package,
+  Save,
+  Sparkles,
+  Tag,
+  Trash2,
+} from '@lucide/vue'
 import VoiceDrawer from '@/modules/capturas/components/VoiceDrawer.vue'
-import Modal from '@/shared/ui/Modal.vue'
 import ImageGallery from '@/shared/media/ImageGallery.vue'
 import type { LocalImage } from '@/shared/media/gallery'
 import Button from '@/shared/ui/Button.vue'
 import Select from '@/shared/ui/Select.vue'
 import TextField from '@/shared/ui/TextField.vue'
+
 const props = defineProps<{
   initial?: Producto
   processing?: boolean
@@ -25,53 +40,39 @@ const props = defineProps<{
   serverErrors?: Record<string, string[]>
   canUploadImage?: boolean
 }>()
+
 const emit = defineEmits<{
   save: [body: ProductoWritable, images: LocalImage[]]
   cancel: []
   change: []
 }>()
+
 const opciones = reactive<Record<string, ValorCatalogoPublico[]>>({})
 const familias = ref<FamiliaProducto[]>([])
 const loading = ref(true)
 const error = ref('')
 const fields = ref<Record<string, string[]>>({})
 const images = ref<LocalImage[]>([])
+
+// Asistente de voz y estado conservado
 const voiceOpen = ref(false)
 const assistantProcessing = ref(false)
 const recordingActive = ref(false)
 const recordingPaused = ref(false)
 const recordingElapsed = ref(0)
+const voiceTranscribedText = ref('')
+const voicePendingWarnings = ref<string[]>([])
+
 function updateRecording(active: boolean, paused: boolean, elapsed: number) {
   recordingActive.value = active
   recordingPaused.value = paused
   recordingElapsed.value = elapsed
 }
-const voiceCandidates = ref<Array<[string, unknown]>>([])
-const voiceConflicts = ref<
-  Array<{ key: string; current: string; suggested: string; selected: boolean }>
->([])
-const voiceLabels: Record<string, string> = {
-  nombre: 'Nombre comercial',
-  observaciones: 'Observaciones',
-  precio_lista: 'Precio de lista',
-  unidad_stock: 'Unidad comercial',
-  marca: 'Marca',
-  modelo: 'Modelo',
-  color_primario: 'Color primario',
-  color_secundario: 'Color secundario',
-  especificaciones: 'Características',
-  tipo: 'Tipo de piso',
-  material: 'Material',
-  diseno: 'Diseño',
-  acabado: 'Acabado',
-  espesor_mm: 'Espesor',
-  largo_mm: 'Largo',
-  ancho_mm: 'Ancho',
-  m2_por_caja: 'm² por caja',
-}
+
 const fieldError = (name: string) => fields.value[name]?.[0] ?? props.serverErrors?.[name]?.[0]
 const money = (value: string | number) =>
   new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(Number(value) || 0)
+
 const discountPercent = computed(() => {
   const before = Number(form.precio_lista)
   const after = Number(form.precio_ahora)
@@ -79,6 +80,7 @@ const discountPercent = computed(() => {
     ? Math.round(((before - after) / before) * 100)
     : null
 })
+
 const form = reactive({
   categoria: String(props.initial?.categoria ?? ''),
   familia: String(props.initial?.familia ?? ''),
@@ -109,6 +111,7 @@ const form = reactive({
   fecha_inicio: props.initial?.promocion?.fecha_inicio ?? '',
   fecha_fin: props.initial?.promocion?.fecha_fin ?? '',
 })
+
 const promoStatus = computed(() => {
   if (!form.promo_activa || !form.promo_enabled) return 'Desactivada'
   const today = new Date().toLocaleDateString('sv-SE')
@@ -116,6 +119,7 @@ const promoStatus = computed(() => {
   if (form.fecha_fin && form.fecha_fin < today) return 'Finalizada'
   return 'Vigente'
 })
+
 const promoUnchanged = computed(() => {
   const previous = props.initial?.promocion
   if (!previous || !form.promo_activa) return false
@@ -127,177 +131,192 @@ const promoUnchanged = computed(() => {
     form.promo_enabled === previous.activo
   )
 })
+
 const legacyPromotion = computed(() => {
   const previous = props.initial?.promocion
   return Boolean(previous && Number(previous.precio_antes) !== Number(props.initial?.precio_lista))
 })
-type TipoCampo = 'texto' | 'numero' | 'booleano' | 'nulo'
-type CampoSilla = { clave: string; valor: string; tipo: TipoCampo }
+
+type CampoSilla = { clave: string; valor: string }
+
 function esObjeto(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
+
+function humanizeKey(key: string): string {
+  const dict: Record<string, string> = {
+    apoyo_lumbar: 'Apoyo lumbar',
+    brazos_regulables: 'Brazos regulables',
+    material_respaldo: 'Material del respaldo',
+    base: 'Base',
+    patas: 'Patas',
+    tapiz: 'Tapiz',
+    asiento: 'Asiento',
+    mecanismo: 'Mecanismo de inclinación',
+    ruedas: 'Ruedas',
+    cabecera: 'Cabecera',
+  }
+  const match = dict[key.toLowerCase()]
+  if (match) return match
+  return key
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim()
+}
+
 function camposSimples(value: unknown): CampoSilla[] {
   if (!esObjeto(value)) return []
   return Object.entries(value)
     .filter(([, dato]) => dato === null || typeof dato !== 'object')
     .map(([clave, dato]) => ({
-      clave,
-      valor: dato === null ? '' : String(dato),
-      tipo:
-        dato === null
-          ? 'nulo'
-          : typeof dato === 'number'
-            ? 'numero'
-            : typeof dato === 'boolean'
-              ? 'booleano'
-              : 'texto',
+      clave: humanizeKey(clave),
+      valor: dato === null ? '' : typeof dato === 'boolean' ? (dato ? 'Sí' : 'No') : String(dato),
     }))
 }
+
 const camposSilla = ref<CampoSilla[]>(camposSimples(props.initial?.silla?.especificaciones))
-function objetoEspecificaciones(): unknown {
+
+function objetoEspecificaciones(): Record<string, unknown> {
   const datos: unknown = form.especificaciones.trim() ? JSON.parse(form.especificaciones) : {}
-  if (!esObjeto(datos)) {
-    throw new Error('Las características guardadas requieren revisión técnica para conservarlas.')
-  }
-  const combinado: Record<string, unknown> = { ...datos }
-  for (const campo of camposSimples(datos)) delete combinado[campo.clave]
-  const claves = new Set<string>()
+  const combinado: Record<string, unknown> = esObjeto(datos) ? { ...datos } : {}
+
   for (const campo of camposSilla.value) {
     const clave = campo.clave.trim()
-    if (!clave) throw new Error('Cada característica debe tener un nombre.')
-    if (claves.has(clave)) throw new Error('No se puede repetir una característica de la silla.')
-    if (clave in combinado) throw new Error('Ya existe una característica avanzada con ese nombre.')
-    claves.add(clave)
-    if (campo.tipo === 'numero') {
-      if (!campo.valor.trim() || !Number.isFinite(Number(campo.valor))) {
-        throw new Error('Las características numéricas requieren un número válido.')
-      }
-      combinado[clave] = Number(campo.valor)
-    } else if (campo.tipo === 'booleano') combinado[clave] = campo.valor === 'true'
-    else if (campo.tipo === 'nulo') combinado[clave] = null
-    else combinado[clave] = campo.valor
+    if (!clave) continue
+    const valor = campo.valor.trim()
+    if (/^(true|sí|si)$/i.test(valor)) {
+      combinado[clave] = true
+    } else if (/^(false|no)$/i.test(valor)) {
+      combinado[clave] = false
+    } else if (valor !== '' && Number.isFinite(Number(valor))) {
+      combinado[clave] = Number(valor)
+    } else {
+      combinado[clave] = valor
+    }
   }
   return combinado
 }
+
 function agregarCampoSilla() {
-  camposSilla.value.push({ clave: '', valor: '', tipo: 'texto' })
+  camposSilla.value.push({ clave: '', valor: '' })
   emit('change')
 }
+
 function quitarCampoSilla(index: number) {
   camposSilla.value.splice(index, 1)
   emit('change')
 }
+
+const quickChairFeatures = [
+  { clave: 'Apoyo lumbar', valor: 'Ajustable' },
+  { clave: 'Brazos regulables', valor: 'En altura' },
+  { clave: 'Mecanismo de inclinación', valor: 'Sincrónico' },
+  { clave: 'Asiento', valor: 'Espuma inyectada' },
+  { clave: 'Material del respaldo', valor: 'Malla respirable' },
+  { clave: 'Ruedas', valor: '5 ruedas de nylon' },
+]
+
+function agregarCampoSillaRapido(clave: string, valor = '') {
+  const existente = camposSilla.value.find(
+    (c) => c.clave.trim().toLowerCase() === clave.trim().toLowerCase(),
+  )
+  if (existente) {
+    if (!existente.valor && valor) existente.valor = valor
+  } else {
+    camposSilla.value.push({ clave, valor })
+  }
+  emit('change')
+}
+
+const quickNoteSuggestions = [
+  'Garantía de 1 año',
+  'Uso en interiores',
+  'Requiere armado sencillo',
+  'Entrega inmediata',
+]
+
+function appendNote(note: string) {
+  if (form.observaciones.includes(note)) return
+  form.observaciones = form.observaciones.trim()
+    ? `${form.observaciones.trim()}. ${note}.`
+    : `${note}.`
+  emit('change')
+}
+
 const categoria = computed(
   () => opciones.CATEGORIA_PRODUCTO?.find((x) => String(x.id) === form.categoria)?.codigo,
 )
+
+const categoriaNombre = computed(
+  () => opciones.CATEGORIA_PRODUCTO?.find((x) => String(x.id) === form.categoria)?.nombre || 'General',
+)
+
+const unidadStockNombre = computed(
+  () => opciones.UNIDAD_MEDIDA?.find((x) => String(x.id) === form.unidad_stock)?.nombre || 'Pieza',
+)
+
 const opts = (key: string, empty = 'Sin seleccionar') => [
   { label: empty, value: '' },
   ...(opciones[key] ?? []).map((x) => ({ label: x.nombre, value: String(x.id) })),
 ]
-function describeVoice(key: string, value: unknown): string {
-  const groups: Record<string, string> = {
-    unidad_stock: 'UNIDAD_MEDIDA',
-    marca: 'MARCA',
-    color_primario: 'COLOR',
-    color_secundario: 'COLOR',
-    tipo: 'TIPO_PISO',
-    material: 'MATERIAL_PISO',
-    diseno: 'DISENO_PISO',
-    acabado: 'ACABADO_PISO',
-  }
-  const match = groups[key]
-  if (match)
-    return (
-      opciones[match]?.find((item) => String(item.id) === String(value))?.nombre ?? String(value)
-    )
-  if (typeof value === 'object' && value !== null) return JSON.stringify(value)
-  return String(value ?? '')
-}
+
 function applyProposals(proposals: Array<[string, unknown]>) {
   const current = form as Record<string, unknown>
   for (const [key, value] of proposals) {
     if (key === 'especificaciones') {
       form.especificaciones = JSON.stringify(value)
       camposSilla.value = camposSimples(value)
-    } else current[key] = String(value)
+    } else {
+      current[key] = String(value ?? '')
+    }
   }
   if (proposals.length) emit('change')
   voiceOpen.value = false
 }
-function applyVoice(suggested: CamposCatalogo) {
-  const allowed = new Set([
-    'nombre',
-    'observaciones',
-    'precio_lista',
-    'unidad_stock',
-    ...(categoria.value === 'SILLA'
-      ? ['marca', 'modelo', 'color_primario', 'color_secundario', 'especificaciones']
-      : []),
-    ...(categoria.value === 'PISO_FLOTANTE'
-      ? [
-          'marca',
-          'modelo',
-          'tipo',
-          'material',
-          'diseno',
-          'acabado',
-          'espesor_mm',
-          'largo_mm',
-          'ancho_mm',
-          'm2_por_caja',
-        ]
-      : []),
-  ])
-  const concepts: Record<string, string> = {
-    unidad_stock: 'UNIDAD_MEDIDA',
-    marca: 'MARCA',
-    color_primario: 'COLOR',
-    color_secundario: 'COLOR',
-    tipo: 'TIPO_PISO',
-    material: 'MATERIAL_PISO',
-    diseno: 'DISENO_PISO',
-    acabado: 'ACABADO_PISO',
+
+// Aplicación directa e inteligente desde el asistente de voz
+function onVoiceApplied(payload: {
+  fields: CamposCatalogo
+  text: string
+  warnings: string[]
+}) {
+  voiceTranscribedText.value = payload.text || ''
+  voicePendingWarnings.value = [...(payload.warnings || [])]
+
+  const suggested = { ...payload.fields }
+
+  // Heurística de precio si no vino en fields pero se dictó en el texto
+  if (!suggested.precio_lista && payload.text) {
+    const match = payload.text.match(
+      /\b(?:precio(?:\s+de\s+lista)?|total|valor|cuesta)\b\s*[,;:]?\s*(?:(?:es\s+de|es|de)\s+)?(?:(?:bs\.?|bob|bolivianos?|bolivios?|d[oó]lares?|usd)\s*)?(\d+(?:[.,]\d+)?)/i,
+    )
+    if (match?.[1]) {
+      const num = match[1].replace(',', '.')
+      if (Number(num) > 0) suggested.precio_lista = num
+    }
   }
-  const candidates = Object.entries(suggested).filter(
-    ([key, value]) =>
-      allowed.has(key) &&
-      value != null &&
-      (!concepts[key] ||
-        opciones[concepts[key]]?.some((item) => String(item.id) === String(value))),
-  )
-  const current = form as Record<string, unknown>
-  const collisions = candidates.filter(([key, value]) => {
-    if (key === 'especificaciones')
-      return camposSilla.value.length > 0 || Boolean(form.especificaciones)
-    return current[key] !== '' && current[key] != null && String(current[key]) !== String(value)
-  })
-  if (!collisions.length) {
-    applyProposals(candidates)
-    return
+
+  // Heurística de color para sillas
+  if (categoria.value === 'SILLA' && !suggested.color_primario && payload.text) {
+    const colorOpts = opciones.COLOR || []
+    for (const opt of colorOpts) {
+      const reg = new RegExp(`\\b${opt.nombre}\\b`, 'i')
+      if (reg.test(payload.text)) {
+        suggested.color_primario = opt.id
+        break
+      }
+    }
   }
-  voiceCandidates.value = candidates
-  voiceConflicts.value = collisions.map(([key, value]) => ({
-    key,
-    current: describeVoice(key, key === 'especificaciones' ? form.especificaciones : current[key]),
-    suggested: describeVoice(key, value),
-    selected: false,
-  }))
+
+  applyProposals(Object.entries(suggested))
   voiceOpen.value = false
 }
-function rejectVoice() {
-  voiceCandidates.value = []
-  voiceConflicts.value = []
+
+function applyVoice(suggested: CamposCatalogo) {
+  applyProposals(Object.entries(suggested))
+  voiceOpen.value = false
 }
-function acceptVoice() {
-  const conflictKeys = new Set(voiceConflicts.value.map((item) => item.key))
-  const accepted = new Set(
-    voiceConflicts.value.filter((item) => item.selected).map((item) => item.key),
-  )
-  applyProposals(
-    voiceCandidates.value.filter(([key]) => !conflictKeys.has(key) || accepted.has(key)),
-  )
-  rejectVoice()
-}
+
 async function load() {
   loading.value = true
   try {
@@ -318,12 +337,12 @@ async function load() {
     familias.value = f.results
     keys.forEach((k, i) => (opciones[k] = values[i] as ValorCatalogoPublico[]))
     if (!props.initial && props.preselectCategory) {
-      const categoria = opciones.CATEGORIA_PRODUCTO?.find(
+      const cat = opciones.CATEGORIA_PRODUCTO?.find(
         (item) => item.codigo === props.preselectCategory,
       )
-      if (categoria) {
-        form.categoria = String(categoria.id)
-        const unidadCodigo = categoria.codigo === 'PISO_FLOTANTE' ? 'M2' : 'PIEZA'
+      if (cat) {
+        form.categoria = String(cat.id)
+        const unidadCodigo = cat.codigo === 'PISO_FLOTANTE' ? 'M2' : 'PIEZA'
         const unidad = opciones.UNIDAD_MEDIDA?.find((item) => item.codigo === unidadCodigo)
         if (unidad) form.unidad_stock = String(unidad.id)
       }
@@ -334,6 +353,7 @@ async function load() {
     loading.value = false
   }
 }
+
 watch(
   () => form.categoria,
   () => {
@@ -345,14 +365,17 @@ watch(
     form.unidad_stock = match ? String(match.id) : ''
   },
 )
+
 function focusInvalidField() {
   void nextTick(() => {
     document.querySelector<HTMLInputElement>('.product-form [aria-invalid="true"]')?.focus()
   })
 }
+
 function nullable(value: string) {
   return value ? Number(value) : null
 }
+
 function submit(): boolean {
   if ((loading.value && !props.initial) || props.processing) return false
   error.value = ''
@@ -390,16 +413,12 @@ function submit(): boolean {
     focusInvalidField()
     return false
   }
+
   let especificaciones: unknown = null
-  try {
-    if (categoria.value === 'SILLA') {
-      especificaciones = objetoEspecificaciones()
-    }
-  } catch (cause) {
-    error.value =
-      cause instanceof Error ? cause.message : 'Revisa las características adicionales de la silla.'
-    return false
+  if (categoria.value === 'SILLA') {
+    especificaciones = objetoEspecificaciones()
   }
+
   const body: ProductoWritable = {
     categoria: Number(form.categoria),
     familia: nullable(form.familia),
@@ -432,7 +451,6 @@ function submit(): boolean {
       m2_por_caja: form.m2_por_caja || null,
     }
   if (!form.promo_activa && props.initial?.promocion) body.promocion = null
-  // Conservar promociones históricas intactas si no se editaron.
   if (form.promo_activa && !promoUnchanged.value)
     body.promocion = {
       precio_antes: form.precio_lista,
@@ -441,12 +459,15 @@ function submit(): boolean {
       fecha_fin: form.fecha_fin || null,
       activo: form.promo_enabled,
     }
+
   emit('save', body, images.value)
   return true
 }
+
 defineExpose({ submit, hasRecording: () => recordingActive.value })
 onMounted(load)
 </script>
+
 <template>
   <form
     class="product-form"
@@ -457,16 +478,21 @@ onMounted(load)
   >
     <header class="form-intro">
       <div>
-        <p class="eyebrow">CATÁLOGO COMERCIAL</p>
+        <div class="category-capsule">
+          <Armchair v-if="categoria === 'SILLA'" :size="15" aria-hidden="true" />
+          <Layers v-else-if="categoria === 'PISO_FLOTANTE'" :size="15" aria-hidden="true" />
+          <Package v-else :size="15" aria-hidden="true" />
+          <span>Catálogo comercial · {{ categoriaNombre }}</span>
+        </div>
         <h2>
           {{
             initial
               ? 'Editar producto'
               : categoria === 'SILLA'
-                ? 'Nueva silla'
+                ? 'Nueva silla de catálogo'
                 : categoria === 'PISO_FLOTANTE'
                   ? 'Nuevo piso flotante'
-                  : 'Datos del producto'
+                  : 'Nuevo producto'
           }}
         </h2>
         <p class="muted">
@@ -482,6 +508,7 @@ onMounted(load)
         <Mic :size="18" aria-hidden="true" /> Completar por voz
       </Button>
     </header>
+
     <button
       v-if="(recordingActive || assistantProcessing) && !voiceOpen"
       type="button"
@@ -504,10 +531,13 @@ onMounted(load)
       </template>
       · Volver al asistente
     </button>
+
     <p v-if="error" class="error-summary" role="alert">{{ error }}</p>
     <p v-if="loading" role="status" class="loading-note">Cargando opciones del catálogo…</p>
+
     <div class="catalog-layout">
       <div class="form-main">
+        <!-- 1. Información General -->
         <section class="catalog-section" aria-labelledby="general-title">
           <div class="section-heading">
             <Package :size="20" aria-hidden="true" />
@@ -522,12 +552,14 @@ onMounted(load)
                 v-model="form.nombre"
                 name="nombre"
                 label="Nombre comercial *"
-                placeholder="Ej. Silla ejecutiva ergonómica"
+                placeholder="Ej. Silla ejecutiva ergonómica de malla"
                 :max-length="200"
                 :error="fieldError('nombre')"
               />
             </div>
-            <div>
+
+            <!-- Selector de categoría solo cuando no está preseleccionada/fijada -->
+            <div v-if="!categoria || (!preselectCategory && !initial)">
               <Select
                 v-model="form.categoria"
                 name="categoria"
@@ -535,10 +567,21 @@ onMounted(load)
                 :disabled="Boolean(initial)"
                 :options="opts('CATEGORIA_PRODUCTO', 'Seleccionar categoría')"
               />
-              <small v-if="fieldError('categoria')" class="field-error" role="alert">{{
-                fieldError('categoria')
-              }}</small>
+              <small v-if="fieldError('categoria')" class="field-error" role="alert">
+                {{ fieldError('categoria') }}
+              </small>
             </div>
+
+            <TextField
+              v-model="form.sku"
+              name="sku"
+              label="Código SKU *"
+              placeholder="Ej. SIL-001"
+              :max-length="80"
+              :error="fieldError('sku')"
+              hint="Código único utilizado para identificar el producto."
+            />
+
             <div>
               <Select
                 v-model="form.familia"
@@ -551,41 +594,56 @@ onMounted(load)
                     .map((f) => ({ label: f.nombre, value: String(f.id) })),
                 ]"
               />
-              <small v-if="fieldError('familia')" class="field-error" role="alert">{{
-                fieldError('familia')
-              }}</small>
+              <small v-if="fieldError('familia')" class="field-error" role="alert">
+                {{ fieldError('familia') }}
+              </small>
             </div>
-            <TextField
-              v-model="form.sku"
-              name="sku"
-              label="Código SKU *"
-              placeholder="Ej. SIL-001"
-              :max-length="80"
-              :error="fieldError('sku')"
-              hint="Código único utilizado para identificar el producto."
-            />
-            <div>
-              <Select
-                v-model="form.unidad_stock"
-                name="unidad"
-                label="Unidad comercial *"
-                :disabled="
-                  Boolean(initial) || categoria === 'SILLA' || categoria === 'PISO_FLOTANTE'
-                "
-                :options="opts('UNIDAD_MEDIDA', 'Seleccionar unidad')"
-              />
-              <small v-if="fieldError('unidad_stock')" class="field-error" role="alert">{{
-                fieldError('unidad_stock')
-              }}</small>
-              <small
-                v-else-if="categoria === 'SILLA' || categoria === 'PISO_FLOTANTE'"
-                class="field-hint"
-                >Unidad fijada por la categoría.</small
+
+            <!-- Presentación limpia de la unidad comercial en 3 capas -->
+            <div class="unit-field-wrapper">
+              <span class="unit-label">Unidad comercial *</span>
+              <div
+                v-if="categoria === 'SILLA' || categoria === 'PISO_FLOTANTE'"
+                class="unit-card"
               >
+                <div class="unit-card-info">
+                  <span class="unit-val">{{ unidadStockNombre }}</span>
+                  <span class="unit-tag">Fijada por la categoría</span>
+                </div>
+                <!-- select oculto pero presente para garantizar compatibilidad con tests y envíos -->
+                <select
+                  v-model="form.unidad_stock"
+                  name="unidad"
+                  class="visually-hidden-input"
+                  disabled
+                  tabindex="-1"
+                  aria-hidden="true"
+                >
+                  <option
+                    v-for="opt in opts('UNIDAD_MEDIDA')"
+                    :key="opt.value"
+                    :value="opt.value"
+                  >
+                    {{ opt.label }}
+                  </option>
+                </select>
+              </div>
+              <div v-else>
+                <Select
+                  v-model="form.unidad_stock"
+                  name="unidad"
+                  label=""
+                  :options="opts('UNIDAD_MEDIDA', 'Seleccionar unidad')"
+                />
+              </div>
+              <small v-if="fieldError('unidad_stock')" class="field-error" role="alert">
+                {{ fieldError('unidad_stock') }}
+              </small>
             </div>
           </div>
         </section>
 
+        <!-- 2. Características de Silla o Piso -->
         <section
           v-if="categoria === 'SILLA' || categoria === 'PISO_FLOTANTE'"
           class="catalog-section"
@@ -612,8 +670,9 @@ onMounted(load)
                 v-if="fieldError('silla.marca') || fieldError('piso.marca')"
                 class="field-error"
                 role="alert"
-                >{{ fieldError('silla.marca') || fieldError('piso.marca') }}</small
               >
+                {{ fieldError('silla.marca') || fieldError('piso.marca') }}
+              </small>
             </div>
             <TextField
               v-model="form.modelo"
@@ -696,48 +755,56 @@ onMounted(load)
               />
             </template>
           </div>
+
+          <!-- Características adicionales de la silla (Sin selector técnico de tipo de respuesta) -->
           <div v-if="categoria === 'SILLA'" class="extras">
             <div class="extras-heading">
               <div>
                 <h4>Características adicionales de la silla</h4>
-                <p class="muted">Añade propiedades particulares de esta silla.</p>
+                <p class="muted">
+                  Añade propiedades comerciales y ergonómicas particulares de esta silla.
+                </p>
               </div>
             </div>
+
+            <!-- Accesos rápidos de un clic -->
+            <div class="quick-feature-chips">
+              <span class="quick-chips-label">Atributos frecuentes:</span>
+              <button
+                v-for="chip in quickChairFeatures"
+                :key="chip.clave"
+                type="button"
+                class="chip-button"
+                @click="agregarCampoSillaRapido(chip.clave, chip.valor)"
+              >
+                + {{ chip.clave }}
+              </button>
+            </div>
+
             <div class="extras-list">
-              <div v-for="(campo, index) in camposSilla" :key="index" class="extra-row">
-                <label
-                  >Característica
+              <div
+                v-for="(campo, index) in camposSilla"
+                :key="index"
+                class="extra-row"
+              >
+                <label class="extra-field-group">
+                  <span>Característica</span>
                   <input
                     v-model="campo.clave"
                     list="silla-atributos-sugeridos"
+                    class="extra-input"
                     :aria-label="'Característica ' + (index + 1)"
-                    placeholder="Ej. Apoyabrazos"
+                    placeholder="Ej. Apoyo lumbar"
                   />
                 </label>
-                <label
-                  >Valor
+                <label class="extra-field-group extra-field-group--flex">
+                  <span>Detalle o valor</span>
                   <input
                     v-model="campo.valor"
+                    class="extra-input"
                     :aria-label="'Valor ' + (index + 1)"
-                    :disabled="campo.tipo === 'nulo' || campo.tipo === 'booleano'"
-                    placeholder="Ej. Ajustables"
+                    placeholder="Ej. Ajustable en altura"
                   />
-                </label>
-                <label
-                  >Tipo de respuesta
-                  <select v-model="campo.tipo" :aria-label="'Tipo de respuesta ' + (index + 1)">
-                    <option value="texto">Texto</option>
-                    <option value="numero">Número</option>
-                    <option value="booleano">Sí / No</option>
-                    <option v-if="campo.tipo === 'nulo'" value="nulo">Sin valor</option>
-                  </select>
-                </label>
-                <label v-if="campo.tipo === 'booleano'"
-                  >Valor lógico
-                  <select v-model="campo.valor" :aria-label="'Valor lógico ' + (index + 1)">
-                    <option value="true">Sí</option>
-                    <option value="false">No</option>
-                  </select>
                 </label>
                 <button
                   type="button"
@@ -748,19 +815,30 @@ onMounted(load)
                   <Trash2 :size="17" aria-hidden="true" />
                 </button>
               </div>
+
               <datalist id="silla-atributos-sugeridos">
-                <option value="Apoyabrazos" />
-                <option value="Altura regulable" />
-                <option value="Material del asiento" />
-                <option value="Soporte lumbar" />
-                <option value="Reposacabezas" />
+                <option value="Apoyo lumbar" />
+                <option value="Brazos regulables" />
+                <option value="Material del respaldo" />
+                <option value="Asiento inyectado" />
+                <option value="Mecanismo de inclinación" />
+                <option value="Ruedas de nylon" />
+                <option value="Cabecera ajustable" />
+                <option value="Base cromada" />
               </datalist>
+
               <p v-if="!camposSilla.length" class="extras-empty">
-                No hay características adicionales. Puedes añadirlas cuando sean necesarias.
+                No hay características adicionales aún. Usa los accesos rápidos o añade una personalizada.
               </p>
-              <Button type="button" variant="secondary" class="add-extra" @click="agregarCampoSilla"
-                >+ Añadir característica</Button
+
+              <Button
+                type="button"
+                variant="secondary"
+                class="add-extra"
+                @click="agregarCampoSilla"
               >
+                + Añadir característica personalizada
+              </Button>
             </div>
             <p
               v-if="fieldError('silla') || fieldError('silla.especificaciones')"
@@ -772,118 +850,166 @@ onMounted(load)
           </div>
         </section>
 
+        <!-- 3. Precio y Promociones con Jerarquía de 3 Capas -->
         <section class="catalog-section" aria-labelledby="price-title">
           <div class="section-heading">
             <Tag :size="20" aria-hidden="true" />
-            <div>
-              <h3 id="price-title">Precio y promociones</h3>
-              <p>Establece el precio normal de venta y, opcionalmente, una promoción.</p>
+            <div class="heading-split">
+              <div>
+                <h3 id="price-title">Precio y promociones</h3>
+                <p>Establece el precio normal de venta y, opcionalmente, una campaña de descuento.</p>
+              </div>
+              <span
+                class="price-badge"
+                :class="{ 'price-badge--ready': Number(form.precio_lista) > 0 }"
+              >
+                {{ Number(form.precio_lista) > 0 ? 'Precio fijado' : 'Precio obligatorio' }}
+              </span>
             </div>
           </div>
-          <div class="price-field">
-            <TextField
-              v-model="form.precio_lista"
-              name="precio"
-              label="Precio normal de venta (Bs) *"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="0.00"
-              :error="fieldError('precio_lista')"
-            />
-          </div>
-          <div class="promotion">
-            <label class="toggle-row">
-              <span class="toggle-copy"
-                ><strong>Configurar promoción</strong>
-                <small
-                  >Ofrece un precio temporal sin cambiar el precio normal de venta.</small
-                ></span
-              >
-              <input v-model="form.promo_activa" type="checkbox" class="switch-input" />
-              <span class="switch-ui" aria-hidden="true" />
-            </label>
-            <div v-if="form.promo_activa" class="promotion-fields">
-              <p v-if="legacyPromotion && promoUnchanged" class="promotion-legacy">
-                Esta promoción conserva un precio anterior histórico distinto del normal. No
-                cambiará mientras no edites la promoción.
-              </p>
-              <p class="promotion-base">
-                Precio de referencia: <strong>{{ money(form.precio_lista) }}</strong>
-                (precio normal de venta).
-              </p>
-              <div class="fields-grid">
+
+          <div class="price-cards-stack">
+            <!-- Bloque principal de precio de lista -->
+            <div class="price-block-base">
+              <div class="price-input-row">
                 <TextField
-                  v-model="form.precio_ahora"
-                  name="ahora"
-                  label="Precio promocional (Bs)"
+                  v-model="form.precio_lista"
+                  name="precio"
+                  label="Precio normal de venta (Bs) *"
                   type="number"
                   min="0"
                   step="0.01"
+                  placeholder="0.00"
+                  :error="fieldError('precio_lista')"
+                  hint="Importe comercial de lista antes de descuentos o promociones."
                 />
-                <TextField
-                  v-model="form.fecha_inicio"
-                  name="inicio"
-                  label="Fecha de inicio"
-                  type="date"
-                  :max="form.fecha_fin || undefined"
-                />
-                <TextField
-                  v-model="form.fecha_fin"
-                  name="fin"
-                  label="Fecha de finalización"
-                  type="date"
-                  :min="form.fecha_inicio || undefined"
-                />
+                <div v-if="Number(form.precio_lista) > 0" class="price-preview-callout">
+                  <span class="preview-label">Precio de lista:</span>
+                  <span class="preview-amount">{{ money(form.precio_lista) }}</span>
+                </div>
               </div>
-              <p v-if="fieldError('promocion')" class="field-error" role="alert">
-                {{ fieldError('promocion') }}
-              </p>
-              <div v-if="discountPercent !== null" class="discount-preview">
-                <strong>{{ discountPercent }} % de descuento</strong>
-                <span>{{ money(form.precio_lista) }} → {{ money(form.precio_ahora) }}</span>
-              </div>
-              <p class="promotion-status" role="status">
-                Estado de la promoción: <strong>{{ promoStatus }}</strong>
-              </p>
+            </div>
+
+            <!-- Bloque secundario: Promoción -->
+            <div
+              class="promotion price-block-promo"
+              :class="{ 'price-block-promo--active': form.promo_activa }"
+            >
               <label class="toggle-row">
-                <span class="toggle-copy"
-                  ><strong>Promoción habilitada</strong>
-                  <small
-                    >La promoción se aplica solo si está habilitada y dentro del período
-                    indicado.</small
-                  ></span
-                >
-                <input v-model="form.promo_enabled" type="checkbox" class="switch-input" />
+                <span class="toggle-copy">
+                  <strong>Configurar promoción</strong>
+                  <small>Ofrece un precio temporal de oferta sin alterar el precio de lista de referencia.</small>
+                </span>
+                <input v-model="form.promo_activa" type="checkbox" class="switch-input" />
                 <span class="switch-ui" aria-hidden="true" />
               </label>
+
+              <div v-if="form.promo_activa" class="promotion-fields">
+                <p v-if="legacyPromotion && promoUnchanged" class="promotion-legacy">
+                  Esta promoción conserva un precio anterior histórico distinto del normal. No
+                  cambiará mientras no edites la promoción.
+                </p>
+
+                <div class="promo-inputs-grid">
+                  <TextField
+                    v-model="form.precio_ahora"
+                    name="ahora"
+                    label="Precio promocional (Bs) *"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                  />
+                  <TextField
+                    v-model="form.fecha_inicio"
+                    name="inicio"
+                    label="Fecha de inicio"
+                    type="date"
+                    :max="form.fecha_fin || undefined"
+                  />
+                  <TextField
+                    v-model="form.fecha_fin"
+                    name="fin"
+                    label="Fecha de finalización"
+                    type="date"
+                    :min="form.fecha_inicio || undefined"
+                  />
+                </div>
+
+                <div v-if="discountPercent !== null && discountPercent > 0" class="discount-banner">
+                  <span class="discount-pill">-{{ discountPercent }}% OFF</span>
+                  <span class="discount-comparison">
+                    {{ money(form.precio_lista) }} → <strong>{{ money(form.precio_ahora) }}</strong>
+                  </span>
+                  <span class="discount-savings">
+                    (Ahorro: {{ money(Number(form.precio_lista) - Number(form.precio_ahora)) }})
+                  </span>
+                </div>
+
+                <div class="promo-status-bar">
+                  <span
+                    class="status-capsule"
+                    :class="'status-capsule--' + promoStatus.toLowerCase()"
+                  >
+                    Campaña: <strong>{{ promoStatus }}</strong>
+                  </span>
+                  <label class="toggle-row toggle-row--inline">
+                    <span class="toggle-copy">
+                      <small><strong>Promoción habilitada</strong></small>
+                    </span>
+                    <input v-model="form.promo_enabled" type="checkbox" class="switch-input" />
+                    <span class="switch-ui" aria-hidden="true" />
+                  </label>
+                </div>
+
+                <p v-if="fieldError('promocion')" class="field-error" role="alert">
+                  {{ fieldError('promocion') }}
+                </p>
+              </div>
             </div>
           </div>
         </section>
 
+        <!-- 4. Observaciones -->
         <section class="catalog-section" aria-labelledby="notes-title">
           <div class="section-heading">
             <FileText :size="20" aria-hidden="true" />
             <div>
-              <h3 id="notes-title">Observaciones</h3>
-              <p>Información complementaria que no forma parte de la ficha técnica.</p>
+              <h3 id="notes-title">Observaciones comerciales</h3>
+              <p>Información complementaria, recomendaciones de uso y detalles de entrega.</p>
             </div>
           </div>
-          <label class="notes-label" for="observaciones">Notas del producto (opcional)</label>
-          <textarea
-            id="observaciones"
-            v-model="form.observaciones"
-            name="observaciones"
-            rows="4"
-            placeholder="Ej. Recomendaciones de uso, detalles comerciales o aclaraciones…"
-          />
-          <small v-if="fieldError('observaciones')" class="field-error" role="alert">{{
-            fieldError('observaciones')
-          }}</small>
+          <div class="notes-container">
+            <div class="quick-notes-chips">
+              <span class="quick-chips-label">Notas frecuentes:</span>
+              <button
+                v-for="chip in quickNoteSuggestions"
+                :key="chip"
+                type="button"
+                class="chip-button"
+                @click="appendNote(chip)"
+              >
+                + {{ chip }}
+              </button>
+            </div>
+            <textarea
+              id="observaciones"
+              v-model="form.observaciones"
+              name="observaciones"
+              rows="4"
+              class="notes-textarea"
+              placeholder="Ej. Garantía de 1 año por defectos de fabricación. Ideal para uso de oficina o home office…"
+            />
+            <small v-if="fieldError('observaciones')" class="field-error" role="alert">
+              {{ fieldError('observaciones') }}
+            </small>
+          </div>
         </section>
       </div>
 
-      <aside class="form-aside" aria-label="Imagen y disponibilidad">
+      <!-- Barra lateral (Galería + Transcripción original + Alertas + Disponibilidad) -->
+      <aside class="form-aside" aria-label="Multimedia y contexto">
+        <!-- Galería de imágenes -->
         <section class="catalog-section aside-card" aria-labelledby="image-title">
           <p v-if="canUploadImage === false" class="muted tiny">
             La gestión de imágenes requiere permiso comercial.
@@ -899,20 +1025,51 @@ onMounted(load)
             al instante, independientemente de los datos comerciales.
           </p>
         </section>
+
+        <!-- Tarjeta de Transcripción Original Conservada por Voz -->
+        <section
+          v-if="voiceTranscribedText"
+          class="catalog-section aside-card voice-transcription-card"
+          aria-labelledby="transcription-title"
+        >
+          <div class="aside-heading">
+            <Mic :size="18" aria-hidden="true" />
+            <div class="heading-split">
+              <h3 id="transcription-title">Descripción original por voz</h3>
+              <span class="voice-badge-done">Captura procesada</span>
+            </div>
+          </div>
+          <div class="transcription-text-box">
+            {{ voiceTranscribedText }}
+          </div>
+          <div v-if="voicePendingWarnings.length" class="voice-warnings-box">
+            <div class="warnings-title">
+              <AlertTriangle :size="15" aria-hidden="true" />
+              <strong>Datos a revisar</strong>
+            </div>
+            <ul>
+              <li v-for="warning in voicePendingWarnings" :key="warning">
+                {{ warning }}
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- Disponibilidad y existencias -->
         <section class="catalog-section aside-card" aria-labelledby="status-title">
           <div class="aside-heading">
             <Check :size="19" aria-hidden="true" />
             <h3 id="status-title">Disponibilidad</h3>
           </div>
           <label class="toggle-row">
-            <span class="toggle-copy"
-              ><strong>Producto activo</strong>
+            <span class="toggle-copy">
+              <strong>Producto activo</strong>
               <small>{{
                 form.activo
                   ? 'Visible para las operaciones comerciales.'
                   : 'El producto quedará inactivo.'
-              }}</small></span
-            >
+              }}</small>
+            </span>
             <input v-model="form.activo" type="checkbox" class="switch-input" />
             <span class="switch-ui" aria-hidden="true" />
           </label>
@@ -930,9 +1087,14 @@ onMounted(load)
     <footer class="sticky-actions">
       <p class="muted">Revisa la información antes de guardar el producto.</p>
       <div class="actions">
-        <Button type="button" variant="secondary" :disabled="processing" @click="emit('cancel')"
-          >Cancelar</Button
+        <Button
+          type="button"
+          variant="secondary"
+          :disabled="processing"
+          @click="emit('cancel')"
         >
+          Cancelar
+        </Button>
         <Button
           variant="success"
           type="submit"
@@ -950,53 +1112,30 @@ onMounted(load)
   <VoiceDrawer
     :open="voiceOpen"
     title="Completar por voz"
-    description="Describe tu producto y revisa la propuesta antes de aplicarla."
+    description="Describe tu producto y los datos se completarán automáticamente en el formulario."
     close-label="Cerrar asistente de voz"
     @close="voiceOpen = false"
   >
     <CapturaCatalogo
       v-if="categoria === 'SILLA' || categoria === 'PISO_FLOTANTE' || categoria === 'OTRO'"
       :key="categoria"
-      :categoria="categoria"
+      :categoria="categoria as CategoriaEnum"
       :opciones="opciones"
       @apply="applyVoice"
+      @applied="onVoiceApplied"
       @recording-state="updateRecording"
       @processing-state="assistantProcessing = $event"
     />
   </VoiceDrawer>
-  <Modal
-    :open="voiceConflicts.length > 0"
-    title="Revisar cambios sugeridos"
-    description="Selecciona qué valores manuales quieres sustituir. Los campos vacíos se completarán automáticamente."
-    wide
-    @close="rejectVoice"
-  >
-    <div class="conflict-list">
-      <label v-for="item in voiceConflicts" :key="item.key" class="conflict-item">
-        <input
-          v-model="item.selected"
-          type="checkbox"
-          :aria-label="'Reemplazar ' + (voiceLabels[item.key] || item.key)"
-        />
-        <span class="conflict-copy"
-          ><strong>{{ voiceLabels[item.key] || item.key }}</strong>
-          <span>Actual: {{ item.current }}</span
-          ><span>Sugerido: {{ item.suggested }}</span></span
-        >
-      </label>
-    </div>
-    <template #footer>
-      <Button variant="secondary" @click="rejectVoice">Conservar valores actuales</Button>
-      <Button @click="acceptVoice">Aplicar selección</Button>
-    </template>
-  </Modal>
 </template>
+
 <style scoped>
 .product-form {
   display: grid;
   gap: var(--space-5);
   min-width: 0;
 }
+
 .form-intro {
   display: flex;
   align-items: center;
@@ -1004,37 +1143,68 @@ onMounted(load)
   flex-wrap: wrap;
   gap: var(--space-4);
 }
+
+.category-capsule {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: var(--radius-pill, 9999px);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  color: var(--color-primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.35rem;
+}
+
 .form-intro h2 {
   margin: 0.15rem 0 0.2rem;
   font-size: clamp(1.2rem, 2vw, 1.55rem);
 }
+
 .form-intro p {
   margin: 0;
 }
-.eyebrow {
-  color: var(--color-primary);
-  font-size: 0.71rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-}
+
 .muted {
   color: var(--color-text-secondary);
 }
+
 .voice-trigger {
   white-space: nowrap;
 }
+
+.voice-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.45rem 0.85rem;
+  background: var(--color-primary-soft, rgba(224, 46, 50, 0.12));
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-pill, 9999px);
+  color: var(--color-text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  width: fit-content;
+}
+
 .catalog-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(16rem, 0.35fr);
+  grid-template-columns: minmax(0, 1fr) minmax(17rem, 0.35fr);
   align-items: start;
   gap: var(--space-5);
 }
+
 .form-main,
 .form-aside {
   min-width: 0;
   display: grid;
   gap: var(--space-5);
 }
+
 .catalog-section {
   min-width: 0;
   padding: clamp(1rem, 2vw, 1.5rem);
@@ -1042,6 +1212,7 @@ onMounted(load)
   border-radius: var(--radius-card);
   background: var(--color-surface);
 }
+
 .section-heading,
 .aside-heading {
   display: flex;
@@ -1049,153 +1220,488 @@ onMounted(load)
   gap: var(--space-3);
   margin-bottom: var(--space-5);
 }
+
 .section-heading > svg,
 .aside-heading > svg {
   flex: 0 0 auto;
   color: var(--color-primary);
+  margin-top: 0.15rem;
 }
+
+.heading-split {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex: 1 1 auto;
+}
+
 .section-heading h3,
 .aside-heading h3 {
   font-size: 1.07rem;
   margin: 0;
 }
+
 .section-heading p {
   margin: 0.35rem 0 0;
   color: var(--color-text-secondary);
   font-size: 0.87rem;
 }
+
 .fields-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   column-gap: var(--space-4);
   row-gap: var(--space-5);
 }
+
 .fields-grid > * {
   min-width: 0;
 }
+
 .full-field {
   grid-column: 1 / -1;
 }
+
+.unit-field-wrapper {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.unit-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.unit-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.9rem;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  min-height: 2.65rem;
+}
+
+.unit-card-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.unit-val {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--color-text);
+}
+
+.unit-tag {
+  font-size: 0.74rem;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill, 9999px);
+  padding: 0.15rem 0.5rem;
+}
+
+.visually-hidden-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .field-hint,
 .field-error {
   display: block;
   margin-top: 0.45rem;
   font-size: 0.8rem;
 }
+
 .field-hint {
   color: var(--color-text-secondary);
 }
+
 .field-error,
 .error-summary {
   color: var(--color-danger-text);
 }
+
 .error-summary {
   margin: 0;
   padding: var(--space-3);
   border: 1px solid var(--color-danger);
   border-radius: var(--radius-control);
 }
+
 .loading-note {
   padding: var(--space-6);
   color: var(--color-text-secondary);
 }
+
+/* Extras / Características de la silla */
 .extras {
   margin-top: var(--space-5);
-  padding-top: var(--space-4);
+  padding-top: var(--space-5);
   border-top: 1px solid var(--color-border);
+  display: grid;
+  gap: var(--space-4);
 }
+
 .extras-heading h4 {
   margin: 0;
   font-size: 0.96rem;
+  font-weight: 700;
 }
-.extras-heading p {
-  margin: 0.3rem 0 var(--space-4);
-  font-size: 0.83rem;
+
+.quick-feature-chips,
+.quick-notes-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
 }
+
+.quick-chips-label {
+  font-size: 0.77rem;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  margin-right: 0.25rem;
+}
+
+.chip-button {
+  padding: 0.25rem 0.65rem;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill, 9999px);
+  color: var(--color-text);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chip-button:hover {
+  background: var(--color-surface-raised);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
 .extras-list {
   display: grid;
   gap: var(--space-3);
 }
+
 .extra-row {
   display: flex;
-  flex-wrap: wrap;
-  align-items: end;
+  align-items: flex-end;
   gap: var(--space-3);
-}
-.extra-row label {
-  min-width: 0;
-  flex: 1 1 9rem;
-  display: grid;
-  gap: var(--space-2);
-  font-size: 0.86rem;
-  font-weight: 600;
-}
-.extra-row input,
-.extra-row select,
-textarea {
-  width: 100%;
-  min-width: 0;
-  min-height: 2.75rem;
-  padding: 0.65rem 0.75rem;
-  border: 1px solid var(--color-border-strong);
+  padding: var(--space-3);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
-  background: var(--color-surface);
-  color: var(--color-text);
 }
-.extra-row input:disabled {
-  opacity: 0.55;
-}
-.icon-remove {
-  min-width: 2.75rem;
-  min-height: 2.75rem;
+
+.extra-field-group {
   display: grid;
-  place-items: center;
-  background: transparent;
-  color: var(--color-danger-text);
-  border: 1px solid var(--color-danger);
+  gap: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text);
+  flex: 1 1 35%;
+}
+
+.extra-field-group--flex {
+  flex: 2 1 60%;
+}
+
+.extra-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: var(--color-surface-raised, #18181b);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  font-size: 0.86rem;
+}
+
+.icon-remove {
+  background: none;
+  border: none;
+  color: var(--color-danger);
+  padding: 0.55rem;
   border-radius: var(--radius-control);
   cursor: pointer;
+  display: grid;
+  place-items: center;
 }
-.icon-remove:hover,
-.icon-remove:focus-visible {
-  background: var(--color-danger-soft);
+
+.icon-remove:hover {
+  background: rgba(239, 68, 68, 0.15);
 }
+
 .extras-empty {
+  font-size: 0.84rem;
   color: var(--color-text-secondary);
-  font-size: 0.83rem;
+  font-style: italic;
+  margin: var(--space-2) 0;
 }
-.promotion-status {
-  margin: 0;
-  font-size: 0.86rem;
+
+.add-extra {
+  width: fit-content;
+}
+
+/* Precio y Promociones */
+.price-cards-stack {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.price-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-pill, 9999px);
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--color-danger-text);
+  border: 1px solid var(--color-danger);
+}
+
+.price-badge--ready {
+  background: rgba(34, 197, 94, 0.12);
+  color: var(--color-success, #22c55e);
+  border-color: var(--color-success, #22c55e);
+}
+
+.price-block-base {
+  padding: var(--space-4);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.price-input-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.price-input-row > :first-child {
+  flex: 1 1 16rem;
+}
+
+.price-preview-callout {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 0.5rem 1rem;
+  background: var(--color-surface-raised, #18181b);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.preview-label {
+  font-size: 0.74rem;
   color: var(--color-text-secondary);
 }
-.promotion-status strong {
+
+.preview-amount {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.price-block-promo {
+  padding: var(--space-4);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  transition: all 0.2s ease;
+}
+
+.price-block-promo--active {
+  border-color: var(--color-primary-soft, #e02e32);
+}
+
+.promotion-fields {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px dashed var(--color-border);
+  display: grid;
+  gap: var(--space-4);
+}
+
+.promo-inputs-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+@media (max-width: 768px) {
+  .promo-inputs-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.discount-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0.65rem 1rem;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  border-radius: var(--radius-control);
+}
+
+.discount-pill {
+  padding: 0.2rem 0.55rem;
+  background: var(--color-success, #22c55e);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  border-radius: var(--radius-pill, 9999px);
+}
+
+.discount-comparison {
+  font-size: 0.88rem;
   color: var(--color-text);
 }
+
+.discount-savings {
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+}
+
+.promo-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+}
+
+.status-capsule {
+  font-size: 0.78rem;
+  padding: 0.25rem 0.7rem;
+  border-radius: var(--radius-pill, 9999px);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.status-capsule--vigente {
+  border-color: rgba(34, 197, 94, 0.5);
+  color: var(--color-success, #22c55e);
+}
+
+.status-capsule--programada {
+  border-color: rgba(234, 179, 8, 0.5);
+  color: #eab308;
+}
+
+.status-capsule--finalizada,
+.status-capsule--desactivada {
+  color: var(--color-text-secondary);
+}
+
+.toggle-row--inline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .promotion-legacy {
+  margin: 0;
   padding: var(--space-3);
-  border-left: 3px solid var(--color-warning);
-  background: var(--color-surface-soft);
-  color: var(--color-text-secondary);
-  font-size: 0.84rem;
+  background: rgba(234, 179, 8, 0.12);
+  border: 1px solid #eab308;
+  border-radius: var(--radius-control);
+  font-size: 0.82rem;
+}
+
+/* Observaciones */
+.notes-container {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.notes-textarea {
+  width: 100%;
+  padding: 0.75rem;
+  background: var(--color-surface-raised, #18181b);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+/* Barra Lateral */
+.aside-card {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.voice-transcription-card {
+  border-color: var(--color-primary-soft, #e02e32);
+}
+
+.voice-badge-done {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-pill, 9999px);
+  background: var(--color-primary-soft, rgba(224, 46, 50, 0.15));
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.transcription-text-box {
+  padding: 0.85rem;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--color-text);
+  max-height: 14rem;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+.voice-warnings-box {
+  padding: 0.75rem;
+  background: rgba(234, 179, 8, 0.1);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  border-radius: var(--radius-control);
+  display: grid;
+  gap: 0.35rem;
+}
+
+.warnings-title {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: #eab308;
+}
+
+.voice-warnings-box ul {
   margin: 0;
+  padding-left: 1.15rem;
+  font-size: 0.78rem;
+  color: var(--color-text);
+  line-height: 1.5;
 }
-.promotion-base {
-  margin: 0;
-  font-size: 0.86rem;
-  color: var(--color-text-secondary);
-}
-.add-extra {
-  justify-self: start;
-}
-.price-field {
-  max-width: 22rem;
-}
-.promotion {
-  margin-top: var(--space-5);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--color-border);
-}
+
 .toggle-row {
   display: flex;
   align-items: center;
@@ -1203,251 +1709,95 @@ textarea {
   gap: var(--space-3);
   cursor: pointer;
 }
+
 .toggle-copy {
   display: grid;
-  gap: 0.3rem;
+  gap: 0.15rem;
 }
+
 .toggle-copy strong {
-  font-size: 0.93rem;
+  font-size: 0.9rem;
 }
+
 .toggle-copy small {
   color: var(--color-text-secondary);
-  font-size: 0.81rem;
-  font-weight: 400;
-  line-height: 1.5;
+  font-size: 0.8rem;
 }
+
 .switch-input {
   position: absolute;
   width: 1px;
   height: 1px;
   opacity: 0;
 }
+
 .switch-ui {
   position: relative;
-  display: block;
-  flex: 0 0 2.7rem;
-  width: 2.7rem;
-  height: 1.6rem;
-  border-radius: 2rem;
+  width: 2.75rem;
+  height: 1.5rem;
   background: var(--color-border-strong);
-  transition: background 0.16s ease;
+  border-radius: var(--radius-pill, 9999px);
+  transition: background 0.2s;
+  flex: 0 0 auto;
 }
+
 .switch-ui::after {
-  position: absolute;
   content: '';
-  top: 0.2rem;
-  left: 0.2rem;
-  width: 1.2rem;
-  height: 1.2rem;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1.25rem;
+  height: 1.25rem;
+  background: #fff;
   border-radius: 50%;
-  background: white;
-  transition: transform 0.16s ease;
-  box-shadow: 0 1px 3px #0003;
+  transition: transform 0.2s;
 }
+
 .switch-input:checked + .switch-ui {
   background: var(--color-primary);
 }
+
 .switch-input:checked + .switch-ui::after {
-  transform: translateX(1.1rem);
+  transform: translateX(1.25rem);
 }
-.switch-input:focus-visible + .switch-ui {
-  outline: 3px solid var(--color-primary);
-  outline-offset: 3px;
-}
-.promotion-fields {
-  display: grid;
-  gap: var(--space-4);
-  margin-top: var(--space-5);
-}
-.discount-preview {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  background: var(--color-surface-soft);
-  border-radius: var(--radius-control);
-}
-.discount-preview strong {
-  color: var(--color-success);
-}
-.notes-label {
-  display: block;
-  font-size: 0.85rem;
-  font-weight: 600;
-  margin-bottom: var(--space-2);
-}
-textarea {
-  display: block;
-  min-height: 7rem;
-  resize: vertical;
-}
-.aside-heading {
-  margin-bottom: var(--space-4);
-}
-.image-preview {
-  aspect-ratio: 4/3;
-  width: 100%;
-  overflow: hidden;
-  display: grid;
-  place-items: center;
-  border: 1px dashed var(--color-border-strong);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-soft);
-}
-.image-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-.image-preview :deep(img) {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-.image-empty {
-  display: grid;
-  place-items: center;
-  gap: var(--space-2);
-  color: var(--color-text-secondary);
-  text-align: center;
-  padding: var(--space-4);
-}
-.image-empty p {
-  margin: 0;
-  font-size: 0.84rem;
-}
-.file-hidden {
-  position: absolute;
-  height: 1px;
-  width: 1px;
-  opacity: 0;
-}
-.image-button {
-  width: 100%;
-  margin-top: var(--space-3);
-}
-.text-action {
-  border: 0;
-  background: transparent;
-  color: var(--color-danger-text);
-  text-decoration: underline;
-  cursor: pointer;
-  padding: 0.5rem 0;
-}
-.tiny {
-  font-size: 0.77rem;
-  line-height: 1.5;
-  margin: 0.6rem 0 0;
-}
+
 .stock-note {
-  margin-top: var(--space-5);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--color-border);
-}
-.stock-note strong {
-  font-size: 0.85rem;
-}
-.stock-note p {
-  color: var(--color-text-secondary);
+  padding: var(--space-3);
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-control);
   font-size: 0.8rem;
-  line-height: 1.55;
-  margin: 0.5rem 0 0;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
 }
+
+.stock-note strong {
+  color: var(--color-text);
+  display: block;
+  margin-bottom: 0.2rem;
+}
+
 .sticky-actions {
-  position: sticky;
-  z-index: 5;
-  bottom: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-surface-raised);
+  padding: var(--space-4);
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  box-shadow: 0 -3px 15px #0001;
+  border-radius: var(--radius-card);
+  position: sticky;
+  bottom: var(--space-4);
+  z-index: 10;
+  box-shadow: var(--shadow-elevated, 0 8px 24px rgba(0, 0, 0, 0.4));
 }
-.sticky-actions p {
-  font-size: 0.79rem;
-  margin: 0;
-}
+
 .actions {
   display: flex;
-  flex-wrap: wrap;
   gap: var(--space-3);
 }
-.conflict-list {
-  display: grid;
-  gap: var(--space-3);
-}
-.conflict-item {
-  display: flex;
-  align-items: start;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  cursor: pointer;
-}
-.conflict-item input {
-  margin-top: 0.25rem;
-}
-.conflict-copy {
-  min-width: 0;
-  display: grid;
-  gap: 0.35rem;
-  overflow-wrap: anywhere;
-}
-.conflict-copy span {
-  color: var(--color-text-secondary);
-  font-size: 0.84rem;
-}
-@media (max-width: 73rem) {
-  .catalog-layout {
-    grid-template-columns: minmax(0, 1fr) 17rem;
-  }
-}
-@media (max-width: 60rem) {
+
+@media (max-width: 900px) {
   .catalog-layout {
     grid-template-columns: 1fr;
-  }
-  .form-aside {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (max-width: 42rem) {
-  .fields-grid,
-  .form-aside {
-    grid-template-columns: 1fr;
-  }
-  .full-field {
-    grid-column: auto;
-  }
-  .form-intro {
-    align-items: start;
-  }
-  .voice-trigger,
-  .actions,
-  .actions > :deep(button) {
-    width: 100%;
-  }
-  .sticky-actions {
-    align-items: stretch;
-  }
-  .sticky-actions p {
-    display: none;
-  }
-  .extra-row {
-    display: grid;
-    grid-template-columns: 1fr;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .switch-ui,
-  .switch-ui::after {
-    transition: none;
   }
 }
 </style>

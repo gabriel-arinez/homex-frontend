@@ -14,6 +14,7 @@ vi.mock('@/modules/capturas/audioLimits', async (importOriginal) => {
 })
 
 afterEach(() => vi.restoreAllMocks())
+
 function mockResult(category: CategoriaEnum) {
   vi.spyOn(catalogoCapturaService, 'create').mockResolvedValue({
     id: 1,
@@ -34,16 +35,18 @@ function mockResult(category: CategoriaEnum) {
       warnings: ['Revisar'],
       evidence: [],
       unrecognized: [],
-      version: 'catalog-0.1.20',
+      version: 'catalog-0.1.21',
     },
   })
 }
+
 function button(wrapper: ReturnType<typeof mount>, label: string) {
   return wrapper.findAll('button').find((b) => b.text() === label)!
 }
+
 describe('Voz en creación de catálogo', () => {
   it.each(['SILLA', 'PISO_FLOTANTE', 'OTRO'] as const)(
-    'sube audio, conserva categoría y sólo aplica por acción explícita: %s',
+    'sube audio, conserva categoría y aplica propuesta directamente: %s',
     async (category) => {
       mockResult(category)
       const w = mount(CapturaCatalogo, { props: { categoria: category } })
@@ -56,21 +59,20 @@ describe('Voz en creación de catálogo', () => {
         expect.objectContaining({ categoria: category, audio: file }),
         expect.anything(),
       )
-      expect(w.get('textarea').element.value).toBe('nombre: Zócalo')
-      expect(w.emitted('apply')).toBeUndefined()
-      await button(w, 'Aplicar al formulario').trigger('click')
       expect(w.emitted('apply')).toEqual([[{ nombre: 'Zócalo' }]])
-      await w.get('textarea').setValue('nombre: corregido')
-      expect(button(w, 'Aplicar al formulario').attributes('disabled')).toBeDefined()
-      await button(w, 'Reinterpretar texto').trigger('click')
-      await flushPromises()
-      expect(catalogoCapturaService.create).toHaveBeenLastCalledWith(
-        expect.objectContaining({ texto: 'nombre: corregido', captura_origen: 1 }),
-        expect.anything(),
-      )
+      expect(w.emitted('applied')).toEqual([
+        [
+          {
+            fields: { nombre: 'Zócalo' },
+            text: 'nombre: Zócalo',
+            warnings: ['Revisar'],
+          },
+        ],
+      ])
       w.unmount()
     },
   )
+
   it('detener la grabación lanza la transcripción automáticamente sin pasos extra', async () => {
     mockResult('SILLA')
     const audioRecorder = defineComponent({
@@ -101,7 +103,7 @@ describe('Voz en creación de catálogo', () => {
       expect.objectContaining({ categoria: 'SILLA', audio: expect.any(Blob) }),
       expect.anything(),
     )
-    expect(w.text()).toContain('Campos detectados')
+    expect(w.emitted('apply')).toBeDefined()
     w.unmount()
   })
 
@@ -160,7 +162,7 @@ describe('Voz en creación de catálogo', () => {
     w.unmount()
   })
 
-  it('conserva transcripción cuando no hay propuesta y permite corregir', async () => {
+  it('notifica error cuando el procesamiento falla y permite reintentar', async () => {
     mockResult('OTRO')
     vi.mocked(catalogoCapturaService.get).mockResolvedValue({
       id: 1,
@@ -171,26 +173,34 @@ describe('Voz en creación de catálogo', () => {
       error_codigo: 'PIPELINE_ERROR',
     })
     const w = mount(CapturaCatalogo, { props: { categoria: 'OTRO' } })
-    await w.get('textarea').setValue('texto')
-    await button(w, 'Reinterpretar texto').trigger('click')
+    const file = new File(['audio'], 'homex.wav', { type: 'audio/wav' })
+    const input = w.get('input[type="file"]')
+    Object.defineProperty(input.element, 'files', { value: [file] })
+    await input.trigger('change')
     await flushPromises()
-    expect(w.get('textarea').element.value).toBe('texto original')
+    expect(w.text()).toContain('No se obtuvo una propuesta')
     expect(w.emitted('apply')).toBeUndefined()
     w.unmount()
   })
-  it('cancela la espera y descarta respuestas tardías', async () => {
+
+  it('cancela la espera del procesamiento en curso al pulsar cancelar', async () => {
     mockResult('SILLA')
     vi.mocked(catalogoCapturaService.get).mockImplementation(() => new Promise(() => {}))
     const w = mount(CapturaCatalogo, { props: { categoria: 'SILLA' } })
-    await w.get('textarea').setValue('texto')
-    await button(w, 'Reinterpretar texto').trigger('click')
+    const file = new File(['audio'], 'homex.wav', { type: 'audio/wav' })
+    const input = w.get('input[type="file"]')
+    Object.defineProperty(input.element, 'files', { value: [file] })
+    await input.trigger('change')
     await flushPromises()
-    await button(w, 'Cancelar procesamiento').trigger('click')
-    expect(w.text()).not.toContain('Transcribiendo e interpretando')
+    expect(w.text()).toContain('Analizando descripción comercial')
+    await button(w, 'Cancelar').trigger('click')
+    await flushPromises()
+    expect(w.text()).not.toContain('Analizando descripción comercial')
     expect(w.emitted('apply')).toBeUndefined()
     w.unmount()
   })
-  it('revisa conflictos sin sobrescribir valores manuales y sin guardar automáticamente', async () => {
+
+  it('aplica propuesta de voz directamente al formulario y muestra transcripción conservada en la barra lateral', async () => {
     vi.spyOn(proformasService, 'families').mockResolvedValue({
       count: 0,
       next: null,
@@ -207,89 +217,69 @@ describe('Voz en creación de catálogo', () => {
       global: { stubs: { CapturaCatalogo: true } },
     })
     await flushPromises()
-    const input = w.get('input[name="nombre"]')
-    await input.setValue('Manual')
-    // La captura se monta sólo después de abrir el panel lateral.
+
+    // Abrir asistente y emitir resultado con texto y warnings
     await button(w, 'Completar por voz').trigger('click')
-    w.findComponent({ name: 'CapturaCatalogo' }).vm.$emit('apply', { nombre: 'Propuesto' })
-    await flushPromises()
-    const checkbox = document.body.querySelector<HTMLInputElement>(
-      'input[aria-label="Reemplazar Nombre comercial"]',
-    )
-    expect(checkbox).not.toBeNull()
-    expect((input.element as HTMLInputElement).value).toBe('Manual')
-    expect(w.emitted('save')).toBeUndefined()
-    const cancel = [...document.body.querySelectorAll('button')].find(
-      (item) => item.textContent?.trim() === 'Conservar valores actuales',
-    )
-    cancel?.click()
-    await flushPromises()
-    expect((input.element as HTMLInputElement).value).toBe('Manual')
-    await button(w, 'Completar por voz').trigger('click')
-    w.findComponent({ name: 'CapturaCatalogo' }).vm.$emit('apply', {
-      nombre: 'Propuesto',
-      sku: 'NO',
-      stock: 99,
+    const assistant = w.findComponent({ name: 'CapturaCatalogo' })
+    assistant.vm.$emit('applied', {
+      fields: { nombre: 'Silla Ergonómica Pro', precio_lista: '4500.00' },
+      text: 'Nombre Silla Ergonómica Pro precio 4500',
+      warnings: ['Complete manualmente: SKU'],
     })
     await flushPromises()
-    const confirmCheck = document.body.querySelector<HTMLInputElement>(
-      'input[aria-label="Reemplazar Nombre comercial"]',
+
+    // Los datos se aplican de inmediato en los campos editables
+    expect((w.get('input[name="nombre"]').element as HTMLInputElement).value).toBe(
+      'Silla Ergonómica Pro',
     )
-    confirmCheck?.click()
-    const apply = [...document.body.querySelectorAll('button')].find(
-      (item) => item.textContent?.trim() === 'Aplicar selección',
-    )
-    apply?.click()
-    await flushPromises()
-    expect((input.element as HTMLInputElement).value).toBe('Propuesto')
-    expect((w.get('input[name="sku"]').element as HTMLInputElement).value).toBe('')
+    expect((w.get('input[name="precio"]').element as HTMLInputElement).value).toBe('4500.00')
+
+    // La barra lateral muestra la transcripción conservada y sus avisos
+    expect(w.text()).toContain('Descripción original por voz')
+    expect(w.text()).toContain('Nombre Silla Ergonómica Pro precio 4500')
+    expect(w.text()).toContain('Complete manualmente: SKU')
     expect(w.emitted('save')).toBeUndefined()
     w.unmount()
   })
-})
 
-it('aplica color secundario desde un catálogo activo sólo cuando se acepta el conflicto', async () => {
-  vi.spyOn(proformasService, 'families').mockResolvedValue({
-    count: 0,
-    next: null,
-    previous: null,
-    results: [],
+  it('aplica color secundario y características de silla directamente sin bloqueos modales', async () => {
+    vi.spyOn(proformasService, 'families').mockResolvedValue({
+      count: 0,
+      next: null,
+      previous: null,
+      results: [],
+    })
+    vi.spyOn(proformasService, 'options').mockImplementation(async (key) =>
+      key === 'CATEGORIA_PRODUCTO'
+        ? [{ id: 10, codigo: 'SILLA', nombre: 'Silla', concepto_codigo: key }]
+        : key === 'COLOR'
+          ? [
+              { id: 11, codigo: 'NEGRO', nombre: 'Negro', concepto_codigo: key },
+              { id: 12, codigo: 'AZUL', nombre: 'Azul', concepto_codigo: key },
+            ]
+          : [],
+    )
+    const w = mount(ProductoForm, {
+      props: { preselectCategory: 'SILLA' },
+      global: { stubs: { CapturaCatalogo: true } },
+    })
+    await flushPromises()
+
+    await button(w, 'Completar por voz').trigger('click')
+    const assistant = w.findComponent({ name: 'CapturaCatalogo' })
+    assistant.vm.$emit('applied', {
+      fields: {
+        color_secundario: 12,
+        especificaciones: { apoyo_lumbar: 'Ajustable', material_respaldo: 'Malla' },
+      },
+      text: 'Silla con color secundario azul y apoyo lumbar ajustable',
+      warnings: [],
+    })
+    await flushPromises()
+
+    expect((w.get('select[name="color2"]').element as HTMLSelectElement).value).toBe('12')
+    expect(w.text()).toContain('Apoyo lumbar')
+    expect(w.text()).toContain('Material del respaldo')
+    w.unmount()
   })
-  vi.spyOn(proformasService, 'options').mockImplementation(async (key) =>
-    key === 'CATEGORIA_PRODUCTO'
-      ? [{ id: 10, codigo: 'SILLA', nombre: 'Silla', concepto_codigo: key }]
-      : key === 'COLOR'
-        ? [
-            { id: 11, codigo: 'NEGRO', nombre: 'Negro', concepto_codigo: key },
-            { id: 12, codigo: 'AZUL', nombre: 'Azul', concepto_codigo: key },
-          ]
-        : [],
-  )
-  const w = mount(ProductoForm, {
-    props: { preselectCategory: 'SILLA' },
-    global: { stubs: { CapturaCatalogo: true } },
-  })
-  await flushPromises()
-  await w.get('select[name="color2"]').setValue('11')
-  await button(w, 'Completar por voz').trigger('click')
-  w.findComponent({ name: 'CapturaCatalogo' }).vm.$emit('apply', { color_secundario: 12 })
-  await flushPromises()
-  expect((w.get('select[name="color2"]').element as HTMLSelectElement).value).toBe('11')
-  const checkbox = document.body.querySelector<HTMLInputElement>(
-    'input[aria-label="Reemplazar Color secundario"]',
-  )
-  expect(checkbox).not.toBeNull()
-  checkbox?.click()
-  const apply = [...document.body.querySelectorAll('button')].find(
-    (item) => item.textContent?.trim() === 'Aplicar selección',
-  )
-  apply?.click()
-  await flushPromises()
-  expect((w.get('select[name="color2"]').element as HTMLSelectElement).value).toBe('12')
-  await button(w, 'Completar por voz').trigger('click')
-  w.findComponent({ name: 'CapturaCatalogo' }).vm.$emit('apply', { color_secundario: 999 })
-  await flushPromises()
-  expect((w.get('select[name="color2"]').element as HTMLSelectElement).value).toBe('12')
-  expect(w.emitted('save')).toBeUndefined()
-  w.unmount()
 })

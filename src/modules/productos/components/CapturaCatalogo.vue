@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { AlertTriangle, CheckCircle2, RotateCcw } from '@lucide/vue'
+import { nextTick, onBeforeUnmount, onScopeDispose, ref, watch } from 'vue'
+import { AlertTriangle, Loader2 } from '@lucide/vue'
 import {
   ALLOWED_AUDIO_EXTENSIONS,
   MAX_AUDIO_BYTES,
   MAX_UPLOAD_SECONDS,
   readAudioDuration,
 } from '@/modules/capturas/audioLimits'
+import { convertAudioFileToWav } from '@/modules/capturas/audioConversion'
 import type {
   CamposCatalogo,
   CategoriaEnum,
@@ -23,11 +24,14 @@ const props = defineProps<{
   categoria: CategoriaEnum
   opciones?: Record<string, ValorCatalogoPublico[]>
 }>()
+
 const emit = defineEmits<{
   apply: [fields: CamposCatalogo]
+  applied: [payload: { fields: CamposCatalogo; text: string; warnings: string[] }]
   'recording-state': [active: boolean, paused: boolean, elapsed: number]
   'processing-state': [active: boolean]
 }>()
+
 const recorder = ref<InstanceType<typeof AudioRecorder> | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const requesting = ref(false)
@@ -35,7 +39,29 @@ const recording = ref(false)
 const paused = ref(false)
 const recordingElapsed = ref(0)
 const processing = ref(false)
-watch(processing, (active) => emit('processing-state', active))
+const processingTimer = ref(0)
+let processingInterval: number | null = null
+
+watch(processing, (active) => {
+  emit('processing-state', active)
+  if (active) {
+    processingTimer.value = 0
+    if (processingInterval) clearInterval(processingInterval)
+    processingInterval = window.setInterval(() => {
+      processingTimer.value++
+    }, 1000)
+  } else {
+    if (processingInterval) {
+      clearInterval(processingInterval)
+      processingInterval = null
+    }
+  }
+})
+
+onScopeDispose(() => {
+  if (processingInterval) clearInterval(processingInterval)
+})
+
 const text = ref('')
 const original = ref('')
 const audio = ref<Blob | null>(null)
@@ -44,12 +70,15 @@ const error = ref('')
 const session = crypto.randomUUID()
 let controller: AbortController | null = null
 let generation = 0
+
 function cancel() {
   generation++
   controller?.abort()
   processing.value = false
 }
+
 onBeforeUnmount(cancel)
+
 async function startRecording() {
   if (processing.value || requesting.value) return
   result.value = null
@@ -71,6 +100,7 @@ async function startRecording() {
     requesting.value = false
   }
 }
+
 function onRecorderStatus(state: string, elapsed: number) {
   paused.value = state === 'PAUSED'
   recordingElapsed.value = elapsed
@@ -81,12 +111,15 @@ function onRecorderStatus(state: string, elapsed: number) {
     elapsed,
   )
 }
+
 function pauseRecording() {
   recorder.value?.pauseRecording()
 }
+
 function resumeRecording() {
   recorder.value?.resumeRecording()
 }
+
 function cancelRecording() {
   recorder.value?.cancelRecording()
   recording.value = false
@@ -95,6 +128,7 @@ function cancelRecording() {
   audio.value = null
   emit('recording-state', false, false, 0)
 }
+
 function onRecorded(blob: Blob | null) {
   if (!blob) return
   recording.value = false
@@ -107,10 +141,12 @@ function onRecorded(blob: Blob | null) {
   audio.value = blob
   void interpret(true)
 }
+
 function chooseAudio() {
   if (processing.value || requesting.value || recording.value) return
   fileInput.value?.click()
 }
+
 async function interpret(useAudio = false) {
   cancel()
   const current = generation
@@ -142,8 +178,16 @@ async function interpret(useAudio = false) {
       }
       if (['COMPLETADA', 'ERROR'].includes(response.estado)) {
         result.value = response
-        if (response.estado === 'ERROR')
-          error.value = 'No se obtuvo una propuesta. Puedes corregir el texto y reintentar.'
+        if (response.estado === 'ERROR') {
+          error.value = 'No se obtuvo una propuesta. Puedes reintentar la grabación o ingresar los datos manualmente.'
+        } else if (response.propuesta?.fields) {
+          const fields = response.propuesta.fields
+          const transcrito = response.texto_transcrito_original || ''
+          const warnings = response.propuesta.warnings || []
+          // Emisión directa al formulario sin pantalla intermedia
+          emit('apply', fields)
+          emit('applied', { fields, text: transcrito, warnings })
+        }
         return
       }
       if (Date.now() >= deadline)
@@ -165,60 +209,49 @@ async function interpret(useAudio = false) {
     if (generation === current) processing.value = false
   }
 }
-const labels: Record<string, string> = {
-  nombre: 'Nombre comercial',
-  observaciones: 'Descripción / observaciones',
-  precio_lista: 'Precio de lista (BOB)',
-  unidad_stock: 'Unidad comercial',
-  marca: 'Marca',
-  modelo: 'Modelo',
-  color_primario: 'Color primario',
-  color_secundario: 'Color secundario',
-  especificaciones: 'Características',
-  tipo: 'Tipo de piso',
-  material: 'Material',
-  diseno: 'Diseño',
-  acabado: 'Acabado',
-  espesor_mm: 'Espesor (mm)',
-  largo_mm: 'Largo (mm)',
-  ancho_mm: 'Ancho (mm)',
-  m2_por_caja: 'm² por caja (informativo)',
-}
-function displayValue(field: string, value: unknown) {
-  const concepts: Record<string, string> = {
-    unidad_stock: 'UNIDAD_MEDIDA',
-    marca: 'MARCA',
-    color_primario: 'COLOR',
-    color_secundario: 'COLOR',
-    tipo: 'TIPO_PISO',
-    material: 'MATERIAL_PISO',
-    diseno: 'DISENO_PISO',
-    acabado: 'ACABADO_PISO',
-  }
-  if (concepts[field])
-    return (
-      props.opciones?.[concepts[field]]?.find((option) => String(option.id) === String(value))
-        ?.nombre ?? 'Valor pendiente de revisión'
-    )
-  if (value && typeof value === 'object')
-    return Object.entries(value)
-      .map(([key, item]) => `${key.replace(/_/g, ' ')}: ${item}`)
-      .join('; ')
-  return value
-}
+
 async function upload(event: Event) {
   const target = event.target as HTMLInputElement
-  const file = target.files?.[0]
+  let file = target.files?.[0]
   target.value = ''
   if (!file) return
-  if (!ALLOWED_AUDIO_EXTENSIONS.test(file.name) || file.size === 0) {
-    error.value = 'Selecciona un audio válido en formato WAV, MP3, M4A, OGG o WebM.'
+
+  const EXTENSIONES_SOPORTADAS = new Set([
+    '.wav',
+    '.mp3',
+    '.m4a',
+    '.ogg',
+    '.webm',
+    '.aac',
+    '.opus',
+    '.mp4',
+    '.flac',
+  ])
+  const extension = file.name.slice(file.name.lastIndexOf('.')).toLowerCase()
+
+  if (!EXTENSIONES_SOPORTADAS.has(extension) && !ALLOWED_AUDIO_EXTENSIONS.test(file.name)) {
+    error.value = 'Formato no admitido. Utiliza WAV, MP3, M4A, OGG, WebM o AAC.'
+    return
+  }
+  if (file.size === 0) {
+    error.value = 'El archivo de audio está vacío.'
     return
   }
   if (file.size > MAX_AUDIO_BYTES) {
     error.value = 'El archivo supera el límite de 20 MB.'
     return
   }
+
+  // Transcodificación transparente para formatos móviles (.aac, .opus)
+  if (['.aac', '.opus'].includes(extension)) {
+    try {
+      file = await convertAudioFileToWav(file)
+    } catch {
+      error.value = 'No se pudo transcodificar el archivo móvil. Intenta con un formato estándar (WAV o MP3).'
+      return
+    }
+  }
+
   try {
     const seconds = await readAudioDuration(file)
     if (seconds !== null && seconds > MAX_UPLOAD_SECONDS) {
@@ -234,6 +267,7 @@ async function upload(event: Event) {
   void interpret(true)
 }
 </script>
+
 <template>
   <section
     class="voice-catalog"
@@ -244,7 +278,7 @@ async function upload(event: Event) {
       class="voice-block"
       icon="mic"
       title="Descripción por voz"
-      description="Dicta nombre, marca, colores o características del producto."
+      description="Dicta nombre, marca, colores o características del producto. Los datos se aplicarán directamente al formulario."
     >
       <VoiceCaptureControls
         :recording="recording"
@@ -271,7 +305,7 @@ async function upload(event: Event) {
         ref="fileInput"
         class="visually-hidden"
         type="file"
-        accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm"
+        accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm,.aac,.opus,.mp4,.flac"
         :disabled="processing || recording || requesting"
         tabindex="-1"
         aria-hidden="true"
@@ -279,123 +313,67 @@ async function upload(event: Event) {
       />
     </VoiceSection>
 
-    <div v-if="processing" class="processing-note" role="status">
-      <span class="loader" aria-hidden="true" />
-      <span>Transcribiendo e interpretando…</span>
-      <Button variant="secondary" @click="cancel">Cancelar procesamiento</Button>
+    <!-- Feedback en vivo con fases y cronómetro -->
+    <div v-if="processing" class="voice-processing" role="status" aria-live="polite">
+      <div class="processing-header">
+        <div class="processing-pulse">
+          <Loader2 class="spinning" :size="20" aria-hidden="true" />
+        </div>
+        <div class="processing-info">
+          <strong>Analizando descripción comercial</strong>
+          <span class="processing-time">
+            Tiempo transcurrido: {{ String(Math.floor(processingTimer / 60)).padStart(2, '0') }}:{{
+              String(processingTimer % 60).padStart(2, '0')
+            }}
+          </span>
+        </div>
+        <Button variant="secondary" size="sm" @click="cancel">Cancelar</Button>
+      </div>
+
+      <div class="processing-steps">
+        <div class="step-item" :class="{ 'step-item--active': processingTimer < 4 }">
+          <span class="step-dot" />
+          <span>1. Procesando archivo de audio</span>
+        </div>
+        <div
+          class="step-item"
+          :class="{ 'step-item--active': processingTimer >= 4 && processingTimer < 9 }"
+        >
+          <span class="step-dot" />
+          <span>2. Transcribiendo términos y dictado</span>
+        </div>
+        <div class="step-item" :class="{ 'step-item--active': processingTimer >= 9 }">
+          <span class="step-dot" />
+          <span>3. Estructurando atributos comerciales</span>
+        </div>
+      </div>
+      <p class="processing-disclaimer">
+        La propuesta se inyecta directamente al formulario editable al concluir el análisis.
+      </p>
     </div>
+
     <p v-if="error" role="alert" class="error">
       <AlertTriangle :size="17" aria-hidden="true" />{{ error }}
     </p>
 
-    <VoiceSection
-      class="voice-block"
-      icon="review"
-      title="Revisar transcripción"
-      description="Corrige las palabras o códigos antes de aplicar los datos."
-    >
-      <details v-if="original" class="original">
-        <summary>Ver transcripción original</summary>
-        <p>{{ original }}</p>
-      </details>
-      <label class="transcript-label"
-        >Transcripción / texto corregido
-        <textarea
-          v-model="text"
-          rows="4"
-          :disabled="processing"
-          placeholder="Ej. Silla ergonómica, marca…, color…, precio…"
-        />
-      </label>
-      <Button variant="secondary" :disabled="!text.trim() || processing" @click="interpret(false)">
-        <RotateCcw :size="16" aria-hidden="true" /> Reinterpretar texto
-      </Button>
-    </VoiceSection>
-
-    <div v-if="result?.propuesta" class="voice-block results">
-      <div class="block-title">
-        <CheckCircle2 :size="19" aria-hidden="true" />
-        <div>
-          <h2>Campos detectados</h2>
-          <p>Estos valores son una propuesta; todavía no se ha guardado el producto.</p>
-        </div>
-      </div>
-      <dl class="detected-list">
-        <div v-for="(value, field) in result.propuesta.fields" :key="field" class="detected-item">
-          <dt>{{ labels[field] ?? field }}</dt>
-          <dd>{{ displayValue(field, value) }}</dd>
-        </div>
-      </dl>
-      <div v-if="result.propuesta.warnings.length" class="warnings">
-        <h3><AlertTriangle :size="17" aria-hidden="true" /> Datos a revisar</h3>
-        <ul>
-          <li v-for="warning in result.propuesta.warnings" :key="warning">{{ warning }}</li>
-        </ul>
-      </div>
-      <details class="evidences">
-        <summary>Evidencias y datos sin reconocer</summary>
-        <ul>
-          <li v-for="evidence in result.propuesta.evidence" :key="evidence.candidate_id">
-            {{ evidence.label }}: «{{ evidence.text }}» — {{ evidence.decision }}
-          </li>
-        </ul>
-        <p v-for="(fragment, index) in result.propuesta.unrecognized" :key="index">
-          {{ fragment }}
-        </p>
-      </details>
-      <Button
-        class="apply-button"
-        :disabled="
-          !Object.keys(result.propuesta.fields).length ||
-          processing ||
-          text !== result.texto_transcrito_original
-        "
-        @click="emit('apply', result.propuesta.fields)"
-      >
-        <CheckCircle2 :size="18" aria-hidden="true" /> Aplicar al formulario
-      </Button>
-      <p v-if="text !== result.texto_transcrito_original" class="hint">
-        El texto cambió; vuelve a reinterpretarlo antes de aplicar.
-      </p>
+    <div class="voice-guide">
+      <h4>Recomendaciones para dictar</h4>
+      <ul>
+        <li>Menciona el <strong>nombre del producto</strong> («Silla ergonómica ejecutiva»).</li>
+        <li>Indica el <strong>precio</strong> («precio 4500» o «precio de lista 5200 bolivianos»).</li>
+        <li>Detalla atributos («respaldo de malla negra», «apoyo lumbar ajustable», «5 ruedas»).</li>
+      </ul>
     </div>
-    <p class="voice-footer">
-      Los datos sugeridos deben revisarse. El producto se crea únicamente al pulsar Guardar
-      producto.
-    </p>
   </section>
 </template>
+
 <style scoped>
 .voice-catalog {
   display: grid;
   gap: var(--space-5);
   padding: var(--space-5);
 }
-/* Las propuestas detectadas conservan su presentación anterior. */
-.results {
-  display: grid;
-  gap: var(--space-3);
-  padding-top: var(--space-5);
-  border-top: 1px solid var(--color-border);
-}
-.block-title {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-}
-.block-title > svg {
-  flex: 0 0 auto;
-  color: var(--color-primary);
-}
-.block-title h2 {
-  margin: 0;
-  font-size: 1.06rem;
-}
-.block-title p {
-  margin: 0.35rem 0 0;
-  font-size: 0.82rem;
-  line-height: 1.5;
-  color: var(--color-text-secondary);
-}
+
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -404,132 +382,135 @@ async function upload(event: Event) {
   overflow: hidden;
   pointer-events: none;
 }
-.transcript-label {
-  display: grid;
-  gap: 0.55rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-.transcript-label textarea {
-  min-height: 7rem;
-  padding: 0.75rem;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
-  color: var(--color-text);
-  resize: vertical;
-}
-.hint {
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--color-text-secondary);
-}
-.original,
-.evidences {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  padding: var(--space-3);
-  overflow-wrap: anywhere;
-}
-.original summary,
-.evidences summary {
-  font-weight: 600;
-  cursor: pointer;
-}
-.original p,
-.evidences p {
-  font-size: 0.83rem;
-}
-.processing-note {
+
+.voice-processing {
   display: grid;
   gap: var(--space-3);
-  align-items: center;
-  background: var(--color-surface-soft);
-  border-radius: var(--radius-control);
   padding: var(--space-4);
-  font-size: 0.86rem;
-}
-.loader {
-  width: 1.25rem;
-  height: 1.25rem;
-  border: 2px solid var(--color-border);
-  border-top-color: var(--color-primary);
-  border-radius: 50%;
-  animation: rotate 1s linear infinite;
-}
-.error {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  padding: var(--space-3);
-  border-radius: var(--radius-control);
-  background: var(--color-danger-soft);
-  color: var(--color-danger-text);
-}
-.detected-list {
-  display: grid;
-  gap: var(--space-2);
-  margin: 0;
-}
-.detected-item {
+  background: var(--color-surface-muted);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  padding: var(--space-3);
-  overflow-wrap: anywhere;
+  border-radius: var(--radius-card);
 }
-.detected-item dt {
-  color: var(--color-text-secondary);
-  font-size: 0.78rem;
-  margin-bottom: 0.35rem;
-}
-.detected-item dd {
-  margin: 0;
-  font-size: 0.94rem;
-  font-weight: 600;
-}
-.warnings {
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-}
-.warnings h3 {
+
+.processing-header {
   display: flex;
-  gap: 0.5rem;
   align-items: center;
-  font-size: 0.9rem;
-  margin: 0 0 0.5rem;
+  justify-content: space-between;
+  gap: var(--space-3);
 }
-.warnings ul {
-  margin: 0;
-  padding-left: 1.25rem;
-  font-size: 0.83rem;
+
+.processing-pulse {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  background: var(--color-primary-soft, rgba(224, 46, 50, 0.12));
+  border-radius: 50%;
+  color: var(--color-primary);
 }
-.evidences ul {
-  padding-left: 1.2rem;
-  font-size: 0.82rem;
+
+.spinning {
+  animation: spin 1s linear infinite;
 }
-.apply-button {
-  width: 100%;
-}
-.voice-footer {
-  margin: 0;
-  color: var(--color-text-secondary);
-  font-size: 0.8rem;
-  line-height: 1.5;
-}
-@keyframes rotate {
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
   to {
     transform: rotate(360deg);
   }
 }
-@media (max-width: 36rem) {
-  .voice-catalog {
-    padding: var(--space-4);
-  }
+
+.processing-info {
+  display: grid;
+  gap: 0.15rem;
+  flex: 1 1 auto;
 }
-@media (prefers-reduced-motion: reduce) {
-  .loader {
-    animation: none;
-  }
+
+.processing-info strong {
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.processing-time {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.processing-steps {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--color-border);
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.81rem;
+  color: var(--color-text-secondary);
+}
+
+.step-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-border-strong);
+}
+
+.step-item--active {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.step-item--active .step-dot {
+  background: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(224, 46, 50, 0.25);
+}
+
+.processing-disclaimer {
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3);
+  background: var(--color-surface-danger, rgba(239, 68, 68, 0.1));
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-control);
+  color: var(--color-danger-text);
+  font-size: 0.84rem;
+}
+
+.voice-guide {
+  padding: var(--space-4);
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border);
+}
+
+.voice-guide h4 {
+  margin: 0 0 var(--space-2);
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.voice-guide ul {
+  margin: 0;
+  padding-left: 1.15rem;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  line-height: 1.55;
 }
 </style>
