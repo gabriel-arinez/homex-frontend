@@ -65,7 +65,7 @@ import { loadPending, savePending } from '@/shared/media/pending'
 import { galleryService } from '@/shared/media/gallery'
 import MuebleStudio from '../components/MuebleStudio.vue'
 import { mapearCapturaAsistida } from '../services/capturaAsistidaMapper'
-import { tecnicaIgual } from '../services/muebleTecnico'
+import { leerDatosTecnicos, tecnicaIgual } from '../services/muebleTecnico'
 import { proformasService } from '../services/proformasService'
 import { retornoAProformas } from '../utils/navegacionProformas'
 import { useSessionStore } from '@/app/stores/useSessionStore'
@@ -168,6 +168,13 @@ function aplicarCaptura(result: ResultadoAsistida) {
     return
   try {
     const linea = mapearCapturaAsistida(result.propuesta_configurador, tipos.value, unidades.value)
+    if (result.texto_transcrito_original && linea.especificacion) {
+      const dt = leerDatosTecnicos(linea.especificacion.datos_tecnicos)
+      if (!dt.descripcion_original) {
+        dt.descripcion_original = result.texto_transcrito_original
+        linea.especificacion.datos_tecnicos = dt
+      }
+    }
     draftingFurniture.value = {
       ...linea,
       localId: draftingFurniture.value.localId,

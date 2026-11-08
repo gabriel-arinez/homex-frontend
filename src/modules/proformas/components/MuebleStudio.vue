@@ -12,6 +12,7 @@ import {
   Wallet,
   ImagePlus,
   Mic,
+  FileText,
 } from '@lucide/vue'
 import type {
   EspecificacionMueble,
@@ -26,6 +27,7 @@ import CapturaAsistida from './CapturaAsistida.vue'
 import EspecificacionForm from './EspecificacionForm.vue'
 import ImageGallery from '@/shared/media/ImageGallery.vue'
 import { galleryService } from '@/shared/media/gallery'
+import { leerDatosTecnicos } from '../services/muebleTecnico'
 
 type Seccion = 'general' | 'estructura' | 'accesorios' | 'imagenes' | 'comercial' | 'revision'
 type DatosComerciales = {
@@ -173,6 +175,10 @@ watch(imageStepStatus, (state) => {
 const volverARevision = ref(false)
 const indice = computed(() => secciones.findIndex((item) => item.id === seccion.value))
 const titulo = computed(() => props.detalle?.nombre?.trim() || 'Nuevo mueble a pedido')
+const descripcionOriginal = computed(() => {
+  const datos = leerDatosTecnicos(props.especificacion?.datos_tecnicos)
+  return typeof datos.descripcion_original === 'string' ? datos.descripcion_original.trim() : ''
+})
 watch(seccion, async () => {
   await nextTick()
   tituloSeccion.value?.focus({ preventScroll: true })
@@ -375,6 +381,16 @@ defineExpose({ save: guardarDesdeEstudio })
           @click="seccion = 'imagenes'"
           ><ImagePlus :size="16" aria-hidden="true" />Gestionar imágenes</Button
         >
+        <article
+          v-if="seccion === 'revision' && descripcionOriginal"
+          class="studio-review-transcript"
+        >
+          <header class="studio-review-transcript__header">
+            <FileText :size="15" aria-hidden="true" />
+            <h4>Descripción técnica original conservada</h4>
+          </header>
+          <p class="studio-review-transcript__text">{{ descripcionOriginal }}</p>
+        </article>
       </section>
       <fieldset
         v-show="seccion !== 'imagenes' || Boolean(externalError)"
@@ -668,6 +684,40 @@ defineExpose({ save: guardarDesdeEstudio })
   justify-content: center;
   background: var(--color-surface-raised);
   border-color: var(--color-border-strong);
+}
+.studio-review-transcript {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+.studio-review-transcript__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text);
+}
+.studio-review-transcript__header h4 {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 650;
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+}
+.studio-review-transcript__text {
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--color-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 20rem;
+  overflow-y: auto;
 }
 @media (max-width: 60rem) {
   .studio-review-layout {

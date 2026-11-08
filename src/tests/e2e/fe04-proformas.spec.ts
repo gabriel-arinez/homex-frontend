@@ -1300,6 +1300,9 @@ for (const width of [360, 768, 1440]) {
     await expect(
       page.locator('.review-pending').getByText('unidad del ancho', { exact: false }),
     ).toBeVisible()
+    await expect(page.locator('.studio-review-transcript')).toContainText(
+      captura24.texto_transcrito_original!,
+    )
     await studioStep(page, 'General')
     await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Escritorio')
     await studioStep(page, 'Precio')

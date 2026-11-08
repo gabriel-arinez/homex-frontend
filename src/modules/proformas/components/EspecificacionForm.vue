@@ -2607,7 +2607,7 @@ onMounted(loadCatalog)
                 <li v-for="warning in base.advertencias" :key="warning">{{ warning }}</li>
               </ul>
             </div>
-            <details v-if="base.descripcion_original" class="review-original-desc">
+            <details v-if="!studio && base.descripcion_original" class="review-original-desc">
               <summary>Ver descripción técnica original conservada</summary>
               <p>{{ base.descripcion_original }}</p>
             </details>
