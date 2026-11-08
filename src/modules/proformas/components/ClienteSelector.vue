@@ -373,10 +373,11 @@ void ensureSelected()
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  padding: var(--space-3);
+  padding: 0.75rem 1rem;
   border: 1px solid var(--color-primary);
   border-radius: var(--radius-control);
-  background: var(--color-primary-soft);
+  background: color-mix(in srgb, var(--color-primary-soft) 45%, var(--color-surface));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 30%, transparent);
 }
 .selected-client__identity {
   display: flex;

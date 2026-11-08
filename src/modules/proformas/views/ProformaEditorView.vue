@@ -33,11 +33,14 @@ import {
   ChevronRight,
   ChevronUp,
   ClipboardCheck,
+  Clock,
   Info,
   PackageOpen,
   Plus,
   SlidersHorizontal,
   Sofa,
+  UserCheck,
+  UserPlus,
   UserRound,
   Pencil,
   Copy,
@@ -1791,40 +1794,51 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               :class="{ 'client-option--active': clienteMode === 'pendiente' }"
             >
               <input v-model="clienteMode" type="radio" value="pendiente" />
-              <span
-                ><strong>Pendiente</strong><small>Completar el cliente más adelante</small></span
-              >
+              <span class="client-option__icon" aria-hidden="true">
+                <Clock :size="18" />
+              </span>
+              <span class="client-option__copy">
+                <strong>Pendiente</strong>
+                <small>Completar el cliente más adelante</small>
+              </span>
             </label>
             <label
               class="client-option"
               :class="{ 'client-option--active': clienteMode === 'existente' }"
             >
               <input v-model="clienteMode" type="radio" value="existente" />
-              <span
-                ><strong>Existente</strong
-                ><small>Seleccionar desde clientes registrados</small></span
-              >
+              <span class="client-option__icon" aria-hidden="true">
+                <UserCheck :size="18" />
+              </span>
+              <span class="client-option__copy">
+                <strong>Existente</strong>
+                <small>Seleccionar desde clientes registrados</small>
+              </span>
             </label>
             <label
               class="client-option"
               :class="{ 'client-option--active': clienteMode === 'nuevo' }"
             >
               <input v-model="clienteMode" type="radio" value="nuevo" />
-              <span
-                ><strong>Registrar nuevo</strong
-                ><small>Registrar al guardar la proforma</small></span
-              >
+              <span class="client-option__icon" aria-hidden="true">
+                <UserPlus :size="18" />
+              </span>
+              <span class="client-option__copy">
+                <strong>Registrar nuevo</strong>
+                <small>Registrar al guardar la proforma</small>
+              </span>
             </label>
           </div>
-          <ClienteSelector
-            v-if="clienteMode === 'existente'"
-            :model-value="header.cliente"
-            label="Cliente existente"
-            @update:model-value="setExistingClient"
-            @select="clienteSeleccionado = $event"
-            @input.stop
-            @change.stop
-          />
+          <Card v-if="clienteMode === 'existente'" class="client-fields client-fields--existing">
+            <ClienteSelector
+              :model-value="header.cliente"
+              label="Cliente existente"
+              @update:model-value="setExistingClient"
+              @select="clienteSeleccionado = $event"
+              @input.stop
+              @change.stop
+            />
+          </Card>
           <Card v-if="clienteMode === 'nuevo'" class="client-fields">
             <ClienteFormFields
               :model="nuevoCliente"
@@ -1836,8 +1850,13 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             />
           </Card>
           <div v-if="clienteMode === 'pendiente'" class="context-note">
-            <Info :size="19" aria-hidden="true" />
-            <p>Puedes guardar el borrador sin cliente. Para emitir deberás definirlo.</p>
+            <span class="context-note__icon" aria-hidden="true">
+              <Info :size="19" />
+            </span>
+            <div class="context-note__copy">
+              <strong>Borrador flexible</strong>
+              <p>Puedes guardar el borrador sin cliente. Para emitir a revisión deberás definirlo.</p>
+            </div>
           </div>
         </section>
 
@@ -2780,21 +2799,40 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 .undo,
 .context-note {
   display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
+  align-items: center;
+  gap: var(--space-4);
   margin: 0;
-  padding: var(--space-4);
+  padding: var(--space-4) var(--space-5);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  background: var(--quote-muted);
-  color: var(--color-text-secondary);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
 }
-.context-note svg {
-  flex-shrink: 0;
+.context-note__icon {
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.5rem;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
   color: var(--color-info);
 }
-.context-note p {
+.context-note__copy {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.context-note__copy strong {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.context-note__copy p {
   margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
 }
 .undo button {
   border: 0;
@@ -2814,48 +2852,79 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 .client-option {
   display: flex;
   min-width: 0;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-3);
-  padding: var(--space-4);
+  padding: 0.85rem 1rem;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
   cursor: pointer;
   transition:
     border-color var(--transition-fast),
-    background var(--transition-fast);
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 .client-option:hover {
   border-color: var(--color-border-strong);
-  background: var(--quote-muted);
+  background: var(--color-surface-hover);
 }
 .client-option--active {
   border-color: var(--color-primary);
-  background: var(--color-primary-soft);
+  background: color-mix(in srgb, var(--color-primary-soft) 45%, var(--color-surface));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 30%, transparent);
 }
 .client-option input {
-  margin-top: 0.2rem;
+  margin: 0;
   flex: 0 0 auto;
   accent-color: var(--color-primary);
 }
-.client-option span {
+.client-option__icon {
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.5rem;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+.client-option--active .client-option__icon {
+  background: var(--color-primary-soft);
+  border-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
+  color: var(--color-primary-accent);
+}
+.client-option__copy {
   display: grid;
   min-width: 0;
-  gap: 0.35rem;
+  gap: 0.15rem;
 }
 .client-option strong {
-  font-size: 0.87rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text);
 }
 .client-option small {
   color: var(--color-text-secondary);
-  line-height: 1.45;
+  font-size: 0.74rem;
+  line-height: 1.35;
 }
 .client-option:focus-within {
   outline: 2px solid var(--color-primary-accent);
   outline-offset: 2px;
 }
 .client-fields {
-  border-color: var(--quote-border);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: var(--space-5);
+}
+.client-fields--existing {
+  padding: var(--space-4) var(--space-5);
 }
 .form-grid {
   display: grid;

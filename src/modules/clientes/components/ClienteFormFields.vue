@@ -193,11 +193,15 @@ function changeType(value: string) {
   align-items: center;
   gap: var(--space-3);
   min-width: 0;
-  padding: var(--space-4);
+  padding: 0.85rem 1rem;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-control);
   background: var(--color-surface);
   cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 .client-type__option:hover {
   border-color: var(--color-border-strong);
@@ -208,10 +212,15 @@ function changeType(value: string) {
 }
 .client-type__option--active {
   border-color: var(--color-primary);
-  background: var(--color-primary-soft);
+  background: color-mix(in srgb, var(--color-primary-soft) 45%, var(--color-surface));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 30%, transparent);
 }
 .client-type__option svg {
   flex-shrink: 0;
+  color: var(--color-text-secondary);
+  transition: color var(--transition-fast);
+}
+.client-type__option--active svg {
   color: var(--color-primary-accent);
 }
 .client-type__option input {
@@ -221,10 +230,16 @@ function changeType(value: string) {
 .client-type__option span {
   display: grid;
   min-width: 0;
-  gap: var(--space-1);
+  gap: 0.15rem;
+}
+.client-type__option strong {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text);
 }
 .client-type__option small {
   color: var(--color-text-secondary);
+  font-size: 0.74rem;
   font-weight: 400;
 }
 .readonly-field {

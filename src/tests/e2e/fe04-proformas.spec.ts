@@ -1341,6 +1341,8 @@ test('PRF-UX inicia con cliente pendiente y permite guardar borrador sin cliente
     return route.fallback()
   })
   await page.goto('/proformas/nueva')
+  await page.getByRole('button', { name: /Condiciones$/ }).click()
+  await page.getByLabel('Título').fill('Borrador inicial')
   await page.getByRole('button', { name: /Cliente$/ }).click()
   await expect(page.getByRole('radio', { name: /Pendiente/ })).toBeChecked()
   await page.getByRole('button', { name: 'Guardar borrador' }).click()
