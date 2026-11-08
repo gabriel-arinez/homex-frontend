@@ -295,10 +295,7 @@ defineExpose({ save: guardarDesdeEstudio })
         /></span>
         <span class="studio-step-label"
           ><small>{{ String(i + 1).padStart(2, '0') }}</small
-          >{{ item.titulo
-          }}<small v-if="item.id === 'imagenes' && imageStepStatus === 'pending'">
-            · Opcional</small
-          ></span
+          >{{ item.titulo }}</span
         >
         <AlertCircle
           v-if="estadoApartados[item.id] === 'issues'"

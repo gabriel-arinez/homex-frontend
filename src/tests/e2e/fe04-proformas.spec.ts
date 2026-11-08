@@ -492,8 +492,16 @@ test('FURNITURE STUDIO ubica los controles de imágenes al lado y los apila en m
     .click()
   await expect(gallery.locator('h3')).toContainText('1/8')
   await viewer.getByLabel('Cerrar').click()
+  await expect(viewer).not.toBeVisible()
   await page.setViewportSize({ width: 390, height: 844 })
   await noOverflow(page)
+  await expect
+    .poll(async () => {
+      const h = await hero.boundingBox()
+      const t = await pageThumbs.boundingBox()
+      return t && h ? t.y - (h.y + h.height - 1) : -999
+    })
+    .toBeGreaterThanOrEqual(0)
   const mobileHero = await hero.boundingBox()
   const mobilePageThumbs = await pageThumbs.boundingBox()
   const mobileControls = await controls.boundingBox()

@@ -103,7 +103,12 @@ const listQuery = computed(() =>
 )
 const isReview = computed(() => persisted.value?.estado_info.codigo === 'EN_REVISION')
 let allowNavigationAfterSave = false
-const steps = ['Productos', 'Cliente', 'Condiciones', 'Revisar'] as const
+const steps = [
+  { id: 'productos', titulo: 'Productos', icono: PackageOpen },
+  { id: 'cliente', titulo: 'Cliente', icono: UserRound },
+  { id: 'condiciones', titulo: 'Condiciones', icono: SlidersHorizontal },
+  { id: 'revision', titulo: 'Revisar', icono: ClipboardCheck },
+] as const
 const currentStep = ref(0)
 const loading = ref(Boolean(proformaId.value))
 const saving = ref(false)
@@ -1490,7 +1495,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       <div class="quote-topline" aria-label="Ubicación en el proceso">
         <span>COMERCIAL <span class="quote-divider">/</span> PROFORMAS</span>
         <div class="quote-topline__right">
-          <span class="quote-progress">Paso {{ currentStep + 1 }} de {{ steps.length }}</span>
           <div
             class="quote-save-status"
             :class="{
@@ -1509,9 +1513,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <Info v-else :size="14" aria-hidden="true" />
             <span>{{ editingStatus }}</span>
           </div>
-          <span v-if="persisted" class="quote-save-reference">
-            {{ persisted.estado_info.nombre }} · Proforma {{ persisted.numero }}
-          </span>
         </div>
       </div>
       <PageHeader
@@ -1534,21 +1535,25 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         <nav class="steps" aria-label="Apartados de la proforma">
           <button
             v-for="(step, index) in steps"
-            :key="step"
+            :key="step.id"
             type="button"
             :class="{ active: currentStep === index, complete: isStepComplete(index) }"
             :aria-current="currentStep === index ? 'step' : undefined"
             @click="currentStep = index"
           >
-            <span class="step-number">{{ String(index + 1).padStart(2, '0') }}</span>
-            <span class="step-label">{{ step }}</span>
+            <span class="step-icon">
+              <component :is="step.icono" :size="18" aria-hidden="true" />
+            </span>
+            <span class="step-label">
+              <small>{{ String(index + 1).padStart(2, '0') }}</small>
+              {{ step.titulo }}
+            </span>
             <CheckCircle2
               v-if="isStepComplete(index)"
-              :size="15"
+              :size="16"
               class="step-complete"
               aria-hidden="true"
             />
-            <span class="step-marker" aria-hidden="true" />
           </button>
         </nav>
 
@@ -2414,15 +2419,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   padding: 0 var(--space-2);
   color: var(--color-border-strong);
 }
-.quote-progress {
-  padding: 0.4rem 0.75rem;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  color: var(--color-primary-accent);
-  background: var(--color-primary-soft);
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
 .quote-topline__right {
   display: grid;
   justify-items: end;
@@ -2454,11 +2450,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 .quote-save-status--warning svg {
   color: var(--color-danger);
 }
-.quote-save-reference {
-  color: var(--color-text-secondary);
-  font-size: 0.68rem;
-  font-weight: 500;
-}
 .quote-workspace :deep(.page-header) {
   margin-bottom: var(--space-6);
 }
@@ -2470,24 +2461,23 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 .steps {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-2);
+  gap: 0.5rem;
   margin-bottom: var(--space-4);
 }
 .steps button {
-  position: relative;
   display: flex;
-  min-width: 0;
-  min-height: 2.85rem;
+  gap: 0.65rem;
   align-items: center;
-  gap: var(--space-3);
-  padding: 0.55rem 0.85rem;
+  min-width: 0;
+  min-height: 4.25rem;
+  text-align: left;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
+  padding: 0.75rem;
   background: var(--color-surface);
   color: var(--color-text-secondary);
+  font: inherit;
   cursor: pointer;
-  font-weight: 600;
-  text-align: left;
   transition:
     border-color var(--transition-fast),
     background var(--transition-fast),
@@ -2496,56 +2486,50 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 }
 .steps button:hover {
   border-color: var(--color-border-strong);
-  background: var(--color-surface-hover);
 }
 .steps button:focus-visible {
   outline: 2px solid var(--color-primary-accent);
   outline-offset: 2px;
 }
 .steps button.active {
-  border-color: var(--color-primary);
   background: color-mix(in srgb, var(--color-primary-soft) 55%, var(--color-surface));
   color: var(--color-text);
-  box-shadow: inset 0 -2px 0 var(--color-primary);
+  border-color: var(--color-primary);
+  box-shadow: inset 0 -3px 0 var(--color-primary);
 }
-.step-number {
-  display: grid;
-  width: 1.75rem;
-  height: 1.75rem;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 0.45rem;
-  background: var(--color-surface-raised);
+.steps button.active .step-icon {
+  background: var(--color-primary-soft);
+  color: var(--color-primary-accent);
+}
+.steps button.active .step-label small {
   color: var(--color-text-secondary);
-  font-size: 0.72rem;
-  font-weight: 750;
 }
-.steps button.active .step-number {
-  color: #fff;
-  background: var(--color-primary);
+.step-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  background: var(--color-surface-muted);
+  color: var(--color-text-secondary);
+}
+.step-label {
+  display: grid;
+  font-size: 0.81rem;
+  font-weight: 700;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.step-label small {
+  font-size: 0.65rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
 }
 .step-complete {
   flex-shrink: 0;
   margin-left: auto;
   color: var(--color-success);
-}
-.step-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.85rem;
-}
-.step-marker {
-  position: absolute;
-  right: var(--space-4);
-  bottom: -1px;
-  left: var(--space-4);
-  height: 2px;
-  border-radius: 2px 2px 0 0;
-  background: transparent;
-}
-.steps button.active .step-marker {
-  background: var(--color-primary);
 }
 .quote-panel {
   display: grid;
@@ -3531,9 +3515,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     grid-row: 1 / 3;
   }
   .steps button {
-    justify-content: center;
-    padding: var(--space-3);
-    gap: var(--space-2);
+    padding: 0.65rem;
+    gap: 0.5rem;
   }
   .choice-card {
     align-items: flex-start;
@@ -3544,12 +3527,12 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   }
 }
 @media (max-width: 48rem) {
-  .steps button {
-    min-height: 2.75rem;
+  .step-icon {
+    display: none;
   }
-  .step-number {
-    width: 1.7rem;
-    height: 1.7rem;
+  .steps button {
+    min-height: 3.25rem;
+    padding: 0.55rem 0.65rem;
   }
   .quote-panel {
     padding: var(--space-5);
@@ -3578,19 +3561,23 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     gap: 0.35rem;
   }
   .steps button {
-    min-height: 4.25rem;
+    min-height: 3.5rem;
     flex-direction: column;
-    gap: 0.35rem;
-    padding: 0.55rem 0.25rem;
+    justify-content: center;
+    gap: 0.15rem;
+    padding: 0.45rem 0.25rem;
     text-align: center;
   }
   .step-label {
     width: 100%;
     font-size: 0.69rem;
+    align-items: center;
   }
-  .step-marker {
-    right: 0.3rem;
-    left: 0.3rem;
+  .step-label small {
+    font-size: 0.6rem;
+  }
+  .step-complete {
+    display: none;
   }
   .section-title {
     align-items: stretch;
