@@ -2,7 +2,8 @@
 export const MAX_RECORD_SECONDS = 180
 export const MAX_UPLOAD_SECONDS = 300
 export const MAX_AUDIO_BYTES = 20_000_000
-export const ALLOWED_AUDIO_EXTENSIONS = /\.(wav|mp3|m4a|ogg|webm)$/i
+/** Extensiones admitidas para subida de audio: incluye formatos móviles comunes con transcodificación transparente a WAV si es necesario */
+export const ALLOWED_AUDIO_EXTENSIONS = /\.(wav|mp3|m4a|ogg|webm|aac|opus|mp4|flac)$/i
 
 /** La duración de un archivo requiere metadata decodificable por el navegador. */
 export function readAudioDuration(file: File): Promise<number | null> {

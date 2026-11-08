@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apiRequest } from '@/shared/api'
 import GalleryPhoto from './GalleryPhoto.vue'
 
-vi.mock('@/shared/api', () => ({ apiRequest: vi.fn() }))
+vi.mock('@/shared/api', () => ({ apiRequest: vi.fn<() => Promise<unknown>>() }))
 
 describe('GalleryPhoto', () => {
   afterEach(() => vi.restoreAllMocks())

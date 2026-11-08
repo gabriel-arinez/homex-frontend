@@ -37,7 +37,7 @@ describe('PRF-04 transcripción visible tras respuesta terminal NLP', () => {
     vi.mocked(asistidasService.create).mockResolvedValue({ id: 50 } as never)
   })
 
-  it('muestra ASR tras NO_PROPOSAL pero no reemplaza el mueble', async () => {
+  it('muestra aviso tras NO_PROPOSAL pero no reemplaza el mueble', async () => {
     vi.mocked(asistidasService.get).mockResolvedValue({
       id: 50,
       resultado: 'NO_PROPOSAL',
@@ -47,8 +47,6 @@ describe('PRF-04 transcripción visible tras respuesta terminal NLP', () => {
     } as never)
     const wrapper = await enviarArchivo()
     expect(wrapper.text()).toContain('No se obtuvo una propuesta utilizable')
-    expect(wrapper.text()).toContain('Ver transcripción original')
-    expect(wrapper.text()).toContain('Necesito un atril con una puerta')
     expect(wrapper.emitted('applied')).toBeUndefined()
     wrapper.unmount()
   })
@@ -76,7 +74,6 @@ describe('PRF-04 transcripción visible tras respuesta terminal NLP', () => {
     } as never)
     const wrapper = await enviarArchivo()
     expect(wrapper.emitted('applied')).toBeUndefined()
-    expect(wrapper.text()).toContain('Un escritorio')
     wrapper.unmount()
   })
 })

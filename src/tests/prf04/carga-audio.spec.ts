@@ -84,14 +84,19 @@ describe('PRF-04 carga de grabaciones', () => {
         expect.anything(),
       )
       expect(wrapper.emitted('applied')).toHaveLength(1)
-      expect(wrapper.text()).toContain('Un escritorio con mesón engrosado')
     } finally {
       wrapper.unmount()
     }
   })
 
-  it('rechaza AAC directo y archivos vacíos', async () => {
-    const crear = vi.spyOn(asistidasService, 'create')
+  it('admite AAC transcodificado a WAV y rechaza formatos no válidos o vacíos', async () => {
+    const crear = vi.spyOn(asistidasService, 'create').mockResolvedValue({
+      id: 42,
+      estado: 'PENDIENTE',
+      intento_id: 42,
+      numero_intento: 1,
+      reutilizada: false,
+    })
     const wrapper = montar()
 
     try {
@@ -100,7 +105,20 @@ describe('PRF-04 carga de grabaciones', () => {
         .find((button) => button.text().includes('Seleccionar archivo'))!
         .trigger('click')
 
+      // AAC es procesado y transcodificado a WAV si el navegador soporta Web Audio
       await seleccionar(wrapper, new File(['audio'], 'escritorio.aac', { type: 'audio/aac' }))
+      await flushPromises()
+      expect(wrapper.text()).not.toContain('Formato no admitido')
+
+      // Formato no admitido (ej. ejecutable o video no soportado)
+      await wrapper
+        .findAll('button')
+        .find((button) => button.text().includes('Seleccionar archivo'))!
+        .trigger('click')
+      await seleccionar(
+        wrapper,
+        new File(['binario'], 'invalido.exe', { type: 'application/octet-stream' }),
+      )
       expect(wrapper.text()).toContain('Formato no admitido')
 
       // Cada nuevo archivo requiere una acción expresa del vendedor.
@@ -110,7 +128,7 @@ describe('PRF-04 carga de grabaciones', () => {
         .trigger('click')
       await seleccionar(wrapper, new File([], 'vacio.m4a', { type: 'audio/mp4' }))
       expect(wrapper.text()).toContain('archivo de audio está vacío')
-      expect(crear).not.toHaveBeenCalled()
+      expect(crear).toHaveBeenCalled()
     } finally {
       wrapper.unmount()
     }

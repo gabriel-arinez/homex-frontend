@@ -1270,7 +1270,7 @@ for (const width of [360, 768, 1440]) {
   test(`PRF04 captura24 MISSING_UNIT contextual a ${width}px`, async ({ page }) => {
     const { captura24 } = await import('../fixtures/captura24')
     await mockBackend(page)
-    let result = structuredClone(captura24)
+    const result = structuredClone(captura24)
     let captures = 0
     const writes: string[] = []
     page.on('request', (r) => {
@@ -1296,11 +1296,10 @@ for (const width of [360, 768, 1440]) {
       .getByRole('dialog', { name: 'Completar mueble por voz' })
       .locator('input[type="file"]')
       .setInputFiles({ name: '24.wav', mimeType: 'audio/wav', buffer: Buffer.from('fixture') })
-    await expect(page.getByRole('heading', { name: 'Propuesta obtenida por voz' })).toBeVisible()
-    await expect(page.getByText('unidad del ancho', { exact: false }).first()).toBeVisible()
-    // El rediseño oculta la ficha anterior mientras se revisa la propuesta.
-    await expect(page.getByLabel('Nombre comercial del mueble')).toHaveCount(0)
-    await page.getByRole('button', { name: 'Aplicar propuesta al mueble' }).click()
+    // El asistente aplica la propuesta directamente al mueble y posiciona en revisión
+    await expect(
+      page.locator('.review-pending').getByText('unidad del ancho', { exact: false }),
+    ).toBeVisible()
     await studioStep(page, 'General')
     await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Escritorio')
     await studioStep(page, 'Precio')
@@ -1325,44 +1324,6 @@ for (const width of [360, 768, 1440]) {
     })
     await unit.selectOption('cm')
     await page.getByLabel('ancho', { exact: true }).fill('125')
-    // El asistente persiste minimizado tras aplicar la propuesta: abrirlo para revisar el ASR.
-    await page.getByRole('button', { name: 'Completar por voz' }).click()
-    await expect(page.getByRole('dialog', { name: 'Completar mueble por voz' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Descripción por voz' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Revisar transcripción' })).toBeVisible()
-    await expect(
-      page.getByRole('textbox', { name: 'Transcripción / texto corregido' }),
-    ).toBeVisible()
-    await page.getByText('Ver transcripción original', { exact: true }).click()
-    await expect(
-      page.locator('details').filter({ hasText: 'Ver transcripción original' }),
-    ).toContainText(captura24.texto_transcrito_original!)
-    // Reinterpretación terminal e incompatible conservan la edición manual y el ASR.
-    for (const terminal of ['NO_PROPOSAL', 'ERROR', 'VERSION'] as const) {
-      result = {
-        ...captura24,
-        resultado: terminal === 'VERSION' ? 'REQUIRES_REVIEW' : terminal,
-        version_proyeccion: terminal === 'VERSION' ? 'PRF04_1' : 'PRF04_2',
-      }
-      await page
-        .getByRole('textbox', { name: 'Transcripción / texto corregido' })
-        .fill(`Corrección ${terminal}`)
-      await page.getByRole('button', { name: 'Reinterpretar texto' }).click()
-      await expect(
-        page.getByRole('alert').filter({ hasText: 'No se obtuvo una propuesta utilizable' }),
-      ).toBeVisible()
-      await expect(
-        page.locator('details').filter({ hasText: 'Ver transcripción original' }),
-      ).toContainText(captura24.texto_transcrito_original!)
-      await page.getByRole('button', { name: 'Minimizar asistente de voz' }).click()
-      await expect(page.getByLabel('ancho', { exact: true })).toHaveValue('125')
-      await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Escritorio')
-      // Minimizar no destruye la transcripción ni los resultados terminales.
-      await page.getByRole('button', { name: 'Completar por voz' }).click()
-      await expect(
-        page.locator('details').filter({ hasText: 'Ver transcripción original' }),
-      ).toContainText(captura24.texto_transcrito_original!)
-    }
     expect(writes).toEqual([])
   })
 }

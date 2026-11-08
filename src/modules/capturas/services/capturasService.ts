@@ -22,6 +22,10 @@ export function appendCaptureAudio(form: FormData, audio: Blob) {
       m4a: 'audio/mp4',
       ogg: 'audio/ogg',
       webm: 'audio/webm',
+      aac: 'audio/aac',
+      opus: 'audio/opus',
+      mp4: 'audio/mp4',
+      flac: 'audio/flac',
     }
     const mime = mimeByExtension[extension]
     const content =

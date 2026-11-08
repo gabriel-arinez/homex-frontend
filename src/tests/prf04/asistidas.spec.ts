@@ -97,13 +97,10 @@ describe('PRF-04 confirmación del reemplazo', () => {
   })
 })
 
-describe('PRF-04 trazabilidad visible de reinterpretaciones', () => {
-  it('conserva el ASR original, encadena capturas y aísla los contextos de borrador', async () => {
-    const original = 'Un escritorio con cajones'
-    const primeraCorreccion = 'Un escritorio con dos cajones'
-    const segundaCorreccion = 'Un escritorio con tres cajones'
+describe('PRF-04 aplicación de capturas por voz', () => {
+  it('aplica la propuesta del ASR aislando los contextos de borrador', async () => {
     let siguienteId = 0
-    const create = vi.spyOn(asistidasService, 'create').mockImplementation(async () => ({
+    vi.spyOn(asistidasService, 'create').mockImplementation(async () => ({
       id: ++siguienteId,
       estado: 'PENDIENTE',
       intento_id: siguienteId,
@@ -115,8 +112,7 @@ describe('PRF-04 trazabilidad visible de reinterpretaciones', () => {
         id,
         estado: 'COMPLETADA',
         intento_id: id,
-        texto_transcrito_original:
-          id === 1 ? original : id === 2 ? primeraCorreccion : segundaCorreccion,
+        texto_transcrito_original: 'Un escritorio con cajones',
         resultado: 'REQUIRES_REVIEW',
         propuesta_configurador: propuesta(),
         pendientes: [],
@@ -134,34 +130,7 @@ describe('PRF-04 trazabilidad visible de reinterpretaciones', () => {
       await wrapper.get('button').trigger('click')
       wrapper.findComponent({ name: 'AudioRecorder' }).vm.$emit('ready', new Blob(['audio']))
       await flushPromises()
-      expect(wrapper.text()).toContain(original)
       expect(wrapper.emitted('applied')).toHaveLength(1)
-
-      for (const [texto, origen] of [
-        [primeraCorreccion, 1],
-        [segundaCorreccion, 2],
-      ] as const) {
-        await wrapper.setProps({ dirty: true })
-        await wrapper.get('textarea').setValue(texto)
-        const reinterpretar = wrapper
-          .findAll('button')
-          .find((b) => b.text() === 'Reinterpretar texto')
-        await reinterpretar!.trigger('click')
-        expect(wrapper.text()).toContain('reemplazará toda la información')
-        const continuar = wrapper.findAll('button').find((b) => b.text() === 'Continuar con voz')
-        await continuar!.trigger('click')
-        await flushPromises()
-        expect(create).toHaveBeenLastCalledWith(
-          expect.objectContaining({ texto, captura_origen: origen }),
-          expect.anything(),
-        )
-        expect(wrapper.get('details').text()).toContain(original)
-        expect(wrapper.get('details').text()).toContain('Última interpretación: ' + texto)
-        expect(wrapper.emitted('applied')).toHaveLength(origen + 1)
-      }
-      expect(wrapper.get('details').text()).not.toContain('Última interpretación: ' + original)
-      await wrapper.setProps({ sesion: crypto.randomUUID(), moneda: 'USD' })
-      expect(wrapper.find('details').exists()).toBe(false)
     } finally {
       wrapper.unmount()
       vi.restoreAllMocks()

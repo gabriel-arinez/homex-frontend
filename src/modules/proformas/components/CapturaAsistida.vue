@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue'
-import { FileAudio, RotateCcw } from '@lucide/vue'
+import { nextTick, onScopeDispose, ref, watch } from 'vue'
+import { Loader2 } from '@lucide/vue'
 import {
   MAX_AUDIO_BYTES,
   MAX_UPLOAD_SECONDS,
   readAudioDuration,
 } from '@/modules/capturas/audioLimits'
+import { convertAudioFileToWav } from '@/modules/capturas/audioConversion'
 import type { ResultadoAsistida } from '@/generated/api'
 import AudioRecorder from '@/modules/capturas/components/AudioRecorder.vue'
 import VoiceCaptureControls from '@/modules/capturas/components/VoiceCaptureControls.vue'
@@ -35,15 +36,40 @@ const recorder = ref<InstanceType<typeof AudioRecorder> | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const pendingMode = ref<'record' | 'upload'>('record')
 const puedeSeleccionarAudio = ref(false)
-const hasResult = ref(false)
 const fileError = ref('')
-const EXTENSIONES_AUDIO = new Set(['.wav', '.mp3', '.m4a', '.ogg', '.webm'])
-const original = ref('')
-const corrected = ref('')
-const lastInterpretation = ref('')
+const EXTENSIONES_AUDIO = new Set([
+  '.wav',
+  '.mp3',
+  '.m4a',
+  '.ogg',
+  '.webm',
+  '.aac',
+  '.opus',
+  '.mp4',
+  '.flac',
+])
 const captureId = ref<number | null>(null)
-const pendingText = ref('')
-watch(voice.processing, (value) => emit('processing', value))
+const processingTimer = ref(0)
+let processingInterval: number | null = null
+
+watch(voice.processing, (isProc) => {
+  emit('processing', isProc)
+  if (isProc) {
+    processingTimer.value = 0
+    if (processingInterval) clearInterval(processingInterval)
+    processingInterval = window.setInterval(() => {
+      processingTimer.value++
+    }, 1000)
+  } else {
+    if (processingInterval) {
+      clearInterval(processingInterval)
+      processingInterval = null
+    }
+  }
+})
+onScopeDispose(() => {
+  if (processingInterval) clearInterval(processingInterval)
+})
 watch(
   () => [props.sesion, props.moneda, props.proforma],
   () => {
@@ -51,22 +77,14 @@ watch(
     recording.value = false
     fileError.value = ''
     confirm.value = false
-    original.value = ''
-    corrected.value = ''
-    lastInterpretation.value = ''
     captureId.value = null
-    pendingText.value = ''
-    hasResult.value = false
     puedeSeleccionarAudio.value = false
   },
 )
 async function activate() {
-  if (pendingText.value) {
-    void send(undefined, pendingText.value)
-    return
-  }
   if (pendingMode.value === 'upload') {
     puedeSeleccionarAudio.value = true
+    await nextTick()
     fileInput.value?.click()
     return
   }
@@ -85,7 +103,6 @@ async function activate() {
 function start(mode: 'record' | 'upload' = 'record') {
   pendingMode.value = mode
   puedeSeleccionarAudio.value = false
-  pendingText.value = ''
   fileError.value = ''
   if (voice.processing.value) return
   if (props.dirty && !props.reviewBeforeApply) confirm.value = true
@@ -94,11 +111,6 @@ function start(mode: 'record' | 'upload' = 'record') {
 function proceed() {
   confirm.value = false
   void activate()
-}
-function reinterpret() {
-  pendingText.value = corrected.value
-  if (props.dirty && !props.reviewBeforeApply) confirm.value = true
-  else void send(undefined, pendingText.value)
 }
 function onRecorderStatus(state: string, seconds: number) {
   paused.value = state === 'PAUSED'
@@ -130,7 +142,7 @@ async function seleccionarAudio(event: Event) {
   const extension = archivo.name.slice(archivo.name.lastIndexOf('.')).toLowerCase()
 
   if (!EXTENSIONES_AUDIO.has(extension)) {
-    fileError.value = 'Formato no admitido. Utiliza WAV, MP3, M4A, OGG o WebM.'
+    fileError.value = 'Formato no admitido. Utiliza WAV, MP3, M4A, OGG, WebM o AAC.'
     return
   }
 
@@ -154,7 +166,20 @@ async function seleccionarAudio(event: Event) {
     fileError.value = cause instanceof Error ? cause.message : 'No se pudo validar el audio.'
     return
   }
-  void send(archivo)
+
+  // Si es un formato como .aac, .opus o .flac que el backend podría no soportar directamente,
+  // se convierte a .wav mediante Web Audio API si está disponible.
+  let audioParaEnviar = archivo
+  if (['.aac', '.opus', '.flac', '.mp4'].includes(extension)) {
+    try {
+      audioParaEnviar = await convertAudioFileToWav(archivo)
+    } catch {
+      // Si la conversión falla, se envía el archivo original
+      audioParaEnviar = archivo
+    }
+  }
+
+  void send(audioParaEnviar)
 }
 
 async function send(audio?: Blob, texto?: string) {
@@ -174,19 +199,9 @@ async function send(audio?: Blob, texto?: string) {
   const visibleResult = result ?? voice.terminalResult.value
   if (!visibleResult || context !== JSON.stringify([props.sesion, props.moneda, props.proforma]))
     return
-  if (texto) {
-    // La nueva interpretación conserva la transcripción original de la captura por voz.
-    lastInterpretation.value = texto
-    corrected.value = texto
-  } else {
-    original.value = visibleResult.texto_transcrito_original ?? ''
-    lastInterpretation.value = original.value
-    corrected.value = original.value
-  }
   captureId.value = visibleResult.id
-  hasResult.value = true
+
   // Una respuesta terminal sin propuesta no debe sustituir el mueble.
-  // La transcripción queda disponible para revisión y reinterpretación.
   if (
     result &&
     result.resultado === 'REQUIRES_REVIEW' &&
@@ -241,55 +256,50 @@ function cancel() {
         type="file"
         tabindex="-1"
         :disabled="!puedeSeleccionarAudio || voice.processing.value"
-        accept=".wav,.mp3,.m4a,.ogg,.webm"
+        accept=".wav,.mp3,.m4a,.ogg,.webm,.aac,.opus,.mp4,.flac"
         aria-hidden="true"
         @change="seleccionarAudio"
       />
     </VoiceSection>
     <div v-if="voice.processing.value" class="voice-processing" role="status" aria-live="polite">
-      <FileAudio :size="20" aria-hidden="true" />
-      <div>
-        <strong>Analizando descripción</strong
-        ><span>La información de tu mueble se mantiene mientras procesamos el audio.</span>
+      <div class="processing-header">
+        <div class="processing-pulse">
+          <Loader2 class="spinning" :size="20" aria-hidden="true" />
+        </div>
+        <div class="processing-info">
+          <strong>Analizando descripción de mueble</strong>
+          <span class="processing-time"
+            >Tiempo transcurrido: {{ String(Math.floor(processingTimer / 60)).padStart(2, '0') }}:{{
+              String(processingTimer % 60).padStart(2, '0')
+            }}</span
+          >
+        </div>
+        <Button variant="secondary" size="sm" @click="cancel">Cancelar</Button>
       </div>
-      <Button variant="secondary" @click="cancel">Cancelar</Button>
+
+      <div class="processing-steps">
+        <div class="step-item" :class="{ 'step-item--active': processingTimer < 4 }">
+          <span class="step-dot" />
+          <span>1. Procesando archivo de audio</span>
+        </div>
+        <div
+          class="step-item"
+          :class="{ 'step-item--active': processingTimer >= 4 && processingTimer < 10 }"
+        >
+          <span class="step-dot" />
+          <span>2. Transcribiendo y reconociendo términos</span>
+        </div>
+        <div class="step-item" :class="{ 'step-item--active': processingTimer >= 10 }">
+          <span class="step-dot" />
+          <span>3. Estructurando piezas, medidas y cotización</span>
+        </div>
+      </div>
+      <p class="processing-disclaimer">
+        La información de tu mueble se mantiene segura mientras procesamos el audio.
+      </p>
     </div>
     <p v-if="fileError" role="alert" class="voice-error">{{ fileError }}</p>
     <p v-if="voice.error.value" role="alert" class="voice-error">{{ voice.error.value }}</p>
-    <VoiceSection
-      icon="review"
-      title="Revisar transcripción"
-      description="Corrige las palabras o códigos antes de aplicar los datos."
-    >
-      <details v-if="original" class="voice-original">
-        <summary>Ver transcripción original</summary>
-        <blockquote>{{ original }}</blockquote>
-        <p v-if="lastInterpretation && lastInterpretation !== original">
-          Última interpretación: {{ lastInterpretation }}
-        </p>
-      </details>
-      <label class="transcript-label" for="transcripcion-corregida">
-        Transcripción / texto corregido
-      </label>
-      <textarea
-        id="transcripcion-corregida"
-        v-model="corrected"
-        :disabled="voice.processing.value"
-        rows="4"
-        placeholder="Ej. Mesa de reunión para diez personas, ancho…, largo…, materiales…"
-      />
-      <Button
-        variant="secondary"
-        :disabled="voice.processing.value || !corrected.trim() || corrected === lastInterpretation"
-        @click="reinterpret"
-      >
-        <RotateCcw :size="16" aria-hidden="true" />
-        Reinterpretar texto
-      </Button>
-      <p v-if="hasResult && !original" role="status">
-        La interpretación se ha procesado. Revisa la ficha antes de incorporarla.
-      </p>
-    </VoiceSection>
     <Modal
       :open="confirm"
       title="Reemplazar información del mueble"
@@ -320,63 +330,85 @@ function cancel() {
   white-space: nowrap;
 }
 .voice-processing {
+  display: grid;
+  gap: var(--space-3);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: var(--space-4);
+}
+.processing-header {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-  background: var(--color-surface-muted);
-  border-radius: var(--radius-card);
-  padding: var(--space-3);
+  justify-content: space-between;
+  gap: var(--space-3);
 }
-.voice-processing div {
+.processing-pulse {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+.spinning {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+.processing-info {
   flex: 1;
   display: grid;
-  gap: 0.3rem;
+  gap: 0.2rem;
 }
-.voice-processing strong {
-  font-size: 0.9rem;
+.processing-info strong {
+  font-size: 0.92rem;
+  color: var(--color-text);
 }
-.voice-processing span {
+.processing-time {
   font-size: 0.8rem;
+  color: var(--color-primary);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.processing-steps {
+  display: grid;
+  gap: 0.45rem;
+  padding: var(--space-2) 0;
+  border-top: 1px dashed var(--color-border);
+  border-bottom: 1px dashed var(--color-border);
+}
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+.step-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-border-strong);
+}
+.step-item--active {
+  color: var(--color-text);
+  font-weight: 600;
+}
+.step-item--active .step-dot {
+  background: var(--color-primary);
+  box-shadow: 0 0 6px var(--color-primary);
+}
+.processing-disclaimer {
+  margin: 0;
+  font-size: 0.76rem;
   color: var(--color-text-secondary);
 }
 .voice-error {
   color: var(--color-danger-text);
-}
-.voice-original {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  padding: var(--space-3);
-  overflow-wrap: anywhere;
-}
-.voice-original summary {
-  font-weight: 600;
-  cursor: pointer;
-}
-.voice-original blockquote {
-  border-left: 2px solid var(--color-primary);
-  margin: 0.75rem 0;
-  padding-left: 1rem;
-  color: var(--color-text-secondary);
-}
-.voice-original p {
-  color: var(--color-text-secondary);
-  font-size: 0.83rem;
-}
-.transcript-label {
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-#transcripcion-corregida {
-  width: 100%;
-  display: block;
-  min-height: 7rem;
-  padding: 0.75rem;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font: inherit;
-  resize: vertical;
 }
 </style>
