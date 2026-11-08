@@ -1012,7 +1012,7 @@ function irASeccion(seccion: SeccionStudio) {
   emit('requestSection', seccion)
 }
 
-function submit() {
+function submit(): boolean {
   submitAttempted.value = true
   const dim = serializarDimensiones()
   const generalesActuales: Record<string, unknown> = { ...generales }
@@ -1097,7 +1097,7 @@ function submit() {
     errores.push('Confirma la diferencia entre el total dictado y el importe comercial ingresado.')
   if (errores.length) {
     error.value = errores.join(' ')
-    return
+    return false
   }
   emit(
     'save',
@@ -1115,7 +1115,9 @@ function submit() {
       descuento: comercial.descuento,
     },
   )
+  return true
 }
+defineExpose({ submit })
 onMounted(loadCatalog)
 </script>
 

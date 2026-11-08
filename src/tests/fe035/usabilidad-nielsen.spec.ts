@@ -73,16 +73,24 @@ describe('FE03.5 baseline de usabilidad Nielsen', () => {
 
   it('no ejecuta una acción destructiva antes de confirmarla', async () => {
     const confirm = vi.fn<() => void>()
+    const save = vi.fn<() => void>()
     const wrapper = mount(ConfirmDialog, {
       props: {
         open: true,
-        title: 'Descartar cambios',
-        description: 'Los cambios no se guardarán.',
+        title: 'Descartar ficha técnica',
+        description:
+          'Hay cambios sin guardar en la ficha técnica. ¿Deseas guardarlos o descartarlos?',
+        confirmLabel: 'Descartar cambios',
+        saveLabel: 'Guardar cambios',
         onConfirm: confirm,
+        onSave: save,
       },
       attachTo: document.body,
     })
     expect(confirm).not.toHaveBeenCalled()
+    expect(save).not.toHaveBeenCalled()
+    await document.querySelector<HTMLButtonElement>('[role="dialog"] .button--success')?.click()
+    expect(save).toHaveBeenCalledOnce()
     await document.querySelector<HTMLButtonElement>('[role="dialog"] .button--danger')?.click()
     expect(confirm).toHaveBeenCalledOnce()
     wrapper.unmount()

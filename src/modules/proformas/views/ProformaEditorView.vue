@@ -152,6 +152,7 @@ const readError = ref('')
 let readRequestId = 0
 const specLine = ref<number | null>(null)
 const draftingFurniture = ref<LineaLocal | null>(null)
+const studioRef = ref<InstanceType<typeof MuebleStudio> | null>(null)
 const furnitureOpen = computed(() => specLine.value !== null || draftingFurniture.value !== null)
 const sesionBorrador = ref(crypto.randomUUID())
 const specRenderVersion = ref(0)
@@ -219,15 +220,23 @@ function updateNuevoCliente(field: keyof typeof nuevoCliente, value: string) {
   if (error.value.startsWith('Revisa los campos señalados')) error.value = ''
 }
 const lineas = ref<LineaLocal[]>([])
-const confirmation = ref<{ title: string; description: string; confirmLabel: string } | null>(null)
+const confirmation = ref<{
+  title: string
+  description: string
+  confirmLabel: string
+  saveLabel?: string
+  onSave?: () => void | Promise<void>
+} | null>(null)
 let confirmResolver: ((answer: boolean) => void) | null = null
 function askConfirmation(
   description: string,
   title = 'Confirmar acción',
   confirmLabel = 'Continuar',
+  saveLabel?: string,
+  onSave?: () => void | Promise<void>,
 ) {
   if (confirmResolver) confirmResolver(false)
-  confirmation.value = { title, description, confirmLabel }
+  confirmation.value = { title, description, confirmLabel, saveLabel, onSave }
   return new Promise<boolean>((resolve) => {
     confirmResolver = resolve
   })
@@ -237,6 +246,11 @@ function answerConfirmation(answer: boolean) {
   const resolver = confirmResolver
   confirmResolver = null
   resolver?.(answer)
+}
+async function saveConfirmation() {
+  const callback = confirmation.value?.onSave
+  answerConfirmation(false)
+  await callback?.()
 }
 const leaveDialog = ref(false)
 const leaveSaving = ref(false)
@@ -905,9 +919,13 @@ async function closeSpec() {
   if (
     specModalDirty.value &&
     !(await askConfirmation(
-      'Hay cambios sin guardar en la ficha técnica. ¿Deseas descartarlos?',
+      'Hay cambios sin guardar en la ficha técnica. ¿Deseas guardarlos o descartarlos?',
       'Descartar ficha técnica',
       'Descartar cambios',
+      'Guardar cambios',
+      async () => {
+        await studioRef.value?.save()
+      },
     ))
   )
     return
@@ -1407,8 +1425,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       :title="confirmation?.title || 'Confirmar'"
       :description="confirmation?.description || ''"
       :confirm-label="confirmation?.confirmLabel"
+      :save-label="confirmation?.saveLabel"
       @close="answerConfirmation(false)"
       @confirm="answerConfirmation(true)"
+      @save="saveConfirmation"
     />
     <UnsavedChangesDialog
       :open="leaveDialog"
@@ -2164,6 +2184,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     </div>
     <MuebleStudio
       v-if="furnitureOpen"
+      ref="studioRef"
       :key="editableSpecDetail?.localId"
       :form-version="specRenderVersion"
       :galeria-id="editableSpecDetail?.galeria_id"

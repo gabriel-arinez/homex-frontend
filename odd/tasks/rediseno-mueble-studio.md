@@ -52,7 +52,8 @@ Objetivo: optimizar jerarquía visual, contraste de capas, distribución y micro
 - T3 — S3 — inline — `de4f8db` — Paso 03 Accesorios completado y verificado.
 - T4 — S4 — inline — `528d5db` — Paso 04 Imágenes completado y verificado.
 - T5 — S5 — inline — `168eefa` — Paso 05 Precio completado y verificado.
-- T6 — S6 — inline — verificado — Paso 06 Revisar implementado y verificado con pruebas unitarias, E2E, contraste WCAG AA y responsividad móvil (360px).
+- T6 — S6 — inline — `57ee2d8` — Paso 06 Revisar completado y verificado.
+- T7 — S7 — inline — verificado — Modal `Descartar ficha técnica` con opción `Guardar cambios` directa desde el diálogo.
 
 ## Log
 
@@ -64,3 +65,4 @@ Objetivo: optimizar jerarquía visual, contraste de capas, distribución y micro
 - L6 — En `MuebleStudio.vue` e `ImageGallery.vue` (Paso 04 Imágenes) se envolvió la galería en una tarjeta `--color-surface` con jerarquía de 3 capas, se señalizó la portada principal en `.hero` y en miniaturas (`Star` + borde de acento), se enriqueció el estado vacío (`0/8`) y la guía contextual del panel de carga, y se reestructuró el `Visor de imágenes` llevando `.viewer-file` a una franja superior clara con badge `Imagen principal` / `Referencia adicional` y agrupando `.viewer-toolbar` con confirmación `Portada actual`. También se ajustó el contraste en modo claro de migas y numeración de pasos en `MuebleStudio.vue`.
 - L7 — En `EspecificacionForm.vue` (Paso 05 Precio) se alineó la cabecera `Condiciones de cotización` con badge vivo (`Precio obligatorio` / `Importe listo`), se normalizó la cantidad inicial entera (`1.0000` → `1`), se reordenaron y agruparon los campos en dos sub-bloques con 3 capas (negociación principal arriba y glosa opcional para proforma debajo), se rediseñó `Resumen de cotización` tipo recibo con fórmula viva y recuadro elevado para el total estimado, y se estilizó el aviso de importe dictado por voz.
 - L8 — Inicio de Paso 06 Revisar: galería lateral sticky con 3 capas, cabecera ejecutiva con importe total estimado y síntesis de piezas/accesorios, controles `Editar` como píldoras secundarias, eliminación de `0 conjuntos` cuando no aplica, numeración y atributos compactos en piezas, recuadros para observaciones/glosa y barra final `.review-actions` integrada.
+- L9 — Pulido #1 (`Descartar ficha técnica`): se incorporó `saveLabel` y evento `save` en `ConfirmDialog.vue`, se expuso `submit(): boolean` en `EspecificacionForm.vue` y `save(): Promise<boolean>` en `MuebleStudio.vue` (redirigiendo a `06 Revisar` si faltan obligatorios), y se conectó en `ProformaEditorView.vue` para permitir guardar directamente al salir.

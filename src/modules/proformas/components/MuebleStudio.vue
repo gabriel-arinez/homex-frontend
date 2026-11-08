@@ -102,6 +102,7 @@ function onVoiceState(active: boolean, paused: boolean, elapsed: number) {
 const galleryId = ref(props.galeriaId ?? '')
 const galleryError = ref('')
 const galleryRef = ref<InstanceType<typeof ImageGallery> | null>(null)
+const formRef = ref<InstanceType<typeof EspecificacionForm> | null>(null)
 const galleryBusy = ref(false)
 const galleryStatus = ref({ confirmed: 0, pending: 0, busy: false, error: false })
 function onGalleryStatus(value: {
@@ -232,6 +233,17 @@ async function seleccionarApartado(id: typeof seccion.value) {
   seccion.value = id
   volverARevision.value = false
 }
+async function guardarDesdeEstudio(): Promise<boolean> {
+  if (galleryBusy.value) return false
+  if (galleryRef.value && !(await galleryRef.value.flush())) {
+    seccion.value = 'imagenes'
+    return false
+  }
+  const ok = formRef.value?.submit() ?? false
+  if (!ok) seccion.value = 'revision'
+  return ok
+}
+defineExpose({ save: guardarDesdeEstudio })
 </script>
 
 <template>
@@ -504,6 +516,7 @@ async function seleccionarApartado(id: typeof seccion.value) {
         :disabled="processing"
       >
         <EspecificacionForm
+          ref="formRef"
           :key="formVersion"
           :tipos="tipos"
           :especificacion="especificacion"
