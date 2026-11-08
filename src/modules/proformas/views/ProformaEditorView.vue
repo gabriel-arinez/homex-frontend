@@ -349,6 +349,24 @@ const canShareWhatsApp = computed(() => {
   const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
   return Object.keys(validateClient(nuevoCliente, tipo?.codigo === 'EMPRESA')).length === 0
 })
+const isClientStepComplete = computed(() => {
+  if (clienteMode.value === 'existente') return Boolean(header.cliente)
+  if (clienteMode.value === 'nuevo') {
+    if (!nuevoCliente.tipo_cliente) return false
+    const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
+    return Object.keys(validateClient(nuevoCliente, tipo?.codigo === 'EMPRESA')).length === 0
+  }
+  return false
+})
+const isConditionsStepComplete = computed(() => {
+  return Object.keys(validateQuoteConditions(header)).length === 0
+})
+function isStepComplete(index: number): boolean {
+  if (index === 0) return lineas.value.length > 0
+  if (index === 1) return isClientStepComplete.value
+  if (index === 2) return isConditionsStepComplete.value
+  return false
+}
 const existingProductIds = computed(() =>
   lineas.value.flatMap((line) => (line.producto ? [line.producto] : [])),
 )
@@ -674,6 +692,21 @@ function money(value: number) {
 }
 function unitName(unitId: number) {
   return unidades.value.find((unit) => unit.id === unitId)?.nombre ?? 'unidad'
+}
+function formatQuantity(val: string | number | null | undefined): string {
+  if (val == null || val === '') return ''
+  const str = String(val).trim()
+  const num = Number.parseFloat(str)
+  if (!Number.isFinite(num)) return str
+  if (num === Math.trunc(num)) return String(Math.trunc(num))
+  return String(Number(num.toFixed(4)))
+}
+function itemTypeLabel(line: LineaLocal): string {
+  if (line.tipo_item) {
+    const found = tipos.value.find((x) => x.id === Number(line.tipo_item))
+    if (found?.nombre) return found.nombre
+  }
+  return line.producto ? 'Catálogo' : 'Mueble a medida'
 }
 function localId() {
   return crypto.randomUUID()
@@ -1496,12 +1529,18 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             v-for="(step, index) in steps"
             :key="step"
             type="button"
-            :class="{ active: currentStep === index }"
+            :class="{ active: currentStep === index, complete: isStepComplete(index) }"
             :aria-current="currentStep === index ? 'step' : undefined"
             @click="currentStep = index"
           >
             <span class="step-number">{{ String(index + 1).padStart(2, '0') }}</span>
             <span class="step-label">{{ step }}</span>
+            <CheckCircle2
+              v-if="isStepComplete(index)"
+              :size="15"
+              class="step-complete"
+              aria-hidden="true"
+            />
             <span class="step-marker" aria-hidden="true" />
           </button>
         </nav>
@@ -1618,7 +1657,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                     :alt="'Imagen principal de ' + line.nombre"
                   />
                 </div>
-                <strong>{{ line.nombre }}</strong>
+                <div class="line-heading-copy">
+                  <span class="line-type-badge">{{ itemTypeLabel(line) }}</span>
+                  <strong>{{ line.nombre }}</strong>
+                </div>
               </div>
             </div>
             <div v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'" class="line-metrics">
@@ -1637,7 +1679,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <div v-else-if="totalEstimadoLinea(line) !== null" class="line-metrics">
               <div class="line-metric">
                 <span>Cantidad</span
-                ><strong>{{ line.cantidad }} {{ unitName(line.unidad) }}</strong>
+                ><strong>{{ formatQuantity(line.cantidad) }} {{ unitName(line.unidad) }}</strong>
               </div>
               <div class="line-metric">
                 <span>Precio por unidad</span>
@@ -2117,7 +2159,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             </div>
             <div class="editor-actions__operations">
               <Button
-                variant="success"
+                variant="secondary"
                 class="editor-save-draft"
                 :disabled="!hasRealChanges"
                 :processing="saving"
@@ -2128,7 +2170,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               </Button>
               <Button
                 v-if="!isReview"
-                variant="info"
+                :variant="currentStep === 3 ? 'primary' : 'secondary'"
                 :disabled="!canEmit"
                 :processing="saving"
                 @click="requestReview"
@@ -2316,12 +2358,12 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   position: relative;
   display: flex;
   min-width: 0;
-  min-height: 4.1rem;
+  min-height: 2.85rem;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  padding: 0.55rem 0.85rem;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text-secondary);
   cursor: pointer;
@@ -2331,7 +2373,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     border-color var(--transition-fast),
     background var(--transition-fast),
     color var(--transition-fast),
-    transform var(--transition-fast);
+    box-shadow var(--transition-fast);
 }
 .steps button:hover {
   border-color: var(--color-border-strong);
@@ -2343,29 +2385,36 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 }
 .steps button.active {
   border-color: var(--color-primary);
-  background: var(--color-primary-soft);
-  color: var(--color-primary-accent);
+  background: color-mix(in srgb, var(--color-primary-soft) 55%, var(--color-surface));
+  color: var(--color-text);
+  box-shadow: inset 0 -2px 0 var(--color-primary);
 }
 .step-number {
   display: grid;
-  width: 2rem;
-  height: 2rem;
+  width: 1.75rem;
+  height: 1.75rem;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: 0.6rem;
+  border-radius: 0.45rem;
   background: var(--color-surface-raised);
   color: var(--color-text-secondary);
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 750;
 }
 .steps button.active .step-number {
   color: #fff;
   background: var(--color-primary);
 }
+.step-complete {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--color-success);
+}
 .step-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 0.85rem;
 }
 .step-marker {
   position: absolute;
@@ -2574,22 +2623,29 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   align-items: center;
   grid-template-columns: auto minmax(14rem, 0.9fr) minmax(24rem, 1.5fr) auto auto;
   gap: var(--space-4);
-  padding: var(--space-4);
+  padding: 0.85rem 1rem;
   cursor: pointer;
-  border-color: var(--quote-border);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 3%);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 .line-card:hover {
   border-color: var(--color-border-strong);
+  background: var(--color-surface-hover);
 }
 .line-index {
   display: grid;
-  width: 2.4rem;
-  height: 2.4rem;
+  width: 2.2rem;
+  height: 2.2rem;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: 0.6rem;
+  border-radius: 0.5rem;
   background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
   color: var(--color-text-secondary);
   font-size: 0.74rem;
   font-weight: 700;
@@ -2597,6 +2653,26 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 .line-summary {
   min-width: 0;
   cursor: pointer;
+}
+.line-heading-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.line-type-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 0.12rem 0.5rem;
+  border-radius: 9999px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .line-summary strong {
   display: block;
@@ -2627,7 +2703,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 }
 .line-metric > strong {
   overflow-wrap: anywhere;
-  font-size: 0.82rem;
+  font-size: 0.85rem;
 }
 .line-summary:focus-visible {
   outline: 2px solid var(--color-primary);
@@ -2639,7 +2715,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   justify-items: end;
   gap: 0.2rem;
   min-width: 8.5rem;
-  padding: var(--space-3);
+  padding: 0.55rem 0.85rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-surface-raised);
@@ -3044,7 +3120,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 }
 @media (max-width: 48rem) {
   .steps button {
-    min-height: 3.7rem;
+    min-height: 2.75rem;
   }
   .step-number {
     width: 1.7rem;

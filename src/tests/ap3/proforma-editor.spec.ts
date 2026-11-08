@@ -111,7 +111,7 @@ describe('AP3 editor integral', () => {
     const lineMetrics = wrapper.get('.line-card .line-metrics')
     const metricsText = lineMetrics.text().replace(/\s+/g, ' ')
     expect(metricsText).toContain('Cantidad')
-    expect(metricsText).toContain('1.0000 Pieza')
+    expect(metricsText).toContain('1 Pieza')
     expect(metricsText).toContain('Precio por unidad')
     expect(metricsText).toContain('Bs 7.300,00')
     expect(metricsText).toContain('Descuento')
