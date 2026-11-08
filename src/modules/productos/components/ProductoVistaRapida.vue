@@ -33,6 +33,7 @@ const props = withDefaults(
     gallery?: GalleryImage[]
     galleryEndpoint?: string
     galleryFallbackEndpoint?: string
+    moneda?: string
   }>(),
   {
     product: null,
@@ -46,6 +47,7 @@ const props = withDefaults(
     gallery: () => [],
     galleryEndpoint: '',
     galleryFallbackEndpoint: '',
+    moneda: '',
   },
 )
 const emit = defineEmits<{
@@ -248,6 +250,52 @@ function productFields(product: Producto) {
 }
 function lineAmount() {
   return props.line?.total ?? ''
+}
+function formatQuantity(val: string | number | null | undefined): string {
+  if (val == null || val === '') return ''
+  const str = String(val).trim()
+  const num = Number.parseFloat(str)
+  if (!Number.isFinite(num)) return str
+  if (num === Math.trunc(num)) return String(Math.trunc(num))
+  return String(Number(num.toFixed(4)))
+}
+function formatUnitPrice(val: string | number | null | undefined): string {
+  if (val == null || val === '') return 'No especificado'
+  const str = String(val).trim()
+  if (/^[A-Za-z$]/.test(str)) return str
+  const num = typeof val === 'number' ? val : Number.parseFloat(str)
+  if (!Number.isFinite(num)) return str
+  if (props.moneda) {
+    try {
+      return new Intl.NumberFormat('es-BO', {
+        style: 'currency',
+        currency: props.moneda,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(num)
+    } catch {
+      return `${props.moneda} ${num.toFixed(2)}`
+    }
+  }
+  return str
+}
+function formatDiscount(discount: string | number | null | undefined): string | null {
+  if (discount == null || discount === '') return null
+  const num = Number.parseFloat(String(discount))
+  if (!Number.isFinite(num) || num === 0) return null
+  if (props.moneda) {
+    try {
+      return new Intl.NumberFormat('es-BO', {
+        style: 'currency',
+        currency: props.moneda,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(num)
+    } catch {
+      return `${props.moneda} ${num.toFixed(2)}`
+    }
+  }
+  return String(discount)
 }
 const summaryDimensions = computed(() => {
   const technical = leerDatosTecnicos(props.line?.especificacion?.datos_tecnicos)
@@ -463,7 +511,7 @@ const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.t
             <dl class="line-summary-metrics">
               <div>
                 <dt>Cantidad</dt>
-                <dd>{{ line.cantidad }} {{ line.unidad_info?.nombre }}</dd>
+                <dd>{{ formatQuantity(line.cantidad) }} {{ line.unidad_info?.nombre }}</dd>
               </div>
               <div v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
                 <dt>Importe negociado histórico</dt>
@@ -471,14 +519,18 @@ const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.t
               </div>
               <div v-else>
                 <dt>Precio por unidad cotizado</dt>
-                <dd>{{ line.precio_unitario ?? 'No especificado' }}</dd>
+                <dd>{{ formatUnitPrice(line.precio_unitario) }}</dd>
               </div>
               <div>
                 <dt>Descuento</dt>
-                <dd>
+                <dd
+                  :class="{
+                    'line-summary-discount--active': line.descuento && Number(line.descuento) !== 0,
+                  }"
+                >
                   {{
                     line.descuento && Number(line.descuento) !== 0
-                      ? line.descuento
+                      ? (formatDiscount(line.descuento) || line.descuento)
                       : 'Sin descuento'
                   }}
                 </dd>
@@ -507,7 +559,9 @@ const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.t
             <p v-if="summaryNotes" class="line-summary-description">
               <strong>Observaciones</strong>{{ summaryNotes }}
             </p>
-            <p class="data-summary-hint">El detalle completo está en el paso 04 · Revisar.</p>
+            <p class="data-summary-hint">
+              El detalle completo está disponible con el botón «{{ actionLabel || 'Editar línea' }}».
+            </p>
           </section>
 
           <section v-if="product && !line && productFields(product).length" class="info-card">
@@ -565,7 +619,7 @@ const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.t
   place-items: center;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
-  background: var(--color-background);
+  background: var(--color-surface-muted);
 }
 .media-frame :deep(img.gallery-image) {
   width: 100%;
@@ -664,7 +718,7 @@ const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.t
   font-size: 0.9rem;
 }
 .quote-card--summary {
-  border-color: color-mix(in srgb, var(--color-primary) 32%, var(--color-border));
+  border-color: var(--color-border);
 }
 .line-summary-meta {
   display: flex;
@@ -673,12 +727,16 @@ const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.t
   margin-bottom: var(--space-3);
 }
 .line-summary-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   padding: 0.25rem 0.65rem;
   border: 1px solid var(--color-border);
   border-radius: 999px;
-  color: var(--color-text-secondary);
-  background: var(--color-background);
-  font-size: 0.82rem;
+  color: var(--color-text);
+  background: var(--color-surface-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 .line-summary-metrics {
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -692,33 +750,100 @@ const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.t
   padding: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
-  background: var(--color-background);
+  background: var(--color-surface-muted);
 }
 .line-summary-metrics dt {
-  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.line-summary-metrics dd {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.96rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.line-summary-discount--active {
+  color: var(--color-success, #22c55e) !important;
 }
 .line-summary-total {
   grid-column: 1 / -1;
-  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border)) !important;
-  background: color-mix(in srgb, var(--color-primary) 9%, var(--color-background)) !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4) !important;
+  border: 1px solid var(--color-border-strong) !important;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-raised) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+.line-summary-total dt {
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 .line-summary-total dd {
-  font-size: 1.5rem;
+  margin: 0;
+  font-size: 1.55rem !important;
+  font-weight: 800;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
 }
 .data-summary-dimensions {
   grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr));
   gap: var(--space-3);
 }
 .data-summary-dimensions > div {
+  display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
+}
+.data-summary-dimensions dt {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.data-summary-dimensions dd {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.95rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.data-summary .line-summary-description {
+  display: grid;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
+}
+.data-summary .line-summary-description strong {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 .data-summary-hint {
-  margin: var(--space-4) 0 0;
+  margin: var(--space-3) 0 0;
   padding-top: var(--space-3);
   border-top: 1px solid var(--color-border);
   color: var(--color-text-secondary);
-  font-size: 0.8rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
 }
 .line-summary-description {
   display: grid;

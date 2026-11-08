@@ -2151,6 +2151,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         :open="Boolean(readingLine)"
         :line="readingLineForViewer"
         :product="readMaster"
+        :moneda="header.moneda_codigo"
         :gallery="readingFurnitureGallery"
         :gallery-endpoint="readingProductGalleryEndpoint"
         :product-loading="readLoading"
