@@ -44,3 +44,4 @@ Objetivo: Optimizar el formulario de creación de productos de catálogo en HOME
 - T5 — S5 — inline — `ProductoForm.vue`: 3 capas en precio de lista, cálculo vivo de descuento y vigencia.
 - T6 — S6 — inline — `ProductoForm.vue`: tarjeta lateral de transcripción conservada y alertas, notas comerciales con chips rápidos.
 - T7 — S1 — inline — `catalogo-voz.spec.ts`: actualización de pruebas de voz al flujo directo sin pantallas intermedias ni modales de conflicto.
+- T8 — S4/S3 — inline & NLP — Normalización de modelos hablados con guión en NLP (`NF Guión 810` -> `NF-810`), extracción completa de especificaciones ergonómicas de silla, grilla balanceada 2x2 en Información general, eliminación de cabeceras redundantes y prevención de volcado de audio en Observaciones.
