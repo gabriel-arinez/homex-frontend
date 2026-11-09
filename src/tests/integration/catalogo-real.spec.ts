@@ -184,9 +184,9 @@ for (const [category, file] of samples) {
           await page
             .getByLabel('Código SKU *', { exact: false })
             .fill(`VOICE-${category}-${mode}-${Date.now()}`)
-          const name = page.getByLabel('Nombre comercial *', { exact: true })
+          const name = page.getByLabel('Nombre comercial *', { exact: false })
           if (!(await name.inputValue())) await name.fill(`Prueba voz ${category}`)
-          await page.getByLabel('Precio normal de venta (Bs) *', { exact: true }).fill('100')
+          await page.getByLabel('Precio normal de venta (Bs) *', { exact: false }).fill('100')
           const savedResponse = page.waitForResponse(
             (r) =>
               r.request().method() === 'POST' &&

@@ -220,13 +220,26 @@ function drop(event: DragEvent) {
   dropActive.value = false
   void select(Array.from(event.dataTransfer?.files ?? []))
 }
-async function upload() {
-  if (!props.endpoint || busy.value || selecting.value) return !busy.value && !selecting.value
+let activeUploadPromise: Promise<boolean> | null = null
+
+async function upload(): Promise<boolean> {
+  if (activeUploadPromise) return activeUploadPromise
+  if (!props.endpoint || selecting.value) return !busy.value && !selecting.value
+  activeUploadPromise = doUpload()
+  try {
+    return await activeUploadPromise
+  } finally {
+    activeUploadPromise = null
+  }
+}
+
+async function doUpload(): Promise<boolean> {
+  const path = props.endpoint
+  if (!path) return false
   busy.value = true
   emit('busy', true)
   error.value = ''
   progress.value = 0
-  const path = props.endpoint
   const items = [...pending.value]
   totalUploads.value = items.length
   const remaining = [...items]
