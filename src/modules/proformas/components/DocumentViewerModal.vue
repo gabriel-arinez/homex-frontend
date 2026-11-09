@@ -199,7 +199,7 @@ watch(
       }
     } catch (error) {
       if (!disposed) {
-        pdfError.value = error instanceof Error ? error.message : 'No se pudo abrir el PDF.'
+        pdfError.value = error instanceof Error ? error.message : `No se pudo abrir el PDF: ${String(error)}`
       }
     }
   },
