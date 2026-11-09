@@ -203,8 +203,13 @@ watch(
   font-size: calc(var(--text-scale-factor) * var(--font-height));
   transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
 }
-.pdf-page .textLayer span.markedContent { top: 0; height: 0; }
-.pdf-page .textLayer ::selection { background: rgba(37, 99, 235, .25); }
+.pdf-page .textLayer span.markedContent {
+  top: 0;
+  height: 0;
+}
+.pdf-page .textLayer ::selection {
+  background: rgba(37, 99, 235, 0.25);
+}
 .pdf-page .textLayer .endOfContent {
   position: absolute;
   left: 0;
