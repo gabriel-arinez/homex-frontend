@@ -93,12 +93,17 @@ watch(
       if (textContainer.value) {
         textContainer.value.replaceChildren()
         textContainer.value.style.setProperty('--scale-factor', String(viewport.scale))
-        textLayer = new TextLayer({
-          textContentSource: page.streamTextContent(),
-          container: textContainer.value,
-          viewport,
-        })
-        await textLayer.render()
+        try {
+          textLayer = new TextLayer({
+            textContentSource: page.streamTextContent(),
+            container: textContainer.value,
+            viewport,
+          })
+          await textLayer.render()
+        } catch {
+          // Text selection is supplemental; never hide an otherwise valid PDF page.
+          if (!cancelled) textContainer.value?.replaceChildren()
+        }
       }
       if (!cancelled) rendered.value = true
     } catch (cause) {
