@@ -158,7 +158,10 @@ watch(
       await nextTick()
       if (!disposed) {
         fit('page')
-        viewportRef.value?.scrollTo({ top: 0, left: 0 })
+        if (viewportRef.value) {
+          viewportRef.value.scrollTop = 0
+          viewportRef.value.scrollLeft = 0
+        }
       }
     } catch (error) {
       if (!disposed) {
