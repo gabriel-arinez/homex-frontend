@@ -26,6 +26,11 @@ const mountViewer = (props: Record<string, unknown>) =>
     props: { open: true, ...props },
     global: {
       stubs: { Teleport: true },
+      config: {
+        errorHandler: (error: unknown) => {
+          console.error('PDF_VIEWER_ORIGINAL_VUE_ERROR', error)
+        },
+      },
     },
   })
 
