@@ -172,8 +172,10 @@ watch(
   async ([open, url], _, onCleanup) => {
     let disposed = false
     let task: PDFDocumentLoadingTask | null = null
+    let fitFrame = 0
     onCleanup(() => {
       disposed = true
+      if (fitFrame) window.cancelAnimationFrame(fitFrame)
       if (task) void task.destroy()
     })
     pdf.value = null
@@ -189,12 +191,17 @@ watch(
       pdf.value = document
       pages.value = Array.from({ length: document.numPages }, (_, i) => i + 1)
       await nextTick()
-      if (!disposed) {
-        fit('page')
-        if (viewportRef.value) {
-          viewportRef.value.scrollTop = 0
-          viewportRef.value.scrollLeft = 0
-        }
+      // The initial fit must happen after the PDF pages have mounted, not
+      // within the same Vue render flush that installs them.
+      if (!disposed && typeof window.requestAnimationFrame === 'function') {
+        fitFrame = window.requestAnimationFrame(() => {
+          if (disposed) return
+          fit('page')
+          if (viewportRef.value) {
+            viewportRef.value.scrollTop = 0
+            viewportRef.value.scrollLeft = 0
+          }
+        })
       }
     } catch (error) {
       if (!disposed) {
