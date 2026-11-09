@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { TextLayer, type PDFDocumentProxy, type RenderTask } from 'pdfjs-dist'
+import 'pdfjs-dist/web/pdf_viewer.css'
 
 const props = defineProps<{
   pdf: PDFDocumentProxy
