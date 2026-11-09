@@ -8,6 +8,7 @@ import {
   CircleX,
   ClipboardCheck,
   Download,
+  Eye,
   FileText,
   Pencil,
   Paperclip,
@@ -31,6 +32,8 @@ import Toast from '@/shared/ui/Toast.vue'
 import { useQuoteProductImages } from '../composables/useQuoteProductImages'
 import { proformasService } from '../services/proformasService'
 import { retornoAProformas } from '../utils/navegacionProformas'
+import DocumentViewerModal from '../components/DocumentViewerModal.vue'
+import ProformaDocumentSheet from '../components/ProformaDocumentSheet.vue'
 
 const emit = defineEmits<{ openMenu: [] }>()
 const route = useRoute()
@@ -52,7 +55,59 @@ const success = ref('')
 const downloadNotice = ref('')
 const lastPedidoId = ref<number | null>(null)
 const confirmAction = ref<'approve' | 'not-completed' | 'reopen' | 'cancel' | null>(null)
+const previewModalOpen = ref(false)
 const listPath = computed(() => retornoAProformas(route.query.returnTo))
+
+const documentLines = computed(() => {
+  if (!quote.value) return []
+  return quote.value.detalles.map((line) => {
+    let imageUrl: string | null = null
+    if (line.producto) {
+      const img = quoteImages.value[line.producto]
+      imageUrl = img?.variantes?.['640'] ?? img?.variantes?.['320'] ?? img?.original ?? null
+    } else {
+      const cover = furnitureCoverFor(line, quote.value?.id)
+      imageUrl = cover?.variantes?.['640'] ?? cover?.variantes?.['320'] ?? cover?.url ?? null
+    }
+    return {
+      id: line.id,
+      producto: line.producto,
+      nombre: line.nombre,
+      descripcion: line.descripcion,
+      tipo_item: line.tipo_item,
+      tipo_item_label: line.tipo_item_info.nombre,
+      cantidad: line.cantidad,
+      unidad: line.unidad,
+      unidad_label: line.unidad_info.nombre,
+      precio_unitario: line.precio_unitario,
+      descuento: line.descuento,
+      modo_calculo: line.modo_calculo,
+      importe_negociado: line.importe_negociado,
+      total_calculado: Number(line.total),
+      especificacion: line.especificacion,
+      imagen_url: imageUrl,
+    }
+  })
+})
+
+const documentClientInfo = computed(() => {
+  if (!quote.value?.cliente_resumen) return null
+  return {
+    nombres: quote.value.cliente_resumen.nombre,
+    empresa: quote.value.cliente_resumen.empresa,
+    celular: quote.value.cliente_resumen.celular,
+  }
+})
+
+const documentConditions = computed(() => {
+  if (!quote.value) return null
+  return {
+    porcentaje_adelanto: quote.value.porcentaje_adelanto,
+    plazo_entrega: quote.value.plazo_entrega,
+    validez_oferta: quote.value.validez_oferta,
+    observaciones: quote.value.observaciones,
+  }
+})
 const stateCode = computed(() => quote.value?.estado_info.codigo ?? '')
 const editable = computed(() => ['BORRADOR', 'EN_REVISION'].includes(stateCode.value))
 const inReview = computed(() => ['EN_REVISION', 'ENVIADA'].includes(stateCode.value))
@@ -220,6 +275,13 @@ onMounted(() => void load())
         >
           <Download :size="17" aria-hidden="true" />
           {{ stateCode === 'BORRADOR' ? 'Descargar borrador (PDF)' : 'Descargar PDF' }}
+        </Button>
+        <Button
+          v-if="quote"
+          variant="primary"
+          @click="previewModalOpen = true"
+        >
+          <Eye :size="17" aria-hidden="true" /> Ver documento / PDF
         </Button>
         <Button v-if="editable" variant="secondary" :disabled="processing" @click="edit">
           <Pencil :size="17" aria-hidden="true" /> Continuar edición
@@ -470,6 +532,34 @@ onMounted(() => void load())
       @close="confirmAction = null"
       @confirm="transition"
     />
+
+    <DocumentViewerModal
+      v-if="quote"
+      :open="previewModalOpen"
+      :title="`Proforma #${quote.numero}`"
+      :subtitle="`Vista previa de impresión · Tamaño Carta (216 × 279 mm) · ${quote.estado_info.nombre}`"
+      :downloading="downloading"
+      :can-download-pdf="true"
+      @close="previewModalOpen = false"
+      @download="downloadDocument"
+    >
+      <ProformaDocumentSheet
+        :numero="quote.numero"
+        :fecha="quote.fecha"
+        :titulo="quote.titulo"
+        :moneda-codigo="quote.moneda_info.codigo"
+        :moneda-nombre="quote.moneda_info.nombre"
+        :estado-codigo="quote.estado_info.codigo"
+        :estado-nombre="quote.estado_info.nombre"
+        :cliente="documentClientInfo"
+        :condiciones="documentConditions"
+        :lineas="documentLines"
+        :subtotal="Number(quote.subtotal)"
+        :descuento-total="Number(quote.descuento_total)"
+        :total="Number(quote.total)"
+        :catalog-images="quoteImages"
+      />
+    </DocumentViewerModal>
   </div>
 </template>
 

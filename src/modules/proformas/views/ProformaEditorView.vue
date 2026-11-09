@@ -52,6 +52,8 @@ import {
   Wrench,
   Save,
   Send,
+  Eye,
+  FileText,
 } from '@lucide/vue'
 import Button from '@/shared/ui/Button.vue'
 import Card from '@/shared/ui/Card.vue'
@@ -90,6 +92,9 @@ import {
   saveEditorDraft,
 } from '../services/editorLocal'
 import { totalEstimadoCompleto, totalEstimadoLinea } from '../services/presentacionComercial'
+import { downloadBlob } from '@/shared/download/downloadBlob'
+import DocumentViewerModal from '../components/DocumentViewerModal.vue'
+import ProformaDocumentSheet from '../components/ProformaDocumentSheet.vue'
 
 type LineaLocal = DetalleIntegralWritable & { localId: string; galeria_id?: string }
 const emit = defineEmits<{ openMenu: [] }>()
@@ -749,6 +754,116 @@ function normalizeLine(line: Proforma['detalles'][number]): LineaLocal {
       : null,
   }
 }
+
+const documentModalOpen = ref(false)
+const downloadingDocument = ref(false)
+
+const currentCurrencyName = computed(() => {
+  return (
+    monedas.value.find((m) => m.codigo === header.moneda_codigo)?.nombre ??
+    (header.moneda_codigo === 'USD' ? 'Dólares' : 'Bolivianos')
+  )
+})
+
+const calculatedDiscountTotal = computed(() => {
+  return lineas.value.reduce((acc, l) => {
+    const d = Number(l.descuento)
+    return acc + (Number.isFinite(d) && d > 0 ? d : 0)
+  }, 0)
+})
+
+const documentLines = computed(() => {
+  return lineas.value.map((line) => {
+    let imageUrl: string | null = null
+    if (line.producto) {
+      const img = quoteImages.value[line.producto]
+      imageUrl = img?.variantes?.['640'] ?? img?.variantes?.['320'] ?? img?.original ?? null
+    } else {
+      const cover = furnitureCoverFor(line, proformaId.value)
+      imageUrl = cover?.variantes?.['640'] ?? cover?.variantes?.['320'] ?? cover?.url ?? null
+    }
+
+    return {
+      id: line.id,
+      localId: line.localId,
+      producto: line.producto,
+      nombre: line.nombre,
+      descripcion: line.descripcion,
+      tipo_item: line.tipo_item,
+      tipo_item_label: itemTypeLabel(line),
+      cantidad: line.cantidad,
+      unidad: line.unidad,
+      unidad_label: unitName(Number(line.unidad)),
+      precio_unitario: line.precio_unitario,
+      descuento: line.descuento,
+      modo_calculo: line.modo_calculo,
+      importe_negociado: line.importe_negociado,
+      total_calculado: totalEstimadoLinea(line),
+      especificacion: line.especificacion,
+      imagen_url: imageUrl,
+    }
+  })
+})
+
+const documentClientInfo = computed(() => {
+  if (clienteMode.value === 'nuevo') {
+    return {
+      nombres: nuevoCliente.nombres,
+      apellidos: nuevoCliente.apellidos,
+      empresa: nuevoCliente.empresa,
+      celular: nuevoCliente.celular,
+      direccion: nuevoCliente.direccion,
+    }
+  }
+  const sel = clienteSeleccionado.value
+  if (!sel) return null
+  if ('nombres' in sel) {
+    const c = sel as Cliente
+    return {
+      nombres: c.nombres,
+      apellidos: c.apellidos,
+      empresa: c.empresa,
+      celular: c.celular,
+      direccion: c.direccion,
+    }
+  }
+  const resumen = sel as ClienteResumenProforma
+  return {
+    nombres: resumen.nombre,
+    empresa: resumen.empresa,
+    celular: resumen.celular,
+  }
+})
+
+const documentConditions = computed(() => ({
+  porcentaje_adelanto: header.porcentaje_adelanto,
+  plazo_entrega: header.plazo_entrega,
+  validez_oferta: header.validez_oferta,
+  observaciones: header.observaciones,
+}))
+
+async function downloadDocumentPdf() {
+  if (downloadingDocument.value) return
+  if (persisted.value?.id) {
+    downloadingDocument.value = true
+    try {
+      const blob = await proformasService.documentPdf(persisted.value.id)
+      const prefix = isReview.value
+        ? 'proforma-revision'
+        : persisted.value.estado_info.codigo === 'BORRADOR'
+          ? 'proforma-borrador'
+          : 'proforma'
+      downloadBlob(blob, `${prefix}-${persisted.value.numero}.pdf`)
+    } catch {
+      window.print()
+    } finally {
+      downloadingDocument.value = false
+    }
+  } else {
+    window.print()
+  }
+}
+
 function fill(value: Proforma) {
   persisted.value = value
   header.cliente = value.cliente ? String(value.cliente) : ''
@@ -2012,6 +2127,14 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 <p>Comprueba los datos registrados antes de guardar o emitir.</p>
               </div>
             </div>
+            <div class="section-title__tools">
+              <span
+                class="review-state-pill"
+                :data-status="persisted?.estado_info?.codigo ?? 'BORRADOR'"
+              >
+                {{ persisted?.estado_info?.nombre ?? 'Borrador' }}
+              </span>
+            </div>
           </div>
           <div class="review-grid">
             <Card class="review-summary-card">
@@ -2218,6 +2341,26 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 </div>
               </div>
             </div>
+            <div class="document-preview-launcher">
+              <div class="document-preview-launcher__summary">
+                <span class="document-preview-launcher__icon" aria-hidden="true">
+                  <FileText :size="20" />
+                </span>
+                <div class="document-preview-launcher__heading">
+                  <strong>Documento comercial y vista previa PDF</strong>
+                  <small>Ficha en tamaño Carta con logotipo institucional, fichas técnicas y condiciones.</small>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="primary"
+                class="document-preview-launcher__btn"
+                @click="documentModalOpen = true"
+              >
+                <Eye :size="16" aria-hidden="true" />
+                <span>Ver documento / PDF</span>
+              </Button>
+            </div>
           </Card>
           <div class="totals">
             <div class="totals__identity">
@@ -2316,11 +2459,14 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 Enviar a revisión
               </Button>
               <Button
-                v-if="persisted"
+                type="button"
                 variant="secondary"
-                @click="router.push({ path: `/proformas/${persisted.id}`, query: listQuery })"
-                >Ver resumen y documentos</Button
+                class="editor-preview-doc-btn"
+                @click="documentModalOpen = true"
               >
+                <FileText :size="17" aria-hidden="true" />
+                Vista previa PDF
+              </Button>
             </div>
           </div>
         </footer>
@@ -2404,6 +2550,33 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       @applied="aplicarCaptura"
       @processing="voiceProcessing = $event"
     />
+
+    <DocumentViewerModal
+      :open="documentModalOpen"
+      :title="persisted?.numero ? `Proforma #${persisted.numero}` : 'Cotización comercial HOMEX'"
+      :subtitle="`Vista previa de impresión · Tamaño Carta (216 × 279 mm) · ${persisted?.estado_info?.nombre ?? 'Borrador'}`"
+      :downloading="downloadingDocument"
+      :can-download-pdf="true"
+      @close="documentModalOpen = false"
+      @download="downloadDocumentPdf"
+    >
+      <ProformaDocumentSheet
+        :numero="persisted?.numero"
+        :fecha="persisted?.fecha ?? null"
+        :titulo="header.titulo"
+        :moneda-codigo="header.moneda_codigo"
+        :moneda-nombre="currentCurrencyName"
+        :estado-codigo="persisted?.estado_info?.codigo ?? 'BORRADOR'"
+        :estado-nombre="persisted?.estado_info?.nombre ?? 'Borrador'"
+        :cliente="documentClientInfo"
+        :condiciones="documentConditions"
+        :lineas="documentLines"
+        :subtotal="totalPreview"
+        :descuento-total="calculatedDiscountTotal"
+        :total="persisted && !dirty ? Number(persisted.total) : totalPreview"
+        :catalog-images="quoteImages"
+      />
+    </DocumentViewerModal>
   </div>
 </template>
 
@@ -3891,6 +4064,89 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 }
 .whatsapp-share__edit-actions small {
   color: var(--color-text-secondary);
+}
+
+.review-state-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.review-state-pill[data-status="APROBADA"] {
+  background: color-mix(in srgb, var(--color-success) 14%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-success) 40%, transparent);
+  color: var(--color-success);
+}
+
+.review-state-pill[data-status="EN_REVISION"] {
+  background: color-mix(in srgb, var(--color-warning) 14%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-warning) 40%, transparent);
+  color: var(--color-warning);
+}
+
+.document-preview-launcher {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+  padding: 1.15rem 1.25rem;
+  border: 1.5px solid color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface));
+  flex-wrap: wrap;
+}
+
+.document-preview-launcher__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  flex: 1;
+}
+
+.document-preview-launcher__icon {
+  display: grid;
+  flex: 0 0 auto;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 30%, transparent);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface));
+  color: var(--color-primary-accent);
+}
+
+.document-preview-launcher__heading {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.document-preview-launcher__heading strong {
+  color: var(--color-text);
+  font-size: 0.92rem;
+  font-weight: 650;
+}
+
+.document-preview-launcher__heading small {
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.document-preview-launcher__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
 }
 .emission-checklist,
 .emission-ready {
