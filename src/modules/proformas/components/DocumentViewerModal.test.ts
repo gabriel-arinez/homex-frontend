@@ -4,11 +4,11 @@ import DocumentViewerModal from './DocumentViewerModal.vue'
 
 vi.mock('pdfjs-dist', () => ({
   GlobalWorkerOptions: { workerSrc: '' },
-  getDocument: vi.fn(() => ({
-    promise: Promise.resolve({ numPages: 2, destroy: vi.fn() }),
-    destroy: vi.fn(),
+  getDocument: vi.fn<() => { promise: Promise<{ numPages: number; destroy: () => void }>; destroy: () => void }>(() => ({
+    promise: Promise.resolve({ numPages: 2, destroy: vi.fn<() => void>() }),
+    destroy: vi.fn<() => void>(),
   })),
-  TextLayer: vi.fn(),
+  TextLayer: vi.fn<() => void>(),
 }))
 
 afterEach(() => { vi.restoreAllMocks() })
