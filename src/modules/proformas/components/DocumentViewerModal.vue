@@ -62,7 +62,6 @@ const printError = ref('')
 const printReady = ref(false)
 let previousOverflow = ''
 let previousFocus: HTMLElement | null = null
-let resizing: ResizeObserver | null = null
 let scrollRaf = 0
 
 const clamp = (n: number) => Math.min(1.8, Math.max(0.4, Math.round(n * 100) / 100))
@@ -223,22 +222,16 @@ watch(
   },
   { immediate: true },
 )
+function onResize() {
+  if (pdf.value && mode.value !== 'custom') fit(mode.value)
+}
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
-})
-watch(viewportRef, (el) => {
-  resizing?.disconnect()
-  resizing = null
-  if (el && typeof ResizeObserver !== 'undefined') {
-    resizing = new ResizeObserver(() => {
-      if (pdf.value && mode.value !== 'custom') fit(mode.value)
-    })
-    resizing.observe(el)
-  }
+  window.addEventListener('resize', onResize)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
-  resizing?.disconnect()
+  window.removeEventListener('resize', onResize)
   if (scrollRaf) cancelAnimationFrame(scrollRaf)
   if (props.open) document.body.style.overflow = previousOverflow
 })
