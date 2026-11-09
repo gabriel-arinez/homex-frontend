@@ -3,8 +3,8 @@ export default defineConfig({
   testDir: './src/tests/integration',
   testMatch: 'catalogo-real.spec.ts',
   workers: 1,
-  timeout: 240_000,
-  expect: { timeout: 180_000 },
+  timeout: 60_000,
+  expect: { timeout: 15_000 },
   reporter: 'list',
   outputDir: 'test-results/playwright-catalogo',
   use: {

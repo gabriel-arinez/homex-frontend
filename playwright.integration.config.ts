@@ -4,8 +4,8 @@ export default defineConfig({
   testDir: './src/tests/integration',
   fullyParallel: false,
   workers: 1,
-  timeout: 180_000,
-  expect: { timeout: 120_000 },
+  timeout: 60_000,
+  expect: { timeout: 15_000 },
   reporter: [
     ['list'],
     ['json', { outputFile: 'test-results/playwright-integration/results.json' }],

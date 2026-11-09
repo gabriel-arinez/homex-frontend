@@ -85,6 +85,11 @@ jobs:
           node-version: 24.18.1
           cache: npm
       - run: npm ci
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - name: Upload Playwright evidence on failure
@@ -103,6 +108,11 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 24.18.1, cache: npm }
       - run: npm ci
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - run: npx playwright install --with-deps chromium
       - run: npm run test:a11y
 
@@ -151,6 +161,11 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 24.18.1, cache: npm }
       - run: npm ci
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - run: npx playwright install --with-deps chromium firefox webkit
       - name: Build reproducible y bundle seguro
         run: npm run release:check
@@ -222,6 +237,11 @@ jobs:
           path: .cache/fe08-asr
           key: faster-whisper-small-536b066-v1
       - run: npm ci
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - run: npx playwright install --with-deps chromium
       - run: uv sync --project backend --locked --extra dev --extra worker
       - name: Install deterministic speech fixture generator
