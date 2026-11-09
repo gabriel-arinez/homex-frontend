@@ -59,8 +59,12 @@ const previewModalOpen = ref(false)
 const listPath = computed(() => retornoAProformas(route.query.returnTo))
 
 const {
-  blob: documentBlob, url: documentUrl, loading: documentLoading,
-  error: documentError, load: loadDocument, clear: clearDocument,
+  blob: documentBlob,
+  url: documentUrl,
+  loading: documentLoading,
+  error: documentError,
+  load: loadDocument,
+  clear: clearDocument,
 } = useProformaPdf()
 watch(previewModalOpen, (open) => {
   if (open && quote.value) void loadDocument(quote.value.id)
@@ -195,7 +199,7 @@ async function downloadDocument() {
   error.value = ''
   const opened = previewModalOpen.value
   try {
-    const file = (opened && documentBlob.value) || await loadDocument(id)
+    const file = (opened && documentBlob.value) || (await loadDocument(id))
     if (!file) {
       if (!opened) error.value = documentError.value || 'No se pudo obtener el PDF.'
       return
@@ -508,7 +512,6 @@ onMounted(() => void load())
       @retry="loadDocument(quote.id)"
       @download="downloadDocument"
     />
-
   </div>
 </template>
 

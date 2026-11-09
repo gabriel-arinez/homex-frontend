@@ -759,8 +759,12 @@ const documentModalOpen = ref(false)
 const downloadingDocument = ref(false)
 
 const {
-  blob: documentBlob, url: documentUrl, loading: documentLoading,
-  error: documentError, load: loadDocument, clear: clearDocument,
+  blob: documentBlob,
+  url: documentUrl,
+  loading: documentLoading,
+  error: documentError,
+  load: loadDocument,
+  clear: clearDocument,
 } = useProformaPdf()
 watch(documentModalOpen, (open) => {
   if (open && persisted.value?.id) void loadDocument(persisted.value.id)
@@ -783,7 +787,7 @@ async function downloadDocumentPdf() {
   const opened = documentModalOpen.value
   downloadingDocument.value = true
   try {
-    const file = (opened && documentBlob.value) || await loadDocument(persisted.value.id)
+    const file = (opened && documentBlob.value) || (await loadDocument(persisted.value.id))
     if (!file) {
       if (!opened) error.value = documentError.value || 'No se pudo generar el PDF.'
       return
@@ -2502,7 +2506,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       :open="documentModalOpen"
       :title="persisted?.numero ? `Proforma #${persisted.numero}` : 'Cotización HOMEX'"
       :subtitle="`PDF de la versión guardada · Tamaño Carta · ${persisted?.estado_info?.nombre ?? 'Borrador'}`"
-      :notice="dirty ? 'Hay cambios sin guardar. El PDF corresponde a la última versión guardada.' : ''"
+      :notice="
+        dirty ? 'Hay cambios sin guardar. El PDF corresponde a la última versión guardada.' : ''
+      "
       :downloading="downloadingDocument"
       :can-download-pdf="true"
       :pdf-url="documentUrl"
@@ -2512,7 +2518,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       @retry="persisted?.id && loadDocument(persisted.id)"
       @download="downloadDocumentPdf"
     />
-
   </div>
 </template>
 

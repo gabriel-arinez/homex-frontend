@@ -19,7 +19,9 @@ describe('DocumentViewerModal (PDF auténtico)', () => {
     })
     expect(wrapper.text()).toContain('Proforma #578')
     expect(wrapper.text()).toContain('Carta · Borrador')
-    expect(wrapper.find('iframe').attributes('src')).toContain('blob:http://localhost/proforma-prueba')
+    expect(wrapper.find('iframe').attributes('src')).toContain(
+      'blob:http://localhost/proforma-prueba',
+    )
     expect(wrapper.findAll('.product-card')).toHaveLength(0)
 
     await wrapper.find('button[aria-label="Aumentar zoom"]').trigger('click')
@@ -37,7 +39,10 @@ describe('DocumentViewerModal (PDF auténtico)', () => {
       props: { open: true, pdfUrl: 'blob:http://localhost/pdf' },
       global: { stubs: { Teleport: true } },
     })
-    await wrapper.findAll('button').find((button) => button.text().includes('Imprimir'))?.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Imprimir'))
+      ?.trigger('click')
     expect(printApp).not.toHaveBeenCalled()
     wrapper.unmount()
   })
@@ -49,7 +54,10 @@ describe('DocumentViewerModal (PDF auténtico)', () => {
     })
     expect(wrapper.text()).toContain('No disponible')
     expect(wrapper.find('iframe').exists()).toBe(false)
-    await wrapper.findAll('button').find((button) => button.text().includes('Reintentar'))?.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Reintentar'))
+      ?.trigger('click')
     expect(wrapper.emitted('retry')).toHaveLength(1)
     wrapper.unmount()
   })
