@@ -15,14 +15,11 @@ import {
   AlertTriangle,
   Armchair,
   Check,
-  CheckCircle2,
   FileText,
-  Info,
   Layers,
   Mic,
   Package,
   Save,
-  Sparkles,
   Tag,
   Trash2,
 } from '@lucide/vue'
@@ -143,38 +140,12 @@ function esObjeto(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
-function humanizeKey(key: string): string {
-  const dict: Record<string, string> = {
-    apoyo_lumbar: 'Apoyo lumbar',
-    brazos_regulables: 'Brazos regulables',
-    material_respaldo: 'Material del respaldo',
-    base: 'Base',
-    patas: 'Patas',
-    tapiz: 'Tapiz',
-    asiento: 'Asiento',
-    mecanismo: 'Mecanismo de inclinación',
-    ruedas: 'Ruedas',
-    cabecera: 'Cabecera',
-    reposacabezas: 'Cabecera',
-    reposapies: 'Reposapiés',
-    suspension: 'Suspensión / Altura',
-    giro: 'Giro',
-    capacidad: 'Capacidad de soporte',
-  }
-  const match = dict[key.toLowerCase()]
-  if (match) return match
-  return key
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase())
-    .trim()
-}
-
 function camposSimples(value: unknown): CampoSilla[] {
   if (!esObjeto(value)) return []
   return Object.entries(value)
     .filter(([, dato]) => dato === null || typeof dato !== 'object')
     .map(([clave, dato]) => ({
-      clave: humanizeKey(clave),
+      clave,
       valor: dato === null ? '' : typeof dato === 'boolean' ? (dato ? 'Sí' : 'No') : String(dato),
     }))
 }
@@ -183,11 +154,19 @@ const camposSilla = ref<CampoSilla[]>(camposSimples(props.initial?.silla?.especi
 
 function objetoEspecificaciones(): Record<string, unknown> {
   const datos: unknown = form.especificaciones.trim() ? JSON.parse(form.especificaciones) : {}
-  const combinado: Record<string, unknown> = esObjeto(datos) ? { ...datos } : {}
+  if (!esObjeto(datos)) {
+    throw new Error('Las características guardadas requieren revisión técnica para conservarlas.')
+  }
+  const combinado: Record<string, unknown> = { ...datos }
+  for (const campo of camposSimples(datos)) delete combinado[campo.clave]
+  const claves = new Set<string>()
 
   for (const campo of camposSilla.value) {
     const clave = campo.clave.trim()
-    if (!clave) continue
+    if (!clave) throw new Error('Cada característica debe tener un nombre.')
+    if (claves.has(clave)) throw new Error('No se puede repetir una característica de la silla.')
+    if (clave in combinado) throw new Error('Ya existe una característica avanzada con ese nombre.')
+    claves.add(clave)
     const valor = campo.valor.trim()
     if (/^(true|sí|si)$/i.test(valor)) {
       combinado[clave] = true
@@ -255,7 +234,8 @@ const categoria = computed(
 )
 
 const categoriaNombre = computed(
-  () => opciones.CATEGORIA_PRODUCTO?.find((x) => String(x.id) === form.categoria)?.nombre || 'General',
+  () =>
+    opciones.CATEGORIA_PRODUCTO?.find((x) => String(x.id) === form.categoria)?.nombre || 'General',
 )
 
 const unidadStockNombre = computed(
@@ -282,11 +262,7 @@ function applyProposals(proposals: Array<[string, unknown]>) {
 }
 
 // Aplicación directa e inteligente desde el asistente de voz
-function onVoiceApplied(payload: {
-  fields: CamposCatalogo
-  text: string
-  warnings: string[]
-}) {
+function onVoiceApplied(payload: { fields: CamposCatalogo; text: string; warnings: string[] }) {
   voiceTranscribedText.value = payload.text || ''
   voicePendingWarnings.value = [...(payload.warnings || [])]
 
@@ -294,10 +270,7 @@ function onVoiceApplied(payload: {
 
   // Evitar volcar la transcripción completa en observaciones si el NLP la incluyó por fallback.
   // La transcripción completa se preserva y muestra en la tarjeta lateral.
-  if (
-    suggested.observaciones &&
-    suggested.observaciones.trim() === (payload.text || '').trim()
-  ) {
+  if (suggested.observaciones && suggested.observaciones.trim() === (payload.text || '').trim()) {
     delete suggested.observaciones
   }
 
@@ -431,8 +404,14 @@ function submit(): boolean {
   }
 
   let especificaciones: unknown = null
-  if (categoria.value === 'SILLA') {
-    especificaciones = objetoEspecificaciones()
+  try {
+    if (categoria.value === 'SILLA') {
+      especificaciones = objetoEspecificaciones()
+    }
+  } catch (cause) {
+    error.value =
+      cause instanceof Error ? cause.message : 'Revisa las características adicionales de la silla.'
+    return false
   }
 
   const body: ProductoWritable = {
@@ -602,10 +581,7 @@ onMounted(load)
             <!-- Presentación limpia de la unidad comercial en 3 capas -->
             <div class="unit-field-wrapper">
               <span class="unit-label">Unidad comercial *</span>
-              <div
-                v-if="categoria === 'SILLA' || categoria === 'PISO_FLOTANTE'"
-                class="unit-card"
-              >
+              <div v-if="categoria === 'SILLA' || categoria === 'PISO_FLOTANTE'" class="unit-card">
                 <div class="unit-card-info">
                   <span class="unit-val">{{ unidadStockNombre }}</span>
                   <span class="unit-tag">Fijada por la categoría</span>
@@ -619,11 +595,7 @@ onMounted(load)
                   tabindex="-1"
                   aria-hidden="true"
                 >
-                  <option
-                    v-for="opt in opts('UNIDAD_MEDIDA')"
-                    :key="opt.value"
-                    :value="opt.value"
-                  >
+                  <option v-for="opt in opts('UNIDAD_MEDIDA')" :key="opt.value" :value="opt.value">
                     {{ opt.label }}
                   </option>
                 </select>
@@ -782,11 +754,7 @@ onMounted(load)
             </div>
 
             <div class="extras-list">
-              <div
-                v-for="(campo, index) in camposSilla"
-                :key="index"
-                class="extra-row"
-              >
+              <div v-for="(campo, index) in camposSilla" :key="index" class="extra-row">
                 <label class="extra-field-group">
                   <span>Característica</span>
                   <input
@@ -828,7 +796,8 @@ onMounted(load)
               </datalist>
 
               <p v-if="!camposSilla.length" class="extras-empty">
-                No hay características adicionales aún. Usa los accesos rápidos o añade una personalizada.
+                No hay características adicionales aún. Usa los accesos rápidos o añade una
+                personalizada.
               </p>
 
               <Button
@@ -857,7 +826,9 @@ onMounted(load)
             <div class="heading-split">
               <div>
                 <h3 id="price-title">Precio y promociones</h3>
-                <p>Establece el precio normal de venta y, opcionalmente, una campaña de descuento.</p>
+                <p>
+                  Establece el precio normal de venta y, opcionalmente, una campaña de descuento.
+                </p>
               </div>
               <span
                 class="price-badge"
@@ -898,7 +869,10 @@ onMounted(load)
               <label class="toggle-row">
                 <span class="toggle-copy">
                   <strong>Configurar promoción</strong>
-                  <small>Ofrece un precio temporal de oferta sin alterar el precio de lista de referencia.</small>
+                  <small
+                    >Ofrece un precio temporal de oferta sin alterar el precio de lista de
+                    referencia.</small
+                  >
                 </span>
                 <input v-model="form.promo_activa" type="checkbox" class="switch-input" />
                 <span class="switch-ui" aria-hidden="true" />
@@ -1087,12 +1061,7 @@ onMounted(load)
     <footer class="sticky-actions">
       <p class="muted">Revisa la información antes de guardar el producto.</p>
       <div class="actions">
-        <Button
-          type="button"
-          variant="secondary"
-          :disabled="processing"
-          @click="emit('cancel')"
-        >
+        <Button type="button" variant="secondary" :disabled="processing" @click="emit('cancel')">
           Cancelar
         </Button>
         <Button

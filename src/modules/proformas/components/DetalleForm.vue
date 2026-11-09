@@ -332,8 +332,7 @@ async function submit() {
         processing-label="Guardando…"
       >
         <Save :size="17" aria-hidden="true" />
-        Guardar línea
-      </Button
+        Guardar línea </Button
       ><Button variant="secondary" :disabled="saving || processing" @click="emit('cancel')"
         >Cancelar</Button
       >

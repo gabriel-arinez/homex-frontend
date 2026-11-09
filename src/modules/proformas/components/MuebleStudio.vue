@@ -340,10 +340,7 @@ defineExpose({ save: guardarDesdeEstudio })
         }}
       </p>
     </div>
-    <div
-      class="studio-body"
-      :class="{ 'studio-review-layout': seccion === 'revision' }"
-    >
+    <div class="studio-body" :class="{ 'studio-review-layout': seccion === 'revision' }">
       <section
         v-show="seccion === 'imagenes' || seccion === 'revision'"
         class="studio-review-gallery"

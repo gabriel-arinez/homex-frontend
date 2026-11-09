@@ -1,15 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
-import {
-  Printer,
-  Download,
-  X,
-  ZoomIn,
-  ZoomOut,
-  Maximize2,
-  RotateCcw,
-  FileText,
-} from '@lucide/vue'
+import { Printer, Download, X, ZoomIn, ZoomOut, Maximize2, FileText } from '@lucide/vue'
 import Button from '@/shared/ui/Button.vue'
 
 export interface DocumentViewerModalProps {

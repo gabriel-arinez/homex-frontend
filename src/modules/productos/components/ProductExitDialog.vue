@@ -52,12 +52,7 @@ const titleId = useId()
           <ArrowLeft :size="17" aria-hidden="true" /> Seguir editando
         </Button>
         <div class="exit-actions__decisions">
-          <Button
-            variant="danger"
-            class="exit-discard"
-            :disabled="saving"
-            @click="emit('discard')"
-          >
+          <Button variant="danger" class="exit-discard" :disabled="saving" @click="emit('discard')">
             <LogOut :size="17" aria-hidden="true" />
             {{ existingProductId ? 'Ir a la ficha' : 'Descartar y salir' }}
           </Button>

@@ -1991,7 +1991,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             </span>
             <div class="context-note__copy">
               <strong>Borrador flexible</strong>
-              <p>Puedes guardar el borrador sin cliente. Para emitir a revisión deberás definirlo.</p>
+              <p>
+                Puedes guardar el borrador sin cliente. Para emitir a revisión deberás definirlo.
+              </p>
             </div>
           </div>
         </section>
@@ -2145,11 +2147,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 <span class="review-summary-card__title">Productos</span>
               </div>
               <p class="review-summary-card__detail">{{ lineas.length }} línea(s)</p>
-              <button
-                type="button"
-                class="review-summary-card__action"
-                @click="currentStep = 0"
-              >
+              <button type="button" class="review-summary-card__action" @click="currentStep = 0">
                 <span>Corregir productos</span>
                 <ChevronRight :size="15" aria-hidden="true" />
               </button>
@@ -2170,11 +2168,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                       : nombreClienteVisible()
                 }}
               </p>
-              <button
-                type="button"
-                class="review-summary-card__action"
-                @click="currentStep = 1"
-              >
+              <button type="button" class="review-summary-card__action" @click="currentStep = 1">
                 <span>Corregir cliente</span>
                 <ChevronRight :size="15" aria-hidden="true" />
               </button>
@@ -2189,11 +2183,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <p class="review-summary-card__detail">
                 {{ header.plazo_entrega || 'Plazo pendiente' }} · {{ header.moneda_codigo }}
               </p>
-              <button
-                type="button"
-                class="review-summary-card__action"
-                @click="currentStep = 2"
-              >
+              <button type="button" class="review-summary-card__action" @click="currentStep = 2">
                 <span>Corregir condiciones</span>
                 <ChevronRight :size="15" aria-hidden="true" />
               </button>
@@ -2228,19 +2218,26 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   <div class="review-product-card__info">
                     <span class="line-type-badge">{{ itemTypeLabel(line) }}</span>
                     <strong class="review-product-card__title">{{ line.nombre }}</strong>
-                    <p v-if="line.descripcion" class="review-product-card__desc">{{ line.descripcion }}</p>
+                    <p v-if="line.descripcion" class="review-product-card__desc">
+                      {{ line.descripcion }}
+                    </p>
                   </div>
                 </div>
 
                 <div class="review-product-card__details">
-                  <div v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'" class="review-product-card__metric">
+                  <div
+                    v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'"
+                    class="review-product-card__metric"
+                  >
                     <span>Modalidad</span>
                     <strong>Importe negociado</strong>
                   </div>
                   <template v-else-if="totalEstimadoLinea(line) !== null">
                     <div class="review-product-card__metric">
                       <span>Cantidad</span>
-                      <strong>{{ formatQuantity(line.cantidad) }} {{ unitName(line.unidad) }}</strong>
+                      <strong
+                        >{{ formatQuantity(line.cantidad) }} {{ unitName(line.unidad) }}</strong
+                      >
                     </div>
                     <div class="review-product-card__metric">
                       <span>Precio unitario</span>
@@ -2268,7 +2265,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 </div>
               </div>
             </div>
-            <div v-if="header.plazo_entrega || header.validez_oferta" class="commercial-preview__meta">
+            <div
+              v-if="header.plazo_entrega || header.validez_oferta"
+              class="commercial-preview__meta"
+            >
               <div v-if="header.plazo_entrega" class="commercial-preview__meta-item">
                 <Clock :size="15" aria-hidden="true" />
                 <span><strong>Plazo:</strong> {{ header.plazo_entrega }}</span>
@@ -2348,7 +2348,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 </span>
                 <div class="document-preview-launcher__heading">
                   <strong>Documento comercial y vista previa PDF</strong>
-                  <small>Ficha en tamaño Carta con logotipo institucional, fichas técnicas y condiciones.</small>
+                  <small
+                    >Ficha en tamaño Carta con logotipo institucional, fichas técnicas y
+                    condiciones.</small
+                  >
                 </div>
               </div>
               <Button
@@ -2376,15 +2379,19 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   <span>Estimación local</span>
                   <small>El total confirmado será el que devuelva HOMEX al guardar.</small>
                   <small v-if="persisted">
-                    Último total guardado: {{ money(Number(persisted.total)) }}. Los cambios actuales
-                    aún no se guardaron.
+                    Último total guardado: {{ money(Number(persisted.total)) }}. Los cambios
+                    actuales aún no se guardaron.
                   </small>
                 </template>
               </div>
             </div>
             <div class="totals__value">
-              <strong v-if="persisted && !dirty" class="totals__amount">{{ money(Number(persisted.total)) }}</strong>
-              <strong v-else-if="totalPreview !== null" class="totals__amount">{{ money(totalPreview) }}</strong>
+              <strong v-if="persisted && !dirty" class="totals__amount">{{
+                money(Number(persisted.total))
+              }}</strong>
+              <strong v-else-if="totalPreview !== null" class="totals__amount">{{
+                money(totalPreview)
+              }}</strong>
               <strong v-else class="totals__amount pending-value">Total pendiente</strong>
             </div>
           </div>
@@ -4080,13 +4087,13 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   color: var(--color-text-secondary);
 }
 
-.review-state-pill[data-status="APROBADA"] {
+.review-state-pill[data-status='APROBADA'] {
   background: color-mix(in srgb, var(--color-success) 14%, var(--color-surface));
   border-color: color-mix(in srgb, var(--color-success) 40%, transparent);
   color: var(--color-success);
 }
 
-.review-state-pill[data-status="EN_REVISION"] {
+.review-state-pill[data-status='EN_REVISION'] {
   background: color-mix(in srgb, var(--color-warning) 14%, var(--color-surface));
   border-color: color-mix(in srgb, var(--color-warning) 40%, transparent);
   color: var(--color-warning);

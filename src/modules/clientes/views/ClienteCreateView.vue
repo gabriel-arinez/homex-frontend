@@ -154,12 +154,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         />
         <p v-if="error" class="form-error" role="alert">{{ error }}</p>
         <div class="actions">
-          <Button
-            variant="info"
-            type="submit"
-            :processing="saving"
-            processing-label="Registrando…"
-          >
+          <Button variant="info" type="submit" :processing="saving" processing-label="Registrando…">
             <UserPlus :size="17" aria-hidden="true" />
             Registrar cliente
           </Button>

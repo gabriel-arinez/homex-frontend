@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import DocumentViewerModal from './DocumentViewerModal.vue'
 import ProformaDocumentSheet from './ProformaDocumentSheet.vue'

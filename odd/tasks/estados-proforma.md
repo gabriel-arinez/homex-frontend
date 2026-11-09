@@ -5,10 +5,15 @@ Objetivo: adaptar creación, anulación, vencimiento y acciones. Rama: feat/voz-
 ## Specs
 
 ### S1
+
 “el plazo se cuenta desde la fecha de que se envia a revisión” fue sustituido por “tomemos esa fecha” de creación. “se venceria el 12” para una fecha calculada el 11: último día válido inclusivo.
+
 ### S2
+
 “enviada, es un estado que no se utilizara”, “anulada si deberia de existir”, “rechazada no”, “vencida igual se queda”; “como inactivos, dejemoslos como inactivos, asi mejor no borramos nada”.
+
 ### S3
+
 “se agregen a acciones botones para el cambio de estado cuando corresponda”; “el botón de guardar borrador debe de permanecer desabilitado hasta que realemnte hayan cambios”.
 
 ## Tasks

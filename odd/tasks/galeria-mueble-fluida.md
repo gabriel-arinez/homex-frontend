@@ -5,10 +5,15 @@ Objetivo: simplificar carga y gestión de imágenes en Mueble Studio sin alterar
 ## Specs
 
 ### S1
+
 “en el modal, directamente se encuentren los botones de de gestión para establecer como principal eliminar o cambiar el orden”; mantener permisos, confirmación de eliminación, navegación y zoom. “hay botones que se estan repitiendo, mejor si todos los botones estan en una misma fila a la misma altura”; diferenciar navegación de cambio de orden y permitir ajuste responsive. “mejor si las imagnes secundarias se muestran en una columna verticalmente al lado de la imagen ya que hay un espacio abajo que no deberia [Image #1]”.
+
 ### S2
+
 “un cuadro claro que represente el arrastrado de imagenes, y recien debajo de el el unico botón de agregar imagenes”; conservar formatos, límites y accesibilidad. “ahora lo mismo pero a la izquierda de la imagen grande, adaptalo bien[Image #1]”.
+
 ### S3
+
 “una imagen debe de guardarse automaticamente se suba, es decir no debe de haber confirmación”; no perder archivos ante errores: preservar los pendientes y permitir reintentar. La variante de otros contextos conserva el comportamiento actual.
 
 ## Tasks

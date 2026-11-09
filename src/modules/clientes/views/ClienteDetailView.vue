@@ -257,7 +257,12 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           Descartar cambios y recargar ficha
         </Button>
         <div class="actions">
-          <Button variant="success" type="submit" :processing="saving" processing-label="Guardando…">
+          <Button
+            variant="success"
+            type="submit"
+            :processing="saving"
+            processing-label="Guardando…"
+          >
             <Save :size="17" aria-hidden="true" />
             Guardar
           </Button>

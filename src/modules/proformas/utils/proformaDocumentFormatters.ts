@@ -79,7 +79,9 @@ export function extractSpecSheetData(
 
   // 1. Dimensiones generales
   const rawDims =
-    generales.dimensiones && typeof generales.dimensiones === 'object' && !Array.isArray(generales.dimensiones)
+    generales.dimensiones &&
+    typeof generales.dimensiones === 'object' &&
+    !Array.isArray(generales.dimensiones)
       ? (generales.dimensiones as Record<string, unknown>)
       : {}
 
@@ -96,14 +98,19 @@ export function extractSpecSheetData(
     const norm = key.trim().toLocaleLowerCase('es')
     if (DIMENSION_KEYS.has(norm)) {
       const formatted = formatRawDimension(val)
-      if (formatted && !dimensiones.some((d) => d.label.toLowerCase() === labelFor(key).toLowerCase())) {
+      if (
+        formatted &&
+        !dimensiones.some((d) => d.label.toLowerCase() === labelFor(key).toLowerCase())
+      ) {
         dimensiones.push({ label: labelFor(key), value: formatted })
       }
     }
   }
 
   // 2. Atributos generales
-  const rawAttrs = Array.isArray(generales.atributos) ? (generales.atributos as AtributoTecnico[]) : []
+  const rawAttrs = Array.isArray(generales.atributos)
+    ? (generales.atributos as AtributoTecnico[])
+    : []
   for (const attr of rawAttrs) {
     if (!attr || !attr.nombre || !attr.valor) continue
     const norm = attr.nombre.trim().toLocaleLowerCase('es')
@@ -187,7 +194,10 @@ export function extractSpecSheetData(
   }
 }
 
-export function formatDocCurrency(value: number | string | null | undefined, currencyCode = 'BOB'): string {
+export function formatDocCurrency(
+  value: number | string | null | undefined,
+  currencyCode = 'BOB',
+): string {
   if (value === null || value === undefined || value === '') return '-'
   const num = Number(value)
   if (!Number.isFinite(num)) return String(value)
@@ -204,7 +214,12 @@ export function formatDocCurrency(value: number | string | null | undefined, cur
 }
 
 export function formatDocDate(fecha: string | null | undefined): string {
-  if (!fecha) return new Intl.DateTimeFormat('es-BO', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())
+  if (!fecha)
+    return new Intl.DateTimeFormat('es-BO', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(new Date())
   const clean = fecha.split('T')[0] || ''
   if (!/^\d{4}-\d{2}-\d{2}$/.test(clean)) return fecha
   return new Intl.DateTimeFormat('es-BO', {

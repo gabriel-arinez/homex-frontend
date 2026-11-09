@@ -166,9 +166,7 @@ const calculatedTotal = computed(() => {
         <h1 class="sheet-header__number">
           {{ numero ? `Nº ${numero}` : 'Borrador' }}
         </h1>
-        <p class="sheet-header__date">
-          <strong>Emisión:</strong> {{ formatDocDate(fecha) }}
-        </p>
+        <p class="sheet-header__date"><strong>Emisión:</strong> {{ formatDocDate(fecha) }}</p>
         <p v-if="condiciones?.validez_oferta" class="sheet-header__validity">
           <strong>Validez:</strong> {{ condiciones.validez_oferta }} días calendario
         </p>
@@ -231,7 +229,9 @@ const calculatedTotal = computed(() => {
     <section class="sheet-products" aria-label="Detalle de productos cotizados">
       <div class="sheet-section-heading">
         <h2 class="sheet-section-title">DETALLE DE PRODUCTOS Y ESPECIFICACIONES</h2>
-        <span class="sheet-section-count">{{ lineas.length }} {{ lineas.length === 1 ? 'ítem' : 'ítems' }}</span>
+        <span class="sheet-section-count"
+          >{{ lineas.length }} {{ lineas.length === 1 ? 'ítem' : 'ítems' }}</span
+        >
       </div>
 
       <div v-if="lineas.length === 0" class="sheet-products__empty">
@@ -247,7 +247,9 @@ const calculatedTotal = computed(() => {
           <!-- Cabecera de la ficha del producto -->
           <header class="product-card__header">
             <div class="product-card__identity">
-              <span class="product-card__item-num">ÍTEM {{ String(idx + 1).padStart(2, '0') }}</span>
+              <span class="product-card__item-num"
+                >ÍTEM {{ String(idx + 1).padStart(2, '0') }}</span
+              >
               <h3 class="product-card__title">{{ line.nombre }}</h3>
             </div>
             <span v-if="line.tipo_item_label" class="product-card__type-badge">
@@ -301,7 +303,10 @@ const calculatedTotal = computed(() => {
                 </div>
 
                 <!-- Colores y Acabados -->
-                <div v-if="lineSpecs(line).colores.length || lineSpecs(line).acabados.length" class="spec-group">
+                <div
+                  v-if="lineSpecs(line).colores.length || lineSpecs(line).acabados.length"
+                  class="spec-group"
+                >
                   <span class="spec-group__title">Color y Acabado</span>
                   <p class="spec-text">
                     {{ [...lineSpecs(line).colores, ...lineSpecs(line).acabados].join(' · ') }}
@@ -342,7 +347,9 @@ const calculatedTotal = computed(() => {
           <footer class="product-card__footer">
             <div class="product-card__commercial-left">
               <template v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
-                <span class="commercial-badge commercial-badge--negotiated">Modalidad: Importe total acordado</span>
+                <span class="commercial-badge commercial-badge--negotiated"
+                  >Modalidad: Importe total acordado</span
+                >
               </template>
               <template v-else>
                 <div class="commercial-metric">
@@ -398,7 +405,10 @@ const calculatedTotal = computed(() => {
               <span>Subtotal general:</span>
               <span>{{ formatDocCurrency(calculatedSubtotal, monedaCodigo) }}</span>
             </div>
-            <div v-if="descuentoTotal && descuentoTotal > 0" class="summary-line summary-line--discount">
+            <div
+              v-if="descuentoTotal && descuentoTotal > 0"
+              class="summary-line summary-line--discount"
+            >
               <span>Descuento global:</span>
               <span>-{{ formatDocCurrency(descuentoTotal, monedaCodigo) }}</span>
             </div>
@@ -418,9 +428,15 @@ const calculatedTotal = computed(() => {
         <div class="condition-box">
           <span class="condition-box__label">Anticipo requerido</span>
           <strong class="condition-box__value">
-            {{ condiciones?.porcentaje_adelanto != null && condiciones.porcentaje_adelanto !== '' ? `${condiciones.porcentaje_adelanto}%` : '50%' }}
+            {{
+              condiciones?.porcentaje_adelanto != null && condiciones.porcentaje_adelanto !== ''
+                ? `${condiciones.porcentaje_adelanto}%`
+                : '50%'
+            }}
           </strong>
-          <small class="condition-box__desc">A la confirmación de la cotización, saldo contra entrega.</small>
+          <small class="condition-box__desc"
+            >A la confirmación de la cotización, saldo contra entrega.</small
+          >
         </div>
 
         <div class="condition-box">
@@ -428,7 +444,9 @@ const calculatedTotal = computed(() => {
           <strong class="condition-box__value">
             {{ condiciones?.plazo_entrega || 'A coordinar con producción' }}
           </strong>
-          <small class="condition-box__desc">Computable a partir del anticipo y validación de medidas.</small>
+          <small class="condition-box__desc"
+            >Computable a partir del anticipo y validación de medidas.</small
+          >
         </div>
 
         <div class="condition-box">
@@ -436,7 +454,9 @@ const calculatedTotal = computed(() => {
           <strong class="condition-box__value">
             {{ condiciones?.validez_oferta ? `${condiciones.validez_oferta} días` : '15 días' }}
           </strong>
-          <small class="condition-box__desc">Precios sujetos a confirmación posterior al vencimiento.</small>
+          <small class="condition-box__desc"
+            >Precios sujetos a confirmación posterior al vencimiento.</small
+          >
         </div>
       </div>
 
@@ -485,12 +505,22 @@ const calculatedTotal = computed(() => {
   color: #171717;
   padding: 16mm 18mm;
   box-sizing: border-box;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family:
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
   font-size: 11px;
   line-height: 1.45;
   margin: 0 auto;
   position: relative;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0 10px 25px -5px rgba(0, 0, 0, 0.1),
+    0 8px 10px -6px rgba(0, 0, 0, 0.1);
   border: 1px solid #e5e5e5;
 }
 
@@ -658,12 +688,12 @@ const calculatedTotal = computed(() => {
   color: #334155;
 }
 
-.sheet-status-badge[data-status="APROBADA"] {
+.sheet-status-badge[data-status='APROBADA'] {
   background-color: #dcfce7;
   color: #166534;
 }
 
-.sheet-status-badge[data-status="EN_REVISION"] {
+.sheet-status-badge[data-status='EN_REVISION'] {
   background-color: #fef9c3;
   color: #854d0e;
 }

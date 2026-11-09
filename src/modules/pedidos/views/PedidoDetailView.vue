@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import type { Pedido, ValorCatalogoPublico } from '@/generated/api'
 import { pedidosService } from '../services/pedidosService'
-import { FileText, Send, Check } from '@lucide/vue'
+import { FileText, Send } from '@lucide/vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
 import Card from '@/shared/ui/Card.vue'
 import Button from '@/shared/ui/Button.vue'
@@ -164,8 +164,7 @@ onMounted(load)
               @click="receiptOpen = true"
             >
               <FileText :size="17" aria-hidden="true" />
-              Emitir recibo
-            </Button
+              Emitir recibo </Button
             ><Button
               v-if="currentCode === 'LISTO_ENTREGA'"
               variant="info"
@@ -173,8 +172,7 @@ onMounted(load)
               @click="noteOpen = true"
             >
               <Send :size="17" aria-hidden="true" />
-              Emitir nota de entrega
-            </Button
+              Emitir nota de entrega </Button
             ><Button
               v-if="!['CANCELADO', 'ENTREGADO'].includes(currentCode)"
               variant="danger"
@@ -234,7 +232,12 @@ onMounted(load)
       </form>
       <template #footer
         ><Button variant="secondary" @click="receiptOpen = false">Volver</Button
-        ><Button variant="info" type="submit" form="receipt" :disabled="processing || !form.tipo_pago">
+        ><Button
+          variant="info"
+          type="submit"
+          form="receipt"
+          :disabled="processing || !form.tipo_pago"
+        >
           <Send :size="17" aria-hidden="true" />
           Emitir
         </Button></template

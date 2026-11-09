@@ -530,7 +530,7 @@ const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.t
                 >
                   {{
                     line.descuento && Number(line.descuento) !== 0
-                      ? (formatDiscount(line.descuento) || line.descuento)
+                      ? formatDiscount(line.descuento) || line.descuento
                       : 'Sin descuento'
                   }}
                 </dd>
@@ -560,7 +560,9 @@ const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.t
               <strong>Observaciones</strong>{{ summaryNotes }}
             </p>
             <p class="data-summary-hint">
-              El detalle completo está disponible con el botón «{{ actionLabel || 'Editar línea' }}».
+              El detalle completo está disponible con el botón «{{
+                actionLabel || 'Editar línea'
+              }}».
             </p>
           </section>
 

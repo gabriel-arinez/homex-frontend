@@ -276,11 +276,7 @@ onMounted(() => void load())
           <Download :size="17" aria-hidden="true" />
           {{ stateCode === 'BORRADOR' ? 'Descargar borrador (PDF)' : 'Descargar PDF' }}
         </Button>
-        <Button
-          v-if="quote"
-          variant="primary"
-          @click="previewModalOpen = true"
-        >
+        <Button v-if="quote" variant="primary" @click="previewModalOpen = true">
           <Eye :size="17" aria-hidden="true" /> Ver documento / PDF
         </Button>
         <Button v-if="editable" variant="secondary" :disabled="processing" @click="edit">

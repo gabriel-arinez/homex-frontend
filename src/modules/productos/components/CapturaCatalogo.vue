@@ -179,7 +179,8 @@ async function interpret(useAudio = false) {
       if (['COMPLETADA', 'ERROR'].includes(response.estado)) {
         result.value = response
         if (response.estado === 'ERROR') {
-          error.value = 'No se obtuvo una propuesta. Puedes reintentar la grabación o ingresar los datos manualmente.'
+          error.value =
+            'No se obtuvo una propuesta. Puedes reintentar la grabación o ingresar los datos manualmente.'
         } else if (response.propuesta?.fields) {
           const fields = response.propuesta.fields
           const transcrito = response.texto_transcrito_original || ''
@@ -247,7 +248,8 @@ async function upload(event: Event) {
     try {
       file = await convertAudioFileToWav(file)
     } catch {
-      error.value = 'No se pudo transcodificar el archivo móvil. Intenta con un formato estándar (WAV o MP3).'
+      error.value =
+        'No se pudo transcodificar el archivo móvil. Intenta con un formato estándar (WAV o MP3).'
       return
     }
   }
@@ -360,8 +362,12 @@ async function upload(event: Event) {
       <h4>Recomendaciones para dictar</h4>
       <ul>
         <li>Menciona el <strong>nombre del producto</strong> («Silla ergonómica ejecutiva»).</li>
-        <li>Indica el <strong>precio</strong> («precio 4500» o «precio de lista 5200 bolivianos»).</li>
-        <li>Detalla atributos («respaldo de malla negra», «apoyo lumbar ajustable», «5 ruedas»).</li>
+        <li>
+          Indica el <strong>precio</strong> («precio 4500» o «precio de lista 5200 bolivianos»).
+        </li>
+        <li>
+          Detalla atributos («respaldo de malla negra», «apoyo lumbar ajustable», «5 ruedas»).
+        </li>
       </ul>
     </div>
   </section>
