@@ -6,7 +6,6 @@ const props = defineProps<{
   pdf: PDFDocumentProxy
   pageNumber: number
   scale: number
-  scrollRoot: HTMLElement | null
 }>()
 const emit = defineEmits<{ error: [message: string] }>()
 const container = ref<HTMLElement | null>(null)
@@ -35,12 +34,15 @@ function observe() {
     (entries) => {
       visible.value = Boolean(entries[0]?.isIntersecting)
     },
-    { root: props.scrollRoot, rootMargin: '700px 300px', threshold: 0 },
+    {
+      root: container.value.closest<HTMLElement>('.doc-viewer-viewport'),
+      rootMargin: '700px 300px',
+      threshold: 0,
+    },
   )
   observer.observe(container.value)
 }
 onMounted(observe)
-watch(() => props.scrollRoot, observe)
 onBeforeUnmount(() => {
   observer?.disconnect()
   renderTask?.cancel()
