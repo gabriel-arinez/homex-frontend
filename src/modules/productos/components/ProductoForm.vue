@@ -577,7 +577,7 @@ onMounted(load)
             <div>
               <Select
                 v-model="form.unidad_stock"
-                name="unidad_stock"
+                name="unidad"
                 label="Unidad comercial *"
                 :options="opts('UNIDAD_MEDIDA', 'Seleccionar unidad')"
                 :disabled="categoria === 'SILLA' || categoria === 'PISO_FLOTANTE'"
