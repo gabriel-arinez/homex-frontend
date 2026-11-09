@@ -381,7 +381,6 @@ onBeforeUnmount(() => {
             :pdf="pdf"
             :page-number="number"
             :scale="zoom"
-            :scroll-root="viewportRef"
             @error="pdfError = $event"
           />
         </div>
