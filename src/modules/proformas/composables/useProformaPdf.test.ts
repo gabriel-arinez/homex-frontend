@@ -5,7 +5,7 @@ import { proformasService } from '../services/proformasService'
 import { useProformaPdf } from './useProformaPdf'
 
 vi.mock('../services/proformasService', () => ({
-  proformasService: { documentPdf: vi.fn() },
+  proformasService: { documentPdf: vi.fn<(id: number) => Promise<Blob>>() },
 }))
 
 afterEach(() => {
@@ -16,8 +16,8 @@ describe('useProformaPdf', () => {
   it('mantiene el mismo Blob para las tres operaciones y libera su URL al cerrar', async () => {
     const expected = new Blob(['%PDF-1.4 test'], { type: 'application/pdf' })
     vi.mocked(proformasService.documentPdf).mockResolvedValueOnce(expected)
-    const create = vi.fn(() => 'blob:http://localhost/homex-pdf')
-    const revoke = vi.fn()
+    const create = vi.fn<() => string>(() => 'blob:http://localhost/homex-pdf')
+    const revoke = vi.fn<(url: string) => void>()
     Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: create })
     Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revoke })
 
