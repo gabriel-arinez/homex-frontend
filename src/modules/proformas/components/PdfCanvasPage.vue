@@ -33,7 +33,9 @@ function observe() {
     return
   }
   observer = new IntersectionObserver(
-    (entries) => { visible.value = Boolean(entries[0]?.isIntersecting) },
+    (entries) => {
+      visible.value = Boolean(entries[0]?.isIntersecting)
+    },
     { root: props.scrollRoot, rootMargin: '700px 300px', threshold: 0 },
   )
   observer.observe(container.value)
@@ -44,7 +46,10 @@ onBeforeUnmount(() => {
   observer?.disconnect()
   renderTask?.cancel()
   textLayer?.cancel()
-  if (canvas.value) { canvas.value.width = 0; canvas.value.height = 0 }
+  if (canvas.value) {
+    canvas.value.width = 0
+    canvas.value.height = 0
+  }
 })
 
 watch(
@@ -58,7 +63,10 @@ watch(
     })
     rendered.value = false
     if (!visible.value) {
-      if (canvas.value) { canvas.value.width = 0; canvas.value.height = 0 }
+      if (canvas.value) {
+        canvas.value.width = 0
+        canvas.value.height = 0
+      }
       if (textContainer.value) textContainer.value.replaceChildren()
       return
     }
@@ -108,7 +116,10 @@ watch(
       if (!cancelled) rendered.value = true
     } catch (cause) {
       if (!cancelled && !(cause instanceof Error && cause.name === 'RenderingCancelledException')) {
-        emit('error', cause instanceof Error ? cause.message : 'No se pudo representar esta página.')
+        emit(
+          'error',
+          cause instanceof Error ? cause.message : 'No se pudo representar esta página.',
+        )
       }
     }
   },
@@ -137,10 +148,19 @@ watch(
   position: relative;
   flex: none;
   background: white;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, .4);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
 }
-.pdf-page__canvas { display: block; width: 100%; height: 100%; }
-.pdf-page__text { position: absolute; inset: 0; z-index: 2; overflow: hidden; }
+.pdf-page__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.pdf-page__text {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+}
 .pdf-page__loading {
   position: absolute;
   inset: 0;

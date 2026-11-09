@@ -4,14 +4,18 @@ import DocumentViewerModal from './DocumentViewerModal.vue'
 
 vi.mock('pdfjs-dist', () => ({
   GlobalWorkerOptions: { workerSrc: '' },
-  getDocument: vi.fn<() => { promise: Promise<{ numPages: number; destroy: () => void }>; destroy: () => void }>(() => ({
+  getDocument: vi.fn<
+    () => { promise: Promise<{ numPages: number; destroy: () => void }>; destroy: () => void }
+  >(() => ({
     promise: Promise.resolve({ numPages: 2, destroy: vi.fn<() => void>() }),
     destroy: vi.fn<() => void>(),
   })),
   TextLayer: vi.fn<() => void>(),
 }))
 
-afterEach(() => { vi.restoreAllMocks() })
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 const mountViewer = (props: Record<string, unknown>) =>
   mount(DocumentViewerModal, {
@@ -46,7 +50,10 @@ describe('DocumentViewerModal — PDF.js', () => {
     const printApplication = vi.spyOn(window, 'print').mockImplementation(() => {})
     const wrapper = mountViewer({ pdfUrl: 'blob:http://localhost/proforma' })
     await flushPromises()
-    await wrapper.findAll('button').find((button) => button.text().includes('Imprimir'))?.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Imprimir'))
+      ?.trigger('click')
     expect(printApplication).not.toHaveBeenCalled()
     wrapper.unmount()
   })
@@ -55,7 +62,10 @@ describe('DocumentViewerModal — PDF.js', () => {
     const wrapper = mountViewer({ error: 'Documento no disponible' })
     expect(wrapper.text()).toContain('Documento no disponible')
     expect(wrapper.find('.doc-page-stack').exists()).toBe(false)
-    await wrapper.findAll('button').find((button) => button.text().includes('Reintentar'))?.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Reintentar'))
+      ?.trigger('click')
     expect(wrapper.emitted('retry')).toHaveLength(1)
     wrapper.unmount()
   })
