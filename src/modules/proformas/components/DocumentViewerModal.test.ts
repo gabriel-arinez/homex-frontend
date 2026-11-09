@@ -3,7 +3,11 @@ import { flushPromises, mount } from '@vue/test-utils'
 import DocumentViewerModal from './DocumentViewerModal.vue'
 
 vi.mock('./PdfCanvasPage.vue', () => ({
-  default: { name: 'PdfCanvasPage', template: '<div class="pdf-page-placeholder"></div>' },
+  default: {
+    name: 'PdfCanvasPage',
+    props: ['pdf', 'pageNumber', 'scale'],
+    template: '<div class="pdf-page-placeholder"></div>',
+  },
 }))
 
 vi.mock('pdfjs-dist', () => ({
