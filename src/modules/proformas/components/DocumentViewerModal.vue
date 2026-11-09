@@ -44,7 +44,6 @@ const activePage = ref(1)
 const pdfError = ref('')
 const printError = ref('')
 const printReady = ref(false)
-let currentTask: PDFDocumentLoadingTask | null = null
 let previousOverflow = ''
 let previousFocus: HTMLElement | null = null
 let resizing: ResizeObserver | null = null
@@ -150,7 +149,6 @@ watch(
     if (!open || !url) return
     try {
       task = getDocument({ url })
-      currentTask = task
       const document = await task.promise
       if (disposed) return
       pdf.value = document
@@ -187,10 +185,6 @@ watch(() => props.open, async (open) => {
 }, { immediate: true })
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
-  if (typeof ResizeObserver !== 'undefined' && viewportRef.value) {
-    resizing = new ResizeObserver(() => { if (pdf.value && mode.value !== 'custom') fit(mode.value) })
-    resizing.observe(viewportRef.value)
-  }
 })
 watch(viewportRef, (el) => {
   resizing?.disconnect()
@@ -204,7 +198,6 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
   resizing?.disconnect()
   if (scrollRaf) cancelAnimationFrame(scrollRaf)
-  if (currentTask) void currentTask.destroy()
   if (props.open) document.body.style.overflow = previousOverflow
 })
 </script>
