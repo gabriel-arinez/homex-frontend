@@ -51,6 +51,7 @@ const quote = (state = 'BORRADOR'): Proforma => ({
   estado_info: { id: 2, codigo: state, nombre: state === 'BORRADOR' ? 'Borrador' : 'Enviada' },
   titulo: 'Oficina',
   fecha: '2026-09-25',
+  fecha_vencimiento: null,
   plazo_entrega: null,
   validez_oferta: null,
   porcentaje_adelanto: null,

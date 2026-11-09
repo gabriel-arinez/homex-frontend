@@ -687,6 +687,7 @@ export type PatchedProforma = {
   readonly fecha?: string
   plazo_entrega?: string | null
   validez_oferta?: number | null
+  readonly fecha_vencimiento?: string | null
   porcentaje_adelanto?: string | null
   moneda?: number
   moneda_info?: ValorCatalogoResumen
@@ -794,6 +795,7 @@ export type Proforma = {
   readonly fecha: string
   plazo_entrega?: string | null
   validez_oferta?: number | null
+  readonly fecha_vencimiento: string | null
   porcentaje_adelanto?: string | null
   moneda: number
   moneda_info: ValorCatalogoResumen
@@ -846,6 +848,7 @@ export type ProformaListado = {
   readonly creado_en: string | null
   plazo_entrega?: string | null
   validez_oferta?: number | null
+  readonly fecha_vencimiento: string | null
   porcentaje_adelanto?: string | null
   moneda: number
   moneda_info: ValorCatalogoResumen
@@ -3019,6 +3022,32 @@ export type V1ProformasUpdateResponses = {
 }
 
 export type V1ProformasUpdateResponse = V1ProformasUpdateResponses[keyof V1ProformasUpdateResponses]
+
+export type V1ProformasAnularCreateData = {
+  body?: never
+  path: {
+    /**
+     * Un valor de entero único que identifique este proforma.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/proformas/{id}/anular/'
+}
+
+export type V1ProformasAnularCreateErrors = {
+  /**
+   * Conflicto con el estado actual o con una regla comercial concurrente.
+   */
+  409: unknown
+}
+
+export type V1ProformasAnularCreateResponses = {
+  200: Proforma
+}
+
+export type V1ProformasAnularCreateResponse =
+  V1ProformasAnularCreateResponses[keyof V1ProformasAnularCreateResponses]
 
 export type V1ProformasAprobarCreateData = {
   body?: never

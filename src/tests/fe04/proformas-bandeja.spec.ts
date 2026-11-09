@@ -16,6 +16,7 @@ function quote(id: number, status: string): ProformaListado {
     estado_info: { id: 1, codigo: status, nombre: status === 'BORRADOR' ? 'Borrador' : 'Enviada' },
     titulo: id === 1 ? 'Oficina ejecutiva' : 'Cocina',
     fecha: '2026-10-25',
+    fecha_vencimiento: null,
     creado_en: null,
     plazo_entrega: null,
     validez_oferta: null,
