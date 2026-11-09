@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { TextLayer, type PDFDocumentProxy, type RenderTask } from 'pdfjs-dist'
-import 'pdfjs-dist/web/pdf_viewer.css'
 
 const props = defineProps<{
   pdf: PDFDocumentProxy
@@ -101,6 +100,7 @@ watch(
       if (textContainer.value) {
         textContainer.value.replaceChildren()
         textContainer.value.style.setProperty('--scale-factor', String(viewport.scale))
+        textContainer.value.style.setProperty('--total-scale-factor', String(viewport.scale))
         try {
           textLayer = new TextLayer({
             textContentSource: page.streamTextContent(),
@@ -169,5 +169,50 @@ watch(
   background: #fff;
   color: #334155;
   font-size: 13px;
+}
+</style>
+
+<style>
+/* PDF.js text selection only. Avoid importing the entire generic viewer stylesheet. */
+.pdf-page .textLayer {
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor, 1) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  text-align: initial;
+  line-height: 1;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  z-index: 2;
+}
+.pdf-page .textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0 0;
+}
+.pdf-page .textLayer > :not(.markedContent),
+.pdf-page .textLayer .markedContent span:not(.markedContent) {
+  --font-height: 0;
+  --scale-x: 1;
+  --rotate: 0deg;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+.pdf-page .textLayer span.markedContent { top: 0; height: 0; }
+.pdf-page .textLayer ::selection { background: rgba(37, 99, 235, .25); }
+.pdf-page .textLayer .endOfContent {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  bottom: 0;
+  z-index: -1;
+  cursor: default;
+  user-select: none;
 }
 </style>
