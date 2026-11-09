@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { ImagenPrincipal } from '@/generated/api'
+import GalleryPhoto from '@/shared/media/GalleryPhoto.vue'
 import {
   extractSpecSheetData,
   formatDocCurrency,
   formatDocDate,
+  formatDocQuantity,
   type SpecSheetData,
 } from '../utils/proformaDocumentFormatters'
 
@@ -28,8 +29,9 @@ export interface DocumentLineItem {
     datos_tecnicos?: unknown
     observaciones?: string | null
   } | null
-  // URL de imagen resuelta directamente para evitar dependencias asíncronas dentro de la hoja
+  // URLs de imagen autenticadas o relativas
   imagen_url?: string | null
+  imagenes_complementarias?: string[]
 }
 
 export interface DocumentClientInfo {
@@ -66,9 +68,7 @@ export interface ProformaDocumentProps {
   subtotal?: number | null
   descuentoTotal?: number | null
   total?: number | null
-  // Mapas opcionales si no se pasaron las URLs en las líneas
-  catalogImages?: Record<number, ImagenPrincipal | null>
-  furnitureCovers?: Record<string, string | null>
+  vendedorNombre?: string | null
 }
 
 const props = withDefaults(defineProps<ProformaDocumentProps>(), {
@@ -84,14 +84,33 @@ const props = withDefaults(defineProps<ProformaDocumentProps>(), {
   subtotal: null,
   descuentoTotal: null,
   total: null,
-  catalogImages: () => ({}),
-  furnitureCovers: () => ({}),
+  vendedorNombre: null,
+})
+
+const isBorrador = computed(() => {
+  return !props.estadoCodigo || props.estadoCodigo === 'BORRADOR'
+})
+
+const isEmitida = computed(() => {
+  return ['EMITIDA', 'APROBADA', 'EN_REVISION', 'ENVIADA'].includes(props.estadoCodigo)
+})
+
+const clientHasData = computed(() => {
+  if (!props.cliente) return false
+  return Boolean(
+    props.cliente.empresa?.trim() ||
+      props.cliente.nombres?.trim() ||
+      props.cliente.apellidos?.trim() ||
+      props.cliente.nit?.trim() ||
+      props.cliente.documento?.trim() ||
+      props.cliente.celular?.trim(),
+  )
 })
 
 const clientDisplayName = computed(() => {
-  if (!props.cliente) return 'Cliente sin especificar'
-  if (props.cliente.empresa?.trim()) return props.cliente.empresa.trim()
-  const names = [props.cliente.nombres, props.cliente.apellidos].filter(Boolean).join(' ').trim()
+  if (!clientHasData.value) return 'Cliente sin asignar (Provisional)'
+  if (props.cliente?.empresa?.trim()) return props.cliente.empresa.trim()
+  const names = [props.cliente?.nombres, props.cliente?.apellidos].filter(Boolean).join(' ').trim()
   return names || 'Cliente particular'
 })
 
@@ -105,31 +124,11 @@ const clientPhones = computed(() => {
   return [props.cliente.celular, props.cliente.telefono].filter(Boolean).join(' / ') || null
 })
 
-function resolveLineImage(line: DocumentLineItem): string | null {
-  if (line.imagen_url) return line.imagen_url
-  if (line.producto && props.catalogImages[line.producto]) {
-    const img = props.catalogImages[line.producto]
-    return img?.variantes?.['640'] ?? img?.variantes?.['320'] ?? img?.original ?? null
-  }
-  const coverKey = line.id ? `detail:${props.numero ?? ''}:${line.id}` : ''
-  if (coverKey && props.furnitureCovers[coverKey]) {
-    return props.furnitureCovers[coverKey]
-  }
-  return null
-}
-
 function lineSpecs(line: DocumentLineItem): SpecSheetData {
   return extractSpecSheetData(
     line.especificacion?.datos_tecnicos,
     line.especificacion?.observaciones,
   )
-}
-
-function formatQuantity(val: string | number | null | undefined): string {
-  if (val == null || val === '') return '1'
-  const num = Number(val)
-  if (!Number.isFinite(num)) return String(val)
-  return num === Math.trunc(num) ? String(Math.trunc(num)) : num.toFixed(2)
 }
 
 const calculatedSubtotal = computed(() => {
@@ -157,18 +156,20 @@ const calculatedTotal = computed(() => {
         </div>
         <p class="sheet-header__address">
           Soluciones integrales de equipamiento corporativo y residencial<br />
-          Bolivia · ventas@homex.com.bo · www.homex.com.bo
+          Bolivia
         </p>
       </div>
 
       <div class="sheet-header__meta">
-        <span class="sheet-header__kicker">PROFORMA – COTIZACIÓN</span>
+        <span class="sheet-header__kicker">
+          {{ isBorrador ? 'PROFORMA – COTIZACIÓN (BORRADOR)' : 'PROFORMA – COTIZACIÓN' }}
+        </span>
         <h1 class="sheet-header__number">
           {{ numero ? `Nº ${numero}` : 'Borrador' }}
         </h1>
         <p class="sheet-header__date"><strong>Emisión:</strong> {{ formatDocDate(fecha) }}</p>
         <p v-if="condiciones?.validez_oferta" class="sheet-header__validity">
-          <strong>Validez:</strong> {{ condiciones.validez_oferta }} días calendario
+          <strong>Validez de la oferta:</strong> {{ condiciones.validez_oferta }} días calendario
         </p>
       </div>
     </header>
@@ -180,23 +181,35 @@ const calculatedTotal = computed(() => {
       <div class="sheet-info-block">
         <h2 class="sheet-info-block__title">DATOS DEL CLIENTE</h2>
         <div class="sheet-info-block__content">
-          <p class="sheet-info-client-name">{{ clientDisplayName }}</p>
-          <p v-if="clientDocument" class="sheet-info-row">
-            <span class="sheet-info-label">NIT / CI:</span>
-            <span>{{ clientDocument }}</span>
+          <p
+            class="sheet-info-client-name"
+            :class="{ 'sheet-info-client-name--provisional': !clientHasData }"
+          >
+            {{ clientDisplayName }}
           </p>
-          <p v-if="clientPhones" class="sheet-info-row">
-            <span class="sheet-info-label">Contacto:</span>
-            <span>{{ clientPhones }}</span>
-          </p>
-          <p v-if="cliente?.email" class="sheet-info-row">
-            <span class="sheet-info-label">Correo:</span>
-            <span>{{ cliente.email }}</span>
-          </p>
-          <p v-if="cliente?.direccion || cliente?.ciudad" class="sheet-info-row">
-            <span class="sheet-info-label">Dirección:</span>
-            <span>{{ [cliente.direccion, cliente.ciudad].filter(Boolean).join(', ') }}</span>
-          </p>
+          <template v-if="clientHasData">
+            <p v-if="clientDocument" class="sheet-info-row">
+              <span class="sheet-info-label">NIT / CI:</span>
+              <span>{{ clientDocument }}</span>
+            </p>
+            <p v-if="clientPhones" class="sheet-info-row">
+              <span class="sheet-info-label">Contacto:</span>
+              <span>{{ clientPhones }}</span>
+            </p>
+            <p v-if="cliente?.email" class="sheet-info-row">
+              <span class="sheet-info-label">Correo:</span>
+              <span>{{ cliente.email }}</span>
+            </p>
+            <p v-if="cliente?.direccion || cliente?.ciudad" class="sheet-info-row">
+              <span class="sheet-info-label">Dirección:</span>
+              <span>{{ [cliente.direccion, cliente.ciudad].filter(Boolean).join(', ') }}</span>
+            </p>
+          </template>
+          <template v-else>
+            <p class="sheet-info-empty-hint">
+              Documento preliminar: Datos de contacto pendientes de asignación.
+            </p>
+          </template>
         </div>
       </div>
 
@@ -214,7 +227,7 @@ const calculatedTotal = computed(() => {
           <p class="sheet-info-row">
             <span class="sheet-info-label">Estado:</span>
             <span class="sheet-status-badge" :data-status="estadoCodigo">
-              {{ estadoNombre || 'Borrador comercial' }}
+              {{ estadoNombre || (isBorrador ? 'Borrador' : 'Vigente') }}
             </span>
           </p>
           <p v-if="condiciones?.plazo_entrega" class="sheet-info-row">
@@ -228,7 +241,7 @@ const calculatedTotal = computed(() => {
     <!-- Listado de Fichas de Productos -->
     <section class="sheet-products" aria-label="Detalle de productos cotizados">
       <div class="sheet-section-heading">
-        <h2 class="sheet-section-title">DETALLE DE PRODUCTOS Y ESPECIFICACIONES</h2>
+        <h2 class="sheet-section-title">DETALLE DE PRODUCTOS Y ESPECIFICACIONES TÉCNICAS</h2>
         <span class="sheet-section-count"
           >{{ lineas.length }} {{ lineas.length === 1 ? 'ítem' : 'ítems' }}</span
         >
@@ -260,21 +273,38 @@ const calculatedTotal = computed(() => {
           <!-- Cuerpo de la ficha: Adaptativo según presencia de imagen -->
           <div
             class="product-card__body"
-            :class="{ 'product-card__body--with-image': Boolean(resolveLineImage(line)) }"
+            :class="{ 'product-card__body--with-image': Boolean(line.imagen_url) }"
           >
-            <!-- Columna de imagen (Solo se renderiza si hay imagen) -->
-            <div v-if="resolveLineImage(line)" class="product-card__image-col">
+            <!-- Columna de imagen auténtica (o placeholder profesional si está pendiente) -->
+            <div v-if="line.imagen_url" class="product-card__image-col">
               <div class="product-card__image-wrapper">
-                <img
-                  :src="resolveLineImage(line)!"
+                <GalleryPhoto
+                  :src="line.imagen_url"
                   :alt="`Fotografía de referencia de ${line.nombre}`"
-                  class="product-card__image"
-                  loading="lazy"
+                  class="product-card__gallery-photo"
                 />
+              </div>
+
+              <!-- Vistas complementarias si existen (hasta 2) -->
+              <div
+                v-if="line.imagenes_complementarias && line.imagenes_complementarias.length"
+                class="product-card__extra-images"
+              >
+                <div
+                  v-for="(extraUrl, eIdx) in line.imagenes_complementarias.slice(0, 2)"
+                  :key="eIdx"
+                  class="product-card__extra-thumb"
+                >
+                  <GalleryPhoto
+                    :src="extraUrl"
+                    :alt="`Vista complementaria ${eIdx + 1} de ${line.nombre}`"
+                    class="product-card__gallery-photo"
+                  />
+                </div>
               </div>
             </div>
 
-            <!-- Columna de especificaciones y descripción (Ocupa 100% si no hay imagen) -->
+            <!-- Columna de especificaciones y descripción -->
             <div class="product-card__specs-col">
               <p v-if="line.descripcion" class="product-card__description">
                 {{ line.descripcion }}
@@ -296,9 +326,9 @@ const calculatedTotal = computed(() => {
                   </div>
                 </div>
 
-                <!-- Materiales y Espesores -->
+                <!-- Materiales -->
                 <div v-if="lineSpecs(line).materiales.length" class="spec-group">
-                  <span class="spec-group__title">Materialidad</span>
+                  <span class="spec-group__title">Materiales y Estructura</span>
                   <p class="spec-text">{{ lineSpecs(line).materiales.join(' · ') }}</p>
                 </div>
 
@@ -334,10 +364,24 @@ const calculatedTotal = computed(() => {
                   <p class="spec-text">{{ lineSpecs(line).accesorios.join(', ') }}</p>
                 </div>
 
+                <!-- Otros atributos -->
+                <div v-if="lineSpecs(line).otrosAtributos.length" class="spec-group">
+                  <span class="spec-group__title">Características Adicionales</span>
+                  <div class="spec-pills">
+                    <span
+                      v-for="attr in lineSpecs(line).otrosAtributos"
+                      :key="attr.label"
+                      class="spec-pill"
+                    >
+                      <strong>{{ attr.label }}:</strong> {{ attr.value }}
+                    </span>
+                  </div>
+                </div>
+
                 <!-- Observaciones técnicas de la ficha -->
                 <div v-if="lineSpecs(line).observaciones" class="spec-group spec-group--notes">
                   <span class="spec-group__title">Observaciones Técnicas</span>
-                  <p class="spec-text spec-text--italic">{{ lineSpecs(line).observaciones }}</p>
+                  <p class="spec-text spec-text--clean">{{ lineSpecs(line).observaciones }}</p>
                 </div>
               </div>
             </div>
@@ -348,14 +392,20 @@ const calculatedTotal = computed(() => {
             <div class="product-card__commercial-left">
               <template v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
                 <span class="commercial-badge commercial-badge--negotiated"
-                  >Modalidad: Importe total acordado</span
+                  >Modalidad: Importe histórico acordado</span
                 >
+                <div class="commercial-metric">
+                  <span class="commercial-metric__label">Cantidad:</span>
+                  <strong class="commercial-metric__val">
+                    {{ formatDocQuantity(line.cantidad, line.unidad_label || 'pieza') }}
+                  </strong>
+                </div>
               </template>
               <template v-else>
                 <div class="commercial-metric">
                   <span class="commercial-metric__label">Cantidad:</span>
                   <strong class="commercial-metric__val">
-                    {{ formatQuantity(line.cantidad) }} {{ line.unidad_label || 'unidad' }}
+                    {{ formatDocQuantity(line.cantidad, line.unidad_label || 'pieza') }}
                   </strong>
                 </div>
                 <div class="commercial-metric">
@@ -388,14 +438,9 @@ const calculatedTotal = computed(() => {
     <section class="sheet-summary-section" aria-label="Resumen económico definitivo">
       <div class="sheet-summary-grid">
         <div class="sheet-summary-left">
-          <!-- Espacio institucional para notas o aclaraciones -->
-          <div class="sheet-legal-notes">
-            <strong>Condiciones de entrega e instalación:</strong>
-            <p>
-              Los precios incluyen fabricación e instalación según especificaciones detalladas.
-              Cualquier modificación en medidas, materiales o acabados posterior a la aprobación
-              podrá incidir en los costos y plazos acordados.
-            </p>
+          <div v-if="condiciones?.observaciones" class="sheet-conditions-obs">
+            <span class="condition-obs-label">Observaciones generales:</span>
+            <p class="condition-obs-text">{{ condiciones.observaciones }}</p>
           </div>
         </div>
 
@@ -421,48 +466,34 @@ const calculatedTotal = computed(() => {
       </div>
     </section>
 
-    <!-- Condiciones Comerciales -->
-    <section class="sheet-conditions-section" aria-label="Condiciones comerciales de la cotización">
+    <!-- Condiciones Comerciales Fidedignas (Sin textos inventados) -->
+    <section
+      v-if="condiciones?.porcentaje_adelanto || condiciones?.plazo_entrega || condiciones?.validez_oferta"
+      class="sheet-conditions-section"
+      aria-label="Condiciones comerciales de la cotización"
+    >
       <h2 class="sheet-conditions-title">CONDICIONES COMERCIALES</h2>
       <div class="sheet-conditions-grid">
-        <div class="condition-box">
+        <div v-if="condiciones?.porcentaje_adelanto != null && condiciones.porcentaje_adelanto !== ''" class="condition-box">
           <span class="condition-box__label">Anticipo requerido</span>
           <strong class="condition-box__value">
-            {{
-              condiciones?.porcentaje_adelanto != null && condiciones.porcentaje_adelanto !== ''
-                ? `${condiciones.porcentaje_adelanto}%`
-                : '50%'
-            }}
+            {{ condiciones.porcentaje_adelanto }}%
           </strong>
-          <small class="condition-box__desc"
-            >A la confirmación de la cotización, saldo contra entrega.</small
-          >
         </div>
 
-        <div class="condition-box">
+        <div v-if="condiciones?.plazo_entrega" class="condition-box">
           <span class="condition-box__label">Plazo de entrega</span>
           <strong class="condition-box__value">
-            {{ condiciones?.plazo_entrega || 'A coordinar con producción' }}
+            {{ condiciones.plazo_entrega }}
           </strong>
-          <small class="condition-box__desc"
-            >Computable a partir del anticipo y validación de medidas.</small
-          >
         </div>
 
-        <div class="condition-box">
-          <span class="condition-box__label">Validez de la oferta</span>
+        <div v-if="condiciones?.validez_oferta" class="condition-box">
+          <span class="condition-box__label">Validez de la cotización</span>
           <strong class="condition-box__value">
-            {{ condiciones?.validez_oferta ? `${condiciones.validez_oferta} días` : '15 días' }}
+            {{ condiciones.validez_oferta }} días calendario
           </strong>
-          <small class="condition-box__desc"
-            >Precios sujetos a confirmación posterior al vencimiento.</small
-          >
         </div>
-      </div>
-
-      <div v-if="condiciones?.observaciones" class="sheet-conditions-obs">
-        <span class="condition-obs-label">Observaciones generales:</span>
-        <p class="condition-obs-text">{{ condiciones.observaciones }}</p>
       </div>
     </section>
 
@@ -471,13 +502,15 @@ const calculatedTotal = computed(() => {
       <div class="signatures-grid">
         <div class="signature-col">
           <div class="signature-line"></div>
-          <strong class="signature-name">HOMEX MOBILIARIO</strong>
+          <strong class="signature-name">{{ vendedorNombre || 'HOMEX MOBILIARIO' }}</strong>
           <span class="signature-role">Asesor Comercial Autorizado</span>
         </div>
 
         <div class="signature-col">
           <div class="signature-line"></div>
-          <strong class="signature-name">{{ clientDisplayName }}</strong>
+          <strong class="signature-name">
+            {{ clientHasData ? clientDisplayName : 'Aceptación y Aprobación del Cliente' }}
+          </strong>
           <span class="signature-role">Aceptación y Aprobación del Cliente</span>
         </div>
       </div>
@@ -487,23 +520,25 @@ const calculatedTotal = computed(() => {
     <footer class="sheet-footer">
       <span>HOMEX · Mobiliario Corporativo & Residencial</span>
       <span>Proforma {{ numero ? `#${numero}` : 'Borrador' }} · {{ formatDocDate(fecha) }}</span>
-      <span>Documento comercial oficial</span>
+      <span class="sheet-footer__status-text">
+        {{ isBorrador ? 'Borrador — No emitida' : 'Documento comercial emitido' }}
+      </span>
     </footer>
   </article>
 </template>
 
 <style scoped>
 /* =========================================================================
-   ESTILOS DE LA HOJA DE COTIZACIÓN (TAMAÑO CARTA: 216 × 279 mm)
-   Diseño institucional: blanco, escala de grises sutil y acento rojo HOMEX
+   ESTILOS DE LA HOJA DE COTIZACIÓN (TAMAÑO CARTA VERTICAL: 215,9 × 279,4 mm)
+   Diseño sobrio: predominio de blanco, textos oscuros y acento rojo HOMEX
    ========================================================================= */
 
 .proforma-sheet {
-  width: 216mm;
-  min-height: 279mm;
+  width: 215.9mm;
+  min-height: 279.4mm;
   background-color: #ffffff;
   color: #171717;
-  padding: 16mm 18mm;
+  padding: 14mm 16mm;
   box-sizing: border-box;
   font-family:
     'Inter',
@@ -514,7 +549,7 @@ const calculatedTotal = computed(() => {
     Helvetica,
     Arial,
     sans-serif;
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1.45;
   margin: 0 auto;
   position: relative;
@@ -540,19 +575,19 @@ const calculatedTotal = computed(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .sheet-logo__badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   background-color: #dc2626;
   color: #ffffff;
   font-weight: 800;
-  font-size: 18px;
+  font-size: 17px;
   border-radius: 6px;
   letter-spacing: -0.05em;
 }
@@ -579,9 +614,9 @@ const calculatedTotal = computed(() => {
 }
 
 .sheet-header__address {
-  font-size: 9.5px;
+  font-size: 9px;
   color: #525252;
-  margin: 0;
+  margin: 2px 0 0 0;
   line-height: 1.35;
 }
 
@@ -592,83 +627,96 @@ const calculatedTotal = computed(() => {
 
 .sheet-header__kicker {
   display: inline-block;
-  font-size: 9px;
+  font-size: 8.5px;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   color: #dc2626;
   text-transform: uppercase;
 }
 
 .sheet-header__number {
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 800;
   color: #171717;
-  margin: 2px 0 4px 0;
+  margin: 2px 0 3px 0;
   line-height: 1.1;
 }
 
 .sheet-header__date,
 .sheet-header__validity {
-  font-size: 9.5px;
+  font-size: 9px;
   color: #525252;
   margin: 1px 0;
 }
 
-/* Divisor sutil */
+/* Divisores */
 .sheet-divider {
   height: 1px;
   background-color: #e5e5e5;
-  margin: 12px 0;
+  margin: 10px 0;
 }
 
 .sheet-divider--thick {
   height: 2px;
   background-color: #dc2626;
-  margin: 14px 0;
+  margin: 12px 0;
 }
 
 /* Grilla de información de Cliente y Cotización */
 .sheet-info-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  margin-bottom: 16px;
+  gap: 12px;
+  margin-bottom: 14px;
 }
 
 .sheet-info-block {
   background-color: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 6px;
-  padding: 10px 12px;
+  padding: 8px 12px;
 }
 
 .sheet-info-block__title {
-  font-size: 9px;
+  font-size: 8.5px;
   font-weight: 700;
   letter-spacing: 0.08em;
   color: #64748b;
   text-transform: uppercase;
-  margin: 0 0 6px 0;
-  padding-bottom: 4px;
+  margin: 0 0 4px 0;
+  padding-bottom: 3px;
   border-bottom: 1px solid #e2e8f0;
 }
 
 .sheet-info-client-name {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   color: #0f172a;
-  margin: 0 0 4px 0;
+  margin: 0 0 3px 0;
+}
+
+.sheet-info-client-name--provisional {
+  color: #64748b;
+  font-style: italic;
+  font-weight: 600;
+}
+
+.sheet-info-empty-hint {
+  font-size: 8.5px;
+  color: #94a3b8;
+  margin: 2px 0;
+  font-style: italic;
 }
 
 .sheet-info-row {
   display: flex;
   margin: 2px 0;
-  font-size: 10px;
-  line-height: 1.4;
+  font-size: 9.5px;
+  line-height: 1.35;
 }
 
 .sheet-info-label {
-  width: 90px;
+  width: 85px;
   color: #64748b;
   font-weight: 500;
   flex-shrink: 0;
@@ -680,7 +728,7 @@ const calculatedTotal = computed(() => {
 
 .sheet-status-badge {
   display: inline-block;
-  font-size: 9px;
+  font-size: 8.5px;
   font-weight: 600;
   padding: 1px 6px;
   border-radius: 4px;
@@ -703,13 +751,13 @@ const calculatedTotal = computed(() => {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin: 16px 0 8px 0;
+  margin: 14px 0 8px 0;
   padding-bottom: 4px;
   border-bottom: 1.5px solid #0f172a;
 }
 
 .sheet-section-title {
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.06em;
   color: #0f172a;
@@ -718,7 +766,7 @@ const calculatedTotal = computed(() => {
 }
 
 .sheet-section-count {
-  font-size: 9.5px;
+  font-size: 9px;
   color: #64748b;
   font-weight: 600;
 }
@@ -741,7 +789,7 @@ const calculatedTotal = computed(() => {
 .product-card__header {
   background-color: #f1f5f9;
   border-bottom: 1px solid #cbd5e1;
-  padding: 6px 12px;
+  padding: 5px 10px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -754,32 +802,31 @@ const calculatedTotal = computed(() => {
 }
 
 .product-card__item-num {
-  font-size: 9px;
+  font-size: 8.5px;
   font-weight: 700;
   color: #dc2626;
   background-color: #fee2e2;
-  padding: 2px 5px;
+  padding: 1px 5px;
   border-radius: 3px;
   letter-spacing: 0.05em;
 }
 
 .product-card__title {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 700;
   color: #0f172a;
   margin: 0;
 }
 
 .product-card__type-badge {
-  font-size: 9px;
+  font-size: 8.5px;
   font-weight: 600;
   color: #475569;
   background-color: #e2e8f0;
-  padding: 1px 6px;
+  padding: 1px 5px;
   border-radius: 3px;
 }
 
-/* Cuerpo adaptativo */
 .product-card__body {
   padding: 10px 12px;
   display: block;
@@ -787,67 +834,101 @@ const calculatedTotal = computed(() => {
 
 .product-card__body--with-image {
   display: grid;
-  grid-template-columns: 160px 1fr;
-  gap: 14px;
+  grid-template-columns: 50mm 1fr;
+  gap: 12px;
 }
 
 .product-card__image-col {
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
 }
 
 .product-card__image-wrapper {
-  width: 100%;
-  max-height: 150px;
+  width: 48mm;
+  height: 40mm;
   display: flex;
   align-items: center;
   justify-content: center;
   background-color: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 4px;
-  padding: 4px;
   overflow: hidden;
+  padding: 2px;
 }
 
-.product-card__image {
+.product-card__gallery-photo {
   max-width: 100%;
-  max-height: 140px;
-  width: auto;
-  height: auto;
+  max-height: 100%;
   object-fit: contain;
-  display: block;
+}
+
+.product-card__no-image {
+  width: 48mm;
+  height: 34mm;
+  border: 1px dashed #cbd5e1;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f8fafc;
+  padding: 6px;
+  text-align: center;
+}
+
+.product-card__no-image-text {
+  font-size: 8px;
+  color: #94a3b8;
+  font-style: italic;
+  line-height: 1.25;
+}
+
+.product-card__extra-images {
+  display: flex;
+  gap: 4px;
+}
+
+.product-card__extra-thumb {
+  width: 22mm;
+  height: 18mm;
+  border: 1px solid #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .product-card__specs-col {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 
 .product-card__description {
-  font-size: 10.5px;
+  font-size: 10px;
   color: #334155;
-  margin: 0 0 6px 0;
-  line-height: 1.4;
+  margin: 0 0 4px 0;
+  line-height: 1.35;
 }
 
 .specs-grid {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
 }
 
 .spec-group {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .spec-group__title {
-  font-size: 8.5px;
+  font-size: 8px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   color: #64748b;
   text-transform: uppercase;
 }
@@ -855,34 +936,33 @@ const calculatedTotal = computed(() => {
 .spec-pills {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
 }
 
 .spec-pill {
-  font-size: 9.5px;
+  font-size: 9px;
   background-color: #f1f5f9;
   border: 1px solid #e2e8f0;
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 1px 5px;
+  border-radius: 3px;
   color: #1e293b;
 }
 
 .spec-text {
-  font-size: 9.5px;
+  font-size: 9px;
   color: #1e293b;
   margin: 0;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
-.spec-text--italic {
-  font-style: italic;
+.spec-text--clean {
   color: #475569;
 }
 
 .spec-components-list {
   margin: 0;
-  padding-left: 14px;
-  font-size: 9.5px;
+  padding-left: 12px;
+  font-size: 9px;
   color: #1e293b;
 }
 
@@ -890,11 +970,11 @@ const calculatedTotal = computed(() => {
   margin: 1px 0;
 }
 
-/* Pie comercial de la ficha */
+/* Pie de la ficha del producto */
 .product-card__footer {
   background-color: #f8fafc;
   border-top: 1px solid #e2e8f0;
-  padding: 6px 12px;
+  padding: 5px 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -905,16 +985,16 @@ const calculatedTotal = computed(() => {
 .product-card__commercial-left {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 
 .commercial-metric {
-  font-size: 9.5px;
+  font-size: 9px;
   color: #475569;
 }
 
 .commercial-metric__label {
-  margin-right: 4px;
+  margin-right: 3px;
 }
 
 .commercial-metric__val {
@@ -927,28 +1007,28 @@ const calculatedTotal = computed(() => {
 }
 
 .commercial-badge--negotiated {
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 600;
   color: #0369a1;
   background-color: #e0f2fe;
-  padding: 2px 6px;
+  padding: 1px 5px;
   border-radius: 3px;
 }
 
 .product-card__commercial-right {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 
 .commercial-subtotal-label {
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 600;
   color: #475569;
 }
 
 .commercial-subtotal-value {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 800;
   color: #0f172a;
 }
@@ -956,31 +1036,36 @@ const calculatedTotal = computed(() => {
 /* Resumen Económico General */
 .sheet-summary-section {
   margin-top: 14px;
-  padding: 10px 0;
+  padding: 8px 0;
   page-break-inside: avoid;
   break-inside: avoid;
 }
 
 .sheet-summary-grid {
   display: grid;
-  grid-template-columns: 1fr 240px;
+  grid-template-columns: 1fr 220px;
   gap: 16px;
   align-items: start;
 }
 
-.sheet-legal-notes {
+.sheet-conditions-obs {
   background-color: #f8fafc;
   border-left: 3px solid #cbd5e1;
-  padding: 8px 10px;
-  font-size: 8.5px;
-  color: #64748b;
-  line-height: 1.4;
+  padding: 6px 10px;
+  font-size: 9px;
 }
 
-.sheet-legal-notes strong {
-  color: #334155;
+.condition-obs-label {
+  font-weight: 700;
+  color: #475569;
   display: block;
   margin-bottom: 2px;
+}
+
+.condition-obs-text {
+  color: #1e293b;
+  margin: 0;
+  line-height: 1.35;
 }
 
 .sheet-summary-totals {
@@ -996,7 +1081,7 @@ const calculatedTotal = computed(() => {
 .summary-line {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 9.5px;
   color: #475569;
 }
 
@@ -1006,7 +1091,7 @@ const calculatedTotal = computed(() => {
 }
 
 .summary-line--total {
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 800;
   color: #dc2626;
   border-top: 1.5px solid #cbd5e1;
@@ -1016,28 +1101,28 @@ const calculatedTotal = computed(() => {
 
 /* Condiciones Comerciales */
 .sheet-conditions-section {
-  margin-top: 14px;
+  margin-top: 12px;
   border: 1px solid #e2e8f0;
   border-radius: 6px;
   background-color: #ffffff;
-  padding: 10px 12px;
+  padding: 8px 12px;
   page-break-inside: avoid;
   break-inside: avoid;
 }
 
 .sheet-conditions-title {
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.08em;
   color: #0f172a;
   text-transform: uppercase;
-  margin: 0 0 8px 0;
+  margin: 0 0 6px 0;
 }
 
 .sheet-conditions-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  gap: 8px;
 }
 
 .condition-box {
@@ -1050,7 +1135,7 @@ const calculatedTotal = computed(() => {
 }
 
 .condition-box__label {
-  font-size: 8px;
+  font-size: 7.5px;
   font-weight: 700;
   letter-spacing: 0.05em;
   color: #64748b;
@@ -1059,40 +1144,14 @@ const calculatedTotal = computed(() => {
 }
 
 .condition-box__value {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
   color: #0f172a;
 }
 
-.condition-box__desc {
-  font-size: 7.5px;
-  color: #64748b;
-  margin-top: 2px;
-  line-height: 1.25;
-}
-
-.sheet-conditions-obs {
-  margin-top: 8px;
-  padding-top: 6px;
-  border-top: 1px dashed #cbd5e1;
-  font-size: 9px;
-}
-
-.condition-obs-label {
-  font-weight: 700;
-  color: #475569;
-  margin-right: 4px;
-}
-
-.condition-obs-text {
-  display: inline;
-  color: #1e293b;
-  margin: 0;
-}
-
 /* Firmas */
 .sheet-signatures-section {
-  margin-top: 24px;
+  margin-top: 20px;
   page-break-inside: avoid;
   break-inside: avoid;
 }
@@ -1113,7 +1172,7 @@ const calculatedTotal = computed(() => {
 
 .signature-line {
   width: 100%;
-  max-width: 200px;
+  max-width: 180px;
   height: 1px;
   background-color: #475569;
   margin-bottom: 6px;
@@ -1132,7 +1191,7 @@ const calculatedTotal = computed(() => {
 
 /* Pie de página */
 .sheet-footer {
-  margin-top: 20px;
+  margin-top: 18px;
   padding-top: 8px;
   border-top: 1px solid #e2e8f0;
   display: flex;
@@ -1141,12 +1200,16 @@ const calculatedTotal = computed(() => {
   color: #94a3b8;
 }
 
+.sheet-footer__status-text {
+  font-weight: 600;
+}
+
 /* =========================================================================
-   REGLAS PARA IMPRESIÓN DIRECTA (@media print)
+   REGLAS PARA IMPRESIÓN DIRECTA (@media print) EN TAMAÑO CARTA
    ========================================================================= */
 @page {
   size: letter portrait;
-  margin: 10mm 12mm;
+  margin: 8mm 10mm;
 }
 
 @media print {

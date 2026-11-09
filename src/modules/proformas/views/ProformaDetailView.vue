@@ -41,7 +41,7 @@ const router = useRouter()
 const id = Number(route.params.id)
 const quote = ref<(Proforma & { fecha_vencimiento?: string | null }) | null>(null)
 const { images: quoteImages, ensure: ensureQuoteImages } = useQuoteProductImages()
-const { coverFor: furnitureCoverFor, ensureLines: ensureFurnitureCovers } =
+const { coverFor: furnitureCoverFor, galleryFor: furnitureGalleryFor, ensureLines: ensureFurnitureCovers } =
   useQuoteFurnitureCovers()
 function furnitureCoverSource(line: DetalleProforma) {
   const cover = furnitureCoverFor(line, quote.value?.id)
@@ -62,12 +62,23 @@ const documentLines = computed(() => {
   if (!quote.value) return []
   return quote.value.detalles.map((line) => {
     let imageUrl: string | null = null
+    const complementarias: string[] = []
+
     if (line.producto) {
       const img = quoteImages.value[line.producto]
       imageUrl = img?.variantes?.['640'] ?? img?.variantes?.['320'] ?? img?.original ?? null
     } else {
       const cover = furnitureCoverFor(line, quote.value?.id)
       imageUrl = cover?.variantes?.['640'] ?? cover?.variantes?.['320'] ?? cover?.url ?? null
+      const fullGallery = furnitureGalleryFor(line, quote.value?.id)
+      for (const item of fullGallery) {
+        if (item.url !== cover?.url) {
+          const compUrl = item.variantes?.['320'] ?? item.url
+          if (compUrl && !complementarias.includes(compUrl)) {
+            complementarias.push(compUrl)
+          }
+        }
+      }
     }
     return {
       id: line.id,
@@ -86,12 +97,22 @@ const documentLines = computed(() => {
       total_calculado: Number(line.total),
       especificacion: line.especificacion,
       imagen_url: imageUrl,
+      imagenes_complementarias: complementarias,
     }
   })
 })
 
 const documentClientInfo = computed(() => {
-  if (!quote.value?.cliente_resumen) return null
+  if (!quote.value) return null
+  if (quote.value.cliente_nombre_snapshot || quote.value.cliente_empresa_snapshot) {
+    return {
+      nombres: quote.value.cliente_nombre_snapshot,
+      empresa: quote.value.cliente_empresa_snapshot,
+      celular: quote.value.cliente_celular_snapshot,
+      direccion: quote.value.cliente_direccion_snapshot,
+    }
+  }
+  if (!quote.value.cliente_resumen) return null
   return {
     nombres: quote.value.cliente_resumen.nombre,
     empresa: quote.value.cliente_resumen.empresa,

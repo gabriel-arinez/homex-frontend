@@ -775,12 +775,23 @@ const calculatedDiscountTotal = computed(() => {
 const documentLines = computed(() => {
   return lineas.value.map((line) => {
     let imageUrl: string | null = null
+    const complementarias: string[] = []
+
     if (line.producto) {
       const img = quoteImages.value[line.producto]
       imageUrl = img?.variantes?.['640'] ?? img?.variantes?.['320'] ?? img?.original ?? null
     } else {
       const cover = furnitureCoverFor(line, proformaId.value)
       imageUrl = cover?.variantes?.['640'] ?? cover?.variantes?.['320'] ?? cover?.url ?? null
+      const fullGallery = furnitureGalleryFor(line, proformaId.value)
+      for (const item of fullGallery) {
+        if (item.url !== cover?.url) {
+          const compUrl = item.variantes?.['320'] ?? item.url
+          if (compUrl && !complementarias.includes(compUrl)) {
+            complementarias.push(compUrl)
+          }
+        }
+      }
     }
 
     return {
@@ -801,6 +812,7 @@ const documentLines = computed(() => {
       total_calculado: totalEstimadoLinea(line),
       especificacion: line.especificacion,
       imagen_url: imageUrl,
+      imagenes_complementarias: complementarias,
     }
   })
 })
