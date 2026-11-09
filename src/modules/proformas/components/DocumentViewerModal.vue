@@ -1,91 +1,98 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
-import { Printer, Download, X, ZoomIn, ZoomOut, Maximize2, FileText } from '@lucide/vue'
+import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { Printer, Download, X, ZoomIn, ZoomOut, Maximize2, FileText, RotateCw } from '@lucide/vue'
 import Button from '@/shared/ui/Button.vue'
 
-export interface DocumentViewerModalProps {
-  open: boolean
-  title?: string
-  subtitle?: string
-  downloading?: boolean
-  canDownloadPdf?: boolean
-}
-
-const props = withDefaults(defineProps<DocumentViewerModalProps>(), {
-  title: 'Documento comercial',
-  subtitle: 'Vista previa de impresión · Tamaño Carta (216 × 279 mm)',
-  downloading: false,
-  canDownloadPdf: true,
-})
-
+const props = withDefaults(
+  defineProps<{
+    open: boolean
+    title?: string
+    subtitle?: string
+    downloading?: boolean
+    canDownloadPdf?: boolean
+    pdfUrl?: string
+    loading?: boolean
+    error?: string
+    notice?: string
+  }>(),
+  {
+    title: 'Documento comercial',
+    subtitle: 'Vista previa de impresión · Tamaño Carta (216 × 279 mm)',
+    downloading: false,
+    canDownloadPdf: true,
+    pdfUrl: '',
+    loading: false,
+    error: '',
+    notice: '',
+  },
+)
 const emit = defineEmits<{
-  (e: 'close'): void
-  (e: 'download'): void
+  close: []
+  download: []
+  retry: []
 }>()
 
 const zoom = ref(1)
 const viewportRef = ref<HTMLElement | null>(null)
+const frameRef = ref<HTMLIFrameElement | null>(null)
+const closeRef = ref<HTMLButtonElement | null>(null)
+const printError = ref('')
+let previousOverflow = ''
+let previousFocus: HTMLElement | null = null
 
 function zoomIn() {
-  if (zoom.value < 1.8) {
-    zoom.value = Math.min(1.8, Math.round((zoom.value + 0.1) * 10) / 10)
-  }
+  zoom.value = Math.min(1.8, Math.round((zoom.value + 0.1) * 10) / 10)
 }
-
 function zoomOut() {
-  if (zoom.value > 0.4) {
-    zoom.value = Math.max(0.4, Math.round((zoom.value - 0.1) * 10) / 10)
-  }
+  zoom.value = Math.max(0.4, Math.round((zoom.value - 0.1) * 10) / 10)
 }
-
 function resetZoom() {
   zoom.value = 1
 }
-
 function fitWidth() {
   if (!viewportRef.value) return
-  const availableWidth = viewportRef.value.clientWidth - 48
-  // 216mm ~ 816px a 96dpi
-  const sheetWidthPx = 816
-  const targetZoom = Math.min(1.2, Math.max(0.45, availableWidth / sheetWidthPx))
-  zoom.value = Math.round(targetZoom * 100) / 100
+  zoom.value = Math.min(1.2, Math.max(0.4, Math.floor(((viewportRef.value.clientWidth - 48) / 816) * 100) / 100))
 }
-
 function handleKeydown(event: KeyboardEvent) {
-  if (!props.open) return
-  if (event.key === 'Escape') {
-    emit('close')
+  if (props.open && event.key === 'Escape') emit('close')
+}
+function printDocument() {
+  if (!props.pdfUrl || props.loading) return
+  printError.value = ''
+  try {
+    const frame = frameRef.value?.contentWindow
+    if (!frame) throw new Error('No se pudo acceder al documento.')
+    frame.focus()
+    // Imprimir el PDF incrustado, nunca el formulario ni la ventana HOMEX.
+    frame.print()
+  } catch {
+    printError.value = 'El navegador no pudo iniciar la impresión del PDF. Abre el documento en una pestaña nueva o descárgalo para imprimirlo.'
   }
 }
-
-function printDocument() {
-  window.print()
-}
-
 watch(
   () => props.open,
-  (isOpen) => {
-    if (isOpen) {
+  async (open) => {
+    if (open) {
+      previousOverflow = document.body.style.overflow
+      previousFocus = document.activeElement as HTMLElement | null
       document.body.style.overflow = 'hidden'
-      // Ajustar automáticamente si la pantalla es menor a 900px
-      if (typeof window !== 'undefined' && window.innerWidth < 900) {
-        fitWidth()
-      } else {
-        zoom.value = 1
-      }
+      zoom.value = 1
+      printError.value = ''
+      await nextTick()
+      if (window.innerWidth < 900) fitWidth()
+      closeRef.value?.focus()
     } else {
-      document.body.style.overflow = ''
+      document.body.style.overflow = previousOverflow
+      previousFocus?.focus()
+      printError.value = ''
     }
   },
 )
-
-onMounted(() => {
-  window.addEventListener('keydown', handleKeydown)
-})
-
-onUnmounted(() => {
+watch(() => props.pdfUrl, () => { printError.value = '' })
+window.addEventListener('keydown', handleKeydown)
+onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKeydown)
-  document.body.style.overflow = ''
+  if (props.open) document.body.style.overflow = previousOverflow
 })
 </script>
 
@@ -97,112 +104,47 @@ onUnmounted(() => {
       role="dialog"
       aria-modal="true"
       :aria-label="title"
-      @click.self="emit('close')"
     >
-      <!-- Barra superior de herramientas fija -->
-      <header class="doc-viewer-bar no-print">
+      <header class="doc-viewer-bar">
         <div class="doc-viewer-bar__identity">
-          <span class="doc-viewer-bar__icon" aria-hidden="true">
-            <FileText :size="20" />
-          </span>
+          <span class="doc-viewer-bar__icon"><FileText :size="20" aria-hidden="true" /></span>
           <div class="doc-viewer-bar__titles">
             <h2 class="doc-viewer-bar__title">{{ title }}</h2>
-            <p v-if="subtitle" class="doc-viewer-bar__subtitle">{{ subtitle }}</p>
+            <p class="doc-viewer-bar__subtitle">{{ subtitle }}</p>
           </div>
         </div>
-
-        <!-- Controles de Zoom -->
-        <div class="doc-viewer-bar__zoom-controls" aria-label="Controles de escala y zoom">
-          <button
-            type="button"
-            class="zoom-btn"
-            title="Reducir zoom"
-            aria-label="Reducir zoom"
-            :disabled="zoom <= 0.4"
-            @click="zoomOut"
-          >
-            <ZoomOut :size="16" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            class="zoom-display"
-            title="Restablecer zoom a 100%"
-            aria-label="Restablecer escala al 100%"
-            @click="resetZoom"
-          >
-            {{ Math.round(zoom * 100) }}%
-          </button>
-          <button
-            type="button"
-            class="zoom-btn"
-            title="Aumentar zoom"
-            aria-label="Aumentar zoom"
-            :disabled="zoom >= 1.8"
-            @click="zoomIn"
-          >
-            <ZoomIn :size="16" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            class="zoom-btn zoom-btn--text"
-            title="Ajustar al ancho disponible"
-            aria-label="Ajustar al ancho"
-            @click="fitWidth"
-          >
-            <Maximize2 :size="14" aria-hidden="true" />
-            <span>Ajustar</span>
-          </button>
+        <div class="doc-viewer-bar__zoom-controls" aria-label="Controles de escala">
+          <button type="button" class="zoom-btn" title="Reducir zoom" :disabled="zoom <= 0.4" @click="zoomOut"><ZoomOut :size="17" /></button>
+          <button type="button" class="zoom-display" title="Restablecer escala" @click="resetZoom">{{ Math.round(zoom * 100) }}%</button>
+          <button type="button" class="zoom-btn" title="Aumentar zoom" :disabled="zoom >= 1.8" @click="zoomIn"><ZoomIn :size="17" /></button>
+          <button type="button" class="zoom-btn zoom-btn--text" title="Ajustar al ancho" @click="fitWidth"><Maximize2 :size="15" /><span>Ajustar</span></button>
         </div>
-
-        <!-- Acciones principales -->
         <div class="doc-viewer-bar__actions">
-          <Button
-            type="button"
-            variant="secondary"
-            class="doc-action-btn"
-            title="Imprimir documento (Ctrl+P)"
-            @click="printDocument"
-          >
-            <Printer :size="16" aria-hidden="true" />
-            <span>Imprimir</span>
-          </Button>
-
-          <Button
-            v-if="canDownloadPdf"
-            type="button"
-            variant="secondary"
-            class="doc-action-btn"
-            :processing="downloading"
-            title="Descargar en formato PDF"
-            @click="emit('download')"
-          >
-            <Download :size="16" aria-hidden="true" />
-            <span>Descargar PDF</span>
-          </Button>
-
-          <button
-            type="button"
-            class="doc-close-btn"
-            aria-label="Cerrar visor de documento"
-            title="Cerrar (Esc)"
-            @click="emit('close')"
-          >
-            <X :size="20" aria-hidden="true" />
-          </button>
+          <Button type="button" variant="secondary" :disabled="loading || !pdfUrl" @click="printDocument"><Printer :size="17" aria-hidden="true" /> Imprimir</Button>
+          <Button v-if="canDownloadPdf" type="button" variant="secondary" :processing="downloading" :disabled="loading || !pdfUrl" @click="emit('download')"><Download :size="17" aria-hidden="true" /> Descargar PDF</Button>
+          <button ref="closeRef" type="button" class="doc-close-btn" aria-label="Cerrar visor" @click="emit('close')"><X :size="20" /></button>
         </div>
       </header>
 
-      <!-- Escenario central de lectura y navegación con fondo oscuro -->
-      <main ref="viewportRef" class="doc-viewer-viewport" @click.self="emit('close')">
-        <div
-          class="doc-viewer-sheet-stage"
-          :style="{
-            transform: `scale(${zoom})`,
-            transformOrigin: 'top center',
-          }"
-        >
-          <slot />
+      <p v-if="notice" class="doc-viewer-notice" role="status">{{ notice }}</p>
+      <p v-if="printError" class="doc-viewer-error" role="alert">{{ printError }}</p>
+
+      <main ref="viewportRef" class="doc-viewer-viewport">
+        <div v-if="loading" class="doc-state" role="status">Preparando documento PDF…</div>
+        <div v-else-if="error" class="doc-state" role="alert">
+          <p>{{ error }}</p>
+          <Button type="button" variant="secondary" @click="emit('retry')"><RotateCw :size="16" aria-hidden="true" /> Reintentar</Button>
         </div>
+        <div v-else-if="pdfUrl" class="doc-viewer-sheet-stage" :style="{ width: `${816 * zoom}px`, height: `${1056 * zoom}px` }">
+          <iframe
+            ref="frameRef"
+            class="doc-pdf-frame"
+            :src="`${pdfUrl}#toolbar=0&navpanes=0`"
+            :title="`Documento PDF: ${title}`"
+            :style="{ transform: `scale(${zoom})` }"
+          />
+        </div>
+        <div v-else class="doc-state">No hay documento disponible.</div>
       </main>
     </div>
   </Teleport>
@@ -215,214 +157,57 @@ onUnmounted(() => {
   z-index: 100;
   display: flex;
   flex-direction: column;
-  background-color: rgba(9, 9, 11, 0.94);
-  backdrop-filter: blur(8px);
-  color: #f4f4f5;
-  overflow: hidden;
+  background: #09090b;
+  color: #fafafa;
 }
-
-/* Barra superior */
 .doc-viewer-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   padding: 10px 20px;
-  background-color: #18181b;
-  border-bottom: 1px solid #27272a;
-  z-index: 10;
+  background: #18181b;
+  border-bottom: 1px solid #3f3f46;
   flex-shrink: 0;
 }
-
-.doc-viewer-bar__identity {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-
-.doc-viewer-bar__icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  background-color: #27272a;
-  color: #ef4444;
-  flex-shrink: 0;
-}
-
-.doc-viewer-bar__titles {
-  min-width: 0;
-}
-
-.doc-viewer-bar__title {
-  font-size: 14px;
-  font-weight: 700;
-  color: #ffffff;
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.doc-viewer-bar__subtitle {
-  font-size: 11px;
-  color: #a1a1aa;
-  margin: 2px 0 0 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Zoom controls */
-.doc-viewer-bar__zoom-controls {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background-color: #27272a;
-  padding: 3px 6px;
-  border-radius: 8px;
-  border: 1px solid #3f3f46;
-}
-
-.zoom-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  width: 28px;
-  height: 28px;
-  border-radius: 5px;
-  background: transparent;
-  border: none;
-  color: #d4d4d8;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.zoom-btn--text {
-  width: auto;
-  padding: 0 8px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.zoom-btn:hover:not(:disabled) {
-  background-color: #3f3f46;
-  color: #ffffff;
-}
-
-.zoom-btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.zoom-display {
-  background: transparent;
-  border: none;
-  font-size: 12px;
-  font-weight: 600;
-  color: #f4f4f5;
-  padding: 0 6px;
-  cursor: pointer;
-  min-width: 44px;
-  text-align: center;
-}
-
-.zoom-display:hover {
-  color: #ffffff;
-  text-decoration: underline;
-}
-
-/* Acciones principales */
-.doc-viewer-bar__actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-}
-
-.doc-action-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  height: 34px;
-}
-
-.doc-close-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  background-color: #27272a;
-  border: 1px solid #3f3f46;
-  color: #a1a1aa;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  margin-left: 6px;
-}
-
-.doc-close-btn:hover {
-  background-color: #dc2626;
-  color: #ffffff;
-  border-color: #dc2626;
-}
-
-/* Viewport central */
+.doc-viewer-bar__identity, .doc-viewer-bar__zoom-controls,
+.doc-viewer-bar__actions { display: flex; align-items: center; gap: 10px; }
+.doc-viewer-bar__icon { display: grid; place-items: center; background: #27272a; color: #ef4444; width: 36px; height: 36px; border-radius: 8px; }
+.doc-viewer-bar__title { font-size: 14px; font-weight: 700; margin: 0; }
+.doc-viewer-bar__subtitle { font-size: 11px; color: #d4d4d8; margin: 2px 0 0; }
+.doc-viewer-bar__zoom-controls { gap: 3px; padding: 4px; border: 1px solid #52525b; border-radius: 8px; background: #27272a; }
+.zoom-btn, .zoom-display, .doc-close-btn { color: #fafafa; border: 0; background: transparent; cursor: pointer; border-radius: 6px; height: 30px; }
+.zoom-btn { display: inline-flex; gap: 4px; align-items: center; justify-content: center; min-width: 30px; padding: 0 6px; }
+.zoom-display { min-width: 47px; font-weight: 700; }
+.zoom-btn:hover:not(:disabled), .zoom-display:hover, .doc-close-btn:hover { background: #3f3f46; }
+.zoom-btn:disabled { opacity: .35; cursor: not-allowed; }
+.doc-viewer-bar__actions { gap: 10px; }
+.doc-close-btn { width: 36px; height: 36px; display: grid; place-items: center; background: #27272a; border: 1px solid #52525b; }
+.doc-close-btn:focus-visible, .zoom-btn:focus-visible, .zoom-display:focus-visible { outline: 2px solid white; outline-offset: 2px; }
 .doc-viewer-viewport {
   flex: 1;
   overflow: auto;
+  padding: 30px 20px 60px;
   display: flex;
-  justify-content: center;
+  justify-content: safe center;
   align-items: flex-start;
-  padding: 30px 20px 60px 20px;
-  scroll-behavior: smooth;
 }
-
-.doc-viewer-sheet-stage {
-  transition: transform 0.15s ease-out;
-  display: inline-block;
-  margin-bottom: 40px;
+.doc-viewer-sheet-stage { flex: none; position: relative; margin: 0 auto; background: white; box-shadow: 0 12px 35px #0008; }
+.doc-pdf-frame {
+  width: 816px;
+  height: 1056px;
+  border: 0;
+  display: block;
+  background: white;
+  transform-origin: top left;
 }
-
-/* Responsive */
-@media (max-width: 768px) {
-  .doc-viewer-bar {
-    padding: 8px 12px;
-    flex-wrap: wrap;
-  }
-  .doc-viewer-bar__subtitle {
-    display: none;
-  }
-  .zoom-btn--text span {
-    display: none;
-  }
-}
-
-/* Impresión */
-@media print {
-  .no-print {
-    display: none !important;
-  }
-  .doc-viewer-overlay {
-    position: static !important;
-    background: transparent !important;
-    backdrop-filter: none !important;
-    overflow: visible !important;
-    color: #000000 !important;
-  }
-  .doc-viewer-viewport {
-    padding: 0 !important;
-    overflow: visible !important;
-  }
-  .doc-viewer-sheet-stage {
-    transform: none !important;
-    margin: 0 !important;
-  }
+.doc-state { margin: 10vh auto 0; display: grid; justify-items: center; gap: 16px; padding: 24px; color: #fafafa; text-align: center; }
+.doc-viewer-error, .doc-viewer-notice { margin: 0; padding: 10px 20px; font-size: 13px; background: #713f12; color: #fff; }
+.doc-viewer-error { background: #991b1b; }
+@media (max-width: 760px) {
+  .doc-viewer-bar { flex-wrap: wrap; padding: 8px 12px; }
+  .doc-viewer-bar__subtitle { display: none; }
+  .doc-viewer-bar__zoom-controls { order: 3; margin: auto; }
+  .doc-viewer-viewport { padding: 12px; }
 }
 </style>
