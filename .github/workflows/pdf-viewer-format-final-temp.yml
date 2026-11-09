@@ -1,0 +1,35 @@
+name: PDF viewer final formatting
+on:
+  push:
+    branches:
+      - feat/perfeccionamiento-documento-pdf
+permissions:
+  contents: write
+jobs:
+  format:
+    if: contains(github.event.head_commit.message, '[format-final-pdf]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/perfeccionamiento-documento-pdf
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.18.1'
+          cache: npm
+      - run: npm ci
+      - name: Normalize viewer changes
+        run: |
+          npx prettier --write src/modules/proformas/components/DocumentViewerModal.vue src/modules/proformas/components/PdfCanvasPage.vue src/modules/proformas/components/DocumentViewerModal.test.ts
+          npx oxlint --fix src/modules/proformas/components/DocumentViewerModal.vue src/modules/proformas/components/PdfCanvasPage.vue src/modules/proformas/components/DocumentViewerModal.test.ts
+          npx eslint --fix src/modules/proformas/components/DocumentViewerModal.vue src/modules/proformas/components/PdfCanvasPage.vue src/modules/proformas/components/DocumentViewerModal.test.ts
+          npx prettier --write src/modules/proformas/components/DocumentViewerModal.vue src/modules/proformas/components/PdfCanvasPage.vue src/modules/proformas/components/DocumentViewerModal.test.ts
+      - name: Push to existing branch
+        run: |
+          git config user.name homex-ci
+          git config user.email homex-ci@users.noreply.github.com
+          git add src/modules/proformas/components/DocumentViewerModal.vue src/modules/proformas/components/PdfCanvasPage.vue src/modules/proformas/components/DocumentViewerModal.test.ts
+          if ! git diff --cached --quiet; then
+            git commit -m 'style(pdf): finalize PDF.js viewer formatting'
+            git push origin HEAD:feat/perfeccionamiento-documento-pdf
+          fi
