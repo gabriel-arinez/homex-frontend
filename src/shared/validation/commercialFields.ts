@@ -102,9 +102,15 @@ export function validateQuoteConditions(
   }
 
   const advance = data.porcentaje_adelanto.trim()
+  const numAdvance = Number(advance)
   if (!advance) {
     if (forEmission) errors.porcentaje_adelanto = 'Ingresa el porcentaje de adelanto (0 a 100 %).'
-  } else if (!/^\d{1,3}$/.test(advance) || Number(advance) < 0 || Number(advance) > 100) {
+  } else if (
+    !/^\d{1,3}(?:\.0+)?$/.test(advance) ||
+    isNaN(numAdvance) ||
+    numAdvance < 0 ||
+    numAdvance > 100
+  ) {
     errors.porcentaje_adelanto = 'El adelanto debe ser un número entero entre 0 y 100.'
   }
 

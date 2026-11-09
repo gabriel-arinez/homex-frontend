@@ -871,7 +871,9 @@ function fill(value: Proforma) {
   header.moneda_codigo = value.moneda_info.codigo
   header.plazo_entrega = value.plazo_entrega ?? ''
   header.validez_oferta = value.validez_oferta ? String(value.validez_oferta) : ''
-  header.porcentaje_adelanto = value.porcentaje_adelanto ?? ''
+  header.porcentaje_adelanto = value.porcentaje_adelanto
+    ? String(Math.round(Number(value.porcentaje_adelanto)))
+    : ''
   header.observaciones = value.observaciones ?? ''
   clienteMode.value = value.cliente ? 'existente' : 'pendiente'
   clienteSeleccionado.value = value.cliente_resumen ?? null
