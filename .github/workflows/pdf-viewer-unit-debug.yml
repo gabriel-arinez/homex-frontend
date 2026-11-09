@@ -1,0 +1,18 @@
+name: Verify isolated PDF viewer
+on:
+  push:
+    branches: [feat/perfeccionamiento-documento-pdf]
+permissions:
+  contents: read
+jobs:
+  viewer-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.18.1'
+          cache: npm
+      - run: npm ci
+      - name: Verify PDF viewer component
+        run: npx vitest run src/modules/proformas/components/DocumentViewerModal.test.ts
