@@ -155,6 +155,11 @@ function humanizeKey(key: string): string {
     mecanismo: 'Mecanismo de inclinación',
     ruedas: 'Ruedas',
     cabecera: 'Cabecera',
+    reposacabezas: 'Cabecera',
+    reposapies: 'Reposapiés',
+    suspension: 'Suspensión / Altura',
+    giro: 'Giro',
+    capacidad: 'Capacidad de soporte',
   }
   const match = dict[key.toLowerCase()]
   if (match) return match
@@ -213,6 +218,8 @@ const quickChairFeatures = [
   { clave: 'Mecanismo de inclinación', valor: 'Sincrónico' },
   { clave: 'Asiento', valor: 'Espuma inyectada' },
   { clave: 'Material del respaldo', valor: 'Malla respirable' },
+  { clave: 'Suspensión / Altura', valor: 'Pistón a gas' },
+  { clave: 'Giro', valor: '360°' },
   { clave: 'Ruedas', valor: '5 ruedas de nylon' },
 ]
 
@@ -284,6 +291,15 @@ function onVoiceApplied(payload: {
   voicePendingWarnings.value = [...(payload.warnings || [])]
 
   const suggested = { ...payload.fields }
+
+  // Evitar volcar la transcripción completa en observaciones si el NLP la incluyó por fallback.
+  // La transcripción completa se preserva y muestra en la tarjeta lateral.
+  if (
+    suggested.observaciones &&
+    suggested.observaciones.trim() === (payload.text || '').trim()
+  ) {
+    delete suggested.observaciones
+  }
 
   // Heurística de precio si no vino en fields pero se dictó en el texto
   if (!suggested.precio_lista && payload.text) {
@@ -477,27 +493,11 @@ onMounted(load)
     @submit.prevent="submit"
   >
     <header class="form-intro">
-      <div>
-        <div class="category-capsule">
-          <Armchair v-if="categoria === 'SILLA'" :size="15" aria-hidden="true" />
-          <Layers v-else-if="categoria === 'PISO_FLOTANTE'" :size="15" aria-hidden="true" />
-          <Package v-else :size="15" aria-hidden="true" />
-          <span>Catálogo comercial · {{ categoriaNombre }}</span>
-        </div>
-        <h2>
-          {{
-            initial
-              ? 'Editar producto'
-              : categoria === 'SILLA'
-                ? 'Nueva silla de catálogo'
-                : categoria === 'PISO_FLOTANTE'
-                  ? 'Nuevo piso flotante'
-                  : 'Nuevo producto'
-          }}
-        </h2>
-        <p class="muted">
-          Organiza los datos comerciales. Los campos marcados con * son obligatorios.
-        </p>
+      <div class="category-capsule">
+        <Armchair v-if="categoria === 'SILLA'" :size="15" aria-hidden="true" />
+        <Layers v-else-if="categoria === 'PISO_FLOTANTE'" :size="15" aria-hidden="true" />
+        <Package v-else :size="15" aria-hidden="true" />
+        <span>Catálogo comercial · {{ categoriaNombre }}</span>
       </div>
       <Button
         v-if="!initial && categoria"
@@ -547,7 +547,7 @@ onMounted(load)
             </div>
           </div>
           <div class="fields-grid">
-            <div class="full-field">
+            <div :class="{ 'full-field': !preselectCategory && !initial }">
               <TextField
                 v-model="form.nombre"
                 name="nombre"

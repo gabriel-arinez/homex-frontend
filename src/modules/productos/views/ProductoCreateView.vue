@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import type { ProductoWritable } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
@@ -25,6 +25,13 @@ const confirmCancel = ref(false)
 const confirmLeave = ref(false)
 let resolveLeave: ((answer: boolean) => void) | null = null
 let allowNavigationAfterSave = false
+
+const pageTitle = computed(() => {
+  const cat = route.query.categoria
+  if (cat === 'SILLA') return 'Nueva silla'
+  if (cat === 'PISO_FLOTANTE') return 'Nuevo piso flotante'
+  return 'Nuevo producto'
+})
 
 function destination(producto?: number, mediaError = false) {
   const requested = route.query.returnTo
@@ -195,8 +202,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 <template>
   <div class="create-product-page">
     <PageHeader
-      title="Nuevo producto"
-      description="Registra un artículo comercial en el catálogo HOMEX."
+      :title="pageTitle"
+      description="Organiza los datos comerciales. Los campos marcados con * son obligatorios."
       show-menu
       @menu="emit('openMenu')"
     />
