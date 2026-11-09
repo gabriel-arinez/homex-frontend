@@ -87,6 +87,7 @@ watch(
       printError.value = ''
     }
   },
+  { immediate: true },
 )
 watch(() => props.pdfUrl, () => { printError.value = '' })
 window.addEventListener('keydown', handleKeydown)
@@ -114,15 +115,15 @@ onBeforeUnmount(() => {
           </div>
         </div>
         <div class="doc-viewer-bar__zoom-controls" aria-label="Controles de escala">
-          <button type="button" class="zoom-btn" title="Reducir zoom" :disabled="zoom <= 0.4" @click="zoomOut"><ZoomOut :size="17" /></button>
+          <button type="button" class="zoom-btn" title="Reducir zoom" aria-label="Reducir zoom" :disabled="zoom <= 0.4" @click="zoomOut"><ZoomOut :size="17" /></button>
           <button type="button" class="zoom-display" title="Restablecer escala" @click="resetZoom">{{ Math.round(zoom * 100) }}%</button>
-          <button type="button" class="zoom-btn" title="Aumentar zoom" :disabled="zoom >= 1.8" @click="zoomIn"><ZoomIn :size="17" /></button>
+          <button type="button" class="zoom-btn" title="Aumentar zoom" aria-label="Aumentar zoom" :disabled="zoom >= 1.8" @click="zoomIn"><ZoomIn :size="17" /></button>
           <button type="button" class="zoom-btn zoom-btn--text" title="Ajustar al ancho" @click="fitWidth"><Maximize2 :size="15" /><span>Ajustar</span></button>
         </div>
         <div class="doc-viewer-bar__actions">
           <Button type="button" variant="secondary" :disabled="loading || !pdfUrl" @click="printDocument"><Printer :size="17" aria-hidden="true" /> Imprimir</Button>
           <Button v-if="canDownloadPdf" type="button" variant="secondary" :processing="downloading" :disabled="loading || !pdfUrl" @click="emit('download')"><Download :size="17" aria-hidden="true" /> Descargar PDF</Button>
-          <button ref="closeRef" type="button" class="doc-close-btn" aria-label="Cerrar visor" @click="emit('close')"><X :size="20" /></button>
+          <button ref="closeRef" type="button" class="doc-close-btn" aria-label="Cerrar visor de documento" @click="emit('close')"><X :size="20" /></button>
         </div>
       </header>
 
