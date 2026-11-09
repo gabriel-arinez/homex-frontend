@@ -2,6 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import DocumentViewerModal from './DocumentViewerModal.vue'
 
+vi.mock('./PdfCanvasPage.vue', () => ({
+  default: { name: 'PdfCanvasPage', template: '<div class="pdf-page-placeholder"></div>' },
+}))
+
 vi.mock('pdfjs-dist', () => ({
   GlobalWorkerOptions: { workerSrc: '' },
   getDocument: vi.fn<
@@ -21,7 +25,7 @@ const mountViewer = (props: Record<string, unknown>) =>
   mount(DocumentViewerModal, {
     props: { open: true, ...props },
     global: {
-      stubs: { Teleport: true, PdfCanvasPage: true },
+      stubs: { Teleport: true },
     },
   })
 
@@ -35,7 +39,7 @@ describe('DocumentViewerModal — PDF.js', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('Proforma #578')
     expect(wrapper.find('.doc-page-stack').exists()).toBe(true)
-    expect(wrapper.findAll('pdf-canvas-page-stub')).toHaveLength(2)
+    expect(wrapper.findAll('.pdf-page-placeholder')).toHaveLength(2)
     expect(wrapper.find('.doc-pdf-frame').exists()).toBe(false)
     await wrapper.find('button.zoom-display').trigger('click')
     expect(wrapper.text()).toContain('100%')
