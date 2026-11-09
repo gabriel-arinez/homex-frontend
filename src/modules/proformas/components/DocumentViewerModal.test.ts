@@ -38,7 +38,7 @@ describe('DocumentViewerModal — PDF.js', () => {
     })
     await flushPromises()
     expect(wrapper.text()).toContain('Proforma #578')
-    expect(wrapper.find('.doc-page-stack').exists()).toBe(true)
+    expect(wrapper.find('.doc-page-stack').exists(), wrapper.html()).toBe(true)
     expect(wrapper.findAll('.pdf-page-placeholder')).toHaveLength(2)
     expect(wrapper.find('.doc-pdf-frame').exists()).toBe(false)
     await wrapper.find('button.zoom-display').trigger('click')
