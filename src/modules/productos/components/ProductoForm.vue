@@ -238,10 +238,6 @@ const categoriaNombre = computed(
     opciones.CATEGORIA_PRODUCTO?.find((x) => String(x.id) === form.categoria)?.nombre || 'General',
 )
 
-const unidadStockNombre = computed(
-  () => opciones.UNIDAD_MEDIDA?.find((x) => String(x.id) === form.unidad_stock)?.nombre || 'Pieza',
-)
-
 const opts = (key: string, empty = 'Sin seleccionar') => [
   { label: empty, value: '' },
   ...(opciones[key] ?? []).map((x) => ({ label: x.nombre, value: String(x.id) })),
@@ -578,36 +574,14 @@ onMounted(load)
               </small>
             </div>
 
-            <!-- Presentación limpia de la unidad comercial en 3 capas -->
-            <div class="unit-field-wrapper">
-              <span class="unit-label">Unidad comercial *</span>
-              <div v-if="categoria === 'SILLA' || categoria === 'PISO_FLOTANTE'" class="unit-card">
-                <div class="unit-card-info">
-                  <span class="unit-val">{{ unidadStockNombre }}</span>
-                  <span class="unit-tag">Fijada por la categoría</span>
-                </div>
-                <!-- select oculto pero presente para garantizar compatibilidad con tests y envíos -->
-                <select
-                  v-model="form.unidad_stock"
-                  name="unidad"
-                  class="visually-hidden-input"
-                  disabled
-                  tabindex="-1"
-                  aria-hidden="true"
-                >
-                  <option v-for="opt in opts('UNIDAD_MEDIDA')" :key="opt.value" :value="opt.value">
-                    {{ opt.label }}
-                  </option>
-                </select>
-              </div>
-              <div v-else>
-                <Select
-                  v-model="form.unidad_stock"
-                  name="unidad"
-                  label=""
-                  :options="opts('UNIDAD_MEDIDA', 'Seleccionar unidad')"
-                />
-              </div>
+            <div>
+              <Select
+                v-model="form.unidad_stock"
+                name="unidad_stock"
+                label="Unidad comercial *"
+                :options="opts('UNIDAD_MEDIDA', 'Seleccionar unidad')"
+                :disabled="categoria === 'SILLA' || categoria === 'PISO_FLOTANTE'"
+              />
               <small v-if="fieldError('unidad_stock')" class="field-error" role="alert">
                 {{ fieldError('unidad_stock') }}
               </small>
