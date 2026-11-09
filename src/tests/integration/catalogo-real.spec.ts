@@ -123,11 +123,11 @@ for (const [category, file] of samples) {
             await assistant.getByRole('button', { name: 'Finalizar grabación' }).click()
           }
           const proposal = (await (await completed).json()) as ResultadoCatalogo
-          await expect(page.getByRole('heading', { name: 'Campos detectados' })).toBeVisible()
-          const text = page.getByRole('textbox', { name: 'Transcripción / texto corregido' })
-          expect((await text.inputValue()).trim().length).toBeGreaterThan(4)
-          expect(writes).toEqual([])
-          await page.getByRole('button', { name: 'Aplicar al formulario', exact: true }).click()
+          await expect(assistant).not.toBeVisible()
+          await expect(
+            page.getByRole('heading', { name: 'Descripción original por voz' }),
+          ).toBeVisible()
+          expect(proposal.texto_transcrito_original?.trim().length).toBeGreaterThan(4)
           expect(writes).toEqual([])
           expect(await readInventory()).toEqual(before)
           const fields = proposal.propuesta!.fields

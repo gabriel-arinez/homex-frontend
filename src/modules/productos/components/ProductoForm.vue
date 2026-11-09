@@ -940,6 +940,7 @@ onMounted(load)
                 + {{ chip }}
               </button>
             </div>
+            <label for="observaciones" class="visually-hidden">Notas del producto (opcional)</label>
             <textarea
               id="observaciones"
               v-model="form.observaciones"
