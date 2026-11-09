@@ -84,7 +84,7 @@ test('Galería real de mueble: borrador restaurado y vinculación integral', asy
     .getByLabel('Agregar imágenes', { exact: true })
     .setInputFiles([file('red'), file('green')])
   await expect(page.getByRole('heading', { name: 'Imágenes del mueble 2/8' })).toBeVisible()
-  await expect(page.getByRole('img', { name: 'red.png' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Ver red.png' })).toBeVisible()
   await step(page, 'Precio')
   await page.getByLabel('Precio unitario negociado (BOB)').fill('700')
   await step(page, 'Revisar')
