@@ -94,7 +94,7 @@ import {
 import { totalEstimadoCompleto, totalEstimadoLinea } from '../services/presentacionComercial'
 import { downloadBlob } from '@/shared/download/downloadBlob'
 import DocumentViewerModal from '../components/DocumentViewerModal.vue'
-import ProformaDocumentSheet from '../components/ProformaDocumentSheet.vue'
+import { useProformaPdf } from '../composables/useProformaPdf'
 
 type LineaLocal = DetalleIntegralWritable & { localId: string; galeria_id?: string }
 const emit = defineEmits<{ openMenu: [] }>()
@@ -758,121 +758,47 @@ function normalizeLine(line: Proforma['detalles'][number]): LineaLocal {
 const documentModalOpen = ref(false)
 const downloadingDocument = ref(false)
 
-const currentCurrencyName = computed(() => {
-  return (
-    monedas.value.find((m) => m.codigo === header.moneda_codigo)?.nombre ??
-    (header.moneda_codigo === 'USD' ? 'Dólares' : 'Bolivianos')
-  )
+const {
+  blob: documentBlob, url: documentUrl, loading: documentLoading,
+  error: documentError, load: loadDocument, clear: clearDocument,
+} = useProformaPdf()
+watch(documentModalOpen, (open) => {
+  if (open && persisted.value?.id) void loadDocument(persisted.value.id)
+  else clearDocument()
 })
-
-const calculatedDiscountTotal = computed(() => {
-  return lineas.value.reduce((acc, l) => {
-    const d = Number(l.descuento)
-    return acc + (Number.isFinite(d) && d > 0 ? d : 0)
-  }, 0)
-})
-
-const documentLines = computed(() => {
-  return lineas.value.map((line) => {
-    let imageUrl: string | null = null
-    const complementarias: string[] = []
-
-    if (line.producto) {
-      const img = quoteImages.value[line.producto]
-      imageUrl = img?.variantes?.['640'] ?? img?.variantes?.['320'] ?? img?.original ?? null
-    } else {
-      const cover = furnitureCoverFor(line, proformaId.value)
-      imageUrl = cover?.variantes?.['640'] ?? cover?.variantes?.['320'] ?? cover?.url ?? null
-      const fullGallery = furnitureGalleryFor(line, proformaId.value)
-      for (const item of fullGallery) {
-        if (item.url !== cover?.url) {
-          const compUrl = item.variantes?.['320'] ?? item.url
-          if (compUrl && !complementarias.includes(compUrl)) {
-            complementarias.push(compUrl)
-          }
-        }
-      }
-    }
-
-    return {
-      id: line.id,
-      localId: line.localId,
-      producto: line.producto,
-      nombre: line.nombre,
-      descripcion: line.descripcion,
-      tipo_item: line.tipo_item,
-      tipo_item_label: itemTypeLabel(line),
-      cantidad: line.cantidad,
-      unidad: line.unidad,
-      unidad_label: unitName(Number(line.unidad)),
-      precio_unitario: line.precio_unitario,
-      descuento: line.descuento,
-      modo_calculo: line.modo_calculo,
-      importe_negociado: line.importe_negociado,
-      total_calculado: totalEstimadoLinea(line),
-      especificacion: line.especificacion,
-      imagen_url: imageUrl,
-      imagenes_complementarias: complementarias,
-    }
-  })
-})
-
-const documentClientInfo = computed(() => {
-  if (clienteMode.value === 'nuevo') {
-    return {
-      nombres: nuevoCliente.nombres,
-      apellidos: nuevoCliente.apellidos,
-      empresa: nuevoCliente.empresa,
-      celular: nuevoCliente.celular,
-      direccion: nuevoCliente.direccion,
-    }
+function openDocumentPreview() {
+  if (!persisted.value?.id) {
+    error.value = 'Guarda primero el borrador para generar el PDF.'
+    return
   }
-  const sel = clienteSeleccionado.value
-  if (!sel) return null
-  if ('nombres' in sel) {
-    const c = sel as Cliente
-    return {
-      nombres: c.nombres,
-      apellidos: c.apellidos,
-      empresa: c.empresa,
-      celular: c.celular,
-      direccion: c.direccion,
-    }
-  }
-  const resumen = sel as ClienteResumenProforma
-  return {
-    nombres: resumen.nombre,
-    empresa: resumen.empresa,
-    celular: resumen.celular,
-  }
-})
-
-const documentConditions = computed(() => ({
-  porcentaje_adelanto: header.porcentaje_adelanto,
-  plazo_entrega: header.plazo_entrega,
-  validez_oferta: header.validez_oferta,
-  observaciones: header.observaciones,
-}))
+  documentModalOpen.value = true
+}
 
 async function downloadDocumentPdf() {
   if (downloadingDocument.value) return
-  if (persisted.value?.id) {
-    downloadingDocument.value = true
-    try {
-      const blob = await proformasService.documentPdf(persisted.value.id)
-      const prefix = isReview.value
-        ? 'proforma-revision'
-        : persisted.value.estado_info.codigo === 'BORRADOR'
-          ? 'proforma-borrador'
-          : 'proforma'
-      downloadBlob(blob, `${prefix}-${persisted.value.numero}.pdf`)
-    } catch {
-      window.print()
-    } finally {
-      downloadingDocument.value = false
+  if (!persisted.value?.id) {
+    error.value = 'Guarda primero la proforma para descargar el PDF.'
+    return
+  }
+  const opened = documentModalOpen.value
+  downloadingDocument.value = true
+  try {
+    const file = (opened && documentBlob.value) || await loadDocument(persisted.value.id)
+    if (!file) {
+      if (!opened) error.value = documentError.value || 'No se pudo generar el PDF.'
+      return
     }
-  } else {
-    window.print()
+    const prefix = isReview.value
+      ? 'proforma-revision'
+      : persisted.value.estado_info.codigo === 'BORRADOR'
+        ? 'proforma-borrador'
+        : 'proforma'
+    downloadBlob(file, `${prefix}-${persisted.value.numero}.pdf`)
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : 'No se pudo descargar el PDF.'
+  } finally {
+    downloadingDocument.value = false
+    if (!opened) clearDocument()
   }
 }
 
@@ -2372,7 +2298,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 type="button"
                 variant="primary"
                 class="document-preview-launcher__btn"
-                @click="documentModalOpen = true"
+                @click="openDocumentPreview"
               >
                 <Eye :size="16" aria-hidden="true" />
                 <span>Ver documento / PDF</span>
@@ -2483,7 +2409,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 type="button"
                 variant="secondary"
                 class="editor-preview-doc-btn"
-                @click="documentModalOpen = true"
+                @click="openDocumentPreview"
               >
                 <FileText :size="17" aria-hidden="true" />
                 Vista previa PDF
@@ -2574,30 +2500,19 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 
     <DocumentViewerModal
       :open="documentModalOpen"
-      :title="persisted?.numero ? `Proforma #${persisted.numero}` : 'Cotización comercial HOMEX'"
-      :subtitle="`Vista previa de impresión · Tamaño Carta (216 × 279 mm) · ${persisted?.estado_info?.nombre ?? 'Borrador'}`"
+      :title="persisted?.numero ? `Proforma #${persisted.numero}` : 'Cotización HOMEX'"
+      :subtitle="`PDF de la versión guardada · Tamaño Carta · ${persisted?.estado_info?.nombre ?? 'Borrador'}`"
+      :notice="dirty ? 'Hay cambios sin guardar. El PDF corresponde a la última versión guardada.' : ''"
       :downloading="downloadingDocument"
       :can-download-pdf="true"
+      :pdf-url="documentUrl"
+      :loading="documentLoading"
+      :error="documentError"
       @close="documentModalOpen = false"
+      @retry="persisted?.id && loadDocument(persisted.id)"
       @download="downloadDocumentPdf"
-    >
-      <ProformaDocumentSheet
-        :numero="persisted?.numero"
-        :fecha="persisted?.fecha ?? null"
-        :titulo="header.titulo"
-        :moneda-codigo="header.moneda_codigo"
-        :moneda-nombre="currentCurrencyName"
-        :estado-codigo="persisted?.estado_info?.codigo ?? 'BORRADOR'"
-        :estado-nombre="persisted?.estado_info?.nombre ?? 'Borrador'"
-        :cliente="documentClientInfo"
-        :condiciones="documentConditions"
-        :lineas="documentLines"
-        :subtotal="totalPreview"
-        :descuento-total="calculatedDiscountTotal"
-        :total="persisted && !dirty ? Number(persisted.total) : totalPreview"
-        :catalog-images="quoteImages"
-      />
-    </DocumentViewerModal>
+    />
+
   </div>
 </template>
 
