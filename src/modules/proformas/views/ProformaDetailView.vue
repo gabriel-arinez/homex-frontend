@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
   ArrowLeft,
@@ -33,7 +33,7 @@ import { useQuoteProductImages } from '../composables/useQuoteProductImages'
 import { proformasService } from '../services/proformasService'
 import { retornoAProformas } from '../utils/navegacionProformas'
 import DocumentViewerModal from '../components/DocumentViewerModal.vue'
-import ProformaDocumentSheet from '../components/ProformaDocumentSheet.vue'
+import { useProformaPdf } from '../composables/useProformaPdf'
 
 const emit = defineEmits<{ openMenu: [] }>()
 const route = useRoute()
@@ -41,7 +41,7 @@ const router = useRouter()
 const id = Number(route.params.id)
 const quote = ref<(Proforma & { fecha_vencimiento?: string | null }) | null>(null)
 const { images: quoteImages, ensure: ensureQuoteImages } = useQuoteProductImages()
-const { coverFor: furnitureCoverFor, galleryFor: furnitureGalleryFor, ensureLines: ensureFurnitureCovers } =
+const { coverFor: furnitureCoverFor, ensureLines: ensureFurnitureCovers } =
   useQuoteFurnitureCovers()
 function furnitureCoverSource(line: DetalleProforma) {
   const cover = furnitureCoverFor(line, quote.value?.id)
@@ -58,76 +58,13 @@ const confirmAction = ref<'approve' | 'not-completed' | 'reopen' | 'cancel' | nu
 const previewModalOpen = ref(false)
 const listPath = computed(() => retornoAProformas(route.query.returnTo))
 
-const documentLines = computed(() => {
-  if (!quote.value) return []
-  return quote.value.detalles.map((line) => {
-    let imageUrl: string | null = null
-    const complementarias: string[] = []
-
-    if (line.producto) {
-      const img = quoteImages.value[line.producto]
-      imageUrl = img?.variantes?.['640'] ?? img?.variantes?.['320'] ?? img?.original ?? null
-    } else {
-      const cover = furnitureCoverFor(line, quote.value?.id)
-      imageUrl = cover?.variantes?.['640'] ?? cover?.variantes?.['320'] ?? cover?.url ?? null
-      const fullGallery = furnitureGalleryFor(line, quote.value?.id)
-      for (const item of fullGallery) {
-        if (item.url !== cover?.url) {
-          const compUrl = item.variantes?.['320'] ?? item.url
-          if (compUrl && !complementarias.includes(compUrl)) {
-            complementarias.push(compUrl)
-          }
-        }
-      }
-    }
-    return {
-      id: line.id,
-      producto: line.producto,
-      nombre: line.nombre,
-      descripcion: line.descripcion,
-      tipo_item: line.tipo_item,
-      tipo_item_label: line.tipo_item_info.nombre,
-      cantidad: line.cantidad,
-      unidad: line.unidad,
-      unidad_label: line.unidad_info.nombre,
-      precio_unitario: line.precio_unitario,
-      descuento: line.descuento,
-      modo_calculo: line.modo_calculo,
-      importe_negociado: line.importe_negociado,
-      total_calculado: Number(line.total),
-      especificacion: line.especificacion,
-      imagen_url: imageUrl,
-      imagenes_complementarias: complementarias,
-    }
-  })
-})
-
-const documentClientInfo = computed(() => {
-  if (!quote.value) return null
-  if (quote.value.cliente_nombre_snapshot || quote.value.cliente_empresa_snapshot) {
-    return {
-      nombres: quote.value.cliente_nombre_snapshot,
-      empresa: quote.value.cliente_empresa_snapshot,
-      celular: quote.value.cliente_celular_snapshot,
-      direccion: quote.value.cliente_direccion_snapshot,
-    }
-  }
-  if (!quote.value.cliente_resumen) return null
-  return {
-    nombres: quote.value.cliente_resumen.nombre,
-    empresa: quote.value.cliente_resumen.empresa,
-    celular: quote.value.cliente_resumen.celular,
-  }
-})
-
-const documentConditions = computed(() => {
-  if (!quote.value) return null
-  return {
-    porcentaje_adelanto: quote.value.porcentaje_adelanto,
-    plazo_entrega: quote.value.plazo_entrega,
-    validez_oferta: quote.value.validez_oferta,
-    observaciones: quote.value.observaciones,
-  }
+const {
+  blob: documentBlob, url: documentUrl, loading: documentLoading,
+  error: documentError, load: loadDocument, clear: clearDocument,
+} = useProformaPdf()
+watch(previewModalOpen, (open) => {
+  if (open && quote.value) void loadDocument(quote.value.id)
+  else clearDocument()
 })
 const stateCode = computed(() => quote.value?.estado_info.codigo ?? '')
 const editable = computed(() => ['BORRADOR', 'EN_REVISION'].includes(stateCode.value))
@@ -256,17 +193,24 @@ async function downloadDocument() {
   if (!quote.value || downloading.value) return
   downloading.value = true
   error.value = ''
+  const opened = previewModalOpen.value
   try {
-    const blob = await proformasService.documentPdf(id)
+    const file = (opened && documentBlob.value) || await loadDocument(id)
+    if (!file) {
+      if (!opened) error.value = documentError.value || 'No se pudo obtener el PDF.'
+      return
+    }
     const prefix = stateCode.value === 'BORRADOR' ? 'proforma-borrador' : 'proforma'
-    downloadBlob(blob, `${prefix}-${quote.value.numero}.pdf`)
+    downloadBlob(file, `${prefix}-${quote.value.numero}.pdf`)
     downloadNotice.value = 'Documento descargado correctamente.'
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : 'No se pudo descargar el documento.'
   } finally {
     downloading.value = false
+    if (!opened) clearDocument()
   }
 }
+
 onMounted(() => void load())
 </script>
 
@@ -554,29 +498,17 @@ onMounted(() => void load())
       v-if="quote"
       :open="previewModalOpen"
       :title="`Proforma #${quote.numero}`"
-      :subtitle="`Vista previa de impresión · Tamaño Carta (216 × 279 mm) · ${quote.estado_info.nombre}`"
+      :subtitle="`Documento PDF · Tamaño Carta (216 × 279 mm) · ${quote.estado_info.nombre}`"
       :downloading="downloading"
       :can-download-pdf="true"
+      :pdf-url="documentUrl"
+      :loading="documentLoading"
+      :error="documentError"
       @close="previewModalOpen = false"
+      @retry="loadDocument(quote.id)"
       @download="downloadDocument"
-    >
-      <ProformaDocumentSheet
-        :numero="quote.numero"
-        :fecha="quote.fecha"
-        :titulo="quote.titulo"
-        :moneda-codigo="quote.moneda_info.codigo"
-        :moneda-nombre="quote.moneda_info.nombre"
-        :estado-codigo="quote.estado_info.codigo"
-        :estado-nombre="quote.estado_info.nombre"
-        :cliente="documentClientInfo"
-        :condiciones="documentConditions"
-        :lineas="documentLines"
-        :subtotal="Number(quote.subtotal)"
-        :descuento-total="Number(quote.descuento_total)"
-        :total="Number(quote.total)"
-        :catalog-images="quoteImages"
-      />
-    </DocumentViewerModal>
+    />
+
   </div>
 </template>
 
