@@ -2,11 +2,24 @@ import { createPinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { http, HttpResponse } from 'msw'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import ProformaEditorView from '@/modules/proformas/views/ProformaEditorView.vue'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import { productosService } from '@/modules/productos/services/productosService'
 import { server } from '@/tests/msw/server'
+
+vi.mock('pdfjs-dist', () => ({
+  GlobalWorkerOptions: { workerSrc: '' },
+  getDocument: () => ({
+    promise: Promise.resolve({
+      numPages: 1,
+      getPage: async () => ({ getViewport: () => ({ width: 816, height: 1056 }) }),
+    }),
+    destroy: vi.fn(),
+  }),
+}))
+
+afterEach(() => vi.restoreAllMocks())
 
 const options: Record<string, object[]> = {
   TIPO_ITEM: [{ id: 1, concepto_codigo: 'TIPO_ITEM', codigo: 'MUEBLE_MEDIDA', nombre: 'Mueble' }],
@@ -45,7 +58,7 @@ async function mounted(path = '/proformas/nueva') {
   })
   await router.push(path)
   const wrapper = mount(ProformaEditorView, {
-    global: { plugins: [createPinia(), router], stubs: { Teleport: true } },
+    global: { plugins: [createPinia(), router], stubs: { Teleport: true, PdfCanvasPage: true } },
   })
   await flushPromises()
   return { wrapper, router }
@@ -282,4 +295,220 @@ describe('AP3 editor integral', () => {
     expect(wrapper.text()).toContain('Se conservaron tus cambios locales')
     expect(wrapper.text()).toContain('Descartar cambios y recargar')
   })
+})
+
+const savedQuote = () => ({
+  id: 1,
+  numero: 101,
+  revision: 'a'.repeat(64),
+  cliente: null,
+  titulo: 'Original',
+  moneda: 3,
+  moneda_info: { codigo: 'BOB' },
+  estado_info: { codigo: 'BORRADOR', nombre: 'Borrador' },
+  total: '0.00',
+  detalles: [],
+})
+
+function pdfReferences() {
+  sessionStorage.clear()
+  references()
+  vi.spyOn(proformasService, 'get').mockResolvedValue(savedQuote() as never)
+  const generate = vi
+    .spyOn(proformasService, 'documentPdf')
+    .mockResolvedValue(new Blob(['%PDF saved'], { type: 'application/pdf' }))
+  const revoke = vi.fn()
+  Object.defineProperty(URL, 'createObjectURL', {
+    configurable: true,
+    value: vi.fn(() => 'blob:saved-document'),
+  })
+  Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revoke })
+  return { generate, revoke }
+}
+
+async function closePdf(wrapper: Awaited<ReturnType<typeof mounted>>['wrapper']) {
+  await wrapper.get('[aria-label="Cerrar visor de documento"]').trigger('click')
+  await flushPromises()
+}
+
+describe('AP3 saved PDF freshness', () => {
+  it('detecta y revierte cambios reales en un mueble nuevo todavía sin incorporar', async () => {
+    pdfReferences()
+    const save = vi.spyOn(proformasService, 'updateIntegral')
+    const { wrapper } = await mounted('/proformas/1/editar')
+    await click(wrapper, 'Vista previa PDF')
+    await flushPromises()
+    await click(wrapper, 'Añadir ítem')
+    await wrapper.findAll('.choice-card')[1]!.trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.doc-viewer-notice').exists()).toBe(false)
+    await wrapper.get('#mueble-nombre-comercial').setValue('Mueble nuevo pendiente')
+    await flushPromises()
+    expect(wrapper.find('.doc-viewer-notice').exists()).toBe(true)
+    await wrapper.get('#mueble-nombre-comercial').setValue('')
+    await flushPromises()
+    expect(wrapper.find('.doc-viewer-notice').exists()).toBe(false)
+    expect(save).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('advierte solo cambios reales, explica cómo actualizar y desaparece al revertir sin guardar', async () => {
+    pdfReferences()
+    const save = vi.spyOn(proformasService, 'updateIntegral')
+    const { wrapper } = await mounted('/proformas/1/editar')
+    await click(wrapper, 'Vista previa PDF')
+    await flushPromises()
+    expect(wrapper.find('.doc-viewer-notice').exists()).toBe(false)
+    await closePdf(wrapper)
+    await click(wrapper, 'Condiciones')
+    await wrapper.get('#titulo').setValue('Cambio local')
+    await click(wrapper, 'Vista previa PDF')
+    await flushPromises()
+    const notice = wrapper.get('.doc-viewer-notice').text()
+    expect(notice).toContain('guardados en el servidor')
+    expect(notice).toContain('pendientes')
+    expect(notice).toContain('Cierra el visor')
+    expect(notice).toContain('Guardar borrador')
+    expect(notice).toContain('vuelve a abrir')
+    await closePdf(wrapper)
+    await wrapper.get('#titulo').setValue('Original')
+    await click(wrapper, 'Vista previa PDF')
+    await flushPromises()
+    expect(wrapper.find('.doc-viewer-notice').exists()).toBe(false)
+    expect(save).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('conserva el aviso y los datos ante validación local o rechazo del servidor', async () => {
+    pdfReferences()
+    const save = vi
+      .spyOn(proformasService, 'updateIntegral')
+      .mockRejectedValue(new Error('Validación rechazada'))
+    const { wrapper } = await mounted('/proformas/1/editar')
+    await click(wrapper, 'Condiciones')
+    await wrapper.get('#titulo').setValue('Cambio pendiente')
+    await wrapper.get('#validez').setValue('0')
+    await click(wrapper, 'Guardar borrador')
+    await flushPromises()
+    expect(save).not.toHaveBeenCalled()
+    await click(wrapper, 'Vista previa PDF')
+    await flushPromises()
+    expect(wrapper.find('.doc-viewer-notice').exists()).toBe(true)
+    await closePdf(wrapper)
+    await wrapper.get('#validez').setValue('15')
+    await click(wrapper, 'Guardar borrador')
+    await flushPromises()
+    expect(save).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('#titulo').element).toHaveProperty('value', 'Cambio pendiente')
+    await click(wrapper, 'Vista previa PDF')
+    await flushPromises()
+    expect(wrapper.find('.doc-viewer-notice').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('invalida el Blob anterior al guardar y solo ofrece la nueva generación', async () => {
+    const { generate, revoke } = pdfReferences()
+    vi.spyOn(proformasService, 'updateIntegral').mockResolvedValue({
+      ...savedQuote(),
+      titulo: 'Actualizada',
+    } as never)
+    const { wrapper } = await mounted('/proformas/1/editar')
+    await click(wrapper, 'Condiciones')
+    await wrapper.get('#titulo').setValue('Actualizada')
+    await click(wrapper, 'Vista previa PDF')
+    await flushPromises()
+    expect(wrapper.get('.doc-native-print-frame').attributes('src')).toBe('blob:saved-document')
+    let resolve!: (blob: Blob) => void
+    generate.mockImplementationOnce(
+      () =>
+        new Promise<Blob>((done) => {
+          resolve = done
+        }),
+    )
+    await click(wrapper, 'Guardar borrador')
+    await flushPromises()
+    expect(revoke).toHaveBeenCalledWith('blob:saved-document')
+    expect(generate).toHaveBeenCalledTimes(2)
+    expect(wrapper.find('.doc-native-print-frame').exists()).toBe(false)
+    expect(wrapper.find('.doc-viewer-notice').exists()).toBe(false)
+    expect(wrapper.get('button.editor-save-draft').attributes('disabled')).toBeDefined()
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: () => 'blob:updated-document',
+    })
+    resolve(new Blob(['%PDF updated'], { type: 'application/pdf' }))
+    await flushPromises()
+    expect(wrapper.get('.doc-native-print-frame').attributes('src')).toBe('blob:updated-document')
+    wrapper.unmount()
+  })
+
+  it.each(['line', 'spec'])(
+    'advierte ediciones pendientes de %s sin guardarlas ni perderlas',
+    async (kind) => {
+      pdfReferences()
+      const save = vi.spyOn(proformasService, 'updateIntegral')
+      const quote = {
+        ...savedQuote(),
+        detalles: [
+          {
+            id: 31,
+            tipo_item: kind === 'spec' ? 1 : 6,
+            nombre: 'Mesa',
+            producto: null,
+            cantidad: '1',
+            unidad: 2,
+            modo_calculo: 'PRECIO_UNITARIO',
+            precio_unitario: '100.00',
+            descuento: '0.00',
+            descripcion: '',
+            especificacion: null,
+          },
+        ],
+      }
+      vi.mocked(proformasService.get).mockResolvedValue(quote as never)
+      vi.mocked(proformasService.options).mockImplementation(
+        async (concepto) =>
+          (concepto === 'TIPO_ITEM'
+            ? [...options.TIPO_ITEM!, { id: 6, codigo: 'SILLA', nombre: 'Silla' }]
+            : options[concepto]) as never,
+      )
+      const { wrapper } = await mounted('/proformas/1/editar')
+      await click(wrapper, 'Vista previa PDF')
+      await flushPromises()
+      await wrapper.get('[aria-label="Acciones de Mesa"]').trigger('click')
+      await click(wrapper, 'Editar')
+      await flushPromises()
+      const name = kind === 'spec' ? '#mueble-nombre-comercial' : '#nombre-linea'
+      const draftName = kind === 'spec' ? '' : 'Pendiente de incorporar'
+      await wrapper.get(name).setValue(draftName)
+      await flushPromises()
+      expect(wrapper.get('.doc-viewer-notice').text()).toContain('incorpora')
+      await wrapper.get(name).setValue('Mesa')
+      await flushPromises()
+      expect(wrapper.find('.doc-viewer-notice').exists()).toBe(false)
+      expect(save).not.toHaveBeenCalled()
+      await wrapper.get(name).setValue(draftName)
+      await flushPromises()
+      if (kind === 'spec') {
+        await click(wrapper, 'Volver a proforma')
+        await click(wrapper, 'Guardar cambios')
+        await flushPromises()
+        expect(wrapper.find('.doc-viewer-notice').exists()).toBe(true)
+        expect(save).not.toHaveBeenCalled()
+        expect(wrapper.get(name).element).toHaveProperty('value', draftName)
+        wrapper.unmount()
+        return
+      }
+      await closePdf(wrapper)
+      // Saving the outer editor must not persist an older line over an unincorporated draft.
+      await click(wrapper, 'Condiciones')
+      await wrapper.get('#titulo').setValue('Cambio adicional')
+      await click(wrapper, 'Guardar borrador')
+      await flushPromises()
+      expect(save).not.toHaveBeenCalled()
+      expect(wrapper.get(name).element).toHaveProperty('value', draftName)
+      expect(wrapper.text()).toContain('Incorpora')
+      wrapper.unmount()
+    },
+  )
 })

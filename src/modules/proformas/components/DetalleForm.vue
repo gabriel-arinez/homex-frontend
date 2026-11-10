@@ -18,6 +18,7 @@ import { ApiError } from '@/shared/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { getActivePinia } from 'pinia'
 import { productosService } from '@/modules/productos/services/productosService'
+import { clonarTecnica, tecnicaIgual } from '../services/muebleTecnico'
 
 const props = defineProps<{
   tipos: ValorCatalogoPublico[]
@@ -59,7 +60,10 @@ const form = reactive({
   precio_unitario: props.detail?.precio_unitario ?? '',
   descuento: props.detail?.descuento ?? '0.00',
 })
+const initialContent = clonarTecnica(form)
 if (props.initialDraft) Object.assign(form, props.initialDraft)
+const hasRealChanges = computed(() => !tecnicaIgual(form, initialContent))
+defineExpose({ hasRealChanges })
 const unidadCatalogo = ref<string | null>(null)
 const master = ref<Producto | null>(null)
 const categoriaId = computed(() => {

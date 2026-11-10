@@ -1633,7 +1633,9 @@ test('approved PDF renders, downloads identical bytes and prints the original do
   await page.goto('/proformas/1')
   await page.getByRole('button', { name: 'Ver documento / PDF' }).click()
   const viewer = page.locator('.doc-viewer-overlay')
-  await expect(viewer.locator('.pdf-page')).toHaveCount(2)
+  const pageCount = (fixture.toString('latin1').match(/\/Type \/Page\b/g) ?? []).length
+  expect(pageCount).toBeGreaterThan(0)
+  await expect(viewer.locator('.pdf-page')).toHaveCount(pageCount)
   await expect(viewer.locator('.pdf-page__text').first()).toContainText('HOMEX')
   await expect(viewer.locator('.pdf-page__canvas').first()).toBeVisible()
   const downloadEvent = page.waitForEvent('download')

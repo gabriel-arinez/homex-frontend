@@ -1117,7 +1117,13 @@ function submit(): boolean {
   )
   return true
 }
-defineExpose({ submit })
+function currentDraft() {
+  return { form, comercial, medidas, conjuntos, componentes, accesorios, atributosGenerales }
+}
+// Each editor instance is keyed by its line and capture version by MuebleStudio.
+const initialContent = clonarTecnica(currentDraft())
+const hasRealChanges = computed(() => !tecnicaIgual(currentDraft(), initialContent))
+defineExpose({ submit, hasRealChanges })
 onMounted(loadCatalog)
 </script>
 

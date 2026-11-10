@@ -171,6 +171,7 @@ let readRequestId = 0
 const specLine = ref<number | null>(null)
 const draftingFurniture = ref<LineaLocal | null>(null)
 const studioRef = ref<InstanceType<typeof MuebleStudio> | null>(null)
+const lineFormRef = ref<InstanceType<typeof DetalleForm> | null>(null)
 const furnitureOpen = computed(() => specLine.value !== null || draftingFurniture.value !== null)
 const sesionBorrador = ref(crypto.randomUUID())
 const specRenderVersion = ref(0)
@@ -807,6 +808,7 @@ async function downloadDocumentPdf() {
 }
 
 function fill(value: Proforma) {
+  clearDocument()
   persisted.value = value
   header.cliente = value.cliente ? String(value.cliente) : ''
   header.titulo = value.titulo ?? ''
@@ -1404,6 +1406,24 @@ function currentContent() {
 const hasRealChanges = computed(
   () => Boolean(savedContent.value) && currentContent() !== savedContent.value,
 )
+const hasPendingEdits = computed(
+  () =>
+    (lineModal.value
+      ? (lineFormRef.value?.hasRealChanges ?? lineModalDirty.value)
+      : lineModalDirty.value) ||
+    (furnitureOpen.value
+      ? (studioRef.value?.hasRealChanges ?? specModalDirty.value)
+      : specModalDirty.value),
+)
+const documentNotice = computed(() => {
+  if (!hasRealChanges.value && !hasPendingEdits.value) return ''
+  const saveAction = isReview.value ? 'Guardar cambios' : 'Guardar borrador'
+  return (
+    'Hay cambios sin guardar o ediciones pendientes. El PDF refleja los datos guardados en el servidor, no los cambios pendientes. ' +
+    'Cierra el visor, incorpora las ediciones pendientes con Guardar línea o desde la ficha del mueble, ' +
+    `pulsa «${saveAction}» y vuelve a abrir Vista previa PDF para generar el documento actualizado.`
+  )
+})
 async function requestReview() {
   if (saving.value) return
   if (!canEmit.value) {
@@ -1425,6 +1445,11 @@ async function requestReview() {
 }
 async function persist(emitir: boolean, skipNavigation = false): Promise<boolean> {
   if (saving.value || (emitir && (isReview.value || !canEmit.value))) return false
+  if (hasPendingEdits.value) {
+    error.value =
+      'Incorpora primero las ediciones pendientes con Guardar línea o desde la ficha del mueble antes de guardar la proforma.'
+    return false
+  }
   validationAttempted.value = true
   if (emitir) emissionAttempted.value = true
   localErrors.value = validateQuoteConditions(header, { forEmission: emitir })
@@ -1470,6 +1495,7 @@ async function persist(emitir: boolean, skipNavigation = false): Promise<boolean
       : await proformasService.saveIntegral(body(emitir))
     sessionStorage.removeItem(`homex:ap5:draft:${autosaveToken()}`)
     fill(result)
+    if (documentModalOpen.value) void loadDocument(result.id)
     removedLines.value = []
     key.value = crypto.randomUUID()
     success.value = emitir
@@ -2447,6 +2473,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         @close="closeLineModal"
       >
         <DetalleForm
+          ref="lineFormRef"
           :key="lineFormVersion"
           :tipos
           :categorias="catalogCategories"
@@ -2506,9 +2533,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       :open="documentModalOpen"
       :title="persisted?.numero ? `Proforma #${persisted.numero}` : 'Cotización HOMEX'"
       :subtitle="`PDF de la versión guardada · Tamaño Carta · ${persisted?.estado_info?.nombre ?? 'Borrador'}`"
-      :notice="
-        dirty ? 'Hay cambios sin guardar. El PDF corresponde a la última versión guardada.' : ''
-      "
+      :notice="documentNotice"
       :downloading="downloadingDocument"
       :can-download-pdf="true"
       :pdf-url="documentUrl"

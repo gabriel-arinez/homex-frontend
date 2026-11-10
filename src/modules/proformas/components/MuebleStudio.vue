@@ -120,7 +120,9 @@ const imageStepStatus = computed(() => {
     return 'pending' as const
   return galleryStatus.value.confirmed > 0 ? ('complete' as const) : ('pending' as const)
 })
+const galleryChanged = ref(false)
 function onGalleryChanged() {
+  galleryChanged.value = true
   emit('changed')
   emit('galleryChanged')
 }
@@ -221,7 +223,16 @@ async function guardarDesdeEstudio(): Promise<boolean> {
   if (!ok) seccion.value = 'revision'
   return ok
 }
-defineExpose({ save: guardarDesdeEstudio })
+const hasRealChanges = computed(
+  () =>
+    Boolean(formRef.value?.hasRealChanges) ||
+    galleryChanged.value ||
+    Boolean(
+      props.nueva &&
+      (props.detalle?.nombre?.trim() || props.detalle?.precio_unitario || props.especificacion),
+    ),
+)
+defineExpose({ save: guardarDesdeEstudio, hasRealChanges })
 </script>
 
 <template>
