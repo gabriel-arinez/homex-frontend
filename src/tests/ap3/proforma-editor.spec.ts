@@ -15,7 +15,7 @@ vi.mock('pdfjs-dist', () => ({
       numPages: 1,
       getPage: async () => ({ getViewport: () => ({ width: 816, height: 1056 }) }),
     }),
-    destroy: vi.fn(),
+    destroy: vi.fn<() => void>(),
   }),
 }))
 
@@ -317,10 +317,10 @@ function pdfReferences() {
   const generate = vi
     .spyOn(proformasService, 'documentPdf')
     .mockResolvedValue(new Blob(['%PDF saved'], { type: 'application/pdf' }))
-  const revoke = vi.fn()
+  const revoke = vi.fn<() => void>()
   Object.defineProperty(URL, 'createObjectURL', {
     configurable: true,
-    value: vi.fn(() => 'blob:saved-document'),
+    value: vi.fn<() => string>(() => 'blob:saved-document'),
   })
   Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revoke })
   return { generate, revoke }
@@ -442,73 +442,114 @@ describe('AP3 saved PDF freshness', () => {
     wrapper.unmount()
   })
 
-  it.each(['line', 'spec'])(
-    'advierte ediciones pendientes de %s sin guardarlas ni perderlas',
-    async (kind) => {
-      pdfReferences()
-      const save = vi.spyOn(proformasService, 'updateIntegral')
-      const quote = {
-        ...savedQuote(),
-        detalles: [
-          {
-            id: 31,
-            tipo_item: kind === 'spec' ? 1 : 6,
-            nombre: 'Mesa',
-            producto: null,
-            cantidad: '1',
-            unidad: 2,
-            modo_calculo: 'PRECIO_UNITARIO',
-            precio_unitario: '100.00',
-            descuento: '0.00',
-            descripcion: '',
-            especificacion: null,
-          },
-        ],
-      }
-      vi.mocked(proformasService.get).mockResolvedValue(quote as never)
-      vi.mocked(proformasService.options).mockImplementation(
-        async (concepto) =>
-          (concepto === 'TIPO_ITEM'
-            ? [...options.TIPO_ITEM!, { id: 6, codigo: 'SILLA', nombre: 'Silla' }]
-            : options[concepto]) as never,
-      )
-      const { wrapper } = await mounted('/proformas/1/editar')
-      await click(wrapper, 'Vista previa PDF')
-      await flushPromises()
-      await wrapper.get('[aria-label="Acciones de Mesa"]').trigger('click')
-      await click(wrapper, 'Editar')
-      await flushPromises()
-      const name = kind === 'spec' ? '#mueble-nombre-comercial' : '#nombre-linea'
-      const draftName = kind === 'spec' ? '' : 'Pendiente de incorporar'
-      await wrapper.get(name).setValue(draftName)
-      await flushPromises()
-      expect(wrapper.get('.doc-viewer-notice').text()).toContain('incorpora')
-      await wrapper.get(name).setValue('Mesa')
-      await flushPromises()
-      expect(wrapper.find('.doc-viewer-notice').exists()).toBe(false)
-      expect(save).not.toHaveBeenCalled()
-      await wrapper.get(name).setValue(draftName)
-      await flushPromises()
-      if (kind === 'spec') {
-        await click(wrapper, 'Volver a proforma')
-        await click(wrapper, 'Guardar cambios')
-        await flushPromises()
-        expect(wrapper.find('.doc-viewer-notice').exists()).toBe(true)
-        expect(save).not.toHaveBeenCalled()
-        expect(wrapper.get(name).element).toHaveProperty('value', draftName)
-        wrapper.unmount()
-        return
-      }
-      await closePdf(wrapper)
-      // Saving the outer editor must not persist an older line over an unincorporated draft.
-      await click(wrapper, 'Condiciones')
-      await wrapper.get('#titulo').setValue('Cambio adicional')
-      await click(wrapper, 'Guardar borrador')
-      await flushPromises()
-      expect(save).not.toHaveBeenCalled()
-      expect(wrapper.get(name).element).toHaveProperty('value', draftName)
-      expect(wrapper.text()).toContain('Incorpora')
-      wrapper.unmount()
-    },
-  )
+  it('advierte ediciones pendientes de spec sin guardarlas ni perderlas', async () => {
+    pdfReferences()
+    const save = vi.spyOn(proformasService, 'updateIntegral')
+    const quote = {
+      ...savedQuote(),
+      detalles: [
+        {
+          id: 31,
+          tipo_item: 1,
+          nombre: 'Mesa',
+          producto: null,
+          cantidad: '1',
+          unidad: 2,
+          modo_calculo: 'PRECIO_UNITARIO',
+          precio_unitario: '100.00',
+          descuento: '0.00',
+          descripcion: '',
+          especificacion: null,
+        },
+      ],
+    }
+    vi.mocked(proformasService.get).mockResolvedValue(quote as never)
+    vi.mocked(proformasService.options).mockImplementation(
+      async (concepto) =>
+        (concepto === 'TIPO_ITEM'
+          ? [...options.TIPO_ITEM!, { id: 6, codigo: 'SILLA', nombre: 'Silla' }]
+          : options[concepto]) as never,
+    )
+    const { wrapper } = await mounted('/proformas/1/editar')
+    await click(wrapper, 'Vista previa PDF')
+    await flushPromises()
+    await wrapper.get('[aria-label="Acciones de Mesa"]').trigger('click')
+    await click(wrapper, 'Editar')
+    await flushPromises()
+    const name = '#mueble-nombre-comercial'
+    const draftName = ''
+    await wrapper.get(name).setValue(draftName)
+    await flushPromises()
+    expect(wrapper.get('.doc-viewer-notice').text()).toContain('incorpora')
+    await wrapper.get(name).setValue('Mesa')
+    await flushPromises()
+    expect(wrapper.find('.doc-viewer-notice').exists()).toBe(false)
+    expect(save).not.toHaveBeenCalled()
+    await wrapper.get(name).setValue(draftName)
+    await flushPromises()
+    await click(wrapper, 'Volver a proforma')
+    await click(wrapper, 'Guardar cambios')
+    await flushPromises()
+    expect(wrapper.find('.doc-viewer-notice').exists()).toBe(true)
+    expect(save).not.toHaveBeenCalled()
+    expect(wrapper.get(name).element).toHaveProperty('value', draftName)
+    wrapper.unmount()
+  })
+
+  it('advierte ediciones pendientes de line sin guardarlas ni perderlas', async () => {
+    pdfReferences()
+    const save = vi.spyOn(proformasService, 'updateIntegral')
+    const quote = {
+      ...savedQuote(),
+      detalles: [
+        {
+          id: 31,
+          tipo_item: 6,
+          nombre: 'Mesa',
+          producto: null,
+          cantidad: '1',
+          unidad: 2,
+          modo_calculo: 'PRECIO_UNITARIO',
+          precio_unitario: '100.00',
+          descuento: '0.00',
+          descripcion: '',
+          especificacion: null,
+        },
+      ],
+    }
+    vi.mocked(proformasService.get).mockResolvedValue(quote as never)
+    vi.mocked(proformasService.options).mockImplementation(
+      async (concepto) =>
+        (concepto === 'TIPO_ITEM'
+          ? [...options.TIPO_ITEM!, { id: 6, codigo: 'SILLA', nombre: 'Silla' }]
+          : options[concepto]) as never,
+    )
+    const { wrapper } = await mounted('/proformas/1/editar')
+    await click(wrapper, 'Vista previa PDF')
+    await flushPromises()
+    await wrapper.get('[aria-label="Acciones de Mesa"]').trigger('click')
+    await click(wrapper, 'Editar')
+    await flushPromises()
+    const name = '#nombre-linea'
+    const draftName = 'Pendiente de incorporar'
+    await wrapper.get(name).setValue(draftName)
+    await flushPromises()
+    expect(wrapper.get('.doc-viewer-notice').text()).toContain('incorpora')
+    await wrapper.get(name).setValue('Mesa')
+    await flushPromises()
+    expect(wrapper.find('.doc-viewer-notice').exists()).toBe(false)
+    expect(save).not.toHaveBeenCalled()
+    await wrapper.get(name).setValue(draftName)
+    await flushPromises()
+    await closePdf(wrapper)
+    // Saving the outer editor must not persist an older line over an unincorporated draft.
+    await click(wrapper, 'Condiciones')
+    await wrapper.get('#titulo').setValue('Cambio adicional')
+    await click(wrapper, 'Guardar borrador')
+    await flushPromises()
+    expect(save).not.toHaveBeenCalled()
+    expect(wrapper.get(name).element).toHaveProperty('value', draftName)
+    expect(wrapper.text()).toContain('Incorpora')
+    wrapper.unmount()
+  })
 })
