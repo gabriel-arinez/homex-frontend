@@ -57,6 +57,8 @@ const printRef = ref<HTMLIFrameElement | null>(null)
 const pdf = shallowRef<PDFDocumentProxy | null>(null)
 const pages = ref<number[]>([])
 const activePage = ref(1)
+const pageInput = ref('1')
+const pageSize = ref({ width: 816, height: 1056 })
 const pdfError = ref('')
 const printError = ref('')
 const printReady = ref(false)
@@ -64,7 +66,7 @@ let previousOverflow = ''
 let previousFocus: HTMLElement | null = null
 let scrollRaf = 0
 
-const clamp = (n: number) => Math.min(1.8, Math.max(0.4, Math.round(n * 100) / 100))
+const clamp = (n: number) => Math.min(3, Math.max(0.2, Math.round(n * 100) / 100))
 
 function setZoom(next: number, nextMode: typeof mode.value = 'custom') {
   const el = viewportRef.value
@@ -91,9 +93,9 @@ function resetZoom() {
 function fit(modeToFit: 'page' | 'width') {
   const el = viewportRef.value
   if (!el) return
-  // Letter pages are 612 × 792 pt; PDF.js uses 96 CSS px per inch.
-  const widthFit = (el.clientWidth - 60) / 816
-  const pageFit = Math.min(widthFit, (el.clientHeight - 52) / 1056)
+  // El ajuste usa las dimensiones REALES del PDF, no una página supuesta.
+  const widthFit = (el.clientWidth - 48) / pageSize.value.width
+  const pageFit = Math.min(widthFit, (el.clientHeight - 48) / pageSize.value.height)
   setZoom(modeToFit === 'width' ? widthFit : pageFit, modeToFit)
 }
 function updatePage() {
@@ -115,6 +117,7 @@ function updatePage() {
     }
   }
   activePage.value = bestPage
+  pageInput.value = String(bestPage)
 }
 function onScroll() {
   if (scrollRaf) cancelAnimationFrame(scrollRaf)
@@ -124,8 +127,19 @@ function goToPage(number: number) {
   const node = document.getElementById(`homex-pdf-page-${number}`)
   const el = viewportRef.value
   if (!node || !el) return
-  el.scrollTo({ top: node.offsetTop - 16, behavior: 'smooth' })
+  const rect = node.getBoundingClientRect()
+  const viewRect = el.getBoundingClientRect()
+  el.scrollTo({ top: rect.top - viewRect.top + el.scrollTop - 16, behavior: 'smooth' })
   activePage.value = number
+  pageInput.value = String(number)
+}
+function jumpToPage() {
+  const next = Number(pageInput.value)
+  if (!Number.isInteger(next) || next < 1 || next > pages.value.length) {
+    pageInput.value = String(activePage.value)
+    return
+  }
+  goToPage(next)
 }
 function onKeydown(event: KeyboardEvent) {
   if (!props.open) return
@@ -181,6 +195,8 @@ watch(
     pdf.value = null
     pages.value = []
     activePage.value = 1
+    pageInput.value = '1'
+    pageSize.value = { width: 816, height: 1056 }
     pdfError.value = ''
     printReady.value = false
     if (!open || !url) return
@@ -190,6 +206,12 @@ watch(
       if (disposed) return
       pdf.value = document
       pages.value = Array.from({ length: document.numPages }, (_, i) => i + 1)
+      if (document.numPages > 0) {
+        const firstPage = await document.getPage(1)
+        if (disposed) return
+        const actual = firstPage.getViewport({ scale: 96 / 72 })
+        pageSize.value = { width: actual.width, height: actual.height }
+      }
       await nextTick()
       // The initial fit must happen after the PDF pages have mounted, not
       // within the same Vue render flush that installs them.
@@ -262,7 +284,7 @@ onBeforeUnmount(() => {
               type="button"
               class="zoom-btn"
               aria-label="Reducir zoom"
-              :disabled="zoom <= 0.4"
+              :disabled="zoom <= 0.2"
               @click="zoomOut"
             >
               <ZoomOut :size="17" />
@@ -279,7 +301,7 @@ onBeforeUnmount(() => {
               type="button"
               class="zoom-btn"
               aria-label="Aumentar zoom"
-              :disabled="zoom >= 1.8"
+              :disabled="zoom >= 3"
               @click="zoomIn"
             >
               <ZoomIn :size="17" />
@@ -315,7 +337,20 @@ onBeforeUnmount(() => {
             >
               <ChevronLeft :size="17" />
             </button>
-            <span>{{ activePage }} / {{ pages.length }}</span>
+            <label class="doc-page-jump">
+              <span class="sr-only">Ir a página</span>
+              <input
+                v-model="pageInput"
+                type="number"
+                min="1"
+                :max="pages.length"
+                aria-label="Número de página"
+                inputmode="numeric"
+                @change="jumpToPage"
+                @keydown.enter="jumpToPage"
+              />
+            </label>
+            <span aria-label="Páginas totales">/ {{ pages.length }}</span>
             <button
               type="button"
               class="zoom-btn"
@@ -511,12 +546,54 @@ onBeforeUnmount(() => {
   min-height: 0;
   overflow: auto;
   padding: 24px;
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: #71717a #18181b;
   touch-action: pan-x pan-y;
   overscroll-behavior: contain;
 }
 .doc-viewer-viewport::-webkit-scrollbar {
-  display: none;
+  width: 10px;
+  height: 10px;
+}
+.doc-viewer-viewport::-webkit-scrollbar-thumb {
+  background: #71717a;
+  border: 2px solid #18181b;
+  border-radius: 999px;
+}
+.doc-page-jump input {
+  box-sizing: border-box;
+  width: 39px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: #fafafa;
+  font-size: 12px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.doc-page-jump input:focus-visible {
+  outline: 2px solid white;
+  outline-offset: 1px;
+}
+.doc-page-jump input::-webkit-outer-spin-button,
+.doc-page-jump input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.doc-page-jump input[type='number'] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 .doc-page-stack {
   display: flex;
