@@ -1618,3 +1618,42 @@ test('FE04 muestra creación real y alinea totales; histórico sin hora inventad
   await expect(primera.locator('.creation-primary')).toBeVisible()
   await expect(primera.locator('.creation-hour')).toBeVisible()
 })
+
+test('approved PDF renders, downloads identical bytes and prints the original document', async ({
+  page,
+}) => {
+  await mockBackend(page)
+  const fixture = readFileSync('src/tests/fixtures/proforma-approved.pdf')
+  let requests = 0
+  await page.route('**/api/v1/proformas/1/documento-pdf/', (route) => {
+    requests++
+    expect(route.request().headers().authorization).toBe(`Bearer ${access}`)
+    return route.fulfill({ contentType: 'application/pdf', body: fixture })
+  })
+  await page.goto('/proformas/1')
+  await page.getByRole('button', { name: 'Ver documento / PDF' }).click()
+  const viewer = page.locator('.doc-viewer-overlay')
+  await expect(viewer.locator('.pdf-page')).toHaveCount(2)
+  await expect(viewer.locator('.pdf-page__text').first()).toContainText('HOMEX')
+  await expect(viewer.locator('.pdf-page__canvas').first()).toBeVisible()
+  const downloadEvent = page.waitForEvent('download')
+  await viewer.getByRole('button', { name: 'Descargar' }).click()
+  const download = await downloadEvent
+  expect(download.suggestedFilename()).toBe('proforma-borrador-101.pdf')
+  const file = await download.path()
+  expect(file).not.toBeNull()
+  expect(readFileSync(file!)).toEqual(fixture)
+  expect(requests).toBe(1)
+  const iframe = viewer.locator('iframe')
+  await expect(iframe).toHaveAttribute('src', /^blob:/)
+  // Observe only the print dispatch; do not open an operating-system print dialog.
+  await iframe.evaluate((element: HTMLIFrameElement) => {
+    element.dispatchEvent(new Event('load'))
+    element.contentWindow!.print = () => {
+      element.dataset.printDispatched = 'true'
+    }
+  })
+  await viewer.getByRole('button', { name: 'Imprimir' }).click()
+  await expect(iframe).toHaveAttribute('data-print-dispatched', 'true')
+  expect(requests).toBe(1)
+})

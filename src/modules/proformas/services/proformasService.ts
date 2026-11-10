@@ -86,5 +86,8 @@ export const proformasService = {
   document: (id: number) =>
     apiRequest<Blob>(`/api/v1/proformas/${id}/documento/`, { responseType: 'blob' }),
   documentPdf: (id: number) =>
-    apiRequest<Blob>(`/api/v1/proformas/${id}/documento-pdf/`, { responseType: 'blob' }),
+    apiRequest<Blob>(`/api/v1/proformas/${id}/documento-pdf/`, {
+      responseType: 'blob',
+      cache: 'no-store',
+    }),
 }
