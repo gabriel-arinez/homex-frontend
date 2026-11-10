@@ -12,15 +12,26 @@ vi.mock('./PdfCanvasPage.vue', () => ({
 
 vi.mock('pdfjs-dist', () => ({
   GlobalWorkerOptions: { workerSrc: '' },
-  getDocument: vi.fn(() => ({
+  getDocument: vi.fn<
+    () => {
+      promise: Promise<{
+        numPages: number
+        getPage: (page: number) => Promise<{ getViewport: () => { width: number; height: number } }>
+        destroy: () => void
+      }>
+      destroy: () => void
+    }
+  >(() => ({
     promise: Promise.resolve({
       numPages: 2,
-      getPage: vi.fn(async () => ({
+      getPage: vi.fn<
+        (page: number) => Promise<{ getViewport: () => { width: number; height: number } }>
+      >(async (_page) => ({
         getViewport: () => ({ width: 816, height: 1056 }),
       })),
-      destroy: vi.fn(),
+      destroy: vi.fn<() => void>(),
     }),
-    destroy: vi.fn(),
+    destroy: vi.fn<() => void>(),
   })),
   TextLayer: vi.fn<() => void>(),
 }))
