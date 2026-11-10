@@ -12,11 +12,15 @@ vi.mock('./PdfCanvasPage.vue', () => ({
 
 vi.mock('pdfjs-dist', () => ({
   GlobalWorkerOptions: { workerSrc: '' },
-  getDocument: vi.fn<
-    () => { promise: Promise<{ numPages: number; destroy: () => void }>; destroy: () => void }
-  >(() => ({
-    promise: Promise.resolve({ numPages: 2, destroy: vi.fn<() => void>() }),
-    destroy: vi.fn<() => void>(),
+  getDocument: vi.fn(() => ({
+    promise: Promise.resolve({
+      numPages: 2,
+      getPage: vi.fn(async () => ({
+        getViewport: () => ({ width: 816, height: 1056 }),
+      })),
+      destroy: vi.fn(),
+    }),
+    destroy: vi.fn(),
   })),
   TextLayer: vi.fn<() => void>(),
 }))
@@ -44,6 +48,7 @@ describe('DocumentViewerModal — PDF.js', () => {
     expect(wrapper.text()).toContain('Proforma #578')
     expect(wrapper.find('.doc-page-stack').exists()).toBe(true)
     expect(wrapper.findAll('.pdf-page-placeholder')).toHaveLength(2)
+    expect(wrapper.find('input[aria-label="Número de página"]').exists()).toBe(true)
     expect(wrapper.find('.doc-pdf-frame').exists()).toBe(false)
     await wrapper.find('button.zoom-display').trigger('click')
     expect(wrapper.text()).toContain('100%')
