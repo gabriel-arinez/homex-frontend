@@ -27,7 +27,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Ban,
-  Calendar,
   Check,
   CheckCircle2,
   CircleX,
@@ -43,7 +42,6 @@ import {
   Info,
   PackageOpen,
   Plus,
-  ReceiptText,
   RotateCcw,
   SlidersHorizontal,
   Sofa,
@@ -71,6 +69,7 @@ import ConfirmDialog from '@/shared/ui/ConfirmDialog.vue'
 import UnsavedChangesDialog from '../components/UnsavedChangesDialog.vue'
 import TextField from '@/shared/ui/TextField.vue'
 import ClienteSelector from '../components/ClienteSelector.vue'
+import { clientesService } from '@/modules/clientes/services/clientesService'
 import ClienteFormFields from '@/modules/clientes/components/ClienteFormFields.vue'
 import DetalleForm from '../components/DetalleForm.vue'
 import CatalogoContextual from '../components/CatalogoContextual.vue'
@@ -386,9 +385,10 @@ const isConditionsStepComplete = computed(() => {
   return Object.keys(validateQuoteConditions(header, { forEmission: true })).length === 0
 })
 function isStepComplete(index: number): boolean {
-  if (index === 0) return lineas.value.length > 0
-  if (index === 1) return isClientStepComplete.value
-  if (index === 2) return isConditionsStepComplete.value
+  if (index === 0) return lineas.value.length > 0 && productIssues.value.length === 0
+  if (index === 1) return isClientStepComplete.value && clientIssues.value.length === 0
+  if (index === 2) return isConditionsStepComplete.value && conditionIssues.value.length === 0
+  if (index === 3) return emissionIssues.value.length === 0
   return false
 }
 const existingProductIds = computed(() =>
@@ -430,68 +430,32 @@ const totalPreview = computed(() => totalEstimadoCompleto(lineas.value))
 type EmissionIssue = {
   id: string
   step: number
+  section: 'productos' | 'cliente' | 'condiciones'
   title: string
   description: string
   action: string
 }
-const emissionIssues = computed<EmissionIssue[]>(() => {
+
+const productIssues = computed<EmissionIssue[]>(() => {
   const issues: EmissionIssue[] = []
   if (!lineas.value.length) {
     issues.push({
-      id: 'productos',
+      id: 'productos-vacio',
       step: 0,
-      title: 'Productos',
+      section: 'productos',
+      title: 'Productos requeridos',
       description: 'Agrega al menos un producto o mueble a pedido.',
       action: 'Ir a productos',
     })
   }
-  if (clienteMode.value === 'pendiente' || (clienteMode.value === 'existente' && !header.cliente)) {
-    issues.push({
-      id: 'cliente',
-      step: 1,
-      title: 'Cliente',
-      description: 'Selecciona un cliente existente o registra uno nuevo.',
-      action: 'Ir a cliente',
-    })
-  } else if (clienteMode.value === 'nuevo') {
-    const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
-    const company = tipo?.codigo === 'EMPRESA'
-    const invalid = validateClient(nuevoCliente, company)
-    let description = ''
-    if (!nuevoCliente.tipo_cliente)
-      description = 'Indica si el cliente es persona natural o empresa.'
-    else if (!nuevoCliente.nombres.trim() || !nuevoCliente.apellidos.trim())
-      description = 'Completa los nombres y apellidos del contacto.'
-    else if (company && !nuevoCliente.empresa.trim())
-      description = 'Completa la razón social o empresa.'
-    else {
-      const fieldNames: Record<string, string> = {
-        nombres: 'nombres',
-        apellidos: 'apellidos',
-        empresa: 'razón social',
-        celular: 'celular',
-        direccion: 'dirección',
-        observaciones: 'observaciones',
-      }
-      const firstError = Object.entries(invalid)[0]
-      if (firstError) description = 'Revisa ' + fieldNames[firstError[0]] + ': ' + firstError[1]
-    }
-    if (description)
-      issues.push({
-        id: 'cliente-nuevo',
-        step: 1,
-        title: 'Cliente',
-        description,
-        action: 'Ir a cliente',
-      })
-  }
   if (lineas.value.length && (totalPreview.value === null || totalPreview.value <= 0)) {
     issues.push({
-      id: 'importe',
+      id: 'productos-importe',
       step: 0,
-      title: 'Importe',
+      section: 'productos',
+      title: 'Importe inválido',
       description: 'Revisa cantidades, precios y descuentos. El total debe ser mayor que cero.',
-      action: 'Corregir productos',
+      action: 'Corregir importes',
     })
   }
   if (
@@ -502,32 +466,226 @@ const emissionIssues = computed<EmissionIssue[]>(() => {
     )
   ) {
     issues.push({
-      id: 'ficha',
+      id: 'productos-ficha',
       step: 0,
-      title: 'Ficha técnica',
+      section: 'productos',
+      title: 'Ficha técnica incompleta',
       description: 'Los muebles a medida necesitan una ficha técnica antes de enviar.',
       action: 'Completar ficha',
     })
   }
-  const errors = validateQuoteConditions(header, { forEmission: true })
-  const firstError = Object.entries(errors)[0]
-  if (firstError) {
-    const fields: Record<string, string> = {
-      titulo: 'título',
-      porcentaje_adelanto: 'adelanto',
-      plazo_entrega: 'plazo de entrega',
-      validez_oferta: 'validez',
+  return issues
+})
+
+const clientIssues = computed<EmissionIssue[]>(() => {
+  const issues: EmissionIssue[] = []
+  if (clienteMode.value === 'pendiente') {
+    issues.push({
+      id: 'cliente-pendiente',
+      step: 1,
+      section: 'cliente',
+      title: 'Cliente pendiente',
+      description: 'Selecciona un cliente existente o registra uno nuevo.',
+      action: 'Ir a cliente',
+    })
+  } else if (clienteMode.value === 'existente') {
+    if (!header.cliente) {
+      issues.push({
+        id: 'cliente-no-seleccionado',
+        step: 1,
+        section: 'cliente',
+        title: 'Cliente no seleccionado',
+        description: 'Selecciona un cliente existente de la lista.',
+        action: 'Ir a cliente',
+      })
+    }
+  } else if (clienteMode.value === 'nuevo') {
+    const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
+    const company = tipo?.codigo === 'EMPRESA'
+    if (!nuevoCliente.tipo_cliente) {
+      issues.push({
+        id: 'cliente-tipo',
+        step: 1,
+        section: 'cliente',
+        title: 'Tipo de cliente',
+        description: 'Indica si el cliente es persona natural o empresa.',
+        action: 'Ir a cliente',
+      })
+    }
+    if (!nuevoCliente.nombres.trim() || !nuevoCliente.apellidos.trim()) {
+      issues.push({
+        id: 'cliente-contacto',
+        step: 1,
+        section: 'cliente',
+        title: 'Información incompleta',
+        description: 'Completa los nombres y apellidos del contacto.',
+        action: 'Corregir cliente',
+      })
+    }
+    if (company && !nuevoCliente.empresa.trim()) {
+      issues.push({
+        id: 'cliente-empresa',
+        step: 1,
+        section: 'cliente',
+        title: 'Razón social pendiente',
+        description: 'Completa la razón social o empresa.',
+        action: 'Corregir cliente',
+      })
+    }
+    const invalid = validateClient(nuevoCliente, company)
+    const fieldNames: Record<string, string> = {
+      nombres: 'nombres',
+      apellidos: 'apellidos',
+      empresa: 'razón social',
+      celular: 'celular',
+      direccion: 'dirección',
       observaciones: 'observaciones',
     }
+    for (const [field, errorMsg] of Object.entries(invalid)) {
+      if (
+        (field === 'nombres' || field === 'apellidos') &&
+        (!nuevoCliente.nombres.trim() || !nuevoCliente.apellidos.trim())
+      )
+        continue
+      if (field === 'empresa' && company && !nuevoCliente.empresa.trim()) continue
+      issues.push({
+        id: `cliente-${field}`,
+        step: 1,
+        section: 'cliente',
+        title: `Revisa ${fieldNames[field] || field}`,
+        description: errorMsg,
+        action: 'Corregir cliente',
+      })
+    }
+  }
+  return issues
+})
+
+const conditionIssues = computed<EmissionIssue[]>(() => {
+  const issues: EmissionIssue[] = []
+  const errors = validateQuoteConditions(header, { forEmission: true })
+  const fields: Record<string, string> = {
+    porcentaje_adelanto: 'Anticipo',
+    plazo_entrega: 'Plazo de entrega',
+    validez_oferta: 'Validez',
+    observaciones: 'Observaciones',
+    titulo: 'Título',
+  }
+  for (const [field, message] of Object.entries(errors)) {
     issues.push({
-      id: 'condiciones',
+      id: `condiciones-${field}`,
       step: 2,
-      title: 'Condiciones',
-      description: 'Revisa ' + fields[firstError[0]] + ': ' + firstError[1],
-      action: 'Ir a condiciones',
+      section: 'condiciones',
+      title: fields[field] || 'Condición comercial',
+      description: message,
+      action: 'Corregir condiciones',
     })
   }
   return issues
+})
+
+const emissionIssues = computed<EmissionIssue[]>(() => [
+  ...productIssues.value,
+  ...clientIssues.value,
+  ...conditionIssues.value,
+])
+
+async function ensureFullClient(clientId?: string | number | null) {
+  const rawId = clientId ?? header.cliente
+  if (!rawId || clienteMode.value !== 'existente') return
+  const id = Number(rawId)
+  if (!id) return
+  if (
+    clienteSeleccionado.value &&
+    'tipo_cliente' in clienteSeleccionado.value &&
+    clienteSeleccionado.value.id === id
+  ) {
+    return
+  }
+  try {
+    const full = await clientesService.get(id)
+    if (String(header.cliente) === String(id) && clienteMode.value === 'existente') {
+      clienteSeleccionado.value = full
+    }
+  } catch {
+    // Mantener clienteSeleccionado si la petición no prospera
+  }
+}
+
+watch(
+  () => [header.cliente, clienteMode.value] as const,
+  ([clientId, mode]) => {
+    if (mode === 'existente' && clientId) {
+      void ensureFullClient(clientId)
+    }
+  },
+  { immediate: true },
+)
+
+const reviewClientData = computed(() => {
+  if (clienteMode.value === 'pendiente') {
+    return null
+  }
+  if (clienteMode.value === 'nuevo') {
+    const tipo = tiposCliente.value.find((item) => String(item.id) === nuevoCliente.tipo_cliente)
+    const isEmpresa = tipo?.codigo === 'EMPRESA'
+    const empresa = nuevoCliente.empresa.trim() || null
+    const nombres = nuevoCliente.nombres.trim() || null
+    const apellidos = nuevoCliente.apellidos.trim() || null
+    const nombreCompleto = [nombres, apellidos].filter(Boolean).join(' ') || null
+    const celular = nuevoCliente.celular.trim() || null
+    const direccion = nuevoCliente.direccion.trim() || null
+    const observaciones = nuevoCliente.observaciones.trim() || null
+    return {
+      mode: 'nuevo' as const,
+      isEmpresa,
+      tipo: tipo?.nombre ?? (isEmpresa ? 'Empresa' : 'Persona natural'),
+      empresa,
+      nombres,
+      apellidos,
+      nombreCompleto,
+      celular,
+      direccion,
+      observaciones,
+    }
+  }
+
+  const sel = clienteSeleccionado.value
+  if (!sel && !header.cliente) return null
+  const isFull = Boolean(sel && 'tipo_cliente' in sel)
+  const fullSel = isFull ? (sel as Cliente) : null
+  const empresa = sel?.empresa?.trim() || null
+  const tipo = isFull
+    ? fullSel?.tipo_cliente_info?.nombre || (empresa ? 'Empresa' : 'Persona natural')
+    : empresa
+      ? 'Empresa'
+      : 'Persona natural'
+  const isEmpresa = isFull
+    ? fullSel?.tipo_cliente_info?.codigo === 'EMPRESA' || Boolean(empresa)
+    : Boolean(empresa)
+  const nombres = isFull ? fullSel?.nombres?.trim() || null : null
+  const apellidos = isFull ? fullSel?.apellidos?.trim() || null : null
+  const nombreCompleto = isFull
+    ? [nombres, apellidos].filter(Boolean).join(' ') || null
+    : sel && 'nombre' in sel
+      ? sel.nombre?.trim() || null
+      : null
+  const celular = sel?.celular?.trim() || null
+  const direccion = isFull ? fullSel?.direccion?.trim() || null : null
+  const observaciones = isFull ? fullSel?.observaciones?.trim() || null : null
+
+  return {
+    mode: 'existente' as const,
+    isEmpresa,
+    tipo,
+    empresa,
+    nombres,
+    apellidos,
+    nombreCompleto,
+    celular,
+    direccion,
+    observaciones,
+  }
 })
 const editingStatus = computed(() => {
   if (saving.value) return 'Guardando en HOMEX…'
@@ -698,16 +856,6 @@ function setExistingClient(value: string) {
     markDirty()
   }
 }
-function nombreClienteVisible() {
-  const cliente = clienteSeleccionado.value
-  if (!cliente) return 'Cliente pendiente'
-  if ('nombre' in cliente) return cliente.empresa || cliente.nombre || 'Cliente pendiente'
-  return (
-    cliente.empresa ||
-    `${cliente.nombres ?? ''} ${cliente.apellidos ?? ''}`.trim() ||
-    'Cliente pendiente'
-  )
-}
 function money(value: number) {
   return new Intl.NumberFormat('es-BO', {
     style: 'currency',
@@ -826,6 +974,7 @@ function fill(value: Proforma) {
   header.observaciones = value.observaciones ?? ''
   clienteMode.value = value.cliente ? 'existente' : 'pendiente'
   clienteSeleccionado.value = value.cliente_resumen ?? null
+  if (value.cliente) void ensureFullClient(value.cliente)
   lineas.value = value.detalles.map(normalizeLine)
   removedLines.value = []
   savedContent.value = currentContent()
@@ -2264,7 +2413,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <div>
                 <p class="section-kicker">04 · COMPROBACIÓN</p>
                 <h2 id="revisar-title">Revisar</h2>
-                <p>Comprueba los datos registrados antes de guardar o emitir.</p>
+                <p>Comprueba la información antes de guardar o enviar.</p>
               </div>
             </div>
             <div class="section-title__tools">
@@ -2276,68 +2425,77 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               </span>
             </div>
           </div>
-          <div class="review-grid">
-            <Card class="review-summary-card">
-              <div class="review-summary-card__header">
-                <span class="review-summary-card__icon" aria-hidden="true">
+
+          <!-- 1. TÍTULO OPCIONAL (desaparece completamente si no existe título) -->
+          <Card v-if="header.titulo?.trim()" class="review-title-card">
+            <div class="review-title-card__inner">
+              <span class="review-title-card__icon" aria-hidden="true">
+                <FileText :size="20" />
+              </span>
+              <div class="review-title-card__content">
+                <span class="review-field-kicker">TÍTULO DE LA PROFORMA</span>
+                <h3 class="review-title-card__heading">{{ header.titulo }}</h3>
+              </div>
+            </div>
+          </Card>
+
+          <!-- 2. PRODUCTOS COTIZADOS -->
+          <div class="review-section review-section--products">
+            <div class="review-section__header">
+              <div class="review-section__title-group">
+                <span class="review-section-icon review-section-icon--products" aria-hidden="true">
                   <PackageOpen :size="18" />
                 </span>
-                <span class="review-summary-card__title">Productos</span>
-              </div>
-              <p class="review-summary-card__detail">{{ lineas.length }} línea(s)</p>
-              <button type="button" class="review-summary-card__action" @click="currentStep = 0">
-                <span>Corregir productos</span>
-                <ChevronRight :size="15" aria-hidden="true" />
-              </button>
-            </Card>
-            <Card class="review-summary-card">
-              <div class="review-summary-card__header">
-                <span class="review-summary-card__icon" aria-hidden="true">
-                  <UserRound :size="18" />
+                <h3 class="review-section__title">Productos cotizados</h3>
+                <span class="review-section__count">
+                  {{ lineas.length }} {{ lineas.length === 1 ? 'producto' : 'productos' }}
                 </span>
-                <span class="review-summary-card__title">Cliente</span>
               </div>
-              <p class="review-summary-card__detail">
-                {{
-                  clienteMode === 'pendiente'
-                    ? 'Pendiente'
-                    : clienteMode === 'nuevo'
-                      ? nuevoCliente.empresa || `${nuevoCliente.nombres} ${nuevoCliente.apellidos}`
-                      : nombreClienteVisible()
-                }}
-              </p>
-              <button type="button" class="review-summary-card__action" @click="currentStep = 1">
-                <span>Corregir cliente</span>
-                <ChevronRight :size="15" aria-hidden="true" />
-              </button>
-            </Card>
-            <Card class="review-summary-card">
-              <div class="review-summary-card__header">
-                <span class="review-summary-card__icon" aria-hidden="true">
-                  <SlidersHorizontal :size="18" />
+              <div class="review-section__status-group">
+                <span
+                  v-if="productIssues.length"
+                  class="review-section-pill review-section-pill--pending"
+                >
+                  {{ productIssues.length }}
+                  {{ productIssues.length === 1 ? 'pendiente' : 'pendientes' }}
                 </span>
-                <span class="review-summary-card__title">Condiciones</span>
+                <span
+                  v-else-if="lineas.length"
+                  class="review-section-pill review-section-pill--complete"
+                >
+                  Completo
+                </span>
+                <span class="review-section-step"> 01 · Productos </span>
               </div>
-              <p class="review-summary-card__detail">
-                {{ header.plazo_entrega || 'Plazo pendiente' }} · {{ header.moneda_codigo }}
-              </p>
-              <button type="button" class="review-summary-card__action" @click="currentStep = 2">
-                <span>Corregir condiciones</span>
-                <ChevronRight :size="15" aria-hidden="true" />
-              </button>
-            </Card>
-          </div>
-          <Card class="commercial-preview">
-            <div class="preview-brand">
-              <span class="preview-mark">H</span>
-              <p class="brand">HOMEX · VISTA PREVIA</p>
             </div>
-            <h3 class="commercial-preview__title">{{ header.titulo || 'Cotización comercial' }}</h3>
+
+            <!-- Alertas de productos -->
+            <div v-if="productIssues.length" class="review-section__alerts">
+              <div v-for="issue in productIssues" :key="issue.id" class="review-alert-card">
+                <div class="review-alert-card__main">
+                  <CircleAlert :size="18" class="review-alert-card__icon" aria-hidden="true" />
+                  <div class="review-alert-card__content">
+                    <strong>{{ issue.title }}</strong>
+                    <p>{{ issue.description }}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="review-alert-card__btn"
+                  @click="currentStep = issue.step"
+                >
+                  <span>{{ issue.action }}</span>
+                  <ChevronRight :size="14" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+
+            <!-- Listado de productos -->
             <div v-if="lineas.length === 0" class="commercial-preview__empty">
               <PackageOpen :size="22" aria-hidden="true" />
               <p>Aún no has agregado productos a esta cotización.</p>
             </div>
-            <div v-else class="commercial-preview__lines">
+            <div v-else class="review-products-list">
               <div v-for="line in lineas" :key="line.localId" class="review-product-card">
                 <div class="review-product-card__main">
                   <div v-if="line.producto" class="review-thumbnail">
@@ -2391,7 +2549,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   </div>
 
                   <div class="review-product-card__total">
-                    <span>Total de línea</span>
+                    <span>Subtotal</span>
                     <strong v-if="line.modo_calculo === 'TOTAL_NEGOCIADO'">
                       {{ money(Number(line.importe_negociado || 0)) }}
                     </strong>
@@ -2403,164 +2561,286 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 </div>
               </div>
             </div>
-            <div
-              v-if="header.plazo_entrega || header.validez_oferta"
-              class="commercial-preview__meta"
-            >
-              <div v-if="header.plazo_entrega" class="commercial-preview__meta-item">
-                <Clock :size="15" aria-hidden="true" />
-                <span><strong>Plazo:</strong> {{ header.plazo_entrega }}</span>
+
+            <!-- TOTAL COTIZADO / ESTIMACIÓN LOCAL (inmediatamente después del último producto) -->
+            <div class="review-total-block">
+              <div class="review-total-block__meta">
+                <h4 class="review-total-block__title">
+                  {{ persisted && !dirty ? 'TOTAL COTIZADO' : 'ESTIMACIÓN LOCAL' }}
+                </h4>
+                <div class="review-total-block__desc">
+                  <template v-if="persisted && !dirty">
+                    <span>Total confirmado por HOMEX</span>
+                    <small>Importe guardado y calculado por el servidor.</small>
+                  </template>
+                  <template v-else>
+                    <small>El total confirmado será el que devuelva HOMEX al guardar.</small>
+                    <small v-if="persisted" class="review-total-block__sub">
+                      Último total guardado: {{ money(Number(persisted.total)) }}. Los cambios
+                      actuales aún no se guardaron.
+                    </small>
+                  </template>
+                </div>
               </div>
-              <div v-if="header.validez_oferta" class="commercial-preview__meta-item">
-                <Calendar :size="15" aria-hidden="true" />
-                <span><strong>Validez:</strong> {{ header.validez_oferta }} días</span>
+              <div class="review-total-block__amount">
+                <strong v-if="persisted && !dirty">
+                  {{ money(Number(persisted.total)) }}
+                </strong>
+                <strong v-else-if="totalPreview !== null">
+                  {{ money(totalPreview) }}
+                </strong>
+                <strong v-else class="pending-value">Total pendiente</strong>
               </div>
             </div>
-            <div class="whatsapp-share" @input.stop @change.stop>
-              <div class="whatsapp-share__summary">
-                <span class="whatsapp-share__icon">
-                  <MessageCircle :size="20" aria-hidden="true" />
+          </div>
+
+          <!-- 3. DATOS DEL CLIENTE -->
+          <div class="review-section review-section--client">
+            <div class="review-section__header">
+              <div class="review-section__title-group">
+                <span class="review-section-icon review-section-icon--client" aria-hidden="true">
+                  <UserRound :size="18" />
                 </span>
-                <div class="whatsapp-share__heading">
-                  <strong>Mensaje para WhatsApp</strong>
-                  <small>Personaliza el saludo para acompañar el PDF.</small>
-                </div>
-                <div class="whatsapp-share__controls">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    :disabled="!canShareWhatsApp || !whatsappDraft.trim()"
-                    @click="copyCommercialSummary"
-                    >Copiar mensaje</Button
-                  >
-                  <button
-                    type="button"
-                    class="whatsapp-share__toggle"
-                    :aria-expanded="whatsappExpanded"
-                    aria-controls="whatsapp-message-content"
-                    :aria-label="
-                      whatsappExpanded
-                        ? 'Ocultar mensaje de WhatsApp'
-                        : 'Mostrar mensaje de WhatsApp'
-                    "
-                    @click="whatsappExpanded = !whatsappExpanded"
-                  >
-                    <ChevronUp v-if="whatsappExpanded" :size="20" aria-hidden="true" />
-                    <ChevronDown v-else :size="20" aria-hidden="true" />
-                  </button>
-                </div>
+                <h3 class="review-section__title">Datos del cliente</h3>
               </div>
-              <p v-if="!canShareWhatsApp" class="whatsapp-share__hint">
-                Selecciona un cliente o completa los datos del nuevo cliente para copiar el mensaje.
-              </p>
-              <div
-                v-show="whatsappExpanded"
-                id="whatsapp-message-content"
-                class="whatsapp-share__content"
-              >
-                <label for="whatsapp-message">Contenido del mensaje</label>
-                <textarea
-                  id="whatsapp-message"
-                  :value="whatsappDraft"
-                  rows="5"
-                  @input="editWhatsapp(($event.target as HTMLTextAreaElement).value)"
-                />
-                <div class="whatsapp-share__edit-actions">
-                  <small
-                    >Al copiar se incluye únicamente el texto. Adjunta el PDF por separado.</small
-                  >
-                  <Button
-                    v-if="whatsappEdited"
-                    type="button"
-                    variant="secondary"
-                    @click="resetWhatsapp"
-                    >Restaurar mensaje sugerido</Button
-                  >
-                </div>
-              </div>
-            </div>
-            <div class="document-preview-launcher">
-              <div class="document-preview-launcher__summary">
-                <span class="document-preview-launcher__icon" aria-hidden="true">
-                  <FileText :size="20" />
+              <div class="review-section__status-group">
+                <span
+                  v-if="clientIssues.length"
+                  class="review-section-pill review-section-pill--pending"
+                >
+                  {{ clientIssues.length }}
+                  {{ clientIssues.length === 1 ? 'pendiente' : 'pendientes' }}
                 </span>
-                <div class="document-preview-launcher__heading">
-                  <strong>Documento comercial y vista previa PDF</strong>
-                  <small
-                    >Ficha en tamaño Carta con logotipo institucional, fichas técnicas y
-                    condiciones.</small
-                  >
-                </div>
+                <span
+                  v-else-if="reviewClientData"
+                  class="review-section-pill review-section-pill--complete"
+                >
+                  Completo
+                </span>
+                <span class="review-section-step"> 02 · Cliente </span>
               </div>
-              <Button
-                type="button"
-                variant="primary"
-                class="document-preview-launcher__btn"
-                @click="openDocumentPreview"
-              >
-                <Eye :size="16" aria-hidden="true" />
-                <span>Ver documento / PDF</span>
-              </Button>
             </div>
-          </Card>
-          <div class="totals">
-            <div class="totals__identity">
-              <span class="totals__icon" aria-hidden="true">
-                <ReceiptText :size="22" />
-              </span>
-              <div class="totals__meta">
-                <template v-if="persisted && !dirty">
-                  <span>Total confirmado por HOMEX</span>
-                  <small>Importe guardado y calculado por el servidor.</small>
+
+            <!-- Alertas de cliente -->
+            <div v-if="clientIssues.length" class="review-section__alerts">
+              <div v-for="issue in clientIssues" :key="issue.id" class="review-alert-card">
+                <div class="review-alert-card__main">
+                  <CircleAlert :size="18" class="review-alert-card__icon" aria-hidden="true" />
+                  <div class="review-alert-card__content">
+                    <strong>{{ issue.title }}</strong>
+                    <p>{{ issue.description }}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="review-alert-card__btn"
+                  @click="currentStep = issue.step"
+                >
+                  <span>{{ issue.action }}</span>
+                  <ChevronRight :size="14" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+
+            <!-- Tarjeta con cuadrícula de 2 columnas de cliente -->
+            <Card v-if="reviewClientData" class="review-client-card">
+              <div class="review-data-grid">
+                <template v-if="reviewClientData.isEmpresa">
+                  <div v-if="reviewClientData.empresa" class="review-data-item">
+                    <span class="review-data-item__label">Razón social / Empresa</span>
+                    <strong class="review-data-item__value">{{ reviewClientData.empresa }}</strong>
+                  </div>
+                  <div class="review-data-item">
+                    <span class="review-data-item__label">Tipo de cliente</span>
+                    <strong class="review-data-item__value">{{ reviewClientData.tipo }}</strong>
+                  </div>
+                  <div v-if="reviewClientData.nombreCompleto" class="review-data-item">
+                    <span class="review-data-item__label">Contacto responsable</span>
+                    <strong class="review-data-item__value">{{
+                      reviewClientData.nombreCompleto
+                    }}</strong>
+                  </div>
                 </template>
                 <template v-else>
-                  <span>Estimación local</span>
-                  <small>El total confirmado será el que devuelva HOMEX al guardar.</small>
-                  <small v-if="persisted">
-                    Último total guardado: {{ money(Number(persisted.total)) }}. Los cambios
-                    actuales aún no se guardaron.
-                  </small>
+                  <div class="review-data-item">
+                    <span class="review-data-item__label">Nombre completo</span>
+                    <strong v-if="reviewClientData.nombreCompleto" class="review-data-item__value">
+                      {{ reviewClientData.nombreCompleto }}
+                    </strong>
+                    <strong v-else class="review-data-item__value pending-value">Pendiente</strong>
+                  </div>
+                  <div class="review-data-item">
+                    <span class="review-data-item__label">Tipo de cliente</span>
+                    <strong class="review-data-item__value">{{ reviewClientData.tipo }}</strong>
+                  </div>
                 </template>
-              </div>
-            </div>
-            <div class="totals__value">
-              <strong v-if="persisted && !dirty" class="totals__amount">{{
-                money(Number(persisted.total))
-              }}</strong>
-              <strong v-else-if="totalPreview !== null" class="totals__amount">{{
-                money(totalPreview)
-              }}</strong>
-              <strong v-else class="totals__amount pending-value">Total pendiente</strong>
-            </div>
-          </div>
-          <div v-if="emissionIssues.length" class="emission-checklist">
-            <div class="emission-checklist__header">
-              <span class="emission-checklist__icon"
-                ><ClipboardCheck :size="22" aria-hidden="true"
-              /></span>
-              <div class="emission-checklist__heading">
-                <h3>Verificación de la proforma</h3>
-                <p>Completa la información necesaria antes de emitir.</p>
-              </div>
-              <span class="emission-checklist__count" aria-live="polite">
-                {{ emissionIssues.length }}
-                {{ emissionIssues.length === 1 ? 'pendiente' : 'pendientes' }}
-              </span>
-            </div>
-            <ul>
-              <li v-for="issue in emissionIssues" :key="issue.id">
-                <CircleAlert :size="18" aria-hidden="true" />
-                <div class="emission-checklist__detail">
-                  <strong>{{ issue.title }}</strong>
-                  <p>{{ issue.description }}</p>
+
+                <div v-if="reviewClientData.celular" class="review-data-item">
+                  <span class="review-data-item__label">Celular</span>
+                  <strong class="review-data-item__value">{{ reviewClientData.celular }}</strong>
                 </div>
-                <button type="button" @click="currentStep = issue.step">
-                  {{ issue.action }} <ChevronRight :size="16" aria-hidden="true" />
-                </button>
-              </li>
-            </ul>
+                <div v-if="reviewClientData.direccion" class="review-data-item">
+                  <span class="review-data-item__label">Dirección</span>
+                  <strong class="review-data-item__value">{{ reviewClientData.direccion }}</strong>
+                </div>
+                <div
+                  v-if="reviewClientData.observaciones"
+                  class="review-data-item review-data-item--full"
+                >
+                  <span class="review-data-item__label">Observaciones del cliente</span>
+                  <p class="review-data-item__text">{{ reviewClientData.observaciones }}</p>
+                </div>
+              </div>
+            </Card>
+            <div v-else-if="!clientIssues.length" class="review-empty-note">
+              <p>No se ha seleccionado ni registrado un cliente para esta cotización.</p>
+            </div>
           </div>
-          <div v-else class="emission-ready" role="status">
+
+          <!-- 4. CONDICIONES COMERCIALES -->
+          <div class="review-section review-section--conditions">
+            <div class="review-section__header">
+              <div class="review-section__title-group">
+                <span
+                  class="review-section-icon review-section-icon--conditions"
+                  aria-hidden="true"
+                >
+                  <SlidersHorizontal :size="18" />
+                </span>
+                <h3 class="review-section__title">Condiciones comerciales</h3>
+              </div>
+              <div class="review-section__status-group">
+                <span
+                  v-if="conditionIssues.length"
+                  class="review-section-pill review-section-pill--pending"
+                >
+                  {{ conditionIssues.length }}
+                  {{ conditionIssues.length === 1 ? 'pendiente' : 'pendientes' }}
+                </span>
+                <span v-else class="review-section-pill review-section-pill--complete">
+                  Completo
+                </span>
+                <span class="review-section-step"> 03 · Condiciones </span>
+              </div>
+            </div>
+
+            <!-- Alertas de condiciones -->
+            <div v-if="conditionIssues.length" class="review-section__alerts">
+              <div v-for="issue in conditionIssues" :key="issue.id" class="review-alert-card">
+                <div class="review-alert-card__main">
+                  <CircleAlert :size="18" class="review-alert-card__icon" aria-hidden="true" />
+                  <div class="review-alert-card__content">
+                    <strong>{{ issue.title }}</strong>
+                    <p>{{ issue.description }}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="review-alert-card__btn"
+                  @click="currentStep = issue.step"
+                >
+                  <span>{{ issue.action }}</span>
+                  <ChevronRight :size="14" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+
+            <!-- Cuadrícula de 3 tarjetas de condiciones -->
+            <div class="review-conditions-grid">
+              <Card class="review-condition-card">
+                <span class="review-condition-card__label">ANTICIPO</span>
+                <strong class="review-condition-card__value">
+                  {{
+                    header.porcentaje_adelanto ? `${header.porcentaje_adelanto} %` : 'No registrado'
+                  }}
+                </strong>
+              </Card>
+              <Card class="review-condition-card">
+                <span class="review-condition-card__label">PLAZO</span>
+                <strong class="review-condition-card__value">
+                  {{ header.plazo_entrega || 'No registrado' }}
+                </strong>
+              </Card>
+              <Card class="review-condition-card">
+                <span class="review-condition-card__label">VALIDEZ</span>
+                <strong class="review-condition-card__value">
+                  {{ header.validez_oferta ? `${header.validez_oferta} días` : 'No registrado' }}
+                </strong>
+              </Card>
+            </div>
+
+            <!-- Observaciones de la proforma (ancho completo si existen) -->
+            <Card v-if="header.observaciones?.trim()" class="review-condition-obs">
+              <span class="review-condition-card__label">OBSERVACIONES DE LA PROFORMA</span>
+              <p class="review-condition-obs__text">{{ header.observaciones }}</p>
+            </Card>
+          </div>
+
+          <!-- 5. WHATSAPP (bloque secundario desplegable) -->
+          <div class="whatsapp-share" @input.stop @change.stop>
+            <div class="whatsapp-share__summary">
+              <span class="whatsapp-share__icon">
+                <MessageCircle :size="20" aria-hidden="true" />
+              </span>
+              <div class="whatsapp-share__heading">
+                <strong>Mensaje para WhatsApp</strong>
+                <small>Personaliza el saludo para acompañar el PDF.</small>
+              </div>
+              <div class="whatsapp-share__controls">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  :disabled="!canShareWhatsApp || !whatsappDraft.trim()"
+                  @click="copyCommercialSummary"
+                  >Copiar mensaje</Button
+                >
+                <button
+                  type="button"
+                  class="whatsapp-share__toggle"
+                  :aria-expanded="whatsappExpanded"
+                  aria-controls="whatsapp-message-content"
+                  :aria-label="
+                    whatsappExpanded ? 'Ocultar mensaje de WhatsApp' : 'Mostrar mensaje de WhatsApp'
+                  "
+                  @click="whatsappExpanded = !whatsappExpanded"
+                >
+                  <ChevronUp v-if="whatsappExpanded" :size="20" aria-hidden="true" />
+                  <ChevronDown v-else :size="20" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+            <p v-if="!canShareWhatsApp" class="whatsapp-share__hint">
+              Selecciona un cliente o completa los datos del nuevo cliente para copiar el mensaje.
+            </p>
+            <div
+              v-show="whatsappExpanded"
+              id="whatsapp-message-content"
+              class="whatsapp-share__content"
+            >
+              <label for="whatsapp-message">Contenido del mensaje</label>
+              <textarea
+                id="whatsapp-message"
+                :value="whatsappDraft"
+                rows="5"
+                @input="editWhatsapp(($event.target as HTMLTextAreaElement).value)"
+              />
+              <div class="whatsapp-share__edit-actions">
+                <small
+                  >Al copiar se incluye únicamente el texto. Adjunta el PDF por separado.</small
+                >
+                <Button
+                  v-if="whatsappEdited"
+                  type="button"
+                  variant="secondary"
+                  @click="resetWhatsapp"
+                  >Restaurar mensaje sugerido</Button
+                >
+              </div>
+            </div>
+          </div>
+
+          <!-- 6. ESTADO GENERAL / INDICACIÓN COMPACTA -->
+          <div v-if="!emissionIssues.length" class="emission-ready" role="status">
             <CheckCircle2 :size="19" aria-hidden="true" />
             <span>
               {{
@@ -3394,34 +3674,27 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   outline: 2px solid var(--color-primary-accent);
   outline-offset: 1px;
 }
-.review-grid {
+/* ==========================================================================
+   Step 04 · Revisar Redesign
+   ========================================================================== */
+.review-panel {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-4);
+  gap: var(--space-6);
 }
-.review-summary-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-width: 0;
-  padding: 1rem 1.15rem;
+
+/* 1. Título opcional */
+.review-title-card {
+  padding: 1rem 1.25rem;
   background: var(--color-surface-muted);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
-  transition:
-    border-color var(--transition-fast),
-    background var(--transition-fast);
 }
-.review-summary-card:hover {
-  border-color: var(--color-border-strong);
-  background: var(--color-surface-hover);
-}
-.review-summary-card__header {
+.review-title-card__inner {
   display: flex;
   align-items: center;
   gap: var(--space-3);
 }
-.review-summary-card__icon {
+.review-title-card__icon {
   display: grid;
   width: 2.25rem;
   height: 2.25rem;
@@ -3430,56 +3703,202 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   border-radius: 0.5rem;
   background: var(--color-surface-raised);
   border: 1px solid var(--color-border);
-  color: var(--color-primary-accent);
-}
-.review-summary-card__title {
-  color: var(--color-text);
-  font-size: 0.88rem;
-  font-weight: 650;
-}
-.review-summary-card__detail {
-  min-width: 0;
-  margin: 0;
-  overflow-wrap: anywhere;
   color: var(--color-text-secondary);
-  font-size: 0.86rem;
-  line-height: 1.45;
 }
-.review-summary-card__action {
+.review-title-card__content {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.review-field-kicker {
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.review-title-card__heading {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+/* Sections common headers */
+.review-section {
+  display: grid;
+  gap: var(--space-3);
+}
+.review-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-bottom: var(--space-2);
+}
+.review-section__title-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.review-section-icon {
+  display: grid;
+  width: 2.15rem;
+  height: 2.15rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+}
+.review-section-icon--products {
+  color: #ff6b4a;
+  border-color: color-mix(in srgb, #ff6b4a 25%, var(--color-border));
+  background: color-mix(in srgb, #ff6b4a 10%, var(--color-surface));
+}
+.review-section-icon--client {
+  color: #ff7849;
+  border-color: color-mix(in srgb, #ff7849 25%, var(--color-border));
+  background: color-mix(in srgb, #ff7849 10%, var(--color-surface));
+}
+.review-section-icon--conditions {
+  color: #ff6b4a;
+  border-color: color-mix(in srgb, #ff6b4a 25%, var(--color-border));
+  background: color-mix(in srgb, #ff6b4a 10%, var(--color-surface));
+}
+.review-section__title {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.review-section__count {
+  color: var(--color-text-secondary);
+  font-size: 0.84rem;
+  font-weight: 500;
+}
+.review-section__status-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+.review-section-pill {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  margin-top: auto;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 650;
+  line-height: 1.2;
+}
+.review-section-pill--pending {
+  color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 12%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
+}
+.review-section-pill--complete {
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 12%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-success) 30%, transparent);
+}
+.review-section-step {
+  display: inline-flex;
+  align-items: center;
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--color-primary-accent);
-  cursor: pointer;
+  color: var(--color-text-secondary);
   font-size: 0.82rem;
-  font-weight: 650;
-  transition:
-    color var(--transition-fast),
-    gap var(--transition-fast);
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--transition-fast);
 }
-.review-summary-card__action:hover {
-  color: var(--color-primary);
-  gap: 0.45rem;
-  text-decoration: none;
+.review-section-step:hover {
+  color: var(--color-primary-accent);
 }
-.commercial-preview {
+
+/* In-section alerts */
+.review-section__alerts {
   display: grid;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+.review-alert-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-4);
-  padding: var(--space-6);
-  background: var(--color-surface-muted);
-  border: 1px solid var(--color-border);
+  padding: 0.95rem 1.25rem;
   border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--color-warning) 8%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-warning) 35%, var(--color-border));
 }
-.commercial-preview__title {
-  margin: 0;
+.review-alert-card__main {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  flex: 1;
+  min-width: 0;
+}
+.review-alert-card__icon {
+  color: var(--color-warning);
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+.review-alert-card__content strong {
+  display: block;
   color: var(--color-text);
-  font-size: 1.2rem;
-  letter-spacing: -0.02em;
+  font-size: 0.9rem;
+  font-weight: 650;
 }
+.review-alert-card__content p {
+  margin: 0.15rem 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.review-alert-card__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  padding: 0.45rem 0.95rem;
+  border-radius: 999px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.review-alert-card__btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary-accent);
+  background: var(--color-primary-soft);
+}
+@media (max-width: 44rem) {
+  .review-alert-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .review-alert-card__btn {
+    align-self: flex-end;
+  }
+}
+
+/* Products list */
+.review-products-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
 .commercial-preview__empty {
   display: flex;
   align-items: center;
@@ -3498,61 +3917,186 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 .commercial-preview__empty p {
   margin: 0;
 }
-.commercial-preview__lines {
-  display: grid;
-  gap: 0;
-}
-.commercial-preview__meta {
+
+/* 2. Total block right after products */
+.review-total-block {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  padding-top: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 1.25rem 1.5rem;
+  margin-top: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  transition: border-color var(--transition-fast);
+}
+.review-total-block:hover {
+  border-color: var(--color-border-strong);
+}
+.review-total-block__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+.review-total-block__title {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1.15rem;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+.review-total-block__desc {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+.review-total-block__desc small {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+.review-total-block__sub {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+.review-total-block__amount {
+  flex-shrink: 0;
+  text-align: right;
+  color: var(--color-text);
+  font-size: clamp(1.4rem, 2.5vw, 1.85rem);
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+@media (max-width: 48rem) {
+  .review-total-block {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .review-total-block__amount {
+    width: 100%;
+    text-align: left;
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--color-border);
+  }
+}
+
+/* 3. Cliente card & grid */
+.review-client-card {
+  padding: 1.25rem 1.5rem;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+.review-data-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4) var(--space-6);
+}
+.review-data-item {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.review-data-item--full {
+  grid-column: 1 / -1;
+  padding-top: var(--space-2);
   border-top: 1px solid var(--color-border);
 }
-.commercial-preview__meta-item {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 0.35rem 0.75rem;
-  border-radius: var(--radius-control);
-  background: var(--color-surface-raised);
-  border: 1px solid var(--color-border);
+.review-data-item__label {
   color: var(--color-text-secondary);
-  font-size: 0.8rem;
-}
-.commercial-preview__meta-item svg {
-  color: var(--color-primary-accent);
-}
-.commercial-preview__meta-item strong {
-  color: var(--color-text);
-}
-.preview-brand {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--color-border);
-}
-.preview-mark {
-  display: grid;
-  width: 2rem;
-  height: 2rem;
-  place-items: center;
-  border-radius: 0.45rem;
-  background: var(--color-primary);
-  color: #fff;
-  font-weight: 800;
-}
-.brand {
-  margin: 0;
-  color: var(--color-primary-accent);
   font-size: 0.72rem;
-  font-weight: 750;
-  letter-spacing: 0.1em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
-.commercial-preview__lines {
+.review-data-item__value {
+  color: var(--color-text);
+  font-size: 1.05rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.review-data-item__text {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.review-empty-note,
+.review-client-empty {
+  padding: 1.25rem;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 0.88rem;
+}
+.review-empty-note p,
+.review-client-empty p {
+  margin: 0;
+}
+@media (max-width: 42rem) {
+  .review-data-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 4. Condiciones comerciales grid & cards */
+.review-conditions-grid {
   display: grid;
-  gap: var(--space-3);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+.review-condition-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1.15rem 1.35rem;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  transition: border-color var(--transition-fast);
+}
+.review-condition-card:hover {
+  border-color: var(--color-border-strong);
+}
+.review-condition-card__label {
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.review-condition-card__value {
+  color: var(--color-text);
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+.review-condition-obs {
+  padding: 1.15rem 1.35rem;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+.review-condition-obs__text {
+  margin: 0.35rem 0 0;
+  color: var(--color-text);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+@media (max-width: 48rem) {
+  .review-conditions-grid {
+    grid-template-columns: 1fr;
+  }
 }
 .review-product-card {
   display: flex;
@@ -3666,80 +4210,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     margin-left: auto;
   }
 }
-.commercial-preview :deep(.button) {
-  justify-self: start;
-}
-.totals {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: 1.25rem 1.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-muted);
-  transition: border-color var(--transition-fast);
-}
-.totals:hover {
-  border-color: var(--color-border-strong);
-}
-.totals__identity {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-width: 0;
-}
-.totals__icon {
-  display: grid;
-  width: 2.75rem;
-  height: 2.75rem;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 0.6rem;
-  background: var(--color-surface-raised);
-  border: 1px solid var(--color-border);
-  color: var(--color-primary-accent);
-}
-.totals__meta {
-  display: grid;
-  gap: 0.2rem;
-  min-width: 0;
-}
-.totals__meta span {
-  color: var(--color-text-secondary);
-  font-size: 0.82rem;
-  font-weight: 650;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.totals__meta small {
-  color: var(--color-text-secondary);
-  font-size: 0.78rem;
-  line-height: 1.4;
-}
-.totals__value {
-  display: grid;
-  justify-items: end;
-  flex-shrink: 0;
-}
-.totals__amount {
-  color: var(--color-text);
-  font-size: clamp(1.4rem, 2.5vw, 1.85rem);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-}
-@media (max-width: 48rem) {
-  .totals {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .totals__value {
-    justify-items: start;
-    width: 100%;
-    padding-top: var(--space-2);
-    border-top: 1px solid var(--color-border);
-  }
-}
+
 .error,
 .warning {
   color: var(--color-danger);
@@ -4226,62 +4697,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   color: var(--color-warning);
 }
 
-.document-preview-launcher {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  margin-top: var(--space-4);
-  padding: 1.15rem 1.25rem;
-  border: 1.5px solid color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
-  border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface));
-  flex-wrap: wrap;
-}
-
-.document-preview-launcher__summary {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-width: 0;
-  flex: 1;
-}
-
-.document-preview-launcher__icon {
-  display: grid;
-  flex: 0 0 auto;
-  width: 2.5rem;
-  height: 2.5rem;
-  place-items: center;
-  border: 1px solid color-mix(in srgb, var(--color-primary) 30%, transparent);
-  border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface));
-  color: var(--color-primary-accent);
-}
-
-.document-preview-launcher__heading {
-  display: grid;
-  gap: 0.15rem;
-}
-
-.document-preview-launcher__heading strong {
-  color: var(--color-text);
-  font-size: 0.92rem;
-  font-weight: 650;
-}
-
-.document-preview-launcher__heading small {
-  color: var(--color-text-secondary);
-  font-size: 0.78rem;
-  line-height: 1.4;
-}
-
-.document-preview-launcher__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-shrink: 0;
-}
 .emission-checklist,
 .emission-ready {
   padding: 1.25rem 1.5rem;
