@@ -1,4 +1,5 @@
 import { onBeforeUnmount, ref, shallowRef, watch } from 'vue'
+import { getActivePinia } from 'pinia'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { proformasService } from '../services/proformasService'
 
@@ -9,7 +10,7 @@ export function useProformaPdf() {
   const loading = ref(false)
   const error = ref('')
   let request = 0
-  const session = useSessionStore()
+  const session = getActivePinia() ? useSessionStore() : null
 
   function clear() {
     request++
@@ -47,7 +48,9 @@ export function useProformaPdf() {
   }
 
   // Flush synchronously: an old Blob or pending response must not survive a seller switch.
-  watch(() => session.identity?.id, clear, { flush: 'sync' })
+  if (session) {
+    watch(() => session.identity?.id, clear, { flush: 'sync' })
+  }
   onBeforeUnmount(clear)
   return { blob, url, loading, error, load, clear }
 }

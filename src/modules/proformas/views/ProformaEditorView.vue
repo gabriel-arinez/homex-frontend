@@ -26,8 +26,11 @@ import {
 import {
   ArrowLeft,
   ArrowRight,
+  Ban,
   Calendar,
+  Check,
   CheckCircle2,
+  CircleX,
   MessageCircle,
   CircleAlert,
   ChevronDown,
@@ -41,6 +44,7 @@ import {
   PackageOpen,
   Plus,
   ReceiptText,
+  RotateCcw,
   SlidersHorizontal,
   Sofa,
   UserCheck,
@@ -56,6 +60,7 @@ import {
   FileText,
 } from '@lucide/vue'
 import Button from '@/shared/ui/Button.vue'
+import Badge from '@/shared/ui/Badge.vue'
 import Card from '@/shared/ui/Card.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
@@ -826,15 +831,94 @@ function fill(value: Proforma) {
   savedContent.value = currentContent()
   dirty.value = false
 }
+
+const lastPedidoId = ref<number | null>(null)
+const transitionConfirm = ref<'approve' | 'not-completed' | 'reopen' | 'cancel' | null>(null)
+const transitioning = ref(false)
+
+const stateCode = computed(() => persisted.value?.estado_info.codigo ?? '')
+const inReview = computed(() => ['EN_REVISION', 'ENVIADA'].includes(stateCode.value))
+const canApprove = computed(
+  () =>
+    inReview.value &&
+    Boolean(persisted.value?.cliente) &&
+    Boolean(lineas.value.length) &&
+    Number(persisted.value?.total ?? 0) > 0,
+)
+const tone = computed<'neutral' | 'success' | 'warning' | 'danger' | 'info'>(() => {
+  if (stateCode.value === 'APROBADA') return 'success'
+  if (stateCode.value === 'EN_REVISION') return 'warning'
+  if (stateCode.value === 'ENVIADA') return 'info'
+  if (stateCode.value === 'NO_CONCRETADA') return 'danger'
+  if (stateCode.value === 'CANCELADA') return 'danger'
+  return 'neutral'
+})
+
+async function confirmStatusTransition(action: 'approve' | 'not-completed' | 'reopen' | 'cancel') {
+  if (transitioning.value || !persisted.value) return
+  if (hasRealChanges.value || hasPendingEdits.value) {
+    const shouldSave = await askConfirmation(
+      'Hay cambios sin guardar. Para cambiar el estado de la proforma es necesario guardar los cambios primero. ¿Deseas guardarlos ahora?',
+      'Guardar cambios pendientes',
+      'Guardar y continuar',
+    )
+    if (!shouldSave) return
+    const saved = await persist(false, true)
+    if (!saved) return
+  }
+  transitionConfirm.value = action
+}
+
+async function executeTransition() {
+  const action = transitionConfirm.value
+  if (!action || transitioning.value || !persisted.value) return
+  const id = persisted.value.id
+  transitionConfirm.value = null
+  transitioning.value = true
+  error.value = ''
+  success.value = ''
+  try {
+    if (action === 'approve') {
+      if (!canApprove.value) {
+        error.value = 'La proforma no cumple con las condiciones para ser aprobada.'
+        return
+      }
+      const result = await proformasService.approve(id)
+      lastPedidoId.value = result.pedido_id
+      success.value = `Proforma aprobada. Pedido #${result.pedido_id} confirmado.`
+    } else if (action === 'cancel') {
+      await proformasService.cancel(id)
+      success.value = 'Proforma anulada.'
+    } else if (action === 'not-completed') {
+      await proformasService.markNotCompleted(id)
+      success.value = 'Proforma marcada como no concretada.'
+    } else {
+      await proformasService.reopen(id)
+      success.value = 'Proforma reabierta en revisión.'
+    }
+    const updated = await proformasService.get(id)
+    fill(updated)
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : 'No se pudo completar la acción.'
+    error.value =
+      cause instanceof ApiError && cause.status === 409
+        ? `${message} Se actualizará el estado para que puedas revisar la proforma.`
+        : message
+    try {
+      const updated = await proformasService.get(id)
+      fill(updated)
+    } catch {
+      error.value += ' No se pudo consultar el estado actualizado.'
+    }
+  } finally {
+    transitioning.value = false
+  }
+}
 async function load() {
   if (!proformaId.value) return
   loading.value = true
   try {
     const value = await proformasService.get(proformaId.value)
-    if (!['BORRADOR', 'EN_REVISION'].includes(value.estado_info.codigo)) {
-      await router.replace({ name: 'proforma-readonly', params: { id: value.id } })
-      return
-    }
     fill(value)
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : 'No se pudo cargar la proforma.'
@@ -1506,10 +1590,12 @@ async function persist(emitir: boolean, skipNavigation = false): Promise<boolean
     allowNavigationAfterSave = true
     if (!skipNavigation) {
       if (emitir) {
-        await router.replace({
-          path: `/proformas/${result.id}`,
-          query: { ...listQuery.value, enviada: '1' },
-        })
+        if (!proformaId.value) {
+          await router.replace({
+            path: `/proformas/${result.id}/editar`,
+            query: { ...listQuery.value, enviada: '1' },
+          })
+        }
       } else if (!proformaId.value) {
         await router.replace({
           path: `/proformas/${result.id}/editar`,
@@ -1570,6 +1656,37 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       @close="errorToast = ''"
     />
     <ConfirmDialog
+      :open="Boolean(transitionConfirm)"
+      :variant="
+        transitionConfirm === 'approve'
+          ? 'success'
+          : transitionConfirm === 'not-completed' || transitionConfirm === 'cancel'
+            ? 'danger'
+            : 'info'
+      "
+      :title="
+        transitionConfirm === 'approve'
+          ? 'Aprobar y crear pedido'
+          : transitionConfirm === 'cancel'
+            ? 'Anular proforma'
+            : transitionConfirm === 'not-completed'
+              ? 'Marcar como no concretada'
+              : 'Reabrir en revisión'
+      "
+      :description="
+        transitionConfirm === 'approve'
+          ? 'Esta acción confirmará el pedido y aplicará los movimientos de inventario correspondientes. No se podrá deshacer desde la proforma.'
+          : transitionConfirm === 'cancel'
+            ? 'La proforma quedará anulada y no podrá editarse ni aprobarse.'
+            : transitionConfirm === 'not-completed'
+              ? 'La cotización quedará registrada como no concretada y podrá reabrirse posteriormente.'
+              : 'La proforma volverá a EN REVISIÓN y podrá corregirse antes de aprobarla.'
+      "
+      :confirm-label="transitionConfirm === 'approve' ? 'Aprobar y crear pedido' : 'Confirmar'"
+      @close="transitionConfirm = null"
+      @confirm="executeTransition"
+    />
+    <ConfirmDialog
       :open="Boolean(confirmation)"
       :title="confirmation?.title || 'Confirmar'"
       :description="confirmation?.description || ''"
@@ -1619,11 +1736,62 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         @menu="emit('openMenu')"
       >
         <template #actions>
+          <div v-if="persisted" class="header-status-badge">
+            <Badge :tone="tone">{{ persisted.estado_info.nombre }}</Badge>
+          </div>
           <Button variant="secondary" @click="router.push(listPath)">
             <ArrowLeft :size="17" aria-hidden="true" /> Volver a proformas
           </Button>
+          <Button
+            v-if="persisted"
+            variant="secondary"
+            :processing="downloadingDocument"
+            @click="openDocumentPreview"
+          >
+            <Eye :size="17" aria-hidden="true" /> Ver documento / PDF
+          </Button>
+          <Button
+            v-if="persisted && (stateCode === 'BORRADOR' || stateCode === 'EN_REVISION')"
+            variant="danger"
+            :disabled="transitioning"
+            @click="confirmStatusTransition('cancel')"
+          >
+            <Ban :size="17" aria-hidden="true" /> Anular proforma
+          </Button>
+          <Button
+            v-if="inReview"
+            variant="success"
+            :disabled="transitioning || !canApprove"
+            @click="confirmStatusTransition('approve')"
+          >
+            <Check :size="17" aria-hidden="true" />
+            Aprobar y crear pedido
+          </Button>
+          <Button
+            v-if="inReview"
+            variant="secondary"
+            :disabled="transitioning"
+            @click="confirmStatusTransition('not-completed')"
+          >
+            <CircleX :size="17" aria-hidden="true" /> Marcar no concretada
+          </Button>
+          <Button
+            v-if="stateCode === 'NO_CONCRETADA'"
+            variant="secondary"
+            :disabled="transitioning"
+            @click="confirmStatusTransition('reopen')"
+          >
+            <RotateCcw :size="17" aria-hidden="true" /> Reabrir en revisión
+          </Button>
         </template>
       </PageHeader>
+      <div v-if="success && lastPedidoId" class="order-created-banner" role="status">
+        <CheckCircle2 :size="18" aria-hidden="true" />
+        <div class="order-created-banner__content">
+          <span>{{ success }}</span>
+          <RouterLink :to="`/pedidos/${lastPedidoId}`">Consultar pedido #{{ lastPedidoId }}</RouterLink>
+        </div>
+      </div>
       <LoadingSkeleton v-if="loading || referenceLoading" :lines="8" />
       <ErrorState v-else-if="error && !tipos.length" :description="error">
         <button @click="loadReferences">Reintentar</button>
@@ -4329,5 +4497,35 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   display: flex;
   align-items: center;
   gap: 0.65rem;
+}
+.header-status-badge {
+  display: flex;
+  align-items: center;
+}
+.order-created-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding: 0.9rem 1.25rem;
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--color-success) 12%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-success) 35%, transparent);
+  color: var(--color-text);
+}
+.order-created-banner svg {
+  color: var(--color-success);
+  flex-shrink: 0;
+}
+.order-created-banner__content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.order-created-banner__content a {
+  font-weight: 700;
+  color: var(--color-primary);
+  text-decoration: underline;
 }
 </style>

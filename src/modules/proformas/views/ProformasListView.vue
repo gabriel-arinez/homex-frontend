@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ChevronLeft, ChevronRight, Clock3, Eye, Plus, RotateCcw } from '@lucide/vue'
 import type { ProformaListado, ValorCatalogoPublico } from '@/generated/api'
 import { proformasService } from '../services/proformasService'
 import { presentarCreacion } from '../utils/fechaCreacion'
 import ProformaActionsMenu from '../components/ProformaActionsMenu.vue'
+import DocumentViewerModal from '../components/DocumentViewerModal.vue'
+import { useProformaPdf } from '../composables/useProformaPdf'
+import { downloadBlob } from '@/shared/download/downloadBlob'
 import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
@@ -79,6 +82,46 @@ const filters = computed(() => [
   ...(dateFrom.value ? [{ key: 'from', label: `Desde: ${dateFrom.value}` }] : []),
   ...(dateTo.value ? [{ key: 'to', label: `Hasta: ${dateTo.value}` }] : []),
 ])
+
+const previewModalOpen = ref(false)
+const previewQuote = ref<{ id: number; numero: number; estado: string } | null>(null)
+const downloadingDocument = ref(false)
+
+const {
+  blob: documentBlob,
+  url: documentUrl,
+  loading: documentLoading,
+  error: documentError,
+  load: loadDocument,
+  clear: clearDocument,
+} = useProformaPdf()
+
+watch(previewModalOpen, (open) => {
+  if (open && previewQuote.value?.id) void loadDocument(previewQuote.value.id)
+  else clearDocument()
+})
+
+function openPdfViewer(id: number, numero: number, estado: string) {
+  previewQuote.value = { id, numero, estado }
+  previewModalOpen.value = true
+}
+
+async function downloadDocumentPdf() {
+  if (downloadingDocument.value || !previewQuote.value) return
+  downloadingDocument.value = true
+  try {
+    const file =
+      (previewModalOpen.value && documentBlob.value) ||
+      (await loadDocument(previewQuote.value.id))
+    if (!file) return
+    const prefix = previewQuote.value.estado === 'BORRADOR' ? 'proforma-borrador' : 'proforma'
+    downloadBlob(file, `${prefix}-${previewQuote.value.numero}.pdf`)
+  } catch {
+    // Error handled in modal or catch
+  } finally {
+    downloadingDocument.value = false
+  }
+}
 
 let requestId = 0
 let debounce: ReturnType<typeof setTimeout> | undefined
@@ -435,19 +478,18 @@ onBeforeUnmount(() => {
                   :id="row.id"
                   :numero="row.numero"
                   :return-to="route.fullPath === '/proformas' ? undefined : route.fullPath"
+                  @open-pdf="openPdfViewer"
                 />
-                <RouterLink
+                <button
                   v-else
-                  :to="
-                    route.fullPath === '/proformas'
-                      ? `/proformas/${row.id}`
-                      : { path: `/proformas/${row.id}`, query: { returnTo: route.fullPath } }
-                  "
+                  type="button"
                   class="proforma-view-link"
                   :aria-label="`Ver proforma #${row.numero}`"
                   :title="`Ver proforma #${row.numero}`"
-                  ><Eye :size="19" aria-hidden="true"
-                /></RouterLink>
+                  @click="openPdfViewer(row.id, row.numero, row.estado_info.nombre)"
+                >
+                  <Eye :size="19" aria-hidden="true" />
+                </button>
               </td>
             </tr>
           </tbody>
@@ -466,6 +508,21 @@ onBeforeUnmount(() => {
         </div>
       </nav>
     </template>
+
+    <DocumentViewerModal
+      v-if="previewQuote"
+      :open="previewModalOpen"
+      :title="`Proforma #${previewQuote.numero}`"
+      :subtitle="`Documento PDF · Tamaño Carta · ${previewQuote.estado}`"
+      :downloading="downloadingDocument"
+      :can-download-pdf="true"
+      :pdf-url="documentUrl"
+      :loading="documentLoading"
+      :error="documentError"
+      @close="previewModalOpen = false"
+      @retry="loadDocument(previewQuote.id)"
+      @download="downloadDocumentPdf"
+    />
   </div>
 </template>
 
@@ -739,6 +796,7 @@ onBeforeUnmount(() => {
   color: var(--color-text);
   background: var(--color-surface);
   text-decoration: none;
+  cursor: pointer;
 }
 .proforma-view-link:hover {
   background: var(--color-surface-hover);

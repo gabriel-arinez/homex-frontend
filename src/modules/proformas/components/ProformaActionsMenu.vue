@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Ban, Check, CircleX, ClipboardList, MoreHorizontal, Pencil, RotateCcw } from '@lucide/vue'
+import { FileText, MoreHorizontal, Pencil } from '@lucide/vue'
 
 const props = defineProps<{ id: number; numero: number; estado: string; returnTo?: string }>()
+const emit = defineEmits<{ openPdf: [id: number, numero: number, estado: string] }>()
 const open = ref(false)
 const trigger = ref<HTMLButtonElement | null>(null)
 const menu = ref<HTMLElement | null>(null)
@@ -24,7 +25,7 @@ async function toggle() {
   const rect = trigger.value?.getBoundingClientRect()
   if (!rect) return
   const width = 228
-  const height = props.estado === 'EN_REVISION' ? 250 : 175
+  const height = 110
   const top =
     window.innerHeight - rect.bottom >= height + 10
       ? rect.bottom + 6
@@ -62,6 +63,12 @@ function onFocus(event: FocusEvent) {
   if (!(target instanceof Node)) return
   if (!trigger.value?.contains(target) && !menu.value?.contains(target)) close()
 }
+
+function viewPdf() {
+  close(false)
+  emit('openPdf', props.id, props.numero, props.estado)
+}
+
 onMounted(() => {
   document.addEventListener('pointerdown', outside)
   document.addEventListener('focusin', onFocus)
@@ -117,57 +124,15 @@ onBeforeUnmount(() => {
           <Pencil :size="17" aria-hidden="true" />
           Continuar edición
         </RouterLink>
-        <RouterLink
+        <button
+          type="button"
           role="menuitem"
-          :to="{
-            path: `/proformas/${id}`,
-            query: props.returnTo ? { returnTo: props.returnTo } : {},
-          }"
-          @click="close(false)"
+          class="proforma-actions__menu-btn"
+          @click="viewPdf"
         >
-          <ClipboardList :size="17" aria-hidden="true" />
-          Ver resumen y gestión
-        </RouterLink>
-        <RouterLink
-          v-if="estado === 'EN_REVISION'"
-          role="menuitem"
-          :to="{
-            path: `/proformas/${id}`,
-            query: { accion: 'approve', ...(returnTo ? { returnTo } : {}) },
-          }"
-          @click="close(false)"
-          ><Check :size="17" aria-hidden="true" /> Aprobar y crear pedido</RouterLink
-        >
-        <RouterLink
-          v-if="estado === 'EN_REVISION'"
-          role="menuitem"
-          :to="{
-            path: `/proformas/${id}`,
-            query: { accion: 'not-completed', ...(returnTo ? { returnTo } : {}) },
-          }"
-          @click="close(false)"
-          ><CircleX :size="17" aria-hidden="true" /> Marcar no concretada</RouterLink
-        >
-        <RouterLink
-          v-if="estado === 'BORRADOR' || estado === 'EN_REVISION'"
-          role="menuitem"
-          :to="{
-            path: `/proformas/${id}`,
-            query: { accion: 'cancel', ...(returnTo ? { returnTo } : {}) },
-          }"
-          @click="close(false)"
-          ><Ban :size="17" aria-hidden="true" /> Anular proforma</RouterLink
-        >
-        <RouterLink
-          v-if="estado === 'NO_CONCRETADA'"
-          role="menuitem"
-          :to="{
-            path: `/proformas/${id}`,
-            query: { accion: 'reopen', ...(returnTo ? { returnTo } : {}) },
-          }"
-          @click="close(false)"
-          ><RotateCcw :size="17" aria-hidden="true" /> Reabrir en revisión</RouterLink
-        >
+          <FileText :size="17" aria-hidden="true" />
+          Ver documento / PDF
+        </button>
       </div>
     </Teleport>
   </div>
@@ -210,25 +175,35 @@ onBeforeUnmount(() => {
   background: var(--color-surface);
   box-shadow: 0 16px 42px rgb(0 0 0 / 25%);
 }
-.proforma-actions__menu a {
+.proforma-actions__menu a,
+.proforma-actions__menu-btn {
   min-height: 2.75rem;
   display: flex;
   gap: 0.65rem;
   align-items: center;
   padding: 0.7rem 0.75rem;
+  border: 0;
   border-radius: var(--radius-control);
+  background: transparent;
   color: var(--color-text);
   text-decoration: none;
+  font-family: inherit;
   font-size: 0.85rem;
   font-weight: 600;
   white-space: nowrap;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
 }
 .proforma-actions__menu a:hover,
-.proforma-actions__menu a:focus-visible {
+.proforma-actions__menu a:focus-visible,
+.proforma-actions__menu-btn:hover,
+.proforma-actions__menu-btn:focus-visible {
   background: var(--color-surface-hover);
   color: var(--color-primary-accent);
 }
-.proforma-actions__menu a:focus-visible {
+.proforma-actions__menu a:focus-visible,
+.proforma-actions__menu-btn:focus-visible {
   outline: 2px solid var(--color-primary-accent);
   outline-offset: -2px;
 }
