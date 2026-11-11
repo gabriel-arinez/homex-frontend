@@ -1789,7 +1789,9 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         <CheckCircle2 :size="18" aria-hidden="true" />
         <div class="order-created-banner__content">
           <span>{{ success }}</span>
-          <RouterLink :to="`/pedidos/${lastPedidoId}`">Consultar pedido #{{ lastPedidoId }}</RouterLink>
+          <RouterLink :to="`/pedidos/${lastPedidoId}`"
+            >Consultar pedido #{{ lastPedidoId }}</RouterLink
+          >
         </div>
       </div>
       <LoadingSkeleton v-if="loading || referenceLoading" :lines="8" />

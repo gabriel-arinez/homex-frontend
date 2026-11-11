@@ -111,8 +111,7 @@ async function downloadDocumentPdf() {
   downloadingDocument.value = true
   try {
     const file =
-      (previewModalOpen.value && documentBlob.value) ||
-      (await loadDocument(previewQuote.value.id))
+      (previewModalOpen.value && documentBlob.value) || (await loadDocument(previewQuote.value.id))
     if (!file) return
     const prefix = previewQuote.value.estado === 'BORRADOR' ? 'proforma-borrador' : 'proforma'
     downloadBlob(file, `${prefix}-${previewQuote.value.numero}.pdf`)

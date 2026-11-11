@@ -1527,14 +1527,11 @@ test('@a11y FE04 bandeja de proformas usa menú único y visualización de solo 
   await page.goto('/proformas')
   const actions = page.getByRole('button', { name: 'Acciones de la proforma #101' })
   await expect(actions).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Ver proforma #102' })).toHaveAttribute(
-    'href',
-    '/proformas/2',
-  )
+  const viewButton = page.getByRole('button', { name: 'Ver proforma #102' })
+  await expect(viewButton).toBeVisible()
   await actions.click()
   await expect(page.getByRole('menuitem', { name: 'Continuar edición' })).toBeVisible()
-  await expect(page.getByRole('menuitem', { name: 'Ver resumen y gestión' })).toBeVisible()
-  await expect(page.getByRole('menuitem', { name: 'Anular proforma' })).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: 'Ver documento / PDF' })).toBeVisible()
   const accessibility = await new AxeBuilder({ page }).include('.proforma-table').analyze()
   expect(accessibility.violations).toEqual([])
   await page.keyboard.press('Escape')
@@ -1548,16 +1545,15 @@ test('@a11y FE04 bandeja de proformas usa menú único y visualización de solo 
   await expect(page.getByRole('button', { name: 'Acciones de la proforma #101' })).toBeVisible()
 })
 
-test('FE04 acciones de bandeja solicitan confirmación antes de anular', async ({ page }) => {
+test('FE04 acciones de editor solicitan confirmación antes de anular', async ({ page }) => {
   await mockBackend(page)
   let cancellations = 0
   await page.route('**/api/v1/proformas/1/anular/', async (route) => {
     cancellations++
     await route.fulfill({ status: 500 })
   })
-  await page.goto('/proformas')
-  await page.getByRole('button', { name: 'Acciones de la proforma #101' }).click()
-  await page.getByRole('menuitem', { name: 'Anular proforma' }).click()
+  await page.goto('/proformas/1/editar')
+  await page.getByRole('button', { name: 'Anular proforma' }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('heading', { name: 'Anular proforma' })).toBeVisible()
   await dialog.getByRole('button', { name: 'Cancelar' }).click()

@@ -124,12 +124,7 @@ onBeforeUnmount(() => {
           <Pencil :size="17" aria-hidden="true" />
           Continuar edición
         </RouterLink>
-        <button
-          type="button"
-          role="menuitem"
-          class="proforma-actions__menu-btn"
-          @click="viewPdf"
-        >
+        <button type="button" role="menuitem" class="proforma-actions__menu-btn" @click="viewPdf">
           <FileText :size="17" aria-hidden="true" />
           Ver documento / PDF
         </button>
