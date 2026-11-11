@@ -42,6 +42,7 @@ const props = defineProps<{
   galeriaId?: string
   detalleId?: number
   nueva: boolean
+  initialSection?: Seccion
   formVersion: number
   dirty: boolean
   sesion: string
@@ -158,7 +159,13 @@ const secciones = [
   { id: 'comercial', titulo: 'Precio', icono: Wallet },
   { id: 'revision', titulo: 'Revisar', icono: ClipboardCheck },
 ] as const
-const seccion = ref<Seccion>('general')
+const seccion = ref<Seccion>(props.initialSection ?? 'general')
+watch(
+  () => props.initialSection,
+  (val) => {
+    if (val) seccion.value = val
+  },
+)
 watch(seccion, (value) => {
   if (value === 'imagenes') void ensureGallery()
 })
@@ -370,7 +377,7 @@ defineExpose({ save: guardarDesdeEstudio, hasRealChanges })
               seccion === 'imagenes' && galleryStatus.confirmed + galleryStatus.pending > 0,
           }"
           preserve-pending
-          :streamlined="seccion === 'imagenes'"
+          :streamlined="true"
           :endpoint="`/api/v1/galerias/${galleryId}/imagenes/`"
           :editable="seccion === 'imagenes'"
           title="Imágenes del mueble"
@@ -414,6 +421,7 @@ defineExpose({ save: guardarDesdeEstudio, hasRealChanges })
           :processing="processing"
           :external-error="externalError"
           studio
+          :is-editing="!nueva"
           :active-section="seccion === 'imagenes' ? 'imagenes' : seccion"
           @save="saveWithGallery"
           @changed="emit('changed')"

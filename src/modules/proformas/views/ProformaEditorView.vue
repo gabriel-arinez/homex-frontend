@@ -51,7 +51,6 @@ import {
   Pencil,
   Copy,
   Trash2,
-  Wrench,
   Save,
   Send,
   FileText,
@@ -985,6 +984,9 @@ const transitioning = ref(false)
 
 const stateCode = computed(() => persisted.value?.estado_info.codigo ?? '')
 const inReview = computed(() => ['EN_REVISION', 'ENVIADA'].includes(stateCode.value))
+const isEditable = computed(
+  () => !persisted.value || ['BORRADOR', 'EN_REVISION'].includes(stateCode.value),
+)
 const canApprove = computed(
   () =>
     inReview.value &&
@@ -1241,15 +1243,24 @@ async function saveSpec(
   specModalDirty.value = false
   markDirty()
 }
+const furnitureInitialSection = ref<
+  'general' | 'estructura' | 'accesorios' | 'imagenes' | 'comercial' | 'revision'
+>('general')
+
 function selectMenuAction(action: 'edit' | 'spec' | 'duplicate' | 'remove', index: number) {
   menuLineId.value = null
   if (action === 'edit') openLine(index)
-  else if (action === 'spec') openSpec(index)
+  else if (action === 'spec') openSpec(index, 'revision')
   else if (action === 'duplicate') duplicateFurniture(index)
   else removeLine(index)
 }
-function openSpec(index: number) {
+function openSpec(
+  index: number,
+  initialSection:
+    'general' | 'estructura' | 'accesorios' | 'imagenes' | 'comercial' | 'revision' = 'general',
+) {
   specModalDirty.value = false
+  furnitureInitialSection.value = initialSection
   specLine.value = index
 }
 async function closeSpec() {
@@ -1270,6 +1281,7 @@ async function closeSpec() {
   draftingFurniture.value = null
   duplicateOrigin.value = null
   specModalDirty.value = false
+  furnitureInitialSection.value = 'general'
 }
 function removeLine(index: number) {
   const result = removeLocalLine(lineas.value, index)
@@ -1722,18 +1734,13 @@ async function persist(emitir: boolean, skipNavigation = false): Promise<boolean
     removedLines.value = []
     key.value = crypto.randomUUID()
     success.value = emitir
-      ? 'Proforma enviada a revisión.'
+      ? 'Proforma enviada correctamente a revisión.'
       : result.estado_info.codigo === 'EN_REVISION'
         ? 'Cambios guardados en la proforma en revisión.'
         : 'Borrador guardado.'
     allowNavigationAfterSave = true
     if (!skipNavigation) {
-      if (emitir) {
-        await router.replace({
-          path: `/proformas/${result.id}`,
-          query: { ...listQuery.value, enviada: '1' },
-        })
-      } else if (!proformaId.value) {
+      if (!proformaId.value) {
         await router.replace({
           path: `/proformas/${result.id}/editar`,
           query: listQuery.value,
@@ -1947,7 +1954,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <span v-if="lineas.length" class="count-pill"
                 >{{ lineas.length }} {{ lineas.length === 1 ? 'ítem' : 'ítems' }}</span
               >
-              <Button @click="additionMode = 'choose'"
+              <Button v-if="isEditable" @click="additionMode = 'choose'"
                 ><Plus :size="17" aria-hidden="true" />Añadir ítem</Button
               >
             </div>
@@ -2085,6 +2092,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               </button>
               <div v-if="menuLineId === line.localId" class="menu-panel" role="menu">
                 <button
+                  v-if="isEditable"
                   type="button"
                   role="menuitem"
                   :disabled="line.modo_calculo === 'TOTAL_NEGOCIADO'"
@@ -2098,17 +2106,25 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   role="menuitem"
                   @click="selectMenuAction('spec', index)"
                 >
-                  <Wrench :size="16" aria-hidden="true" /> Ficha técnica
+                  <ClipboardCheck :size="16" aria-hidden="true" /> Revisar
                 </button>
                 <button
-                  v-if="tipos.find((x) => x.id === line.tipo_item)?.codigo === 'MUEBLE_MEDIDA'"
+                  v-if="
+                    isEditable &&
+                    tipos.find((x) => x.id === line.tipo_item)?.codigo === 'MUEBLE_MEDIDA'
+                  "
                   type="button"
                   role="menuitem"
                   @click="selectMenuAction('duplicate', index)"
                 >
                   <Copy :size="16" aria-hidden="true" /> Duplicar mueble
                 </button>
-                <button type="button" role="menuitem" @click="selectMenuAction('remove', index)">
+                <button
+                  v-if="isEditable"
+                  type="button"
+                  role="menuitem"
+                  @click="selectMenuAction('remove', index)"
+                >
                   <Trash2 :size="16" aria-hidden="true" /> Eliminar
                 </button>
               </div>
@@ -2125,7 +2141,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               Comienza con un producto de catálogo o un mueble a pedido para construir esta
               proforma.
             </p>
-            <div class="empty-actions">
+            <div v-if="isEditable" class="empty-actions">
               <Button @click="chooseCatalog"
                 ><PackageOpen :size="17" aria-hidden="true" />Producto de catálogo</Button
               >
@@ -2790,9 +2806,15 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <CheckCircle2 :size="19" aria-hidden="true" />
             <span>
               {{
-                isReview
-                  ? 'Esta proforma ya está en revisión. Puedes guardar correcciones o consultar su resumen.'
-                  : 'Información completa. La proforma está lista para enviar a revisión.'
+                stateCode === 'APROBADA'
+                  ? 'Esta proforma está aprobada. Se creó el pedido correspondiente.'
+                  : stateCode === 'CANCELADA'
+                    ? 'Esta proforma está anulada.'
+                    : stateCode === 'NO_CONCRETADA'
+                      ? 'Esta proforma fue marcada como no concretada.'
+                      : isReview
+                        ? 'Esta proforma ya está en revisión. Puedes guardar correcciones o consultar su resumen.'
+                        : 'Información completa. La proforma está lista para enviar a revisión.'
               }}
             </span>
           </div>
@@ -2846,6 +2868,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 Aprobar
               </Button>
               <Button
+                v-if="isEditable"
                 variant="success"
                 class="editor-save-draft"
                 :disabled="!hasRealChanges"
@@ -2856,7 +2879,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 {{ isReview ? 'Guardar cambios' : 'Guardar borrador' }}
               </Button>
               <Button
-                v-if="!isReview"
+                v-if="isEditable && !isReview"
                 variant="info"
                 :disabled="!canEmit"
                 :processing="saving"
@@ -2939,6 +2962,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         }
       "
       :nueva="Boolean(draftingFurniture)"
+      :initial-section="furnitureInitialSection"
       :dirty="specModalDirty"
       :sesion="sesionBorrador"
       :moneda="header.moneda_codigo === 'USD' ? 'USD' : 'BOB'"
