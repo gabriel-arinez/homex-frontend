@@ -1551,7 +1551,7 @@ test('FE04 acciones de editor solicitan confirmación antes de anular', async ({
     await route.fulfill({ status: 500 })
   })
   await page.goto('/proformas/1/editar')
-  await page.getByRole('button', { name: 'Anular proforma' }).click()
+  await page.getByRole('button', { name: 'Anular', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('heading', { name: 'Anular proforma' })).toBeVisible()
   await dialog.getByRole('button', { name: 'Cancelar' }).click()
