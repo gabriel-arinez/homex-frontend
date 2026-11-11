@@ -53,6 +53,7 @@ import { calcularUnitarioExacto, totalComercialCoincide } from '../services/prec
 const props = defineProps<{
   tipos: ValorCatalogoPublico[]
   studio?: boolean
+  isEditing?: boolean
   activeSection?: 'general' | 'estructura' | 'accesorios' | 'imagenes' | 'comercial' | 'revision'
   especificacion?: EspecificacionMueble | null
   pendientesAsistencia?: PendienteAsistida[]
@@ -2697,7 +2698,13 @@ onMounted(loadCatalog)
       <div class="review-actions__buttons">
         <Button variant="success" type="submit" :disabled="processing">
           <Save :size="17" aria-hidden="true" />
-          {{ studio ? 'Agregar mueble a la proforma' : 'Guardar especificación' }}
+          {{
+            studio
+              ? isEditing
+                ? 'Guardar mueble'
+                : 'Agregar mueble a la proforma'
+              : 'Guardar especificación'
+          }}
         </Button>
         <Button v-if="!studio" variant="secondary" @click="emit('cancel')">Cancelar</Button>
       </div>

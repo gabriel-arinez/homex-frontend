@@ -123,7 +123,7 @@ test('Galería real de mueble: borrador restaurado y vinculación integral', asy
   await expect(page.getByText('Borrador guardado.', { exact: true })).toBeVisible()
   await page.reload()
   await page.getByRole('button', { name: /Acciones.*Copia con referencias/ }).click()
-  await page.getByRole('menuitem', { name: 'Ficha técnica', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Revisar', exact: true }).click()
   await step(page, 'Imágenes')
   await expect(page.getByRole('heading', { name: 'Imágenes del mueble 2/8' })).toBeVisible()
   await expect(
