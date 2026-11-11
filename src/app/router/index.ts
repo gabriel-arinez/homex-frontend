@@ -61,7 +61,7 @@ const router = createRouter({
         {
           path: 'proformas/:id',
           name: 'proforma-readonly',
-          redirect: (to) => ({ path: `/proformas/${to.params.id}/editar`, query: to.query }),
+          component: () => import('@/modules/proformas/views/ProformaDetailView.vue'),
           meta: { capability: 'comercial.operar' },
         },
         {

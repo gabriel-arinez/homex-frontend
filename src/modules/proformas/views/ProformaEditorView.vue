@@ -1590,12 +1590,10 @@ async function persist(emitir: boolean, skipNavigation = false): Promise<boolean
     allowNavigationAfterSave = true
     if (!skipNavigation) {
       if (emitir) {
-        if (!proformaId.value) {
-          await router.replace({
-            path: `/proformas/${result.id}/editar`,
-            query: { ...listQuery.value, enviada: '1' },
-          })
-        }
+        await router.replace({
+          path: `/proformas/${result.id}`,
+          query: { ...listQuery.value, enviada: '1' },
+        })
       } else if (!proformaId.value) {
         await router.replace({
           path: `/proformas/${result.id}/editar`,
