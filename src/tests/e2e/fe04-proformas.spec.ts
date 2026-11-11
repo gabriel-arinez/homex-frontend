@@ -1529,7 +1529,7 @@ test('@a11y FE04 bandeja de proformas usa menú único y visualización de solo 
   await expect(viewButton).toBeVisible()
   await actions.click()
   await expect(page.getByRole('menuitem', { name: 'Continuar edición' })).toBeVisible()
-  await expect(page.getByRole('menuitem', { name: 'Ver documento / PDF' })).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: 'Ver Proforma' })).toBeVisible()
   const accessibility = await new AxeBuilder({ page }).include('.proforma-table').analyze()
   expect(accessibility.violations).toEqual([])
   await page.keyboard.press('Escape')
@@ -1625,7 +1625,7 @@ test('approved PDF renders, downloads identical bytes and prints the original do
     return route.fulfill({ contentType: 'application/pdf', body: fixture })
   })
   await page.goto('/proformas/1')
-  await page.getByRole('button', { name: 'Ver documento / PDF' }).click()
+  await page.getByRole('button', { name: 'Ver Proforma' }).click()
   const viewer = page.locator('.doc-viewer-overlay')
   const pageCount = (fixture.toString('latin1').match(/\/Type \/Page\b/g) ?? []).length
   expect(pageCount).toBeGreaterThan(0)

@@ -54,11 +54,9 @@ import {
   Wrench,
   Save,
   Send,
-  Eye,
   FileText,
 } from '@lucide/vue'
 import Button from '@/shared/ui/Button.vue'
-import Badge from '@/shared/ui/Badge.vue'
 import Card from '@/shared/ui/Card.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
@@ -994,14 +992,6 @@ const canApprove = computed(
     Boolean(lineas.value.length) &&
     Number(persisted.value?.total ?? 0) > 0,
 )
-const tone = computed<'neutral' | 'success' | 'warning' | 'danger' | 'info'>(() => {
-  if (stateCode.value === 'APROBADA') return 'success'
-  if (stateCode.value === 'EN_REVISION') return 'warning'
-  if (stateCode.value === 'ENVIADA') return 'info'
-  if (stateCode.value === 'NO_CONCRETADA') return 'danger'
-  if (stateCode.value === 'CANCELADA') return 'danger'
-  return 'neutral'
-})
 
 async function confirmStatusTransition(action: 'approve' | 'not-completed' | 'reopen' | 'cancel') {
   if (transitioning.value || !persisted.value) return
@@ -1654,7 +1644,7 @@ const documentNotice = computed(() => {
   return (
     'Hay cambios sin guardar o ediciones pendientes. El PDF refleja los datos guardados en el servidor, no los cambios pendientes. ' +
     'Cierra el visor, incorpora las ediciones pendientes con Guardar línea o desde la ficha del mueble, ' +
-    `pulsa «${saveAction}» y vuelve a abrir Vista previa PDF para generar el documento actualizado.`
+    `pulsa «${saveAction}» y vuelve a abrir Ver Proforma para generar el documento actualizado.`
   )
 })
 async function requestReview() {
@@ -1883,52 +1873,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         @menu="emit('openMenu')"
       >
         <template #actions>
-          <div v-if="persisted" class="header-status-badge">
-            <Badge :tone="tone">{{ persisted.estado_info.nombre }}</Badge>
-          </div>
           <Button variant="secondary" @click="router.push(listPath)">
             <ArrowLeft :size="17" aria-hidden="true" /> Volver a proformas
-          </Button>
-          <Button
-            v-if="persisted"
-            variant="secondary"
-            :processing="downloadingDocument"
-            @click="openDocumentPreview"
-          >
-            <Eye :size="17" aria-hidden="true" /> Ver documento / PDF
-          </Button>
-          <Button
-            v-if="persisted && (stateCode === 'BORRADOR' || stateCode === 'EN_REVISION')"
-            variant="danger"
-            :disabled="transitioning"
-            @click="confirmStatusTransition('cancel')"
-          >
-            <Ban :size="17" aria-hidden="true" /> Anular proforma
-          </Button>
-          <Button
-            v-if="inReview"
-            variant="success"
-            :disabled="transitioning || !canApprove"
-            @click="confirmStatusTransition('approve')"
-          >
-            <Check :size="17" aria-hidden="true" />
-            Aprobar y crear pedido
-          </Button>
-          <Button
-            v-if="inReview"
-            variant="secondary"
-            :disabled="transitioning"
-            @click="confirmStatusTransition('not-completed')"
-          >
-            <CircleX :size="17" aria-hidden="true" /> Marcar no concretada
-          </Button>
-          <Button
-            v-if="stateCode === 'NO_CONCRETADA'"
-            variant="secondary"
-            :disabled="transitioning"
-            @click="confirmStatusTransition('reopen')"
-          >
-            <RotateCcw :size="17" aria-hidden="true" /> Reabrir en revisión
           </Button>
         </template>
       </PageHeader>
@@ -2864,6 +2810,42 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             </div>
             <div class="editor-actions__operations">
               <Button
+                v-if="persisted && (stateCode === 'BORRADOR' || stateCode === 'EN_REVISION')"
+                variant="danger"
+                :disabled="transitioning"
+                @click="confirmStatusTransition('cancel')"
+              >
+                <Ban :size="17" aria-hidden="true" />
+                Anular
+              </Button>
+              <Button
+                v-if="inReview"
+                variant="secondary"
+                :disabled="transitioning"
+                @click="confirmStatusTransition('not-completed')"
+              >
+                <CircleX :size="17" aria-hidden="true" />
+                No concretada
+              </Button>
+              <Button
+                v-if="stateCode === 'NO_CONCRETADA'"
+                variant="secondary"
+                :disabled="transitioning"
+                @click="confirmStatusTransition('reopen')"
+              >
+                <RotateCcw :size="17" aria-hidden="true" />
+                Reabrir
+              </Button>
+              <Button
+                v-if="inReview"
+                variant="success"
+                :disabled="transitioning || !canApprove"
+                @click="confirmStatusTransition('approve')"
+              >
+                <Check :size="17" aria-hidden="true" />
+                Aprobar
+              </Button>
+              <Button
                 variant="success"
                 class="editor-save-draft"
                 :disabled="!hasRealChanges"
@@ -2885,12 +2867,12 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               </Button>
               <Button
                 type="button"
-                variant="secondary"
+                variant="primary"
                 class="editor-preview-doc-btn"
                 @click="openDocumentPreview"
               >
                 <FileText :size="17" aria-hidden="true" />
-                Vista previa PDF
+                Ver Proforma
               </Button>
             </div>
           </div>

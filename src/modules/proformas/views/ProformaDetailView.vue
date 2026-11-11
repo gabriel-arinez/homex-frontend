@@ -8,7 +8,6 @@ import {
   CircleX,
   ClipboardCheck,
   Download,
-  Eye,
   FileText,
   Pencil,
   Paperclip,
@@ -246,7 +245,7 @@ onMounted(() => void load())
           {{ stateCode === 'BORRADOR' ? 'Descargar borrador (PDF)' : 'Descargar PDF' }}
         </Button>
         <Button v-if="quote" variant="primary" @click="previewModalOpen = true">
-          <Eye :size="17" aria-hidden="true" /> Ver documento / PDF
+          <FileText :size="17" aria-hidden="true" /> Ver Proforma
         </Button>
         <Button v-if="editable" variant="secondary" :disabled="processing" @click="edit">
           <Pencil :size="17" aria-hidden="true" /> Continuar edición

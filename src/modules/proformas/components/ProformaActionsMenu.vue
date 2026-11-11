@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { FileText, MoreHorizontal, Pencil } from '@lucide/vue'
+import { Ban, Check, CircleX, FileText, MoreHorizontal, Pencil, RotateCcw } from '@lucide/vue'
 
 const props = defineProps<{ id: number; numero: number; estado: string; returnTo?: string }>()
 const emit = defineEmits<{ openPdf: [id: number, numero: number, estado: string] }>()
@@ -25,7 +25,7 @@ async function toggle() {
   const rect = trigger.value?.getBoundingClientRect()
   if (!rect) return
   const width = 228
-  const height = 110
+  const height = props.estado === 'EN_REVISION' ? 250 : 175
   const top =
     window.innerHeight - rect.bottom >= height + 10
       ? rect.bottom + 6
@@ -126,8 +126,56 @@ onBeforeUnmount(() => {
         </RouterLink>
         <button type="button" role="menuitem" class="proforma-actions__menu-btn" @click="viewPdf">
           <FileText :size="17" aria-hidden="true" />
-          Ver documento / PDF
+          Ver Proforma
         </button>
+        <RouterLink
+          v-if="estado === 'EN_REVISION'"
+          role="menuitem"
+          :to="{
+            path: `/proformas/${id}`,
+            query: { accion: 'approve', ...(returnTo ? { returnTo } : {}) },
+          }"
+          @click="close(false)"
+        >
+          <Check :size="17" aria-hidden="true" />
+          Aprobar y crear pedido
+        </RouterLink>
+        <RouterLink
+          v-if="estado === 'EN_REVISION'"
+          role="menuitem"
+          :to="{
+            path: `/proformas/${id}`,
+            query: { accion: 'not-completed', ...(returnTo ? { returnTo } : {}) },
+          }"
+          @click="close(false)"
+        >
+          <CircleX :size="17" aria-hidden="true" />
+          Marcar no concretada
+        </RouterLink>
+        <RouterLink
+          v-if="estado === 'BORRADOR' || estado === 'EN_REVISION'"
+          role="menuitem"
+          :to="{
+            path: `/proformas/${id}`,
+            query: { accion: 'cancel', ...(returnTo ? { returnTo } : {}) },
+          }"
+          @click="close(false)"
+        >
+          <Ban :size="17" aria-hidden="true" />
+          Anular proforma
+        </RouterLink>
+        <RouterLink
+          v-if="estado === 'NO_CONCRETADA'"
+          role="menuitem"
+          :to="{
+            path: `/proformas/${id}`,
+            query: { accion: 'reopen', ...(returnTo ? { returnTo } : {}) },
+          }"
+          @click="close(false)"
+        >
+          <RotateCcw :size="17" aria-hidden="true" />
+          Reabrir en revisión
+        </RouterLink>
       </div>
     </Teleport>
   </div>

@@ -83,7 +83,7 @@ describe('Bandeja de proformas HOMEX', () => {
       await flushPromises()
       const menu = document.body.querySelector('[role="menu"]')
       expect(menu?.textContent).toContain('Continuar edición')
-      expect(menu?.textContent).toContain('Ver documento / PDF')
+      expect(menu?.textContent).toContain('Ver Proforma')
       expect(menu?.querySelector('a[href="/proformas/1/editar"]')).not.toBeNull()
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
       await flushPromises()
