@@ -1,13 +1,19 @@
 <script setup lang="ts">
-defineProps<{
-  caption: string
-  columns: Array<{ key: string; label: string }>
-  rows: Array<Record<string, unknown>>
-}>()
+withDefaults(
+  defineProps<{
+    caption: string
+    columns: Array<{ key: string; label: string }>
+    rows: Array<Record<string, unknown>>
+    variant?: 'institutional' | 'plain'
+  }>(),
+  {
+    variant: 'institutional',
+  },
+)
 </script>
 <template>
-  <div class="table-wrap">
-    <table>
+  <div class="table-wrap" :class="`table-wrap--${variant}`">
+    <table :class="`table--${variant}`">
       <caption class="sr-only">
         {{
           caption
@@ -45,6 +51,8 @@ td {
   padding: 0.875rem 1rem;
   text-align: left;
   border-bottom: 1px solid var(--color-border);
+  border-left: 0;
+  border-right: 0;
 }
 th {
   color: var(--color-text-secondary);
@@ -53,6 +61,36 @@ th {
 tbody tr:last-child td {
   border-bottom: 0;
 }
+
+/* Institutional table variant (default for bandejas) */
+.table--institutional thead {
+  background: var(--color-table-header-bg);
+}
+.table--institutional th {
+  background: var(--color-table-header-bg);
+  color: var(--color-table-header-text);
+  border-bottom: 1px solid var(--color-table-border);
+  border-left: 0;
+  border-right: 0;
+}
+.table--institutional td {
+  border-bottom: 1px solid var(--color-table-border);
+  border-left: 0;
+  border-right: 0;
+}
+.table--institutional tbody tr:nth-child(odd) {
+  background-color: var(--color-table-row-odd);
+}
+.table--institutional tbody tr:nth-child(even) {
+  background-color: var(--color-table-row-even);
+}
+.table--institutional tbody tr:hover {
+  background-color: var(--color-table-row-hover);
+}
+.table--institutional tbody tr:last-child td {
+  border-bottom: 0;
+}
+
 @media (max-width: 47.99rem) {
   thead {
     display: none;
@@ -65,6 +103,12 @@ tbody tr:last-child td {
   tr {
     padding: var(--space-3);
     border-bottom: 1px solid var(--color-border);
+  }
+  .table--institutional tr {
+    border-bottom: 1px solid var(--color-table-border);
+  }
+  .table--institutional tbody tr:last-child {
+    border-bottom: 0;
   }
   td {
     display: grid;

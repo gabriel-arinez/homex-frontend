@@ -660,14 +660,17 @@ onBeforeUnmount(() => {
 }
 .proforma-table {
   min-width: 0;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-table-border);
   border-radius: var(--radius-card);
-  background: var(--color-surface);
+  background: var(--color-table-row-odd);
 }
 .proforma-table table {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
+}
+.proforma-table thead {
+  background: var(--color-table-header-bg);
 }
 .col-quote {
   width: 22%;
@@ -691,19 +694,28 @@ onBeforeUnmount(() => {
 .proforma-table td {
   text-align: left;
   padding: 0.8rem 1rem;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-table-border);
+  border-left: 0;
+  border-right: 0;
   vertical-align: middle;
 }
 .proforma-table th {
-  color: var(--color-text-secondary);
+  background: var(--color-table-header-bg);
+  color: var(--color-table-header-text);
   font-size: 0.76rem;
   font-weight: 650;
 }
-.proforma-table tbody tr:last-child td {
-  border-bottom: 0;
+.proforma-table tbody tr:nth-child(odd) {
+  background-color: var(--color-table-row-odd);
+}
+.proforma-table tbody tr:nth-child(even) {
+  background-color: var(--color-table-row-even);
 }
 .proforma-table tbody tr:hover {
-  background: var(--color-surface-hover);
+  background-color: var(--color-table-row-hover);
+}
+.proforma-table tbody tr:last-child td {
+  border-bottom: 0;
 }
 .quote-cell,
 .client-cell {
@@ -884,9 +896,14 @@ onBeforeUnmount(() => {
     grid-template-columns: 1fr 1fr;
     gap: 0.6rem 1rem;
     padding: 1rem;
-    border: 1px solid var(--color-border);
+    border: 1px solid var(--color-table-border);
     border-radius: var(--radius-card);
-    background: var(--color-surface);
+  }
+  .proforma-table tbody tr:nth-child(odd) {
+    background-color: var(--color-table-row-odd);
+  }
+  .proforma-table tbody tr:nth-child(even) {
+    background-color: var(--color-table-row-even);
   }
   .proforma-table tbody td {
     display: block;

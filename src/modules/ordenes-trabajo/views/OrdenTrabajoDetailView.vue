@@ -139,7 +139,12 @@ const columns = [
       <section class="details">
         <h2>Detalle de trabajo</h2>
         <p>Estas líneas provienen de la proforma aprobada que originó el pedido.</p>
-        <DataTable caption="Detalle de la orden de trabajo" :columns="columns" :rows="detailRows">
+        <DataTable
+          caption="Detalle de la orden de trabajo"
+          :columns="columns"
+          :rows="detailRows"
+          variant="plain"
+        >
           <template #cell-nombre="{ row }"
             ><strong>{{ row.nombre }}</strong></template
           >

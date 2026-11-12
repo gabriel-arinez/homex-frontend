@@ -1141,31 +1141,43 @@ onBeforeUnmount(() => {
 .table-wrap {
   max-width: 100%;
   overflow-x: auto;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-table-border);
   border-radius: var(--radius-card);
-  background: var(--color-surface);
+  background: var(--color-table-row-odd);
 }
 .product-table {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
 }
+.product-table thead {
+  background: var(--color-table-header-bg);
+}
 .product-table th,
 .product-table td {
   padding: 0.8rem 0.9rem;
   text-align: left;
   vertical-align: middle;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-table-border);
+  border-left: 0;
+  border-right: 0;
 }
 .product-table th {
-  color: var(--color-text-secondary);
+  background: var(--color-table-header-bg);
+  color: var(--color-table-header-text);
   font-size: 0.75rem;
+}
+.product-table tbody tr:nth-child(odd) {
+  background-color: var(--color-table-row-odd);
+}
+.product-table tbody tr:nth-child(even) {
+  background-color: var(--color-table-row-even);
+}
+.product-table tbody tr:hover {
+  background-color: var(--color-table-row-hover);
 }
 .product-table tr:last-child td {
   border-bottom: none;
-}
-.product-table tbody tr:hover {
-  background: var(--color-surface-hover);
 }
 .product-table th:nth-child(1) {
   width: 34%;
@@ -1325,7 +1337,13 @@ onBeforeUnmount(() => {
   }
   .product-table tbody tr {
     padding: var(--space-3);
-    border-bottom: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-table-border);
+  }
+  .product-table tbody tr:nth-child(odd) {
+    background-color: var(--color-table-row-odd);
+  }
+  .product-table tbody tr:nth-child(even) {
+    background-color: var(--color-table-row-even);
   }
   .product-table tbody tr:last-child {
     border-bottom: 0;

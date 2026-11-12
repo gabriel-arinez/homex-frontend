@@ -29,6 +29,14 @@
   --color-info: #175cd3;
   --color-info-soft: #eff6ff;
   --color-overlay: rgb(28 25 23 / 55%);
+
+  /* Bandejas institucionales HOMEX */
+  --color-table-header-bg: #98232c;
+  --color-table-header-text: #ffffff;
+  --color-table-row-odd: #ffffff;
+  --color-table-row-even: #f1f3f6;
+  --color-table-row-hover: #e8ecf1;
+  --color-table-border: #dedad5;
 }
 
 :root[data-theme='dark'] {
@@ -57,4 +65,12 @@
   --color-info: #79a9ff;
   --color-info-soft: #172a4a;
   --color-overlay: rgb(0 0 0 / 70%);
+
+  /* Bandejas institucionales HOMEX */
+  --color-table-header-bg: #98232c;
+  --color-table-header-text: #ffffff;
+  --color-table-row-odd: #1e1f23;
+  --color-table-row-even: #29272b;
+  --color-table-row-hover: #333136;
+  --color-table-border: #383838;
 }
