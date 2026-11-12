@@ -8,6 +8,7 @@ export type {
   CamposCatalogo,
   CapturaAceptada,
   CapturaRevision,
+  CapturaRevisionWritable,
   CargaArchivoImagen,
   CargaGaleria,
   CargaImagen,

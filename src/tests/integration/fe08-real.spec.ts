@@ -376,3 +376,47 @@ test.describe.serial('FE08 backend real', () => {
     }
   })
 })
+
+test('scoped text proposal retains component measures and explicit unit price through HITL', async ({
+  page,
+}) => {
+  const errors = await login(page)
+  const quote = await createDraft(page, 'Scoped commercial projection')
+  await page.goto('/capturas/nueva')
+  await page.getByLabel('Proforma').fill(String(quote))
+  await page.getByLabel('Texto', { exact: true }).check()
+  await page
+    .getByLabel('Texto dictado o escrito')
+    .fill(
+      'Dos escritorios de 160 cm de ancho. Credencia integrada de MDF de 110 cm de ancho, ' +
+        '65 cm de alto y 45 de profundidad. Preciunitario 1900 bolivianos.',
+    )
+  await page.getByRole('button', { name: 'Enviar a procesamiento' }).click()
+  await expect(page).toHaveURL(/\/capturas\/\d+$/)
+  await expect(page.getByText('Propuesta IA · requiere revisión')).toBeVisible()
+  await expect(page.getByRole('spinbutton', { name: 'Precio unitario' })).toHaveValue('1900.00')
+  const technicalInput = page.locator('textarea[aria-describedby="datos-tecnicos-ayuda"]')
+  const technical = JSON.parse(await technicalInput.inputValue())
+  const sideboard = technical.componentes.find(
+    (c: { nombre: string }) => c.nombre.toLowerCase() === 'credencia integrada',
+  )
+  expect(sideboard.dimensiones).toContain('110 cm')
+  expect(sideboard.dimensiones).toContain('65 cm')
+  expect(sideboard.dimensiones).not.toContain('45')
+  expect(technical.caracteristicas_generales.dimensiones).toEqual({ ancho: '160 cm' })
+  await expect(page.getByRole('list', { name: 'Datos pendientes de revisión' })).toContainText(
+    '45 de profundidad',
+  )
+  const sent = page.waitForRequest(
+    (r) => /\/capturas\/\d+\/confirmar\/$/.test(new URL(r.url()).pathname) && r.method() === 'POST',
+  )
+  await page.getByRole('button', { name: 'Revisar y confirmar' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Confirmar revisión' }).click()
+  const payload = (await sent).postDataJSON()
+  expect(payload.item_corregido.dimensiones).toEqual({ ancho: '160 cm' })
+  expect(payload.linea_comercial.datos_tecnicos.componentes).toEqual(technical.componentes)
+  await expect(page.getByText(/Corrección incorporada.*permanece BORRADOR/)).toBeVisible()
+  await page.goto(`/proformas/${quote}`)
+  await expect(page.locator('.line-card').getByText(/escritorios/i)).toBeVisible()
+  expect(errors).toEqual([])
+})

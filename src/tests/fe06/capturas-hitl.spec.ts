@@ -247,3 +247,86 @@ describe('FE06 capturas y HITL', () => {
     vi.unstubAllGlobals()
   })
 })
+
+const scopedProjection = () => ({
+  comercial: {
+    nombre: 'Escritorios',
+    cantidad: 2,
+    unidad_codigo: 'PIEZA',
+    precio_unitario: '1900.00' as string | null,
+    descuento: null,
+  },
+  especificacion: {
+    tipo_mueble: null,
+    observaciones: null,
+    datos_tecnicos: {
+      componentes: [
+        {
+          uid: 'sideboard',
+          nombre: 'Credencia integrada',
+          dimensiones: 'ancho: 110 cm; alto: 65 cm',
+          material: 'MDF',
+        },
+      ],
+      caracteristicas_generales: { dimensiones: { ancho: { valor: '160', unidad: 'cm' } } },
+    },
+  },
+  pendientes: [
+    {
+      codigo: 'MISSING_UNIT',
+      ruta: 'dimensiones',
+      mensaje: 'Complete la unidad de 45 de profundidad.',
+    },
+  ],
+})
+
+describe('commercial scoped legacy review', () => {
+  it('retains component dimensions and explicit unit price without flattening them into the desk', async () => {
+    common(capture({ proyeccion_configurador: scopedProjection(), proyeccion_error: false }))
+    const w = await view()
+    await flushPromises()
+    expect(w.get('input[name="unitario"]').element).toHaveProperty('value', '1900.00')
+    const dimensions = w
+      .findAll('textarea')
+      .find((x) => x.attributes('placeholder') === '{"ancho":"1.20 m"}')!
+    expect(JSON.parse((dimensions.element as HTMLTextAreaElement).value)).toEqual({
+      ancho: '160 cm',
+    })
+    const technical = JSON.parse(
+      (w.get('textarea[aria-describedby="datos-tecnicos-ayuda"]').element as HTMLTextAreaElement)
+        .value,
+    )
+    expect(technical.componentes[0]).toMatchObject({
+      nombre: 'Credencia integrada',
+      dimensiones: 'ancho: 110 cm; alto: 65 cm',
+    })
+    expect(technical.caracteristicas_generales.dimensiones).toEqual({ ancho: '160 cm' })
+    expect(w.text()).toContain('Complete la unidad de 45 de profundidad.')
+    expect((w.findAll('textarea')[0]!.element as HTMLTextAreaElement).value).not.toContain('18 mm')
+    w.unmount()
+  })
+  it('does not turn an explicit negotiated total into a unit price', async () => {
+    const projection = scopedProjection()
+    projection.comercial.precio_unitario = null
+    projection.pendientes = [
+      {
+        codigo: 'TOTAL_NEGOCIADO',
+        ruta: 'comercial.precio_unitario',
+        mensaje: 'Total negociado; revise el precio unitario.',
+      },
+    ]
+    common(capture({ proyeccion_configurador: projection, proyeccion_error: false }))
+    const w = await view()
+    await flushPromises()
+    expect(w.get('input[name="unitario"]').element).toHaveProperty('value', '')
+    expect(w.text()).toContain('Total negociado; revise el precio unitario.')
+    w.unmount()
+  })
+  it('shows projection errors rather than claiming structured evidence was recovered', async () => {
+    common(capture({ proyeccion_configurador: null, proyeccion_error: true }))
+    const w = await view()
+    await flushPromises()
+    expect(w.text()).toContain('No se pudo recuperar la propuesta estructurada')
+    w.unmount()
+  })
+})

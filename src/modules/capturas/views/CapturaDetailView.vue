@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import type { CapturaRevision, ConfirmarCaptura, ValorCatalogoPublico } from '@/generated/api'
 import { capturasService } from '../services/capturasService'
+import { reviewProjection } from '../reviewProjection'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import { Check } from '@lucide/vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
@@ -75,13 +76,31 @@ function initialize() {
     accesorios: json(x.accesorios),
     observaciones: x.observaciones ?? '',
     precio_unitario: '',
-    // La IA v1 identifica un mueble, no la relación entre sus piezas.
-    // Las correcciones humanas se proyectan a características generales
-    // en el backend; sólo el vendedor puede vincularlas a componentes.
+    // Historical API responses have no structured projection; keep their manual-review fallback.
     datos_tecnicos: JSON.stringify({ componentes: [] }, null, 2),
   }
+  const projection = capture.value.proyeccion_configurador
+  if (projection) {
+    const scoped = reviewProjection(projection)
+    form.value = {
+      ...form.value,
+      nombre: projection.comercial.nombre,
+      cantidad: projection.comercial.cantidad == null ? '' : String(projection.comercial.cantidad),
+      precio_unitario: projection.comercial.precio_unitario ?? '',
+      tipo_mueble_id:
+        projection.especificacion.tipo_mueble == null
+          ? ''
+          : String(projection.especificacion.tipo_mueble),
+      espesor: json(scoped.thickness),
+      color_principal: scoped.primaryColor,
+      color_secundario: scoped.secondaryColor,
+      dimensiones: json(scoped.dimensions),
+      accesorios: json(scoped.accessories),
+      datos_tecnicos: json(scoped.technical),
+    }
+  }
   const t = types.value.find((x) => x.codigo === 'MUEBLE_MEDIDA'),
-    u = units.value.find((x) => x.codigo === 'PIEZA')
+    u = units.value.find((x) => x.codigo === (projection?.comercial.unidad_codigo ?? 'PIEZA'))
   form.value.tipo_item_id = String(t?.id ?? '')
   form.value.unidad_id = String(u?.id ?? '')
   initialized = true
@@ -247,9 +266,25 @@ onBeforeUnmount(() => {
               La captura ya está vinculada a una línea comercial y no puede confirmarse otra vez.
             </p>
             <form v-else @submit.prevent="confirmOpen = true">
+              <p v-if="capture?.proyeccion_error" role="alert">
+                No se pudo recuperar la propuesta estructurada. Revise la evidencia y corrija los
+                datos manualmente.
+              </p>
+              <ul
+                v-if="capture?.proyeccion_configurador?.pendientes.length"
+                aria-label="Datos pendientes de revisión"
+              >
+                <li
+                  v-for="(pending, index) in capture.proyeccion_configurador.pendientes"
+                  :key="index"
+                >
+                  {{ pending.mensaje }}
+                </li>
+              </ul>
               <p v-if="capture.item_ia?.precio_total" class="hint">
-                La IA propuso un total de {{ capture.item_ia.precio_total }}. Define el precio
-                unitario comercial explícitamente; el sistema no convertirá ni redondeará ese total.
+                La IA propuso un total de {{ capture.item_ia.precio_total }}. Revisa el precio
+                unitario: sólo se recupera si fue explícito; el sistema no lo deduce ni redondea a
+                partir del total.
               </p>
               <TextField
                 v-model="form.nombre"
@@ -321,7 +356,7 @@ onBeforeUnmount(() => {
                 label="Unidad"
                 :options="
                   units
-                    .filter((x) => x.codigo === 'PIEZA')
+                    .filter((x) => ['PIEZA', 'JUEGO'].includes(x.codigo))
                     .map((x) => ({ label: x.nombre, value: String(x.id) }))
                 "
               /><Select
