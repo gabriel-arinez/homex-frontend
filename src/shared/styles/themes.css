@@ -37,6 +37,43 @@
   --color-table-row-even: #f1f3f6;
   --color-table-row-hover: #e8ecf1;
   --color-table-border: #dedad5;
+
+  /* Estados / Badges institucionales */
+  --badge-neutral-bg: #eceae7;
+  --badge-neutral-text: #4f4b46;
+  --badge-neutral-dot: #85807a;
+  --badge-warning-bg: #fff1d6;
+  --badge-warning-text: #8c5700;
+  --badge-warning-dot: #d97706;
+  --badge-info-bg: #eaf1fc;
+  --badge-info-text: #1852b7;
+  --badge-info-dot: #2563eb;
+  --badge-success-bg: #e7f5ec;
+  --badge-success-text: #146e43;
+  --badge-success-dot: #16a34a;
+  --badge-danger-bg: #fdebed;
+  --badge-danger-text: #a8201a;
+  --badge-danger-dot: #dc2626;
+
+  /* Avatar palette (pasteles suaves y texto de alto contraste) */
+  --avatar-0-bg: #dbeafe;
+  --avatar-0-text: #1e40af;
+  --avatar-1-bg: #d1fae5;
+  --avatar-1-text: #065f46;
+  --avatar-2-bg: #fef3c7;
+  --avatar-2-text: #92400e;
+  --avatar-3-bg: #ede9fe;
+  --avatar-3-text: #5b21b6;
+  --avatar-4-bg: #ffe4e6;
+  --avatar-4-text: #9f1239;
+  --avatar-5-bg: #ccfbf1;
+  --avatar-5-text: #115e59;
+  --avatar-6-bg: #ffedd5;
+  --avatar-6-text: #9a3412;
+  --avatar-7-bg: #f1f5f9;
+  --avatar-7-text: #334155;
+  --avatar-neutral-bg: #f1eeea;
+  --avatar-neutral-text: #625e59;
 }
 
 :root[data-theme='dark'] {
@@ -73,4 +110,41 @@
   --color-table-row-even: #29272b;
   --color-table-row-hover: #333136;
   --color-table-border: #383838;
+
+  /* Estados / Badges institucionales */
+  --badge-neutral-bg: #2a292d;
+  --badge-neutral-text: #cfcac5;
+  --badge-neutral-dot: #9ca3af;
+  --badge-warning-bg: #382914;
+  --badge-warning-text: #f5c451;
+  --badge-warning-dot: #f59e0b;
+  --badge-info-bg: #162846;
+  --badge-info-text: #8cb5ff;
+  --badge-info-dot: #3b82f6;
+  --badge-success-bg: #143525;
+  --badge-success-text: #6de0a7;
+  --badge-success-dot: #22c55e;
+  --badge-danger-bg: #3c1a17;
+  --badge-danger-text: #ff8e86;
+  --badge-danger-dot: #ef4444;
+
+  /* Avatar palette (tonos oscuros armoniosos con iniciales legibles) */
+  --avatar-0-bg: #1e3a5f;
+  --avatar-0-text: #93c5fd;
+  --avatar-1-bg: #14422e;
+  --avatar-1-text: #86efac;
+  --avatar-2-bg: #452f14;
+  --avatar-2-text: #fcd34d;
+  --avatar-3-bg: #3b1f5e;
+  --avatar-3-text: #d8b4fe;
+  --avatar-4-bg: #4c1d28;
+  --avatar-4-text: #fda4af;
+  --avatar-5-bg: #133e38;
+  --avatar-5-text: #5eead4;
+  --avatar-6-bg: #482613;
+  --avatar-6-text: #fdba74;
+  --avatar-7-bg: #2d3748;
+  --avatar-7-text: #cbd5e1;
+  --avatar-neutral-bg: #29272b;
+  --avatar-neutral-text: #b8b3ae;
 }

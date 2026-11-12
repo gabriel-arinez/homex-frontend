@@ -10,6 +10,7 @@ import EmptyState from '@/shared/ui/EmptyState.vue'
 import DataTable from '@/shared/ui/DataTable.vue'
 import Select from '@/shared/ui/Select.vue'
 import FilterBar from '@/shared/ui/FilterBar.vue'
+import StatusBadge from '@/shared/ui/StatusBadge.vue'
 const emit = defineEmits<{ openMenu: [] }>(),
   rows = ref<Pedido[]>([]),
   states = ref<ValorCatalogoPublico[]>([]),
@@ -17,6 +18,7 @@ const emit = defineEmits<{ openMenu: [] }>(),
   error = ref(''),
   state = ref('')
 const name = (id: number) => states.value.find((x) => x.id === id)?.nombre ?? `Estado ${id}`
+const statusCode = (id: number) => states.value.find((x) => x.id === id)?.codigo ?? ''
 const filtered = computed(() =>
   state.value ? rows.value.filter((x) => String(x.estado) === state.value) : rows.value,
 )
@@ -70,7 +72,10 @@ const columns = [
       ><template #cell-fecha="{ row }">{{
         new Date(String(row.fecha_confirmacion)).toLocaleString('es-BO')
       }}</template
-      ><template #cell-estado="{ row }">{{ name(Number(row.estado)) }}</template
+      ><template #cell-estado="{ row }"
+        ><StatusBadge
+          :status="statusCode(Number(row.estado))"
+          :label="name(Number(row.estado))" /></template
       ><template #cell-proforma="{ row }"
         ><RouterLink :to="`/proformas/${row.proforma}`">#{{ row.proforma }}</RouterLink></template
       ><template #cell-acciones="{ row }"

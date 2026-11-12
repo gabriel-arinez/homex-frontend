@@ -5,6 +5,8 @@ import type { Cliente, ValorCatalogoPublico } from '@/generated/api'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import { clientesService, nombreCliente } from '../services/clientesService'
 import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
+import Badge from '@/shared/ui/Badge.vue'
+import ClientAvatar from '@/shared/ui/ClientAvatar.vue'
 import DataTable from '@/shared/ui/DataTable.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
@@ -223,15 +225,18 @@ const columns = [
           }))
         "
       >
-        <template #cell-nombre="{ row }"
-          ><strong>{{ row.nombre }}</strong></template
-        >
+        <template #cell-nombre="{ row }">
+          <div class="client-cell-content">
+            <ClientAvatar :name="String(row.nombre)" />
+            <strong>{{ row.nombre }}</strong>
+          </div>
+        </template>
         <template #cell-celular="{ row }">{{ row.celular || 'Sin celular' }}</template>
         <template #cell-tipo="{ row }">{{ row.tipo }}</template>
         <template #cell-estado="{ row }">
-          <span :class="row.activo === false ? 'inactive' : 'active'">{{
-            row.activo === false ? 'Inactivo' : 'Activo'
-          }}</span>
+          <Badge :tone="row.activo === false ? 'danger' : 'success'">
+            {{ row.activo === false ? 'Inactivo' : 'Activo' }}
+          </Badge>
         </template>
         <template #cell-acciones="{ row }">
           <RouterLink :to="`/clientes/${row.id}`">Ver detalle</RouterLink>
@@ -261,6 +266,11 @@ const columns = [
 a {
   color: var(--color-primary-accent);
   font-weight: 600;
+}
+.client-cell-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 .primary-link {
   display: inline-flex;

@@ -12,6 +12,7 @@ import { downloadBlob } from '@/shared/download/downloadBlob'
 import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
+import ClientAvatar from '@/shared/ui/ClientAvatar.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
@@ -435,8 +436,13 @@ onBeforeUnmount(() => {
                 }}</span>
               </td>
               <td class="client-cell">
-                <strong :title="customerLabel(row)">{{ customerLabel(row) }}</strong>
-                <span>{{ row.cliente_resumen ? 'Cliente registrado' : 'Prospecto' }}</span>
+                <div class="client-content">
+                  <ClientAvatar :name="customerLabel(row)" />
+                  <div class="client-info">
+                    <strong :title="customerLabel(row)">{{ customerLabel(row) }}</strong>
+                    <span>{{ row.cliente_resumen ? 'Cliente registrado' : 'Prospecto' }}</span>
+                  </div>
+                </div>
               </td>
               <td class="date-cell" data-label="Creación">
                 <div
@@ -661,12 +667,15 @@ onBeforeUnmount(() => {
 .proforma-table {
   min-width: 0;
   border: 1px solid var(--color-table-border);
+  border-top: 1px solid var(--color-table-header-bg);
   border-radius: var(--radius-card);
+  overflow: hidden;
   background: var(--color-table-row-odd);
 }
 .proforma-table table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   table-layout: fixed;
 }
 .proforma-table thead {
@@ -704,6 +713,15 @@ onBeforeUnmount(() => {
   color: var(--color-table-header-text);
   font-size: 0.76rem;
   font-weight: 650;
+  border-top: 0;
+}
+.proforma-table thead th:first-child {
+  border-top-left-radius: calc(var(--radius-card) - 1px);
+  box-shadow: -1px 0 0 var(--color-table-header-bg);
+}
+.proforma-table thead th:last-child {
+  border-top-right-radius: calc(var(--radius-card) - 1px);
+  box-shadow: 1px 0 0 var(--color-table-header-bg);
 }
 .proforma-table tbody tr:nth-child(odd) {
   background-color: var(--color-table-row-odd);
@@ -717,8 +735,25 @@ onBeforeUnmount(() => {
 .proforma-table tbody tr:last-child td {
   border-bottom: 0;
 }
+.proforma-table tbody tr:last-child td:first-child {
+  border-bottom-left-radius: calc(var(--radius-card) - 1px);
+}
+.proforma-table tbody tr:last-child td:last-child {
+  border-bottom-right-radius: calc(var(--radius-card) - 1px);
+}
 .quote-cell,
 .client-cell {
+  min-width: 0;
+}
+.client-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.client-info {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
 }
 .quote-cell strong,

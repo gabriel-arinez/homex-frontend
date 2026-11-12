@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router'
 import type { OrdenTrabajo } from '@/generated/api'
 import { ordenesTrabajoService } from '../services/ordenesTrabajoService'
 import DataTable from '@/shared/ui/DataTable.vue'
+import StatusBadge from '@/shared/ui/StatusBadge.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
@@ -30,6 +31,7 @@ onMounted(load)
 const tableRows = computed(() =>
   rows.value.map((item) => ({
     ...item,
+    estadoCodigo: item.estado_info.codigo,
     estadoLabel: item.estado_info.nombre,
   })),
 )
@@ -65,7 +67,9 @@ const columns = [
       <template #cell-pedido="{ row }">
         <RouterLink :to="`/pedidos/${row.pedido}`">#{{ row.pedido }}</RouterLink>
       </template>
-      <template #cell-estado="{ row }">{{ row.estadoLabel }}</template>
+      <template #cell-estado="{ row }">
+        <StatusBadge :status="String(row.estadoCodigo)" :label="String(row.estadoLabel)" />
+      </template>
       <template #cell-acciones="{ row }">
         <RouterLink :to="`/ordenes-trabajo/${row.id}`">Ver detalle</RouterLink>
       </template>

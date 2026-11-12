@@ -68,9 +68,19 @@ button {
 }
 
 /* HOMEX: Estilo institucional predeterminado para tablas de bandejas */
+.table-wrap--institutional {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--color-table-border);
+  border-top: 1px solid var(--color-table-header-bg);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  background: var(--color-table-row-odd);
+}
 .table-institutional {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 .table-institutional thead {
   background: var(--color-table-header-bg);
@@ -79,8 +89,17 @@ button {
   background: var(--color-table-header-bg);
   color: var(--color-table-header-text);
   border-bottom: 1px solid var(--color-table-border);
+  border-top: 0;
   border-left: 0;
   border-right: 0;
+}
+.table-institutional thead th:first-child {
+  border-top-left-radius: calc(var(--radius-card) - 1px);
+  box-shadow: -1px 0 0 var(--color-table-header-bg);
+}
+.table-institutional thead th:last-child {
+  border-top-right-radius: calc(var(--radius-card) - 1px);
+  box-shadow: 1px 0 0 var(--color-table-header-bg);
 }
 .table-institutional td {
   border-bottom: 1px solid var(--color-table-border);
@@ -98,6 +117,12 @@ button {
 }
 .table-institutional tbody tr:last-child td {
   border-bottom: 0;
+}
+.table-institutional tbody tr:last-child td:first-child {
+  border-bottom-left-radius: calc(var(--radius-card) - 1px);
+}
+.table-institutional tbody tr:last-child td:last-child {
+  border-bottom-right-radius: calc(var(--radius-card) - 1px);
 }
 @media (prefers-reduced-motion: reduce) {
   *,
