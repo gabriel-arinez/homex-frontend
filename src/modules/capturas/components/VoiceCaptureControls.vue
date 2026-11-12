@@ -87,7 +87,7 @@ const emit = defineEmits<{
 .voice-source-actions :deep(.source-action small) {
   font-size: 0.76rem;
   font-weight: 400;
-  opacity: 0.9;
+  opacity: 1;
 }
 .hint {
   grid-column: 1 / -1;
