@@ -221,7 +221,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: gabriel-arinez/homex-backend
-          ref: ${{ inputs.integration_peer_ref || '54c8b91a994c996e595ce0246d4ef8ed5b4f4e9f' }}
+          ref: ${{ inputs.integration_peer_ref || 'd65c07a5605020363e4ba6acd6afcc310797412c' }}
           path: backend
       - name: Record exact frontend and backend revisions
         run: |
