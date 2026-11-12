@@ -682,16 +682,16 @@ onBeforeUnmount(() => {
   background: var(--color-table-header-bg);
 }
 .col-quote {
-  width: 22%;
+  width: 16%;
 }
 .col-client {
-  width: 27%;
+  width: 21%;
 }
 .col-date {
-  width: 15%;
+  width: 17%;
 }
 .col-status {
-  width: 13%;
+  width: 8%;
 }
 .col-total {
   width: 15%;
