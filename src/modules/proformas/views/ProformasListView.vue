@@ -685,19 +685,19 @@ onBeforeUnmount(() => {
   width: 22%;
 }
 .col-client {
-  width: 20%;
+  width: 27%;
 }
 .col-date {
-  width: 22%;
+  width: 15%;
 }
 .col-status {
-  width: 14%;
+  width: 13%;
 }
 .col-total {
   width: 15%;
 }
 .col-actions {
-  width: 7%;
+  width: 8%;
 }
 .proforma-table th,
 .proforma-table td {
@@ -765,7 +765,17 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.quote-cell span,
+.quote-cell span {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.35;
+  word-break: break-word;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+}
 .client-cell span {
   display: block;
   color: var(--color-text-secondary);
@@ -885,19 +895,19 @@ onBeforeUnmount(() => {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .col-quote {
-    width: 20%;
+    width: 22%;
   }
   .col-client {
-    width: 20%;
+    width: 25%;
   }
   .col-date {
-    width: 19%;
+    width: 16%;
   }
   .col-status {
-    width: 15%;
+    width: 13%;
   }
   .col-total {
-    width: 17%;
+    width: 15%;
   }
   .col-actions {
     width: 9%;
