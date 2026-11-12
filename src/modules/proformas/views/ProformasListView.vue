@@ -143,7 +143,7 @@ function tone(code: string): 'neutral' | 'success' | 'warning' | 'danger' | 'inf
   if (code === 'APROBADA') return 'success'
   if (code === 'EN_REVISION') return 'warning'
   if (code === 'ENVIADA') return 'info'
-  if (code === 'NO_CONCRETADA' || code === 'CANCELADA') return 'danger'
+  if (code === 'NO_CONCRETADA' || code === 'CANCELADA' || code === 'ANULADA') return 'danger'
   return 'neutral'
 }
 function editable(row: ProformaListado) {
