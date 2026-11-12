@@ -895,22 +895,22 @@ onBeforeUnmount(() => {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .col-quote {
-    width: 22%;
-  }
-  .col-client {
-    width: 25%;
-  }
-  .col-date {
     width: 16%;
   }
+  .col-client {
+    width: 21%;
+  }
+  .col-date {
+    width: 17%;
+  }
   .col-status {
-    width: 13%;
+    width: 8%;
   }
   .col-total {
     width: 15%;
   }
   .col-actions {
-    width: 9%;
+    width: 8%;
   }
   .proforma-table th,
   .proforma-table td {
