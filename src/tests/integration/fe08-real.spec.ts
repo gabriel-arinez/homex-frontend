@@ -231,8 +231,16 @@ test.describe.serial('FE08 backend real', () => {
     await page.getByRole('dialog').getByRole('button', { name: 'Confirmar revisión' }).click()
     await expect(page.getByText(/Corrección incorporada.*permanece BORRADOR/)).toBeVisible()
     await page.goto(`/proformas/${proformaId}`)
-    await expect(page.getByText('Borrador', { exact: true })).toBeVisible()
-    await expect(page.getByRole('heading', { name: /mesas/i })).toBeVisible()
+    await expect(page).toHaveURL(new RegExp(`/proformas/${proformaId}/editar$`))
+    await expect(page.locator('.line-card').getByText(/mesas/i)).toBeVisible()
+    await page
+      .getByRole('navigation', { name: 'Apartados de la proforma' })
+      .getByRole('button', { name: /Revisar$/ })
+      .click()
+    const persistedState = page.locator('.review-state-pill')
+    await expect(persistedState).toBeVisible()
+    await expect(persistedState).toHaveAttribute('data-status', 'BORRADOR')
+    await expect(persistedState).toHaveText('Borrador')
     expect(consoleErrors).toEqual([])
   })
   test('PRF-03 persiste y reabre cinco muebles reales desde el configurador', async ({ page }) => {

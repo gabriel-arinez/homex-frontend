@@ -88,3 +88,7 @@ El primer comando crea datos comerciales de prueba: nunca debe apuntar a una
 base productiva. El segundo usa respuestas HTTP simuladas. El gate completo de
 CI ejecuta además ASR, worker real, todas las categorías y comprobaciones de
 persistencia; estos dos comandos focalizados no lo sustituyen.
+
+El caso de audio FE08 comprueba la línea restaurada en **Productos** y después
+el estado persistido `BORRADOR` en **Revisar**, incluida su etiqueta visible.
+No presupone que la antigua vista de detalle siga disponible tras recargar.
