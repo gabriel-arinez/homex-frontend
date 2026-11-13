@@ -225,6 +225,9 @@ test.describe.serial('FE08 backend real', () => {
     await expect(page).toHaveURL(/\/capturas\/\d+$/)
     await expect(page.getByText('Propuesta IA · requiere revisión')).toBeVisible()
     await expect(page.locator('blockquote')).toContainText(/mesas/i)
+    // ASR punctuation may separate «Tres. Mesas.»; HITL must supply a missing quantity.
+    const quantity = page.getByRole('spinbutton', { name: 'Cantidad', exact: true })
+    if (!(await quantity.inputValue())) await quantity.fill('3')
     const unitPrice = page.getByRole('spinbutton', { name: 'Precio unitario' })
     if (!(await unitPrice.inputValue())) await unitPrice.fill('100')
     await page.getByRole('button', { name: 'Revisar y confirmar' }).click()
