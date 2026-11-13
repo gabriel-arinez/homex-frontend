@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import type { CapturaRevision, ConfirmarCaptura, ValorCatalogoPublico } from '@/generated/api'
 import { capturasService } from '../services/capturasService'
-import { reviewProjection } from '../reviewProjection'
+import { hasUnsupportedLegacyDimensions, reviewProjection } from '../reviewProjection'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import { Check } from '@lucide/vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
@@ -49,6 +49,22 @@ const projectedDiscount = computed(
 )
 const discountWarning =
   'Esta revisión no admite el descuento propuesto. Resuelva el descuento mediante un flujo comercial compatible antes de confirmar.'
+const dimensionWarning =
+  'Las dimensiones conservan datos que este contrato no admite. Revise ambos JSON y conserve los metadatos como atributos antes de confirmar.'
+const dimensionReviewRequired = computed(() => {
+  try {
+    const technical = JSON.parse(form.value.datos_tecnicos || 'null') as {
+      caracteristicas_generales?: { dimensiones?: unknown }
+    } | null
+    return (
+      hasUnsupportedLegacyDimensions(JSON.parse(form.value.dimensiones || 'null')) ||
+      hasUnsupportedLegacyDimensions(technical?.caracteristicas_generales?.dimensiones)
+    )
+  } catch {
+    // Existing JSON parsing reports malformed input before any confirmation request.
+    return false
+  }
+})
 const terminal = computed(() => ['COMPLETADA', 'ERROR'].includes(capture.value?.estado ?? '')),
   canConfirm = computed(
     () =>
@@ -56,7 +72,8 @@ const terminal = computed(() => ['COMPLETADA', 'ERROR'].includes(capture.value?.
       !!capture.value.item_ia &&
       !capture.value.confirmada &&
       !capture.value.incorporada &&
-      projectedDiscount.value === null,
+      projectedDiscount.value === null &&
+      !dimensionReviewRequired.value,
   ),
   resultKind = computed(() =>
     capture.value?.estado === 'ERROR'
@@ -138,6 +155,10 @@ async function submit() {
   if (!capture.value?.intento_id || !capture.value.item_ia) return
   if (projectedDiscount.value !== null) {
     error.value = discountWarning
+    return
+  }
+  if (dimensionReviewRequired.value) {
+    error.value = dimensionWarning
     return
   }
   processing.value = true
@@ -275,7 +296,13 @@ onBeforeUnmount(() => {
             <p v-else-if="capture.incorporada">
               La captura ya está vinculada a una línea comercial y no puede confirmarse otra vez.
             </p>
-            <form v-else @submit.prevent="projectedDiscount === null && (confirmOpen = true)">
+            <form
+              v-else
+              @submit.prevent="
+                projectedDiscount === null && !dimensionReviewRequired && (confirmOpen = true)
+              "
+            >
+              <p v-if="dimensionReviewRequired" role="alert">{{ dimensionWarning }}</p>
               <p v-if="projectedDiscount !== null" role="alert">
                 {{ discountWarning }} Descuento: {{ projectedDiscount }}.
               </p>

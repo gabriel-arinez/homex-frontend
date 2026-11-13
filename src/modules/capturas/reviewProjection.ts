@@ -3,6 +3,18 @@ import type { PropuestaConfigurador } from '@/generated/api'
 const record = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
 
+/** The legacy confirmation DTO only accepts V1 axes with string values. */
+export function hasUnsupportedLegacyDimensions(value: unknown): boolean {
+  if (value == null) return false
+  const axes = new Set(['ancho', 'alto', 'profundidad', 'largo', 'diametro'])
+  return (
+    !record(value) ||
+    Object.entries(value).some(
+      ([axis, dimension]) => !axes.has(axis) || typeof dimension !== 'string',
+    )
+  )
+}
+
 /** Keep scoped technical data; duplicate legacy fields must have identical representations. */
 export function reviewProjection(projection: PropuestaConfigurador) {
   const technical: unknown = JSON.parse(JSON.stringify(projection.especificacion.datos_tecnicos))

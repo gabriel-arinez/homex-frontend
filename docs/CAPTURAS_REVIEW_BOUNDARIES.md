@@ -10,6 +10,12 @@ between these representations; that check is not weakened.
 - Objects with metadata and incomplete/unknown representations remain intact in
   both JSON fields. No unit is assigned, metadata removed or source object mutated.
   Producer warnings remain visible; retaining JSON is not resolving ambiguity.
+- The legacy confirmation DTO accepts only V1 axes with string values. Rich or
+  unresolved dimension JSON is retained visibly but blocks both the button and
+  submit handler until the operator explicitly resolves both representations.
+  Metadata must be preserved as attributes when resolving; no automatic relocation
+  or unit inference is performed. Retaining unknown JSON is not a promise that the
+  current confirmation endpoint accepts it.
 - Component dimensions and attributes remain scoped and untouched.
 - A projected discount is visible but cannot be confirmed through this legacy
   endpoint, whose contract has no discount field. Confirmation is disabled and

@@ -364,3 +364,58 @@ describe('unsupported projected discounts', () => {
     },
   )
 })
+
+describe('unsupported legacy dimension shapes', () => {
+  it.each([
+    { valor: '160', unidad: 'cm', tolerancia: '2 mm' },
+    { valor: '160', unidad: null },
+  ])('keeps rich evidence visible and blocks unsupported confirmation', async (dimension) => {
+    const projection = scopedProjection()
+    const original = projection.especificacion.datos_tecnicos.caracteristicas_generales
+      .dimensiones as Record<string, unknown>
+    original.ancho = dimension
+    common(capture({ proyeccion_configurador: projection, proyeccion_error: false }))
+    const confirm = vi.fn<() => void>()
+    server.use(
+      http.post('http://localhost:8000/api/v1/capturas/1/confirmar/', () => {
+        confirm()
+        return HttpResponse.json({}, { status: 201 })
+      }),
+    )
+    const w = await view()
+    await flushPromises()
+    expect(w.text()).toContain('Las dimensiones conservan datos que este contrato no admite')
+    const dimensions = w
+      .findAll('textarea')
+      .find((x) => x.attributes('placeholder') === '{"ancho":"1.20 m"}')!
+    expect(JSON.parse((dimensions.element as HTMLTextAreaElement).value)).toEqual({
+      ancho: dimension,
+    })
+    expect(
+      w
+        .findAll('button')
+        .find((b) => b.text().includes('Revisar y confirmar'))
+        ?.attributes('disabled'),
+    ).toBeDefined()
+    w.findComponent({ name: 'ConfirmDialog' }).vm.$emit('confirm')
+    await flushPromises()
+    expect(confirm).not.toHaveBeenCalled()
+    // Only explicit operator resolution changes the representation; no unit is inferred.
+    await dimensions.setValue(JSON.stringify({ ancho: '160 cm' }))
+    const technical = w.get('textarea[aria-describedby="datos-tecnicos-ayuda"]')
+    const data = JSON.parse((technical.element as HTMLTextAreaElement).value)
+    data.caracteristicas_generales.dimensiones = { ancho: '160 cm' }
+    if ('tolerancia' in dimension)
+      data.caracteristicas_generales.atributos = [
+        { nombre: 'Tolerancia ancho', valor: dimension.tolerancia },
+      ]
+    await technical.setValue(JSON.stringify(data))
+    expect(
+      w
+        .findAll('button')
+        .find((b) => b.text().includes('Revisar y confirmar'))
+        ?.attributes('disabled'),
+    ).toBeUndefined()
+    w.unmount()
+  })
+})
