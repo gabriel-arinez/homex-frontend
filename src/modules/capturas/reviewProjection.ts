@@ -11,16 +11,22 @@ export function reviewProjection(projection: PropuestaConfigurador) {
   const general = record(technical.caracteristicas_generales)
     ? technical.caracteristicas_generales
     : {}
-  const dimensions: Record<string, string> = {}
+  const dimensions: Record<string, unknown> = {}
   if (record(general.dimensiones)) {
     for (const [axis, value] of Object.entries(general.dimensiones)) {
       if (typeof value === 'string') dimensions[axis] = value
       else if (
         record(value) &&
-        typeof value.valor === 'string' &&
-        typeof value.unidad === 'string'
+        (typeof value.valor === 'string' ||
+          (typeof value.valor === 'number' && Number.isFinite(value.valor))) &&
+        typeof value.unidad === 'string' &&
+        value.unidad.trim() !== '' &&
+        Object.keys(value).every((key) => key === 'valor' || key === 'unidad')
       ) {
         dimensions[axis] = `${value.valor} ${value.unidad}`
+      } else {
+        // Preserve metadata and unresolved shapes identically in both HITL representations.
+        dimensions[axis] = value
       }
     }
     // Only main-product dimensions enter the legacy correction; component data stays untouched.

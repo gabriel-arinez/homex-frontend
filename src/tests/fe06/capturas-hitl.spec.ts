@@ -254,7 +254,7 @@ const scopedProjection = () => ({
     cantidad: 2,
     unidad_codigo: 'PIEZA',
     precio_unitario: '1900.00' as string | null,
-    descuento: null,
+    descuento: null as string | null,
   },
   especificacion: {
     tipo_mueble: null,
@@ -329,4 +329,38 @@ describe('commercial scoped legacy review', () => {
     expect(w.text()).toContain('No se pudo recuperar la propuesta estructurada')
     w.unmount()
   })
+})
+
+describe('unsupported projected discounts', () => {
+  it.each(['50.00', '0.00'])(
+    'retains and blocks explicit discount %s instead of confirming without it',
+    async (discount) => {
+      const projection = scopedProjection()
+      projection.comercial.descuento = discount
+      common(capture({ proyeccion_configurador: projection, proyeccion_error: false }))
+      const confirm = vi.fn<() => void>()
+      server.use(
+        http.post('http://localhost:8000/api/v1/capturas/1/confirmar/', () => {
+          confirm()
+          return HttpResponse.json({}, { status: 201 })
+        }),
+      )
+      const w = await view()
+      await flushPromises()
+      expect(w.text()).toContain('Esta revisión no admite el descuento propuesto')
+      expect(w.text()).toContain(discount)
+      expect(
+        w
+          .findAll('button')
+          .find((b) => b.text().includes('Revisar y confirmar'))
+          ?.attributes('disabled'),
+      ).toBeDefined()
+      await w.get('form').trigger('submit')
+      const dialog = w.findComponent({ name: 'ConfirmDialog' })
+      dialog.vm.$emit('confirm')
+      await flushPromises()
+      expect(confirm).not.toHaveBeenCalled()
+      w.unmount()
+    },
+  )
 })

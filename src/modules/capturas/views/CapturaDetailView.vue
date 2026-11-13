@@ -44,13 +44,19 @@ const emit = defineEmits<{ openMenu: [] }>(),
   })
 let poll: number | undefined,
   initialized = false
+const projectedDiscount = computed(
+  () => capture.value?.proyeccion_configurador?.comercial.descuento ?? null,
+)
+const discountWarning =
+  'Esta revisión no admite el descuento propuesto. Resuelva el descuento mediante un flujo comercial compatible antes de confirmar.'
 const terminal = computed(() => ['COMPLETADA', 'ERROR'].includes(capture.value?.estado ?? '')),
   canConfirm = computed(
     () =>
       capture.value?.estado === 'COMPLETADA' &&
       !!capture.value.item_ia &&
       !capture.value.confirmada &&
-      !capture.value.incorporada,
+      !capture.value.incorporada &&
+      projectedDiscount.value === null,
   ),
   resultKind = computed(() =>
     capture.value?.estado === 'ERROR'
@@ -130,6 +136,10 @@ async function load(background = false) {
 }
 async function submit() {
   if (!capture.value?.intento_id || !capture.value.item_ia) return
+  if (projectedDiscount.value !== null) {
+    error.value = discountWarning
+    return
+  }
   processing.value = true
   error.value = ''
   try {
@@ -265,7 +275,10 @@ onBeforeUnmount(() => {
             <p v-else-if="capture.incorporada">
               La captura ya está vinculada a una línea comercial y no puede confirmarse otra vez.
             </p>
-            <form v-else @submit.prevent="confirmOpen = true">
+            <form v-else @submit.prevent="projectedDiscount === null && (confirmOpen = true)">
+              <p v-if="projectedDiscount !== null" role="alert">
+                {{ discountWarning }} Descuento: {{ projectedDiscount }}.
+              </p>
               <p v-if="capture?.proyeccion_error" role="alert">
                 No se pudo recuperar la propuesta estructurada. Revise la evidencia y corrija los
                 datos manualmente.
