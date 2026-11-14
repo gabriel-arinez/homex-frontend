@@ -43,3 +43,13 @@ covered. The seven new automatic comments were classified before source edits;
 classification is not a claim of acoustic correctness or commercial precision.
 
 Risk: items 3/5 (shared proposal normalization and exact-peer CI configuration).
+
+## Structured observations
+
+When a structured projection exists, its nullable observations initialize the
+review and its confirmation payload. The legacy materialized observations are
+used only without a projection. Both representations originate from the same
+value in the ordinary fresh pipeline, but they are independently persisted and
+the current public response permits divergence. Controlled API and UI regressions
+cover differing values, nulls, equal values and no-projection fallback. Original
+NLP evidence/materialized rows are not overwritten by this review initialization.

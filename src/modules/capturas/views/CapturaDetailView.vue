@@ -119,6 +119,7 @@ function initialize() {
       color_secundario: scoped.secondaryColor,
       dimensiones: json(scoped.dimensions),
       accesorios: json(scoped.accessories),
+      observaciones: projection.especificacion.observaciones ?? '',
       datos_tecnicos: json(scoped.technical),
     }
   }

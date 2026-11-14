@@ -869,6 +869,7 @@ export type PropuestaCatalogo = {
 }
 
 export type PropuestaConfigurador = {
+  version_proyeccion?: string
   comercial: ComercialAsistida
   especificacion: EspecificacionAsistida
   pendientes: Array<PendienteAsistida>

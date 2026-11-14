@@ -419,3 +419,58 @@ describe('unsupported legacy dimension shapes', () => {
     w.unmount()
   })
 })
+
+describe('structured observations contract', () => {
+  it.each([
+    [true, 'Structured note', 'Older materialized note', 'Structured note'],
+    [true, 'Structured note', null, 'Structured note'],
+    [true, null, 'Older materialized note', null],
+    [true, 'Matching note', 'Matching note', 'Matching note'],
+    [true, null, null, null],
+    [false, null, 'Legacy-only note', 'Legacy-only note'],
+  ] as const)(
+    'displays and submits the selected representation (%s, %s, %s)',
+    async (hasProjection, projected, legacy, expected) => {
+      const base = scopedProjection()
+      const projection = {
+        ...base,
+        especificacion: { ...base.especificacion, observaciones: projected },
+      }
+      common(
+        capture({
+          item_ia: { ...item, observaciones: legacy },
+          proyeccion_configurador: hasProjection ? projection : null,
+          proyeccion_error: false,
+        }),
+      )
+      let posted: unknown
+      server.use(
+        http.post('http://localhost:8000/api/v1/capturas/1/confirmar/', async ({ request }) => {
+          posted = await request.json()
+          return HttpResponse.json(
+            {
+              captura_id: 1,
+              detalle_id: 30,
+              item_humano_id: 31,
+              evaluacion_id: 32,
+              proforma_estado: 'BORRADOR',
+            },
+            { status: 201 },
+          )
+        }),
+      )
+      const w = await view()
+      await flushPromises()
+      expect.soft(w.get('#observaciones').element).toHaveProperty('value', expected ?? '')
+      await w.get('#unitario').setValue('1900.00')
+      await w.get('form').trigger('submit')
+      await w
+        .findAll('button')
+        .find((button) => button.text() === 'Confirmar revisión')
+        ?.trigger('click')
+      await flushPromises()
+      expect(posted).toMatchObject({ item_corregido: { observaciones: expected } })
+      w.unmount()
+    },
+  )
+})

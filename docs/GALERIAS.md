@@ -66,7 +66,7 @@ Al duplicar desde la revisión se abre **General** antes de cambiar el nombre.
 La confirmación del pedido se identifica por su enlace **Consultar pedido**,
 para distinguir el aviso persistente de la notificación temporal duplicada.
 
-El gate de integración fija el backend `55cc7486605abcb362ccfa33a96189d81db4d374`,
+El gate de integración fija el backend `78f3bd8ed55bf49307399c9946f3eeb19322aed8`,
 que consume el wheel `homex-nlp==0.1.24`; no utiliza fuentes NLP por `PYTHONPATH`.
 `integration_peer_ref` permite seleccionar otra revisión explícita sin cambiar
 la referencia predeterminada.
