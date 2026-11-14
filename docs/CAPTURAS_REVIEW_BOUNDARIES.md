@@ -26,7 +26,7 @@ between these representations; that check is not weakened.
   is a separate compatibility policy, not grounds to weaken the current schema.
 
 Both CI consumer checkouts use the same explicit `integration_peer_ref` override
-or default to backend `55cc7486605abcb362ccfa33a96189d81db4d374`.
+or default to backend `a4c9cfc25077ba11e281e52cf1e993ea2e145538`.
 
 ## Verification
 
