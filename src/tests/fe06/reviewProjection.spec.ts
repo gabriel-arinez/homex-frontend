@@ -56,11 +56,10 @@ describe('lossless review dimensions', () => {
 })
 
 it('pins both CI consumers to the coordinated backend while allowing the same explicit override', () => {
+  const backendRef = readFileSync('contracts/backend-ref.txt', 'utf8').trim()
+  expect(backendRef).toMatch(/^[0-9a-f]{40}$/)
+
   const workflow = readFileSync('.github/workflows/ci.yml', 'utf8')
-  const pin =
-    "ref: ${{ inputs.integration_peer_ref || '78f3bd8ed55bf49307399c9946f3eeb19322aed8' }}"
+  const pin = `ref: \${{ inputs.integration_peer_ref || '${backendRef}' }}`
   expect(workflow.split(pin)).toHaveLength(3)
-  expect(readFileSync('contracts/backend-ref.txt', 'utf8').trim()).toBe(
-    '78f3bd8ed55bf49307399c9946f3eeb19322aed8',
-  )
 })
