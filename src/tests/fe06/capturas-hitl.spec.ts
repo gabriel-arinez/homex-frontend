@@ -247,3 +247,230 @@ describe('FE06 capturas y HITL', () => {
     vi.unstubAllGlobals()
   })
 })
+
+const scopedProjection = () => ({
+  comercial: {
+    nombre: 'Escritorios',
+    cantidad: 2,
+    unidad_codigo: 'PIEZA',
+    precio_unitario: '1900.00' as string | null,
+    descuento: null as string | null,
+  },
+  especificacion: {
+    tipo_mueble: null,
+    observaciones: null,
+    datos_tecnicos: {
+      componentes: [
+        {
+          uid: 'sideboard',
+          nombre: 'Credencia integrada',
+          dimensiones: 'ancho: 110 cm; alto: 65 cm',
+          material: 'MDF',
+        },
+      ],
+      caracteristicas_generales: { dimensiones: { ancho: { valor: '160', unidad: 'cm' } } },
+    },
+  },
+  pendientes: [
+    {
+      codigo: 'MISSING_UNIT',
+      ruta: 'dimensiones',
+      mensaje: 'Complete la unidad de 45 de profundidad.',
+    },
+  ],
+})
+
+describe('commercial scoped legacy review', () => {
+  it('retains component dimensions and explicit unit price without flattening them into the desk', async () => {
+    common(capture({ proyeccion_configurador: scopedProjection(), proyeccion_error: false }))
+    const w = await view()
+    await flushPromises()
+    expect(w.get('input[name="unitario"]').element).toHaveProperty('value', '1900.00')
+    const dimensions = w
+      .findAll('textarea')
+      .find((x) => x.attributes('placeholder') === '{"ancho":"1.20 m"}')!
+    expect(JSON.parse((dimensions.element as HTMLTextAreaElement).value)).toEqual({
+      ancho: '160 cm',
+    })
+    const technical = JSON.parse(
+      (w.get('textarea[aria-describedby="datos-tecnicos-ayuda"]').element as HTMLTextAreaElement)
+        .value,
+    )
+    expect(technical.componentes[0]).toMatchObject({
+      nombre: 'Credencia integrada',
+      dimensiones: 'ancho: 110 cm; alto: 65 cm',
+    })
+    expect(technical.caracteristicas_generales.dimensiones).toEqual({ ancho: '160 cm' })
+    expect(w.text()).toContain('Complete la unidad de 45 de profundidad.')
+    expect((w.findAll('textarea')[0]!.element as HTMLTextAreaElement).value).not.toContain('18 mm')
+    w.unmount()
+  })
+  it('does not turn an explicit negotiated total into a unit price', async () => {
+    const projection = scopedProjection()
+    projection.comercial.precio_unitario = null
+    projection.pendientes = [
+      {
+        codigo: 'TOTAL_NEGOCIADO',
+        ruta: 'comercial.precio_unitario',
+        mensaje: 'Total negociado; revise el precio unitario.',
+      },
+    ]
+    common(capture({ proyeccion_configurador: projection, proyeccion_error: false }))
+    const w = await view()
+    await flushPromises()
+    expect(w.get('input[name="unitario"]').element).toHaveProperty('value', '')
+    expect(w.text()).toContain('Total negociado; revise el precio unitario.')
+    w.unmount()
+  })
+  it('shows projection errors rather than claiming structured evidence was recovered', async () => {
+    common(capture({ proyeccion_configurador: null, proyeccion_error: true }))
+    const w = await view()
+    await flushPromises()
+    expect(w.text()).toContain('No se pudo recuperar la propuesta estructurada')
+    w.unmount()
+  })
+})
+
+describe('unsupported projected discounts', () => {
+  it.each(['50.00', '0.00'])(
+    'retains and blocks explicit discount %s instead of confirming without it',
+    async (discount) => {
+      const projection = scopedProjection()
+      projection.comercial.descuento = discount
+      common(capture({ proyeccion_configurador: projection, proyeccion_error: false }))
+      const confirm = vi.fn<() => void>()
+      server.use(
+        http.post('http://localhost:8000/api/v1/capturas/1/confirmar/', () => {
+          confirm()
+          return HttpResponse.json({}, { status: 201 })
+        }),
+      )
+      const w = await view()
+      await flushPromises()
+      expect(w.text()).toContain('Esta revisión no admite el descuento propuesto')
+      expect(w.text()).toContain(discount)
+      expect(
+        w
+          .findAll('button')
+          .find((b) => b.text().includes('Revisar y confirmar'))
+          ?.attributes('disabled'),
+      ).toBeDefined()
+      await w.get('form').trigger('submit')
+      const dialog = w.findComponent({ name: 'ConfirmDialog' })
+      dialog.vm.$emit('confirm')
+      await flushPromises()
+      expect(confirm).not.toHaveBeenCalled()
+      w.unmount()
+    },
+  )
+})
+
+describe('unsupported legacy dimension shapes', () => {
+  it.each([
+    { valor: '160', unidad: 'cm', tolerancia: '2 mm' },
+    { valor: '160', unidad: null },
+  ])('keeps rich evidence visible and blocks unsupported confirmation', async (dimension) => {
+    const projection = scopedProjection()
+    const original = projection.especificacion.datos_tecnicos.caracteristicas_generales
+      .dimensiones as Record<string, unknown>
+    original.ancho = dimension
+    common(capture({ proyeccion_configurador: projection, proyeccion_error: false }))
+    const confirm = vi.fn<() => void>()
+    server.use(
+      http.post('http://localhost:8000/api/v1/capturas/1/confirmar/', () => {
+        confirm()
+        return HttpResponse.json({}, { status: 201 })
+      }),
+    )
+    const w = await view()
+    await flushPromises()
+    expect(w.text()).toContain('Las dimensiones conservan datos que este contrato no admite')
+    const dimensions = w
+      .findAll('textarea')
+      .find((x) => x.attributes('placeholder') === '{"ancho":"1.20 m"}')!
+    expect(JSON.parse((dimensions.element as HTMLTextAreaElement).value)).toEqual({
+      ancho: dimension,
+    })
+    expect(
+      w
+        .findAll('button')
+        .find((b) => b.text().includes('Revisar y confirmar'))
+        ?.attributes('disabled'),
+    ).toBeDefined()
+    w.findComponent({ name: 'ConfirmDialog' }).vm.$emit('confirm')
+    await flushPromises()
+    expect(confirm).not.toHaveBeenCalled()
+    // Only explicit operator resolution changes the representation; no unit is inferred.
+    await dimensions.setValue(JSON.stringify({ ancho: '160 cm' }))
+    const technical = w.get('textarea[aria-describedby="datos-tecnicos-ayuda"]')
+    const data = JSON.parse((technical.element as HTMLTextAreaElement).value)
+    data.caracteristicas_generales.dimensiones = { ancho: '160 cm' }
+    if ('tolerancia' in dimension)
+      data.caracteristicas_generales.atributos = [
+        { nombre: 'Tolerancia ancho', valor: dimension.tolerancia },
+      ]
+    await technical.setValue(JSON.stringify(data))
+    expect(
+      w
+        .findAll('button')
+        .find((b) => b.text().includes('Revisar y confirmar'))
+        ?.attributes('disabled'),
+    ).toBeUndefined()
+    w.unmount()
+  })
+})
+
+describe('structured observations contract', () => {
+  it.each([
+    [true, 'Structured note', 'Older materialized note', 'Structured note'],
+    [true, 'Structured note', null, 'Structured note'],
+    [true, null, 'Older materialized note', null],
+    [true, 'Matching note', 'Matching note', 'Matching note'],
+    [true, null, null, null],
+    [false, null, 'Legacy-only note', 'Legacy-only note'],
+  ] as const)(
+    'displays and submits the selected representation (%s, %s, %s)',
+    async (hasProjection, projected, legacy, expected) => {
+      const base = scopedProjection()
+      const projection = {
+        ...base,
+        especificacion: { ...base.especificacion, observaciones: projected },
+      }
+      common(
+        capture({
+          item_ia: { ...item, observaciones: legacy },
+          proyeccion_configurador: hasProjection ? projection : null,
+          proyeccion_error: false,
+        }),
+      )
+      let posted: unknown
+      server.use(
+        http.post('http://localhost:8000/api/v1/capturas/1/confirmar/', async ({ request }) => {
+          posted = await request.json()
+          return HttpResponse.json(
+            {
+              captura_id: 1,
+              detalle_id: 30,
+              item_humano_id: 31,
+              evaluacion_id: 32,
+              proforma_estado: 'BORRADOR',
+            },
+            { status: 201 },
+          )
+        }),
+      )
+      const w = await view()
+      await flushPromises()
+      expect.soft(w.get('#observaciones').element).toHaveProperty('value', expected ?? '')
+      await w.get('#unitario').setValue('1900.00')
+      await w.get('form').trigger('submit')
+      await w
+        .findAll('button')
+        .find((button) => button.text() === 'Confirmar revisión')
+        ?.trigger('click')
+      await flushPromises()
+      expect(posted).toMatchObject({ item_corregido: { observaciones: expected } })
+      w.unmount()
+    },
+  )
+})

@@ -58,17 +58,19 @@ async function approveCurrentQuote(page: Page) {
   const sendDialog = page.getByRole('dialog', { name: 'Enviar proforma a revisión' })
   await expect(sendDialog).toBeVisible()
   await sendDialog.getByRole('button', { name: 'Enviar a revisión' }).click()
-  await expect(page).toHaveURL(/\/proformas\/\d+(?:\?|$)/)
+  await expect(page).toHaveURL(/\/proformas\/\d+\/editar(?:\?|$)/)
   await expect(page.getByText('Proforma enviada correctamente a revisión.')).toBeVisible()
   const segments = new URL(page.url()).pathname.split('/').filter(Boolean)
-  const proformaId = Number(segments[segments.length - 1])
+  const proformaId = Number(segments[segments.length - 2])
   expect(proformaId).toBeGreaterThan(0)
-  await expect(page.getByRole('button', { name: 'Aprobar y crear pedido' })).toBeEnabled()
-  await page.getByRole('button', { name: 'Aprobar y crear pedido' }).click()
+  await expect(page.getByRole('button', { name: 'Aprobar', exact: true })).toBeEnabled()
+  await page.getByRole('button', { name: 'Aprobar', exact: true }).click()
   const approvalDialog = page.getByRole('dialog', { name: 'Aprobar y crear pedido' })
   await expect(approvalDialog).toBeVisible()
   await approvalDialog.getByRole('button', { name: 'Aprobar y crear pedido' }).click()
-  const status = page.getByRole('status').filter({ hasText: /Pedido #\d+/ })
+  const status = page.getByRole('status').filter({
+    has: page.getByRole('link', { name: /Consultar pedido #\d+/ }),
+  })
   await expect(status).toBeVisible()
   const text = (await status.textContent()) ?? ''
   const id = Number(text.match(/Pedido #(\d+)/)?.[1])
@@ -223,14 +225,25 @@ test.describe.serial('FE08 backend real', () => {
     await expect(page).toHaveURL(/\/capturas\/\d+$/)
     await expect(page.getByText('Propuesta IA · requiere revisión')).toBeVisible()
     await expect(page.locator('blockquote')).toContainText(/mesas/i)
+    // ASR punctuation may separate «Tres. Mesas.»; HITL must supply a missing quantity.
+    const quantity = page.getByRole('spinbutton', { name: 'Cantidad', exact: true })
+    if (!(await quantity.inputValue())) await quantity.fill('3')
     const unitPrice = page.getByRole('spinbutton', { name: 'Precio unitario' })
     if (!(await unitPrice.inputValue())) await unitPrice.fill('100')
     await page.getByRole('button', { name: 'Revisar y confirmar' }).click()
     await page.getByRole('dialog').getByRole('button', { name: 'Confirmar revisión' }).click()
     await expect(page.getByText(/Corrección incorporada.*permanece BORRADOR/)).toBeVisible()
     await page.goto(`/proformas/${proformaId}`)
-    await expect(page.getByText('Borrador', { exact: true })).toBeVisible()
-    await expect(page.getByRole('heading', { name: /mesas/i })).toBeVisible()
+    await expect(page).toHaveURL(new RegExp(`/proformas/${proformaId}/editar$`))
+    await expect(page.locator('.line-card').getByText(/mesas/i)).toBeVisible()
+    await page
+      .getByRole('navigation', { name: 'Apartados de la proforma' })
+      .getByRole('button', { name: /Revisar$/ })
+      .click()
+    const persistedState = page.locator('.review-state-pill')
+    await expect(persistedState).toBeVisible()
+    await expect(persistedState).toHaveAttribute('data-status', 'BORRADOR')
+    await expect(persistedState).toHaveText('Borrador')
     expect(consoleErrors).toEqual([])
   })
   test('PRF-03 persiste y reabre cinco muebles reales desde el configurador', async ({ page }) => {
@@ -365,4 +378,48 @@ test.describe.serial('FE08 backend real', () => {
       await expect(page.locator('.line-card').getByText(caso.nombre, { exact: true })).toBeVisible()
     }
   })
+})
+
+test('scoped text proposal retains component measures and explicit unit price through HITL', async ({
+  page,
+}) => {
+  const errors = await login(page)
+  const quote = await createDraft(page, 'Scoped commercial projection')
+  await page.goto('/capturas/nueva')
+  await page.getByLabel('Proforma').fill(String(quote))
+  await page.getByLabel('Texto', { exact: true }).check()
+  await page
+    .getByLabel('Texto dictado o escrito')
+    .fill(
+      'Dos escritorios de 160 cm de ancho. Credencia integrada de MDF de 110 cm de ancho, ' +
+        '65 cm de alto y 45 de profundidad. Preciunitario 1900 bolivianos.',
+    )
+  await page.getByRole('button', { name: 'Enviar a procesamiento' }).click()
+  await expect(page).toHaveURL(/\/capturas\/\d+$/)
+  await expect(page.getByText('Propuesta IA · requiere revisión')).toBeVisible()
+  await expect(page.getByRole('spinbutton', { name: 'Precio unitario' })).toHaveValue('1900.00')
+  const technicalInput = page.locator('textarea[aria-describedby="datos-tecnicos-ayuda"]')
+  const technical = JSON.parse(await technicalInput.inputValue())
+  const sideboard = technical.componentes.find(
+    (c: { nombre: string }) => c.nombre.toLowerCase() === 'credencia integrada',
+  )
+  expect(sideboard.dimensiones).toContain('110 cm')
+  expect(sideboard.dimensiones).toContain('65 cm')
+  expect(sideboard.dimensiones).not.toContain('45')
+  expect(technical.caracteristicas_generales.dimensiones).toEqual({ ancho: '160 cm' })
+  await expect(page.getByRole('list', { name: 'Datos pendientes de revisión' })).toContainText(
+    '45 de profundidad',
+  )
+  const sent = page.waitForRequest(
+    (r) => /\/capturas\/\d+\/confirmar\/$/.test(new URL(r.url()).pathname) && r.method() === 'POST',
+  )
+  await page.getByRole('button', { name: 'Revisar y confirmar' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Confirmar revisión' }).click()
+  const payload = (await sent).postDataJSON()
+  expect(payload.item_corregido.dimensiones).toEqual({ ancho: '160 cm' })
+  expect(payload.linea_comercial.datos_tecnicos.componentes).toEqual(technical.componentes)
+  await expect(page.getByText(/Corrección incorporada.*permanece BORRADOR/)).toBeVisible()
+  await page.goto(`/proformas/${quote}`)
+  await expect(page.locator('.line-card').getByText(/escritorios/i)).toBeVisible()
+  expect(errors).toEqual([])
 })

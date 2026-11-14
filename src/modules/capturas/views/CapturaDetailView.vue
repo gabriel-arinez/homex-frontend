@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import type { CapturaRevision, ConfirmarCaptura, ValorCatalogoPublico } from '@/generated/api'
 import { capturasService } from '../services/capturasService'
+import { hasUnsupportedLegacyDimensions, reviewProjection } from '../reviewProjection'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import { Check } from '@lucide/vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
@@ -43,13 +44,36 @@ const emit = defineEmits<{ openMenu: [] }>(),
   })
 let poll: number | undefined,
   initialized = false
+const projectedDiscount = computed(
+  () => capture.value?.proyeccion_configurador?.comercial.descuento ?? null,
+)
+const discountWarning =
+  'Esta revisión no admite el descuento propuesto. Resuelva el descuento mediante un flujo comercial compatible antes de confirmar.'
+const dimensionWarning =
+  'Las dimensiones conservan datos que este contrato no admite. Revise ambos JSON y conserve los metadatos como atributos antes de confirmar.'
+const dimensionReviewRequired = computed(() => {
+  try {
+    const technical = JSON.parse(form.value.datos_tecnicos || 'null') as {
+      caracteristicas_generales?: { dimensiones?: unknown }
+    } | null
+    return (
+      hasUnsupportedLegacyDimensions(JSON.parse(form.value.dimensiones || 'null')) ||
+      hasUnsupportedLegacyDimensions(technical?.caracteristicas_generales?.dimensiones)
+    )
+  } catch {
+    // Existing JSON parsing reports malformed input before any confirmation request.
+    return false
+  }
+})
 const terminal = computed(() => ['COMPLETADA', 'ERROR'].includes(capture.value?.estado ?? '')),
   canConfirm = computed(
     () =>
       capture.value?.estado === 'COMPLETADA' &&
       !!capture.value.item_ia &&
       !capture.value.confirmada &&
-      !capture.value.incorporada,
+      !capture.value.incorporada &&
+      projectedDiscount.value === null &&
+      !dimensionReviewRequired.value,
   ),
   resultKind = computed(() =>
     capture.value?.estado === 'ERROR'
@@ -75,13 +99,32 @@ function initialize() {
     accesorios: json(x.accesorios),
     observaciones: x.observaciones ?? '',
     precio_unitario: '',
-    // La IA v1 identifica un mueble, no la relación entre sus piezas.
-    // Las correcciones humanas se proyectan a características generales
-    // en el backend; sólo el vendedor puede vincularlas a componentes.
+    // Historical API responses have no structured projection; keep their manual-review fallback.
     datos_tecnicos: JSON.stringify({ componentes: [] }, null, 2),
   }
+  const projection = capture.value.proyeccion_configurador
+  if (projection) {
+    const scoped = reviewProjection(projection)
+    form.value = {
+      ...form.value,
+      nombre: projection.comercial.nombre,
+      cantidad: projection.comercial.cantidad == null ? '' : String(projection.comercial.cantidad),
+      precio_unitario: projection.comercial.precio_unitario ?? '',
+      tipo_mueble_id:
+        projection.especificacion.tipo_mueble == null
+          ? ''
+          : String(projection.especificacion.tipo_mueble),
+      espesor: json(scoped.thickness),
+      color_principal: scoped.primaryColor,
+      color_secundario: scoped.secondaryColor,
+      dimensiones: json(scoped.dimensions),
+      accesorios: json(scoped.accessories),
+      observaciones: projection.especificacion.observaciones ?? '',
+      datos_tecnicos: json(scoped.technical),
+    }
+  }
   const t = types.value.find((x) => x.codigo === 'MUEBLE_MEDIDA'),
-    u = units.value.find((x) => x.codigo === 'PIEZA')
+    u = units.value.find((x) => x.codigo === (projection?.comercial.unidad_codigo ?? 'PIEZA'))
   form.value.tipo_item_id = String(t?.id ?? '')
   form.value.unidad_id = String(u?.id ?? '')
   initialized = true
@@ -111,6 +154,14 @@ async function load(background = false) {
 }
 async function submit() {
   if (!capture.value?.intento_id || !capture.value.item_ia) return
+  if (projectedDiscount.value !== null) {
+    error.value = discountWarning
+    return
+  }
+  if (dimensionReviewRequired.value) {
+    error.value = dimensionWarning
+    return
+  }
   processing.value = true
   error.value = ''
   try {
@@ -246,10 +297,35 @@ onBeforeUnmount(() => {
             <p v-else-if="capture.incorporada">
               La captura ya está vinculada a una línea comercial y no puede confirmarse otra vez.
             </p>
-            <form v-else @submit.prevent="confirmOpen = true">
+            <form
+              v-else
+              @submit.prevent="
+                projectedDiscount === null && !dimensionReviewRequired && (confirmOpen = true)
+              "
+            >
+              <p v-if="dimensionReviewRequired" role="alert">{{ dimensionWarning }}</p>
+              <p v-if="projectedDiscount !== null" role="alert">
+                {{ discountWarning }} Descuento: {{ projectedDiscount }}.
+              </p>
+              <p v-if="capture?.proyeccion_error" role="alert">
+                No se pudo recuperar la propuesta estructurada. Revise la evidencia y corrija los
+                datos manualmente.
+              </p>
+              <ul
+                v-if="capture?.proyeccion_configurador?.pendientes.length"
+                aria-label="Datos pendientes de revisión"
+              >
+                <li
+                  v-for="(pending, index) in capture.proyeccion_configurador.pendientes"
+                  :key="index"
+                >
+                  {{ pending.mensaje }}
+                </li>
+              </ul>
               <p v-if="capture.item_ia?.precio_total" class="hint">
-                La IA propuso un total de {{ capture.item_ia.precio_total }}. Define el precio
-                unitario comercial explícitamente; el sistema no convertirá ni redondeará ese total.
+                La IA propuso un total de {{ capture.item_ia.precio_total }}. Revisa el precio
+                unitario: sólo se recupera si fue explícito; el sistema no lo deduce ni redondea a
+                partir del total.
               </p>
               <TextField
                 v-model="form.nombre"
@@ -321,7 +397,7 @@ onBeforeUnmount(() => {
                 label="Unidad"
                 :options="
                   units
-                    .filter((x) => x.codigo === 'PIEZA')
+                    .filter((x) => ['PIEZA', 'JUEGO'].includes(x.codigo))
                     .map((x) => ({ label: x.nombre, value: String(x.id) }))
                 "
               /><Select

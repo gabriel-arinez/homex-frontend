@@ -78,6 +78,8 @@ export type CapturaRevision = {
   item_ia: ItemIa | null
   readonly incorporada: boolean
   readonly confirmada: boolean
+  proyeccion_configurador: PropuestaConfigurador | null
+  readonly proyeccion_error: boolean
 }
 
 export type CargaArchivoImagen = {
@@ -867,6 +869,7 @@ export type PropuestaCatalogo = {
 }
 
 export type PropuestaConfigurador = {
+  version_proyeccion?: string
   comercial: ComercialAsistida
   especificacion: EspecificacionAsistida
   pendientes: Array<PendienteAsistida>
@@ -997,6 +1000,10 @@ export type ValorCatalogoResumen = {
   readonly id: number
   readonly codigo: string
   readonly nombre: string
+}
+
+export type CapturaRevisionWritable = {
+  [key: string]: unknown
 }
 
 export type ClienteWritable = {

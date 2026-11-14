@@ -48,3 +48,7 @@ git diff --check
 ```
 
 El servidor de preview de Playwright usa el puerto 4173 y se cierra al terminar. Los orígenes de las pruebas se usan exclusivamente para respuestas simuladas.
+
+## Contraste de las instrucciones de captura
+
+Las instrucciones pequeñas de los botones de origen de audio mantienen opacidad completa. Atenuar el texto blanco con `opacity: 0.9` sobre el rojo institucional `#D32727` reduce el contraste a 4.38:1. Se conserva el color institucional y la prueba Axe existente de las acciones directas de voz, sin exclusiones de accesibilidad.
