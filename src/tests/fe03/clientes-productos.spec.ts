@@ -2,7 +2,7 @@ import { createPinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { http, HttpResponse } from 'msw'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import ClientesListView from '@/modules/clientes/views/ClientesListView.vue'
 import ProductImage from '@/modules/productos/components/ProductImage.vue'
 import { productosService } from '@/modules/productos/services/productosService'
@@ -68,10 +68,16 @@ describe('FE03 clientes y productos', () => {
     expect(requests[requests.length - 1]?.searchParams.get('page_size')).toBe('10')
     expect(requests[requests.length - 1]?.searchParams.get('page')).toBe('1')
 
-    await wrapper.get('input[type="search"]').setValue('Lucía')
-    await flushPromises()
-    expect(requests[requests.length - 1]?.searchParams.get('search')).toBe('Lucía')
-    expect(wrapper.text()).toContain('Lucía HOMEX')
+    vi.useFakeTimers()
+    try {
+      await wrapper.get('input[type="search"]').setValue('Lucía')
+      await vi.advanceTimersByTimeAsync(300)
+      await flushPromises()
+      expect(requests[requests.length - 1]?.searchParams.get('search')).toBe('Lucía')
+      expect(wrapper.text()).toContain('Lucía HOMEX')
+    } finally {
+      vi.useRealTimers()
+    }
 
     await wrapper.get('select').setValue('inactivos')
     await flushPromises()

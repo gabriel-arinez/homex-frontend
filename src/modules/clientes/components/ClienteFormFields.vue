@@ -44,10 +44,16 @@ function changeType(value: string) {
 
 <template>
   <div class="client-fields">
-    <div v-if="typeReadonly" class="readonly-field">
-      <span>Tipo de cliente</span>
-      <strong>{{ selectedType?.nombre ?? 'Tipo no disponible' }}</strong>
-      <small>El tipo se conserva para proteger su identidad comercial.</small>
+    <div v-if="typeReadonly" class="readonly-field client-fields__full">
+      <span class="readonly-field__icon" aria-hidden="true">
+        <Building2 v-if="isCompany" :size="20" />
+        <UserRound v-else :size="20" />
+      </span>
+      <div class="readonly-field__copy">
+        <span class="readonly-field__label">Tipo de cliente</span>
+        <strong>{{ selectedType?.nombre ?? 'Tipo no disponible' }}</strong>
+        <small>El tipo se conserva para proteger su identidad comercial.</small>
+      </div>
     </div>
     <fieldset v-else class="client-type client-fields__full">
       <legend>Tipo de cliente</legend>
@@ -65,9 +71,11 @@ function changeType(value: string) {
             :checked="model.tipo_cliente === String(type.id)"
             @change="changeType(String(type.id))"
           />
-          <UserRound v-if="type.codigo === 'PERSONA'" :size="20" aria-hidden="true" />
-          <Building2 v-else :size="20" aria-hidden="true" />
-          <span>
+          <span class="client-type__icon" aria-hidden="true">
+            <UserRound v-if="type.codigo === 'PERSONA'" :size="18" />
+            <Building2 v-else :size="18" />
+          </span>
+          <span class="client-type__copy">
             <strong>{{ type.codigo === 'PERSONA' ? 'Persona natural' : 'Empresa' }}</strong>
             <small>{{
               type.codigo === 'PERSONA' ? 'Datos personales' : 'Razón social y contacto'
@@ -82,6 +90,19 @@ function changeType(value: string) {
         >{{ errors?.tipo_cliente?.[0] || 'Selecciona el tipo de cliente.' }}</small
       >
     </fieldset>
+    <div v-if="isCompany" class="client-fields__full">
+      <TextField
+        :model-value="model.empresa"
+        :name="prefix + 'empresa'"
+        label="Razón social o empresa"
+        autocomplete="organization"
+        :max-length="CLIENT_LIMITS.empresa"
+        :error="errorFor('empresa')"
+        hint="Se permiten números y símbolos. Máximo 100 caracteres."
+        @blur="touched.empresa = true"
+        @update:model-value="emit('change', 'empresa', $event)"
+      />
+    </div>
     <TextField
       :model-value="model.nombres"
       :name="prefix + 'nombres'"
@@ -105,18 +126,6 @@ function changeType(value: string) {
       hint="Tildes, apóstrofes y guiones permitidos. Máximo 50 caracteres."
       @blur="touched.apellidos = true"
       @update:model-value="emit('change', 'apellidos', $event)"
-    />
-    <TextField
-      v-if="isCompany"
-      :model-value="model.empresa"
-      :name="prefix + 'empresa'"
-      label="Razón social o empresa"
-      autocomplete="organization"
-      :max-length="CLIENT_LIMITS.empresa"
-      :error="errorFor('empresa')"
-      hint="Se permiten números y símbolos. Máximo 100 caracteres."
-      @blur="touched.empresa = true"
-      @update:model-value="emit('change', 'empresa', $event)"
     />
     <TextField
       :model-value="model.celular"
@@ -196,7 +205,7 @@ function changeType(value: string) {
   padding: 0.85rem 1rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
-  background: var(--color-surface);
+  background: var(--color-surface-muted);
   cursor: pointer;
   transition:
     border-color var(--transition-fast),
@@ -208,26 +217,40 @@ function changeType(value: string) {
   background: var(--color-surface-hover);
 }
 .client-type__option:focus-within {
-  box-shadow: var(--focus-ring);
+  outline: 2px solid var(--color-primary-accent);
+  outline-offset: 2px;
 }
 .client-type__option--active {
   border-color: var(--color-primary);
   background: color-mix(in srgb, var(--color-primary-soft) 45%, var(--color-surface));
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 30%, transparent);
 }
-.client-type__option svg {
-  flex-shrink: 0;
+.client-type__icon {
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.5rem;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
   color: var(--color-text-secondary);
-  transition: color var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast);
 }
-.client-type__option--active svg {
+.client-type__option--active .client-type__icon {
+  background: var(--color-primary-soft);
+  border-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
   color: var(--color-primary-accent);
 }
 .client-type__option input {
+  margin: 0;
   flex-shrink: 0;
   accent-color: var(--color-primary);
 }
-.client-type__option span {
+.client-type__copy {
   display: grid;
   min-width: 0;
   gap: 0.15rem;
@@ -241,17 +264,48 @@ function changeType(value: string) {
   color: var(--color-text-secondary);
   font-size: 0.74rem;
   font-weight: 400;
+  line-height: 1.35;
 }
 .readonly-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
+}
+.readonly-field__icon {
   display: grid;
-  align-content: start;
-  gap: var(--space-2);
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.5rem;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  color: var(--color-primary-accent);
 }
-.readonly-field > span {
-  font-weight: 600;
+.readonly-field__copy {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
 }
-.readonly-field small {
+.readonly-field__label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--color-text-secondary);
+}
+.readonly-field__copy strong {
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: var(--color-text);
+}
+.readonly-field__copy small {
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
 }
 @media (max-width: 47.99rem) {
   .client-fields,
