@@ -202,7 +202,7 @@ async function load() {
     states.value = statesRes
     payments.value = paymentsRes
     applyActionQuery()
-    void loadRelatedDocuments(orderRes, currentRequest)
+    await loadRelatedDocuments(orderRes, currentRequest)
   } catch (e) {
     if (currentRequest !== loadRequestId) return
     error.value = e instanceof Error ? e.message : 'No se pudo cargar el pedido.'
@@ -217,8 +217,8 @@ async function action(fn: () => Promise<unknown>, message: string) {
   notice.value = ''
   try {
     await fn()
-    notice.value = message
     await load()
+    notice.value = message
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'La operación no pudo completarse.'
     await load()
@@ -512,7 +512,11 @@ watch(() => route.params.id, load)
           </div>
         </div>
 
-        <LoadingSkeleton v-if="docsLoading" :lines="3" />
+        <div v-if="docsLoading" class="docs-skeleton" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
         <EmptyState
           v-else-if="!receipts.length && !deliveryNotes.length"
           title="Sin documentos emitidos"
@@ -1015,6 +1019,31 @@ watch(() => route.params.id, load)
   color: var(--color-danger);
   background: var(--color-danger-soft);
   font-size: 0.9rem;
+}
+.docs-skeleton {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+.docs-skeleton span {
+  height: 1rem;
+  border-radius: 0.25rem;
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-hover),
+    var(--color-border),
+    var(--color-surface-hover)
+  );
+  background-size: 200%;
+  animation: pulse 1.4s infinite;
+}
+.docs-skeleton span:last-child {
+  width: 65%;
+}
+@keyframes pulse {
+  to {
+    background-position: -200% 0;
+  }
 }
 @media (max-width: 47.99rem) {
   .summary,

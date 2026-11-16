@@ -113,7 +113,7 @@ test.describe.serial('FE08 backend real', () => {
     await page.getByLabel('Tipo de pago').selectOption({ label: 'Efectivo' })
     await page.getByLabel('Pago actual').fill('50')
     await page.getByRole('button', { name: 'Emitir', exact: true }).click()
-    await expect(page.getByRole('status')).toContainText('Recibo emitido')
+    await expect(page.getByRole('status').filter({ hasText: 'Recibo emitido' })).toBeVisible()
 
     await page.getByRole('button', { name: 'Cancelar pedido' }).click()
     await page.getByRole('dialog').getByRole('button', { name: 'Cancelar pedido' }).click()
@@ -125,16 +125,18 @@ test.describe.serial('FE08 backend real', () => {
     await page.getByRole('link', { name: 'Ver detalle' }).first().click()
     await page.getByRole('button', { name: 'Anular recibo' }).click()
     await page.getByRole('dialog').getByRole('button', { name: 'Anular' }).click()
-    await expect(page.getByRole('status')).toContainText('Recibo anulado')
+    await expect(page.getByRole('status').filter({ hasText: 'Recibo anulado' })).toBeVisible()
 
     await page.goto(`/pedidos/${pedidoId}`)
     await page.getByRole('button', { name: 'Otras transiciones de estado' }).click()
     await page.getByRole('menuitem', { name: /Listo para entrega/ }).click()
-    await expect(page.getByRole('status')).toContainText('Estado actualizado')
+    await expect(page.getByRole('status').filter({ hasText: 'Estado actualizado' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Emitir nota de entrega' })).toBeVisible()
     await page.getByRole('button', { name: 'Emitir nota de entrega' }).click()
     await page.getByRole('dialog').getByRole('button', { name: 'Emitir nota' }).click()
-    await expect(page.getByRole('status')).toContainText('Nota de entrega emitida')
+    await expect(
+      page.getByRole('status').filter({ hasText: 'Nota de entrega emitida' }),
+    ).toBeVisible()
     await page.goto('/notas-entrega')
     await expect(
       page
@@ -147,7 +149,7 @@ test.describe.serial('FE08 backend real', () => {
     await page.goto(`/pedidos/${cancelableId}`)
     await page.getByRole('button', { name: 'Cancelar pedido' }).click()
     await page.getByRole('dialog').getByRole('button', { name: 'Cancelar pedido' }).click()
-    await expect(page.getByRole('status')).toContainText('Pedido cancelado')
+    await expect(page.getByRole('status').filter({ hasText: 'Pedido cancelado' })).toBeVisible()
     await page.goto('/movimientos-stock')
     await expect(
       page
