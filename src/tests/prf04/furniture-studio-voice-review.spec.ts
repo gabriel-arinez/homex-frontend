@@ -27,7 +27,7 @@ describe('Furniture Studio: emisión de propuesta PRF04', () => {
     try {
       expect(wrapper.text()).toContain('Descripción por voz')
       expect(wrapper.text()).toContain(
-        'Dicta nombre, medidas, materiales o características del mueble.',
+        'Dicta nombre, medidas, materiales o características del mueble o producto.',
       )
       const upload = wrapper
         .findAll('button')
@@ -41,7 +41,23 @@ describe('Furniture Studio: emisión de propuesta PRF04', () => {
       Object.defineProperty(input.element, 'files', { configurable: true, value: [audio] })
       await input.trigger('change')
       await flushPromises()
-      expect(crear).toHaveBeenCalledTimes(1)
+      expect(crear).not.toHaveBeenCalled()
+      await wrapper
+        .findAll('button')
+        .find((b) => b.text() === 'Transcribir audio')!
+        .trigger('click')
+      await flushPromises()
+      expect(wrapper.emitted('proposed')).toBeUndefined()
+      await wrapper
+        .findAll('button')
+        .find((b) => b.text() === 'Procesar texto')!
+        .trigger('click')
+      await flushPromises()
+      await wrapper
+        .findAll('button')
+        .find((b) => b.text() === 'Aplicar propuesta')!
+        .trigger('click')
+      expect(crear).toHaveBeenCalledTimes(2)
       expect(wrapper.emitted('proposed')).toHaveLength(1)
       expect(wrapper.emitted('applied')).toBeUndefined()
     } finally {

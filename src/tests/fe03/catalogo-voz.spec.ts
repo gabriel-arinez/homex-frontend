@@ -27,6 +27,10 @@ function mockResult(category: CategoriaEnum) {
     id: 1,
     estado: 'COMPLETADA',
     categoria: category,
+    solo_transcribir: false,
+    captura_origen: null,
+    texto_asr_original: null,
+    texto_corregido: null,
     texto_transcrito_original: 'nombre: Zócalo',
     error_codigo: null,
     propuesta: {
@@ -46,7 +50,7 @@ function button(wrapper: ReturnType<typeof mount>, label: string) {
 
 describe('Voz en creación de catálogo', () => {
   it.each(['SILLA', 'PISO_FLOTANTE', 'OTRO'] as const)(
-    'sube audio, conserva categoría y aplica propuesta directamente: %s',
+    'sube audio, conserva categoría y revisa y confirma propuesta: %s',
     async (category) => {
       mockResult(category)
       const w = mount(CapturaCatalogo, { props: { categoria: category } })
@@ -55,17 +59,26 @@ describe('Voz en creación de catálogo', () => {
       Object.defineProperty(input.element, 'files', { value: [file] })
       await input.trigger('change')
       await flushPromises()
+      expect(catalogoCapturaService.create).not.toHaveBeenCalled()
+      await button(w, 'Transcribir audio').trigger('click')
+      await flushPromises()
       expect(catalogoCapturaService.create).toHaveBeenCalledWith(
         expect.objectContaining({ categoria: category, audio: file }),
         expect.anything(),
       )
-      expect(w.emitted('apply')).toEqual([[{ nombre: 'Zócalo' }]])
+      expect(w.emitted('apply')).toBeUndefined()
+      expect(w.emitted('applied')).toBeUndefined()
+      await w.get('textarea').setValue('nombre: Zócalo')
+      await button(w, 'Procesar texto').trigger('click')
+      await flushPromises()
+      await button(w, 'Aplicar propuesta').trigger('click')
       expect(w.emitted('applied')).toEqual([
         [
           {
             fields: { nombre: 'Zócalo' },
             text: 'nombre: Zócalo',
             warnings: ['Revisar'],
+            evidence: [],
           },
         ],
       ])
@@ -73,7 +86,7 @@ describe('Voz en creación de catálogo', () => {
     },
   )
 
-  it('detener la grabación lanza la transcripción automáticamente sin pasos extra', async () => {
+  it('detener la grabación permite escuchar antes de transcribir', async () => {
     mockResult('SILLA')
     const audioRecorder = defineComponent({
       emits: ['ready'],
@@ -98,12 +111,15 @@ describe('Voz en creación de catálogo', () => {
     expect(w.text()).toContain('Cancelar')
     await w.get('button[aria-label="Finalizar grabación"]').trigger('click')
     await flushPromises()
+    expect(catalogoCapturaService.create).not.toHaveBeenCalled()
+    await button(w, 'Transcribir audio').trigger('click')
+    await flushPromises()
     expect(catalogoCapturaService.create).toHaveBeenCalledTimes(1)
     expect(catalogoCapturaService.create).toHaveBeenCalledWith(
       expect.objectContaining({ categoria: 'SILLA', audio: expect.any(Blob) }),
       expect.anything(),
     )
-    expect(w.emitted('apply')).toBeDefined()
+    expect(w.emitted('apply')).toBeUndefined()
     w.unmount()
   })
 
@@ -126,7 +142,7 @@ describe('Voz en creación de catálogo', () => {
     })
     await input.trigger('change')
     await flushPromises()
-    expect(w.text()).toContain('supera el límite de 20 MB')
+    expect(w.text()).toContain('supera 20 MB')
     expect(catalogoCapturaService.create).not.toHaveBeenCalled()
     w.unmount()
   })
@@ -152,13 +168,13 @@ describe('Voz en creación de catálogo', () => {
     await flushPromises()
     await w.get('.voice-trigger').trigger('click')
     const assistant = w.getComponent(CapturaCatalogo)
-    assistant.vm.$emit('recording-state', true, false, 12)
+    await assistant.get('textarea').setValue('Silla plegable corregida')
     await flushPromises()
     await w.get('button[aria-label="Cerrar asistente de voz"]').trigger('click')
     expect(w.findComponent(CapturaCatalogo).exists()).toBe(true)
-    expect(w.get('.voice-mini').text()).toContain('Grabación en curso')
-    await w.get('.voice-mini').trigger('click')
-    expect(w.get('.voice-backdrop').isVisible()).toBe(true)
+    await w.get('.voice-trigger').trigger('click')
+    expect(assistant.get('textarea').element.value).toBe('Silla plegable corregida')
+    expect(w.findComponent(CapturaCatalogo).exists()).toBe(true)
     w.unmount()
   })
 
@@ -168,6 +184,10 @@ describe('Voz en creación de catálogo', () => {
       id: 1,
       estado: 'ERROR',
       categoria: 'OTRO',
+      solo_transcribir: false,
+      captura_origen: null,
+      texto_asr_original: null,
+      texto_corregido: null,
       texto_transcrito_original: 'texto original',
       propuesta: null,
       error_codigo: 'PIPELINE_ERROR',
@@ -178,7 +198,9 @@ describe('Voz en creación de catálogo', () => {
     Object.defineProperty(input.element, 'files', { value: [file] })
     await input.trigger('change')
     await flushPromises()
-    expect(w.text()).toContain('No se obtuvo una propuesta')
+    await button(w, 'Transcribir audio').trigger('click')
+    await flushPromises()
+    expect(w.text()).toContain('No se pudo procesar')
     expect(w.emitted('apply')).toBeUndefined()
     w.unmount()
   })
@@ -192,10 +214,12 @@ describe('Voz en creación de catálogo', () => {
     Object.defineProperty(input.element, 'files', { value: [file] })
     await input.trigger('change')
     await flushPromises()
-    expect(w.text()).toContain('Analizando descripción comercial')
+    await button(w, 'Transcribir audio').trigger('click')
+    await flushPromises()
+    expect(w.text()).toContain('Transcribiendo audio')
     await button(w, 'Cancelar').trigger('click')
     await flushPromises()
-    expect(w.text()).not.toContain('Analizando descripción comercial')
+    expect(w.text()).not.toContain('Transcribiendo audio')
     expect(w.emitted('apply')).toBeUndefined()
     w.unmount()
   })
@@ -235,9 +259,9 @@ describe('Voz en creación de catálogo', () => {
     expect((w.get('input[name="precio"]').element as HTMLInputElement).value).toBe('4500.00')
 
     // La barra lateral muestra la transcripción conservada y sus avisos
-    expect(w.text()).toContain('Descripción original por voz')
-    expect(w.text()).toContain('Nombre Silla Ergonómica Pro precio 4500')
-    expect(w.text()).toContain('Complete manualmente: SKU')
+    expect(w.text()).not.toContain('Descripción original por voz')
+    expect(w.text()).not.toContain('Nombre Silla Ergonómica Pro precio 4500')
+    expect(w.text()).toContain('Sugerido por voz')
     expect(w.emitted('save')).toBeUndefined()
     w.unmount()
   })

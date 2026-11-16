@@ -35,7 +35,10 @@ describe('PRF04 MISSING_UNIT contextual', () => {
       expect(wrapper.get('aside').text()).toContain('unidad del ancho')
       const unidad = wrapper.get('select[aria-label="Unidad de ancho"]')
       expect((unidad.element as HTMLSelectElement).value).toBe('')
-      expect(unidad.attributes('aria-describedby')).toBe('pendiente-ancho')
+      expect(unidad.attributes('aria-describedby')?.split(' ')).toContain('pendiente-ancho')
+      expect(unidad.attributes('aria-describedby')?.split(' ')).toContain(
+        'voice-status-unidad-ancho',
+      )
       expect(wrapper.get('#pendiente-ancho').text()).toContain('Revisar ancho')
       await wrapper.get('aside button').trigger('click')
       expect(document.activeElement).toBe(unidad.element)

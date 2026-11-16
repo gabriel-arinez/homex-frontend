@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { vVoiceFields, type FieldVoiceReview } from '@/modules/capturas/fieldVoiceReview'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import type {
   AtributoMueble,
@@ -57,6 +58,7 @@ const props = defineProps<{
   activeSection?: 'general' | 'estructura' | 'accesorios' | 'imagenes' | 'comercial' | 'revision'
   especificacion?: EspecificacionMueble | null
   pendientesAsistencia?: PendienteAsistida[]
+  voiceSuggestedFields?: string[]
   processing?: boolean
   externalError?: string
   unidades?: ValorCatalogoPublico[]
@@ -237,6 +239,72 @@ const pendientesVisibles = computed(() =>
       return !pendienteResuelto(p, medidas, componentes, atributosGenerales)
     }),
 )
+
+const reviewedVoiceFields = ref<Record<string, 'edited' | 'reviewed'>>({})
+function resolveVoiceField(field: string, edited: boolean) {
+  reviewedVoiceFields.value = {
+    ...reviewedVoiceFields.value,
+    [field]: edited ? 'edited' : 'reviewed',
+  }
+}
+function fieldForPending(p: PendienteAsistida): string | null {
+  if (p.resolucion?.tipo === 'DIMENSION' && p.resolucion.clave)
+    return `unidad-${p.resolucion.clave}`
+  if (p.resolucion?.tipo === 'COMPONENTE') {
+    const index = componentes.findIndex((c) => c.uid === p.resolucion?.uid)
+    return index >= 0 ? `componente-${p.resolucion.campo}-${index}` : null
+  }
+  if (p.codigo === 'TIPO_NO_RESUELTO') return 'tipo-mueble'
+  if (p.codigo === 'NO_QUANTITY') return 'mueble-cantidad'
+  if (['TOTAL_NEGOCIADO', 'INVALID_PRICE'].includes(p.codigo)) return 'mueble-precio'
+  return null
+}
+const criticalPending = computed(() =>
+  pendientesVisibles.value.filter(
+    (p) =>
+      Boolean(p.resolucion) ||
+      [
+        'CONFLICTING_VALUES',
+        'MISSING_UNIT',
+        'MISSING_AXIS',
+        'INVALID_PRICE',
+        'NO_QUANTITY',
+      ].includes(p.codigo),
+  ),
+)
+const voiceReview = computed(() => {
+  const fields: FieldVoiceReview[] = (props.voiceSuggestedFields ?? []).map((field) => ({
+    field,
+    state: reviewedVoiceFields.value[field] ?? 'suggested',
+    reason: '',
+    critical: false,
+  }))
+  for (const pending of pendientesVisibles.value) {
+    const field = fieldForPending(pending)
+    if (!field) continue
+    const previous = fields.findIndex((f) => f.field === field)
+    if (previous >= 0) fields.splice(previous, 1)
+    fields.push({
+      field,
+      state: 'pending',
+      reason: pending.mensaje,
+      critical: criticalPending.value.includes(pending),
+    })
+  }
+  return { fields, resolve: resolveVoiceField }
+})
+function reviewPending(p: PendienteAsistida) {
+  const field = fieldForPending(p)
+  const section = field?.startsWith('componente')
+    ? 'estructura'
+    : field?.startsWith('mueble-') && field !== 'mueble-nombre-comercial'
+      ? 'comercial'
+      : 'general'
+  emit('requestSection', section)
+  void nextTick(() => {
+    if (field) document.getElementById(field)?.focus()
+  })
+}
 
 function aplicarEspesor(p: PendienteAsistida & { indice: number }) {
   const uid = destinosEspesor[p.indice]
@@ -1014,6 +1082,10 @@ function irASeccion(seccion: SeccionStudio) {
 }
 
 function submit(): boolean {
+  if (criticalPending.value.length) {
+    error.value = 'Resuelve los pendientes críticos señalados en los campos antes de guardar.'
+    return false
+  }
   submitAttempted.value = true
   const dim = serializarDimensiones()
   const generalesActuales: Record<string, unknown> = { ...generales }
@@ -1130,6 +1202,7 @@ onMounted(loadCatalog)
 
 <template>
   <form
+    v-voice-fields="voiceReview"
     class="configurator"
     :class="{ 'configurator--studio': studio }"
     @input="changed"
@@ -1151,7 +1224,7 @@ onMounted(loadCatalog)
     <div class="configurator-layout">
       <div class="configurator-fields">
         <aside
-          v-if="pendientesVisibles.length && !studio"
+          v-if="pendientesVisibles.length"
           class="pending-summary"
           aria-label="Información pendiente"
           aria-live="polite"
@@ -2447,7 +2520,12 @@ onMounted(loadCatalog)
               automáticamente.
             </p>
             <ul>
-              <li v-for="p in pendientesVisibles" :key="p.indice">{{ p.mensaje }}</li>
+              <li v-for="p in pendientesVisibles" :key="p.indice">
+                {{ p.mensaje }}
+                <Button type="button" variant="secondary" @click="reviewPending(p)"
+                  >Revisar campo</Button
+                >
+              </li>
             </ul>
           </div>
           <article class="review-card review-card--full">
@@ -2614,10 +2692,6 @@ onMounted(loadCatalog)
                 <li v-for="warning in base.advertencias" :key="warning">{{ warning }}</li>
               </ul>
             </div>
-            <details v-if="!studio && base.descripcion_original" class="review-original-desc">
-              <summary>Ver descripción técnica original conservada</summary>
-              <p>{{ base.descripcion_original }}</p>
-            </details>
           </article>
           <article class="review-card review-commercial">
             <header>

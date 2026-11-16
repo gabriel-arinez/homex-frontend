@@ -1,0 +1,26 @@
+# Review speech before commercial interpretation
+
+Catalog products and custom furniture now share the same staged workflow in their existing side drawer. Existing form data stays unchanged until **Aplicar propuesta**.
+
+## Seller workflow
+
+1. Record up to four minutes, or select an audio file (up to five minutes and 20 MB).
+2. Listen to the audio; discard/repeat it or select **Transcribir audio**. This request sets `solo_transcribir: true`: the backend runs ASR without NLP.
+3. Review and edit the transcript, including quantities, dimensions, prices and names. The original ASR transcript remains available as audit evidence.
+4. Select **Procesar texto**. Only the edited text goes to NLP, linked through `captura_origen`; the audio is not retranscribed.
+5. Review extracted attributes and real candidate evidence. Accepted, unresolved and rejected spans are shown only when their exact offsets and literal text match the submitted transcript.
+6. Select **Aplicar propuesta** to update the structured form once. Free transcript editing is then hidden. Continue with the structured fields, correcting or confirming field observations before saving.
+
+## Input and asynchronous guarantees
+
+- Recordings shorter than two seconds are rejected locally; the backend also measures decoded audio. Upload metadata checks are advisory when the browser cannot decode a format; server validation remains authoritative.
+- A probable-silence notice is advisory, never a hard low-volume rejection.
+- Text must contain at least one letter and remain within the backend's 20,000-character contract. Commercial sufficiency belongs to NLP, not a frontend keyword heuristic.
+- Editing text invalidates an older proposal and cancels its local waiter. Generation and abort guards prevent an obsolete response from being applied.
+- The polling window is 22 minutes, longer than the CPU worker's default hard deadline. A browser timeout does not cancel the backend job.
+- ASR originals and corrected text remain in backend capture records. Hiding the editor after application does not delete audit evidence.
+- There is one catalog application event (`applied`). The parent never extracts prices or colors with its own regular expressions.
+
+## Verification
+
+The feature log is `odd/tasks/voice-hitl-review.md`. Unit tests cover staged requests, explicit confirmation, abstention, stale responses, input bounds, literal span matching and field review. Long decoded WAV validation is distinct from real CPU Whisper inference: report the latter separately when no real model/audio fixture is available.

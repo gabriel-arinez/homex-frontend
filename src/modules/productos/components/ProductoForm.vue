@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { vVoiceFields, type FieldVoiceReview } from '@/modules/capturas/fieldVoiceReview'
+import type { VoiceEvidence } from '@/modules/capturas/voiceEvidence'
 import { dateRangeError } from '@/shared/validation/dateRange'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import type {
@@ -11,18 +13,7 @@ import type {
 } from '@/generated/api'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import CapturaCatalogo from './CapturaCatalogo.vue'
-import {
-  AlertTriangle,
-  Armchair,
-  Check,
-  FileText,
-  Layers,
-  Mic,
-  Package,
-  Save,
-  Tag,
-  Trash2,
-} from '@lucide/vue'
+import { Armchair, Check, FileText, Layers, Mic, Package, Save, Tag, Trash2 } from '@lucide/vue'
 import VoiceDrawer from '@/modules/capturas/components/VoiceDrawer.vue'
 import ImageGallery from '@/shared/media/ImageGallery.vue'
 import type { LocalImage } from '@/shared/media/gallery'
@@ -57,8 +48,13 @@ const assistantProcessing = ref(false)
 const recordingActive = ref(false)
 const recordingPaused = ref(false)
 const recordingElapsed = ref(0)
-const voiceTranscribedText = ref('')
-const voicePendingWarnings = ref<string[]>([])
+const voiceFields = ref<FieldVoiceReview[]>([])
+function resolveVoiceField(field: string, edited: boolean) {
+  voiceFields.value = voiceFields.value.map((item) =>
+    item.field === field ? { ...item, state: edited ? 'edited' : 'reviewed' } : item,
+  )
+}
+const voiceReview = computed(() => ({ fields: voiceFields.value, resolve: resolveVoiceField }))
 
 function updateRecording(active: boolean, paused: boolean, elapsed: number) {
   recordingActive.value = active
@@ -257,49 +253,43 @@ function applyProposals(proposals: Array<[string, unknown]>) {
   voiceOpen.value = false
 }
 
-// Aplicación directa e inteligente desde el asistente de voz
-function onVoiceApplied(payload: { fields: CamposCatalogo; text: string; warnings: string[] }) {
-  voiceTranscribedText.value = payload.text || ''
-  voicePendingWarnings.value = [...(payload.warnings || [])]
-
-  const suggested = { ...payload.fields }
-
-  // Evitar volcar la transcripción completa en observaciones si el NLP la incluyó por fallback.
-  // La transcripción completa se preserva y muestra en la tarjeta lateral.
-  if (suggested.observaciones && suggested.observaciones.trim() === (payload.text || '').trim()) {
-    delete suggested.observaciones
-  }
-
-  // Heurística de precio si no vino en fields pero se dictó en el texto
-  if (!suggested.precio_lista && payload.text) {
-    const match = payload.text.match(
-      /\b(?:precio(?:\s+de\s+lista)?|total|valor|cuesta)\b\s*[,;:]?\s*(?:(?:es\s+de|es|de)\s+)?(?:(?:bs\.?|bob|bolivianos?|bolivios?|d[oó]lares?|usd)\s*)?(\d+(?:[.,]\d+)?)/i,
-    )
-    if (match?.[1]) {
-      const num = match[1].replace(',', '.')
-      if (Number(num) > 0) suggested.precio_lista = num
-    }
-  }
-
-  // Heurística de color para sillas
-  if (categoria.value === 'SILLA' && !suggested.color_primario && payload.text) {
-    const colorOpts = opciones.COLOR || []
-    for (const opt of colorOpts) {
-      const reg = new RegExp(`\\b${opt.nombre}\\b`, 'i')
-      if (reg.test(payload.text)) {
-        suggested.color_primario = opt.id
-        break
-      }
-    }
-  }
-
-  applyProposals(Object.entries(suggested))
-  voiceOpen.value = false
+const catalogFieldNames: Record<string, string> = {
+  precio_lista: 'precio',
+  unidad_stock: 'unidad',
+  color_primario: 'color1',
+  color_secundario: 'color2',
+  tipo: 'tipo-piso',
+  espesor_mm: 'espesor',
+  largo_mm: 'largo',
+  ancho_mm: 'ancho',
+  m2_por_caja: 'm2-caja',
 }
-
-function applyVoice(suggested: CamposCatalogo) {
-  applyProposals(Object.entries(suggested))
-  voiceOpen.value = false
+function onVoiceApplied(payload: {
+  fields: CamposCatalogo
+  text: string
+  warnings: string[]
+  evidence?: VoiceEvidence[]
+}) {
+  const names = new Set([
+    ...Object.keys(payload.fields).flatMap((key) =>
+      key === 'especificaciones' && payload.fields.especificaciones
+        ? Object.keys(payload.fields.especificaciones).map((name) => `especificaciones.${name}`)
+        : [key],
+    ),
+    ...(payload.evidence ?? []).flatMap((e) => (e.label ? [e.label] : [])),
+  ])
+  voiceFields.value = Array.from(names).map((field) => {
+    const pending = (payload.evidence ?? []).find(
+      (e) => e.label === field && e.decision === 'UNRESOLVED',
+    )
+    return {
+      field: catalogFieldNames[field] ?? field,
+      state: pending ? 'pending' : 'suggested',
+      reason: pending?.reason || (pending ? 'Confirma o corrige este dato.' : ''),
+      critical: Boolean(pending),
+    }
+  })
+  applyProposals(Object.entries(payload.fields))
 }
 
 async function load() {
@@ -362,6 +352,10 @@ function nullable(value: string) {
 }
 
 function submit(): boolean {
+  if (voiceFields.value.some((item) => item.critical && item.state === 'pending')) {
+    error.value = 'Revisa los campos señalados antes de guardar el producto.'
+    return false
+  }
   if ((loading.value && !props.initial) || props.processing) return false
   error.value = ''
   fields.value = {}
@@ -461,6 +455,7 @@ onMounted(load)
 
 <template>
   <form
+    v-voice-fields="voiceReview"
     class="product-form"
     :aria-busy="loading || processing"
     @input="emit('change')"
@@ -743,6 +738,7 @@ onMounted(load)
                   <span>Detalle o valor</span>
                   <input
                     v-model="campo.valor"
+                    :name="`especificaciones.${campo.clave}`"
                     class="extra-input"
                     :aria-label="'Valor ' + (index + 1)"
                     placeholder="Ej. Ajustable en altura"
@@ -975,35 +971,6 @@ onMounted(load)
           </p>
         </section>
 
-        <!-- Tarjeta de Transcripción Original Conservada por Voz -->
-        <section
-          v-if="voiceTranscribedText"
-          class="catalog-section aside-card voice-transcription-card"
-          aria-labelledby="transcription-title"
-        >
-          <div class="aside-heading">
-            <Mic :size="18" aria-hidden="true" />
-            <div class="heading-split">
-              <h3 id="transcription-title">Descripción original por voz</h3>
-              <span class="voice-badge-done">Captura procesada</span>
-            </div>
-          </div>
-          <div class="transcription-text-box">
-            {{ voiceTranscribedText }}
-          </div>
-          <div v-if="voicePendingWarnings.length" class="voice-warnings-box">
-            <div class="warnings-title">
-              <AlertTriangle :size="15" aria-hidden="true" />
-              <strong>Datos a revisar</strong>
-            </div>
-            <ul>
-              <li v-for="warning in voicePendingWarnings" :key="warning">
-                {{ warning }}
-              </li>
-            </ul>
-          </div>
-        </section>
-
         <!-- Disponibilidad y existencias -->
         <section class="catalog-section aside-card" aria-labelledby="status-title">
           <div class="aside-heading">
@@ -1056,7 +1023,7 @@ onMounted(load)
   <VoiceDrawer
     :open="voiceOpen"
     title="Completar por voz"
-    description="Describe tu producto y los datos se completarán automáticamente en el formulario."
+    description="Revisa la transcripción, interpreta el texto y confirma la propuesta antes de aplicarla."
     close-label="Cerrar asistente de voz"
     @close="voiceOpen = false"
   >
@@ -1065,7 +1032,6 @@ onMounted(load)
       :key="categoria"
       :categoria="categoria as CategoriaEnum"
       :opciones="opciones"
-      @apply="applyVoice"
       @applied="onVoiceApplied"
       @recording-state="updateRecording"
       @processing-state="assistantProcessing = $event"

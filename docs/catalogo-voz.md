@@ -5,16 +5,19 @@ seleccionado. Reutiliza `AudioRecorder` y no añade acciones a listados, selecto
 de productos ni líneas de proforma. Cambiar de categoría desmonta el contexto y
 cancela su espera; la categoría nunca procede del NLP.
 
-Grabar descripción → Pausar/Reanudar (opcional) → Finalizar → transcribir automáticamente,
-o Seleccionar archivo → transcribir automáticamente. En ambos flujos se mantiene la
-revisión humana antes de aplicar. El asistente lateral se puede minimizar sin
-detener la grabación; al hacerlo aparece un indicador para volver al micrófono.
-Revisar transcripción original y texto editable; si se edita, Reinterpretar texto
-antes de aplicar. La propuesta muestra nombres de catálogos, evidencias y datos
-sin reconocer. Aplicar al formulario sólo admite campos de la categoría y valores
-presentes en los controles reales. Los conflictos con campos manuales requieren
-confirmación. El SKU y stock nunca proceden del dictado. Guardar producto conserva
-el flujo y las validaciones manuales originales.
+Grabar o seleccionar audio → escuchar y confirmar **Transcribir audio** (solo ASR) →
+revisar y corregir la transcripción → **Procesar texto** (solo NLP) → revisar atributos
+y evidencias → **Aplicar propuesta**. Nunca se modifica el formulario antes de esa
+confirmación. Después de aplicar, la transcripción deja de mostrarse como editor;
+los pendientes se corrigen o confirman desde los campos estructurados. La evidencia
+original y el texto corregido permanecen en los registros técnicos del backend.
+El asistente se puede minimizar sin perder su borrador.
+
+Los límites compartidos son 2–240 segundos para grabación, hasta 300 segundos y
+20 MB para archivos, y 20.000 caracteres para texto. El SKU y stock nunca se
+infieren del dictado. Las validaciones definitivas siguen siendo del backend.
+
+Consulta [el contrato de revisión por etapas](voice-transcription-review.md).
 
 El permiso `catalogo.crear_producto` habilita la ruta y el botón de creación.
 Los permisos comerciales o de administración restantes no se infieren del mismo.

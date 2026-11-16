@@ -1264,7 +1264,7 @@ test('@a11y PRF04 acciones directas de voz accesibles y sin reemplazo prematuro'
   await page.getByRole('button', { name: 'Completar por voz' }).click()
   await expect(page.getByRole('button', { name: 'Grabar descripción' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Seleccionar archivo' })).toBeVisible()
-  const results = await new AxeBuilder({ page }).include('.voice-workflow').analyze()
+  const results = await new AxeBuilder({ page }).include('.staged-voice').analyze()
   expect(results.violations).toEqual([])
   await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Mueble previo')
 })
@@ -1300,13 +1300,24 @@ for (const width of [360, 768, 1440]) {
       .getByRole('dialog', { name: 'Completar mueble por voz' })
       .locator('input[type="file"]')
       .setInputFiles({ name: '24.wav', mimeType: 'audio/wav', buffer: Buffer.from('fixture') })
-    // El asistente aplica la propuesta directamente al mueble y posiciona en revisión
+    const drawer = page.getByRole('dialog', { name: 'Completar mueble por voz' })
+    expect(captures).toBe(0)
+    await drawer.getByRole('button', { name: 'Transcribir audio', exact: true }).click()
+    await expect(drawer.locator('textarea')).toHaveValue(captura24.texto_transcrito_original!)
+    expect(captures).toBe(1)
+    await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Mueble previo')
+    await drawer.getByRole('button', { name: 'Procesar texto', exact: true }).click()
+    await expect(
+      drawer.getByRole('button', { name: 'Aplicar propuesta', exact: true }),
+    ).toBeVisible()
+    await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Mueble previo')
+    await drawer.getByRole('button', { name: 'Aplicar propuesta', exact: true }).click()
+    await expect(drawer.locator('textarea')).toHaveCount(0)
+    // Only explicit confirmation applies the proposal and opens structured review.
     await expect(
       page.locator('.review-pending').getByText('unidad del ancho', { exact: false }),
     ).toBeVisible()
-    await expect(page.locator('.studio-review-transcript')).toContainText(
-      captura24.texto_transcrito_original!,
-    )
+    await expect(page.locator('.studio-review-transcript')).toHaveCount(0)
     await studioStep(page, 'General')
     await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Escritorio')
     await studioStep(page, 'Precio')

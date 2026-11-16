@@ -176,6 +176,7 @@ export type CrearAsistida = {
   sesion_borrador: string
   moneda_codigo?: MonedaCodigoEnum
   captura_origen?: number | null
+  solo_transcribir?: boolean
 }
 
 /**
@@ -203,6 +204,7 @@ export type CrearCatalogo = {
   texto?: string
   sesion_borrador: string
   captura_origen?: number | null
+  solo_transcribir?: boolean
   categoria: CategoriaEnum
 }
 
@@ -905,6 +907,10 @@ export type ResolucionPendiente = {
 }
 
 export type ResultadoAsistida = {
+  solo_transcribir: boolean
+  captura_origen: number | null
+  texto_asr_original: string | null
+  texto_corregido: string | null
   id: number
   estado: string
   intento_id: number | null
@@ -913,11 +919,17 @@ export type ResultadoAsistida = {
   propuesta_configurador: PropuestaConfigurador | null
   pendientes: Array<PendienteAsistida>
   version_proyeccion: string
+  candidatos: Array<unknown>
+  advertencias: Array<unknown>
   motor: MotorAsistida | null
   error_codigo: string | null
 }
 
 export type ResultadoCatalogo = {
+  solo_transcribir: boolean
+  captura_origen: number | null
+  texto_asr_original: string | null
+  texto_corregido: string | null
   id: number
   estado: string
   categoria: CategoriaEnum
@@ -928,11 +940,13 @@ export type ResultadoCatalogo = {
 
 /**
  * * `PROCESSING` - PROCESSING
+ * * `TRANSCRIBED` - TRANSCRIBED
  * * `REQUIRES_REVIEW` - REQUIRES_REVIEW
  * * `NO_PROPOSAL` - NO_PROPOSAL
  * * `ERROR` - ERROR
  */
-export type ResultadoEnum = 'PROCESSING' | 'REQUIRES_REVIEW' | 'NO_PROPOSAL' | 'ERROR'
+export type ResultadoEnum =
+  'PROCESSING' | 'TRANSCRIBED' | 'REQUIRES_REVIEW' | 'NO_PROPOSAL' | 'ERROR'
 
 /**
  * * `DIMENSION` - DIMENSION
@@ -1025,6 +1039,7 @@ export type CrearAsistidaWritable = {
   sesion_borrador: string
   moneda_codigo?: MonedaCodigoEnum
   captura_origen?: number | null
+  solo_transcribir?: boolean
 }
 
 /**
@@ -1044,6 +1059,7 @@ export type CrearCatalogoWritable = {
   audio?: Blob | File
   sesion_borrador: string
   captura_origen?: number | null
+  solo_transcribir?: boolean
   categoria: CategoriaEnum
 }
 

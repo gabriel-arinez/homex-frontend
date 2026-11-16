@@ -70,30 +70,14 @@ describe('PRF-04 proyección del servidor', () => {
   })
 })
 describe('PRF-04 confirmación del reemplazo', () => {
-  it('con cambios pide un único modal y cancelar no aplica ni procesa', async () => {
+  it('no procesa ni aplica cambios existentes mientras se revisa texto', async () => {
     const wrapper = mount(CapturaAsistida, {
       props: { dirty: true, sesion: crypto.randomUUID(), moneda: 'BOB' },
-      global: { stubs: { Teleport: true, AudioRecorder: true } },
     })
-    await wrapper.get('button').trigger('click')
-    expect(wrapper.text()).toContain('reemplazará toda la información')
-    const cancel = wrapper.findAll('button').find((b) => b.text() === 'Cancelar')!
-    await cancel.trigger('click')
+    await wrapper.get('textarea').setValue('Un escritorio de madera')
     expect(wrapper.emitted('applied')).toBeUndefined()
-    expect(wrapper.text()).not.toContain('reemplazará toda la información')
+    expect(wrapper.findAll('button').some((b) => b.text() === 'Aplicar propuesta')).toBe(false)
     wrapper.unmount()
-  })
-  it('sin cambios permite grabar sin modal', async () => {
-    vi.stubGlobal('MediaRecorder', undefined)
-    const wrapper = mount(CapturaAsistida, {
-      props: { dirty: false, sesion: crypto.randomUUID(), moneda: 'BOB' },
-      global: { stubs: { AudioRecorder: true, Teleport: true } },
-    })
-    await wrapper.get('button').trigger('click')
-    expect(wrapper.findComponent({ name: 'AudioRecorder' }).exists()).toBe(true)
-    expect(wrapper.text()).not.toContain('reemplazará toda la información')
-    wrapper.unmount()
-    vi.unstubAllGlobals()
   })
 })
 
@@ -112,6 +96,12 @@ describe('PRF-04 aplicación de capturas por voz', () => {
         id,
         estado: 'COMPLETADA',
         intento_id: id,
+        candidatos: [],
+        advertencias: [],
+        solo_transcribir: false,
+        captura_origen: null,
+        texto_asr_original: null,
+        texto_corregido: null,
         texto_transcrito_original: 'Un escritorio con cajones',
         resultado: 'REQUIRES_REVIEW',
         propuesta_configurador: propuesta(),
@@ -127,9 +117,17 @@ describe('PRF-04 aplicación de capturas por voz', () => {
       global: { stubs: { AudioRecorder: true, Teleport: true } },
     })
     try {
-      await wrapper.get('button').trigger('click')
-      wrapper.findComponent({ name: 'AudioRecorder' }).vm.$emit('ready', new Blob(['audio']))
+      await wrapper.get('textarea').setValue('Un escritorio con cajones')
+      await wrapper
+        .findAll('button')
+        .find((b) => b.text() === 'Procesar texto')!
+        .trigger('click')
       await flushPromises()
+      expect(wrapper.emitted('applied')).toBeUndefined()
+      await wrapper
+        .findAll('button')
+        .find((b) => b.text() === 'Aplicar propuesta')!
+        .trigger('click')
       expect(wrapper.emitted('applied')).toHaveLength(1)
     } finally {
       wrapper.unmount()
