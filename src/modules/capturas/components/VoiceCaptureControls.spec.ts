@@ -9,7 +9,7 @@ describe('Controles de voz compartidos HOMEX', () => {
     })
     expect(wrapper.find('.source-record').exists()).toBe(true)
     expect(wrapper.find('.voice-upload').exists()).toBe(true)
-    expect(wrapper.get('.source-record').text()).toContain('Máximo 3 minutos')
+    expect(wrapper.get('.source-record').text()).toContain('Máximo 4 minutos')
     expect(wrapper.get('.voice-upload').text()).toContain('Hasta 20 MB y 5 minutos')
     expect(wrapper.find('.voice-live').exists()).toBe(false)
     await wrapper.get('.source-record').trigger('click')
@@ -22,7 +22,7 @@ describe('Controles de voz compartidos HOMEX', () => {
   it('oculta los botones grandes mientras graba, permite pausar y finalizar', async () => {
     const wrapper = mount(VoiceCaptureControls, {
       props: { recording: true, paused: false },
-      slots: { recorder: '<div class="fake-recorder">Grabando 00:07 / 03:00</div>' },
+      slots: { recorder: '<div class="fake-recorder">Grabando 00:07 / 04:00</div>' },
     })
     expect(wrapper.find('.voice-source-actions').exists()).toBe(false)
     expect(wrapper.get('.fake-recorder').text()).toContain('00:07')

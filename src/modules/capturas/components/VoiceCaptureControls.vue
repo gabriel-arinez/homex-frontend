@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { FileAudio, Mic, Pause, Play, Square, X } from '@lucide/vue'
+import { MAX_RECORD_SECONDS, MAX_UPLOAD_SECONDS } from '../audioLimits'
 import Button from '@/shared/ui/Button.vue'
 
 withDefaults(
@@ -30,7 +31,7 @@ const emit = defineEmits<{
     >
       <Mic :size="28" aria-hidden="true" />
       <strong>Grabar descripción</strong>
-      <small>Máximo 3 minutos</small>
+      <small>Máximo {{ MAX_RECORD_SECONDS / 60 }} minutos</small>
     </Button>
     <Button
       variant="secondary"
@@ -40,7 +41,7 @@ const emit = defineEmits<{
     >
       <FileAudio :size="28" aria-hidden="true" />
       <strong>Seleccionar archivo</strong>
-      <small>Hasta 20 MB y 5 minutos</small>
+      <small>Hasta 20 MB y {{ MAX_UPLOAD_SECONDS / 60 }} minutos</small>
     </Button>
     <p v-if="hint" class="hint">{{ hint }}</p>
   </div>

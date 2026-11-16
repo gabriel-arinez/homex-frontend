@@ -49,7 +49,9 @@ function cancel() {
       class="recording"
     >
       <span aria-hidden="true"></span>{{ r.state.value === 'PAUSED' ? 'Pausado' : 'Grabando' }}
-      {{ time }} / 03:00
+      {{ time }} / {{ String(Math.floor(MAX_RECORD_SECONDS / 60)).padStart(2, '0') }}:{{
+        String(MAX_RECORD_SECONDS % 60).padStart(2, '0')
+      }}
     </p>
     <p v-if="r.elapsed.value >= MAX_RECORD_SECONDS - 30 && r.state.value !== 'READY'" role="status">
       Quedan {{ MAX_RECORD_SECONDS - r.elapsed.value }} segundos para finalizar automáticamente.
@@ -67,7 +69,7 @@ function cancel() {
       />
     </div>
     <p v-else-if="r.state.value === 'READY'" role="status">
-      Audio listo. Se enviará para su interpretación.
+      Audio listo. Escúchalo antes de enviarlo a transcribir.
     </p>
     <p v-if="r.error.value" role="alert" class="error">{{ r.error.value }}</p>
     <div v-if="!props.compact" class="actions">

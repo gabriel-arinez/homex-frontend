@@ -30,6 +30,7 @@ function setup() {
     }
     stop() {
       this.state = 'inactive'
+      this.ondataavailable?.({ data: new Blob(['audio']) })
       this.onstop?.()
     }
   }
@@ -37,7 +38,10 @@ function setup() {
   return { getUserMedia, stopTrack, stream, resolve: () => resolve(stream) }
 }
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.useRealTimers()
+})
 
 function controls(wrapper: ReturnType<typeof mount>) {
   return (
@@ -58,6 +62,7 @@ function controls(wrapper: ReturnType<typeof mount>) {
 describe('recorder pending permission', () => {
   it('discards a late stream after cancel and allows a new capture', async () => {
     const media = setup()
+    vi.useFakeTimers()
     const wrapper = mount(AudioRecorder)
     const first = controls(wrapper).start()
     const duplicate = controls(wrapper).start()
@@ -73,6 +78,7 @@ describe('recorder pending permission', () => {
     media.resolve()
     await second
     expect(wrapper.text()).toContain('Grabando')
+    await vi.advanceTimersByTimeAsync(2000)
     controls(wrapper).stop()
     await flushPromises()
     expect(wrapper.text()).toContain('Audio listo')
@@ -82,6 +88,7 @@ describe('recorder pending permission', () => {
 
   it('pausa y reanuda sin descartar audio, y acepta finalizar desde pausa', async () => {
     const media = setup()
+    vi.useFakeTimers()
     const wrapper = mount(AudioRecorder)
     const pending = controls(wrapper).start()
     media.resolve()
@@ -92,6 +99,7 @@ describe('recorder pending permission', () => {
     controls(wrapper).resume()
     await flushPromises()
     expect(wrapper.text()).toContain('Grabando')
+    await vi.advanceTimersByTimeAsync(2000)
     controls(wrapper).pause()
     controls(wrapper).stop()
     await flushPromises()
@@ -102,6 +110,7 @@ describe('recorder pending permission', () => {
 
   it('stops a stream received after unmount without creating audio', async () => {
     const media = setup()
+    vi.useFakeTimers()
     const wrapper = mount(AudioRecorder)
     const pending = controls(wrapper).start()
     wrapper.unmount()

@@ -1,5 +1,5 @@
 /** Límites comerciales de HOMEX: alineados con validación del servidor. */
-export const MAX_RECORD_SECONDS = 180
+export const MAX_RECORD_SECONDS = 240
 export const MAX_UPLOAD_SECONDS = 300
 export const MAX_AUDIO_BYTES = 20_000_000
 /** Extensiones admitidas para subida de audio: incluye formatos móviles comunes con transcodificación transparente a WAV si es necesario */
@@ -26,4 +26,24 @@ export function readAudioDuration(file: File): Promise<number | null> {
     element.onerror = () => done()
     element.src = url
   })
+}
+
+export const MIN_AUDIO_SECONDS = 2
+export const MAX_TRANSCRIPT_CHARACTERS = 20_000
+/** CPU transcription can take longer than the recording itself. */
+export const CAPTURE_TIMEOUT_MS = 22 * 60_000
+
+export function validateTranscript(text: string): string {
+  if (!text.trim() || !/\p{L}/u.test(text)) return 'Escribe una descripción con contenido textual.'
+  if (text.length > MAX_TRANSCRIPT_CHARACTERS)
+    return `La descripción supera ${MAX_TRANSCRIPT_CHARACTERS} caracteres.`
+  return ''
+}
+
+export function validateAudioDuration(seconds: number | null): string {
+  if (seconds !== null && seconds < MIN_AUDIO_SECONDS)
+    return 'El audio debe durar al menos 2 segundos.'
+  if (seconds !== null && seconds > MAX_UPLOAD_SECONDS)
+    return 'El audio supera los 5 minutos permitidos.'
+  return ''
 }
