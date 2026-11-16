@@ -419,7 +419,7 @@ watch(() => route.params.id, load)
           </div>
         </div>
 
-        <div v-if="isCancelled" class="cancelled-banner" role="status">
+        <div v-if="isCancelled" class="cancelled-banner">
           <Ban :size="18" aria-hidden="true" />
           <div>
             <strong>Pedido cancelado</strong>
