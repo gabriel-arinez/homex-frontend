@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChevronLeft, ChevronRight, Clock3, Eye, Plus, RotateCcw } from '@lucide/vue'
+import { ChevronLeft, ChevronRight, Eye, Plus, RotateCcw } from '@lucide/vue'
 import type { ProformaListado, ValorCatalogoPublico } from '@/generated/api'
 import { proformasService } from '../services/proformasService'
 import { presentarCreacion } from '../utils/fechaCreacion'
@@ -13,6 +13,7 @@ import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
 import ClientAvatar from '@/shared/ui/ClientAvatar.vue'
+import DatePresentation from '@/shared/ui/DatePresentation.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
@@ -445,30 +446,7 @@ onBeforeUnmount(() => {
                 </div>
               </td>
               <td class="date-cell" data-label="Creación">
-                <div
-                  class="creation-cell"
-                  :title="
-                    row.creacion.historica ? 'Registro histórico sin hora de creación' : undefined
-                  "
-                >
-                  <div
-                    class="creation-primary"
-                    :class="{ 'creation-primary--recent': row.creacion.reciente }"
-                  >
-                    <Clock3 :size="15" aria-hidden="true" />
-                    <strong>{{ row.creacion.principal }}</strong>
-                  </div>
-                  <time
-                    v-if="row.creacion.hora"
-                    class="creation-hour"
-                    :datetime="row.creado_en ?? undefined"
-                    >{{ row.creacion.hora }}</time
-                  >
-                  <span v-else class="creation-hour">Hora no registrada</span>
-                  <span v-if="row.creacion.mostrarFechaSeparada" class="creation-date">{{
-                    row.creacion.fecha
-                  }}</span>
-                </div>
+                <DatePresentation :presentation="row.creacion" :timestamp="row.creado_en" />
               </td>
               <td class="status-cell" data-label="Estado">
                 <Badge :tone="tone(row.estado_info.codigo)">{{ row.estado_info.nombre }}</Badge>

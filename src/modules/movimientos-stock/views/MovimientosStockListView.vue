@@ -4,6 +4,7 @@ import type { MovimientoStock, ValorCatalogoPublico } from '@/generated/api'
 import { movimientosStockService } from '../services/movimientosStockService'
 import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
 import DataTable from '@/shared/ui/DataTable.vue'
+import DatePresentation from '@/shared/ui/DatePresentation.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import FilterBar from '@/shared/ui/FilterBar.vue'
@@ -211,9 +212,9 @@ const columns = [
     <template v-else>
       <p class="results">{{ total }} movimiento{{ total === 1 ? '' : 's' }}</p>
       <DataTable caption="Historial de movimientos de stock" :columns="columns" :rows="tableRows">
-        <template #cell-fecha="{ row }">{{
-          new Date(String(row.fecha)).toLocaleString('es-BO')
-        }}</template>
+        <template #cell-fecha="{ row }">
+          <DatePresentation :timestamp="String(row.fecha)" />
+        </template>
         <template #cell-tipo="{ row }">{{ row.tipo }}</template>
         <template #cell-producto="{ row }">
           <strong>{{ row.productoNombre }}</strong>
