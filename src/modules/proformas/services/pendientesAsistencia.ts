@@ -38,7 +38,10 @@ export function pendienteResuelto(
   if (r.tipo === 'DIMENSION') return medidas.some((m) => m.clave === r.clave && completa(m))
   if (r.tipo === 'COMPONENTE') {
     const componente = componentes.find((c) => c.uid === r.uid)
-    return !componente || !!String(componente[r.campo ?? ''] ?? '').trim()
+    if (!componente) return false
+    const valor = componente[r.campo ?? '']
+    if (r.campo === 'cantidad_interna') return Number.isInteger(Number(valor)) && Number(valor) > 0
+    return !!String(valor ?? '').trim()
   }
   const normalizar = (valor: string) =>
     valor
@@ -50,7 +53,10 @@ export function pendienteResuelto(
       (a) =>
         (normalizar(a.codigo ?? '') === normalizar(r.clave ?? '') ||
           normalizar(a.nombre) === normalizar(r.clave ?? '')) &&
-        !!a.valor.trim(),
+        !!a.valor.trim() &&
+        (a.tipo_entrada !== 'entero' || (/^\d+$/.test(a.valor.trim()) && Number(a.valor) >= 0)) &&
+        (a.tipo_entrada !== 'numero_unidad' ||
+          (Number.isFinite(Number(a.valor)) && !!a.unidad?.trim())),
     )
   if (r.tipo === 'DIMENSIONES_NUEVAS')
     return (

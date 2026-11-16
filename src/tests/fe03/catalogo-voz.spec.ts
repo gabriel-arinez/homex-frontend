@@ -307,3 +307,55 @@ describe('Voz en creación de catálogo', () => {
     w.unmount()
   })
 })
+
+it('retains active catalog warnings and validates pending prices on confirm, correction and reversion', async () => {
+  vi.spyOn(proformasService, 'families').mockResolvedValue({
+    count: 0,
+    next: null,
+    previous: null,
+    results: [],
+  })
+  vi.spyOn(proformasService, 'options').mockImplementation(async (key) =>
+    key === 'CATEGORIA_PRODUCTO'
+      ? [{ id: 10, codigo: 'OTRO', nombre: 'Otro', concepto_codigo: key }]
+      : [],
+  )
+  const w = mount(ProductoForm, {
+    props: { preselectCategory: 'OTRO' },
+    global: { stubs: { CapturaCatalogo: true } },
+  })
+  await flushPromises()
+  await button(w, 'Completar por voz').trigger('click')
+  const evidence = [
+    {
+      label: 'precio_lista',
+      start: 0,
+      end: 2,
+      text: '-1',
+      decision: 'UNRESOLVED',
+      reason: 'Revise precio',
+    },
+  ]
+  w.getComponent({ name: 'CapturaCatalogo' }).vm.$emit('applied', {
+    fields: { nombre: 'Mesa', precio_lista: '-1' },
+    text: '-1',
+    warnings: ['Verifique la disponibilidad'],
+    evidence,
+  })
+  await flushPromises()
+  expect(w.text()).toContain('Verifique la disponibilidad')
+  const price = w.get('[name="precio"]')
+  expect(price.attributes('data-voice-state')).toBe('pending')
+  const confirm = w
+    .findAll('.voice-field-status')
+    .find((n) => n.text().includes('Revise precio'))!
+    .get('button')
+  await confirm.trigger('click')
+  expect(price.attributes('data-voice-state')).toBe('pending')
+  await price.setValue('120')
+  expect(price.attributes('data-voice-state')).toBe('edited')
+  await price.setValue('-1')
+  expect(price.attributes('data-voice-state')).toBe('pending')
+  expect(evidence[0]!.decision).toBe('UNRESOLVED')
+  w.unmount()
+})

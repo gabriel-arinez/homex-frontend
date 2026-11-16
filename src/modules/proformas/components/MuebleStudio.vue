@@ -60,6 +60,7 @@ const props = defineProps<{
   } | null
   unidades: ValorCatalogoPublico[]
   pendientesAsistencia?: PendienteAsistida[]
+  voiceCaptureId?: number
   processing?: boolean
   externalError?: string
 }>()
@@ -428,6 +429,7 @@ defineExpose({ save: guardarDesdeEstudio, hasRealChanges })
           :detalle="detalle"
           :unidades="unidades"
           :pendientes-asistencia="pendientesAsistencia"
+          :voice-capture-id="voiceCaptureId"
           :voice-suggested-fields="voiceSuggestedFields"
           :moneda="moneda"
           :processing="processing"

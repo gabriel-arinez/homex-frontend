@@ -39,6 +39,7 @@ const opciones = reactive<Record<string, ValorCatalogoPublico[]>>({})
 const familias = ref<FamiliaProducto[]>([])
 const loading = ref(true)
 const error = ref('')
+const formElement = ref<HTMLFormElement | null>(null)
 const fields = ref<Record<string, string[]>>({})
 const images = ref<LocalImage[]>([])
 
@@ -48,11 +49,48 @@ const assistantProcessing = ref(false)
 const recordingActive = ref(false)
 const recordingPaused = ref(false)
 const recordingElapsed = ref(0)
-const voiceFields = ref<FieldVoiceReview[]>([])
+const voiceObservations = ref<FieldVoiceReview[]>([])
+const voiceWarnings = ref<string[]>([])
+const voiceOriginalValues = ref<Record<string, string>>({})
+const voiceResolutions = ref<Record<string, { value: string; state: 'edited' | 'reviewed' }>>({})
+function voiceValue(field: string): string {
+  if (field.startsWith('especificaciones.'))
+    return camposSilla.value.find((c) => `especificaciones.${c.clave}` === field)?.valor ?? ''
+  const key =
+    Object.keys(catalogFieldNames).find((key) => catalogFieldNames[key] === field) ?? field
+  return String((form as Record<string, unknown>)[key] ?? '')
+}
+function validVoiceValue(field: string): boolean {
+  const value = voiceValue(field).trim()
+  if (!value) return false
+  if (field === 'precio') return Number.isFinite(Number(value)) && Number(value) >= 0
+  if (['espesor', 'largo', 'ancho', 'm2-caja'].includes(field))
+    return Number.isFinite(Number(value)) && Number(value) > 0
+  const control = Array.from(
+    formElement.value?.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input,select') ?? [],
+  ).find((el) => el.name === field)
+  return !!control && control.checkValidity()
+}
+const voiceFields = computed(() =>
+  voiceObservations.value.map((item) => {
+    const resolution = voiceResolutions.value[item.field]
+    return resolution && resolution.value === voiceValue(item.field) && validVoiceValue(item.field)
+      ? { ...item, state: resolution.state }
+      : item
+  }),
+)
 function resolveVoiceField(field: string, edited: boolean) {
-  voiceFields.value = voiceFields.value.map((item) =>
-    item.field === field ? { ...item, state: edited ? 'edited' : 'reviewed' } : item,
-  )
+  if (
+    !validVoiceValue(field) ||
+    (edited && voiceValue(field) === voiceOriginalValues.value[field])
+  ) {
+    delete voiceResolutions.value[field]
+    return
+  }
+  voiceResolutions.value[field] = {
+    value: voiceValue(field),
+    state: edited ? 'edited' : 'reviewed',
+  }
 }
 const voiceReview = computed(() => ({ fields: voiceFields.value, resolve: resolveVoiceField }))
 
@@ -278,7 +316,7 @@ function onVoiceApplied(payload: {
     ),
     ...(payload.evidence ?? []).flatMap((e) => (e.label ? [e.label] : [])),
   ])
-  voiceFields.value = Array.from(names).map((field) => {
+  voiceObservations.value = Array.from(names).map((field) => {
     const pending = (payload.evidence ?? []).find(
       (e) => e.label === field && e.decision === 'UNRESOLVED',
     )
@@ -289,7 +327,12 @@ function onVoiceApplied(payload: {
       critical: Boolean(pending),
     }
   })
+  voiceWarnings.value = [...payload.warnings]
+  voiceResolutions.value = {}
   applyProposals(Object.entries(payload.fields))
+  voiceOriginalValues.value = Object.fromEntries(
+    voiceObservations.value.map((item) => [item.field, voiceValue(item.field)]),
+  )
 }
 
 async function load() {
@@ -455,6 +498,7 @@ onMounted(load)
 
 <template>
   <form
+    ref="formElement"
     v-voice-fields="voiceReview"
     class="product-form"
     :aria-busy="loading || processing"
@@ -479,6 +523,9 @@ onMounted(load)
       </Button>
     </header>
 
+    <aside v-if="voiceWarnings.length" aria-label="Observaciones de voz" role="status">
+      <p v-for="(warning, index) in voiceWarnings" :key="index">{{ warning }}</p>
+    </aside>
     <button
       v-if="(recordingActive || assistantProcessing) && !voiceOpen"
       type="button"

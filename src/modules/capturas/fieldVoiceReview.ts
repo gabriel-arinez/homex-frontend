@@ -4,6 +4,7 @@ export type FieldVoiceReview = {
   state: 'suggested' | 'pending' | 'reviewed' | 'edited'
   reason: string
   critical: boolean
+  confirmable?: boolean
 }
 type Binding = { fields: FieldVoiceReview[]; resolve: (field: string, edited: boolean) => void }
 const cleanup = new WeakMap<HTMLElement, () => void>()
@@ -42,14 +43,14 @@ function render(root: HTMLElement, value: Binding) {
       label +
       (review.reason && ['pending', 'suggested'].includes(review.state) ? ': ' + review.reason : '')
     note.append(text)
-    if (['suggested', 'pending'].includes(review.state)) {
+    if (review.confirmable !== false && ['suggested', 'pending'].includes(review.state)) {
       const button = document.createElement('button')
       button.type = 'button'
       button.textContent = 'Confirmar campo'
       button.style.cssText =
         'margin-inline-start:.5rem;padding:.2rem .5rem;border:1px solid var(--color-border-strong);border-radius:var(--radius-control);background:var(--color-surface);color:var(--color-text);font:inherit;cursor:pointer;'
       button.addEventListener('click', () => {
-        if (input.value.trim()) value.resolve(review.field, false)
+        if (input.value.trim() && input.checkValidity()) value.resolve(review.field, false)
         else input.focus()
       })
       note.append(button)
@@ -64,8 +65,7 @@ function render(root: HTMLElement, value: Binding) {
   const onInput = (event: Event) => {
     const target = event.target as HTMLInputElement
     const field = target.name || target.id
-    if (field && target.value?.trim() && value.fields.some((f) => f.field === field))
-      value.resolve(field, true)
+    if (field && value.fields.some((f) => f.field === field)) value.resolve(field, true)
   }
   root.addEventListener('input', onInput)
   root.addEventListener('change', onInput)
