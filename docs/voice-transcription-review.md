@@ -27,8 +27,18 @@ The feature log is `odd/tasks/voice-hitl-review.md`. Unit tests cover staged req
 
 ## Final verification evidence
 
-The final candidate passed 338 unit tests and 110 browser tests; one existing attachment-freezing E2E remains explicitly skipped. Lint, typecheck, production build and generated OpenAPI contract checks passed. Browser tests use controlled API fixtures; backend/API and installed NLP artifact tests run separately against disposable PostgreSQL.
+The original implementation passed 338 unit tests and 110 browser tests. The corrective audit passed 369 unit tests and 114 browser tests; one existing attachment-freezing E2E remains explicitly skipped. Lint, typecheck, production build and generated OpenAPI contract checks passed. Browser tests use controlled API fixtures; backend/API and installed NLP artifact tests run separately against disposable PostgreSQL.
 
 A real cached Whisper-small model also processed 240.0 seconds of locally synthesized Spanish speech using CPU/int8 and four threads, without network access. ASR took 42.32 seconds and produced 2,807 characters over 29 timestamped segments, with the final segment ending at 239.28 seconds. The ASR-only backend stage made no NLP or commercial writes; a subsequent explicit text request ran NLP without repeating ASR and preserved the complete transcript/origin link.
 
 This demonstrates long-audio pipeline continuity, not perfect recognition or human-microphone accuracy: the synthetic closing word “Cierre” was recognized as “Sierra”, among other ASR errors. Those errors remain editable before interpretation. Remote CI was not triggered; its applicable checks were run locally.
+
+## Corrective audit
+
+Reinterpreting edited text keeps one stable original audio capture ID rather than chaining successive interpretation IDs. Each text execution still has its own capture/result. The original ASR transcript and edited execution text remain distinct.
+
+Starting a recording or opening the file chooser immediately invalidates the previous proposal. Applying requires the exact currently interpreted text and current operation generation, with no recording, microphone request, audio preparation, transcription or interpretation in progress. Cancelling preserves valid prior text/form data but never automatically restores an old proposal. A transcript obtained before a terminal validation error remains editable when available.
+
+The server accepts WAV, MP3, M4A, OGG and WebM natively. AAC, Opus, MP4 and FLAC uploads are converted to WAV in browsers capable of decoding them. Unsupported conversion is rejected before submission with a clear compatible-format alternative; there is no silent fallback to an extension rejected by the server. Full decoded duration must remain between 2 and 300 seconds. PCM size is checked before allocation and must remain under20MB; large decompressed stereo files are rejected explicitly rather than silently downsampled or truncated.
+
+Proposal review uses commercial attribute groups, real option names and contextual pending indicators instead of technical JSON. Missing/null attributes are not invented. Exact transcript-evidence highlighting and explicit reinterpret/apply controls remain unchanged. See [field-resolution audit notes](voice-hitl-corrections.md) for the form-level resolution rules.

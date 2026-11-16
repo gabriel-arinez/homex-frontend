@@ -4,14 +4,13 @@ import type { CategoriaEnum, ResultadoCatalogo, ResultadoAsistida } from '@/gene
 import { catalogoCapturaService } from '@/modules/productos/services/catalogoCapturaService'
 import { asistidasService } from '../services/asistidasService'
 import {
-  ALLOWED_AUDIO_EXTENSIONS,
   MAX_AUDIO_BYTES,
   MAX_TRANSCRIPT_CHARACTERS,
   CAPTURE_TIMEOUT_MS,
-  readAudioDuration,
-  validateAudioDuration,
   validateTranscript,
 } from '../audioLimits'
+import { prepareAudioForCapture } from '../audioConversion'
+import ProposalSummary from './ProposalSummary.vue'
 import type { VoiceEvidence } from '../voiceEvidence'
 import AudioRecorder from './AudioRecorder.vue'
 import AudioReview from './AudioReview.vue'
@@ -25,6 +24,7 @@ const props = defineProps<{
   moneda?: 'BOB' | 'USD'
   proforma?: number | null
   dirty?: boolean
+  options?: Record<string, import('@/generated/api').ValorCatalogoPublico[]>
 }>()
 const emit = defineEmits<{
   applied: [result: ResultadoCatalogo | ResultadoAsistida]
@@ -36,14 +36,23 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const recording = ref(false),
   paused = ref(false),
   processing = ref(false),
-  requesting = ref(false)
+  requesting = ref(false),
+  preparingAudio = ref(false)
 const audio = ref<Blob | null>(null),
   text = ref(''),
   original = ref(''),
   error = ref(''),
   applied = ref(false)
 const result = ref<ResultadoCatalogo | ResultadoAsistida | null>(null)
-const captureId = ref<number | null>(null)
+const asrCaptureId = ref<number | null>(null)
+const lastInterpretationId = ref<number | null>(null)
+const originCaptureId = computed(() => asrCaptureId.value ?? lastInterpretationId.value)
+const busy = computed(
+  () => processing.value || recording.value || requesting.value || preparingAudio.value,
+)
+let proposalGeneration = -1
+let proposalText = ''
+let settingAsrText = false
 const transcriptError = computed(() => validateTranscript(text.value))
 const catalog = computed(() => (result.value && 'propuesta' in result.value ? result.value : null))
 const furniture = computed(() =>
@@ -70,7 +79,10 @@ let generation = 0,
 function cancel() {
   generation++
   controller?.abort()
+  result.value = null
+  proposalGeneration = -1
   processing.value = false
+  preparingAudio.value = false
   emit('processing', false)
 }
 function discard() {
@@ -79,12 +91,17 @@ function discard() {
   error.value = ''
   recorder.value?.cancelRecording?.()
   recording.value = false
+  requesting.value = false
+  paused.value = false
   emit('recording-state', false, false, 0)
 }
-watch(text, () => {
-  cancel()
-  result.value = null
-})
+watch(
+  text,
+  () => {
+    if (!settingAsrText) cancel()
+  },
+  { flush: 'sync' },
+)
 watch(
   () => [props.sesion, props.moneda, props.proforma, props.categoria],
   () => {
@@ -92,7 +109,8 @@ watch(
     result.value = null
     text.value = ''
     original.value = ''
-    captureId.value = null
+    asrCaptureId.value = null
+    lastInterpretationId.value = null
     applied.value = false
   },
 )
@@ -103,14 +121,21 @@ async function start() {
   applied.value = false
   requesting.value = true
   recording.value = true
+  const current = generation
   await nextTick()
+  const activeRecorder = recorder.value
   try {
-    if (!(await recorder.value?.startRecording?.())) {
+    const started = await activeRecorder?.startRecording?.()
+    if (current !== generation) {
+      activeRecorder?.cancelRecording?.()
+      return
+    }
+    if (!started) {
       recording.value = false
       error.value = recorder.value?.getError?.() || 'No fue posible iniciar la grabación.'
     }
   } finally {
-    requesting.value = false
+    if (current === generation) requesting.value = false
   }
 }
 function status(state: string, seconds: number) {
@@ -135,30 +160,32 @@ function recorded(blob: Blob | null) {
   result.value = null
   applied.value = false
 }
-async function upload(event: Event) {
-  const input = event.target as HTMLInputElement,
-    file = input.files?.[0]
-  input.value = ''
-  if (!file) return
+function chooseAudio() {
+  if (busy.value) return
   discard()
-  if (!file.size || file.size > MAX_AUDIO_BYTES) {
-    error.value = 'El archivo está vacío o supera 20 MB.'
-    return
-  }
-  if (!ALLOWED_AUDIO_EXTENSIONS.test(file.name)) {
-    error.value = 'Formato de audio no admitido.'
-    return
-  }
+  fileInput.value?.click()
+}
+async function upload(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  discard()
+  if (!file) return
   const current = generation
-  const validation = validateAudioDuration(await readAudioDuration(file))
-  if (current !== generation) return
-  if (validation) {
-    error.value = validation
-    return
+  preparingAudio.value = true
+  try {
+    const prepared = await prepareAudioForCapture(file)
+    if (current !== generation) return
+    recorded(prepared)
+  } catch (cause) {
+    if (current === generation)
+      error.value = cause instanceof Error ? cause.message : 'No se pudo validar el audio.'
+  } finally {
+    if (current === generation) preparingAudio.value = false
   }
-  recorded(file)
 }
 async function process(useAudio = false) {
+  if (busy.value || (!useAudio && audio.value)) return
   if (!useAudio && transcriptError.value) {
     error.value = transcriptError.value
     return
@@ -181,7 +208,7 @@ async function process(useAudio = false) {
         ? { audio: audio.value!, solo_transcribir: true }
         : {
             texto: submittedText,
-            ...(captureId.value ? { captura_origen: captureId.value } : {}),
+            ...(originCaptureId.value ? { captura_origen: originCaptureId.value } : {}),
           }),
     }
     const created =
@@ -202,18 +229,29 @@ async function process(useAudio = false) {
           : await asistidasService.get(created.id, abort.signal)
       if (current !== generation) return
       if (['COMPLETADA', 'ERROR'].includes(response.estado)) {
-        captureId.value = response.id
-        if (response.estado === 'ERROR') {
-          error.value =
-            'No se pudo procesar la captura. Conserva o corrige el texto y vuelve a intentar.'
-          return
-        }
-        if (useAudio) {
+        if (
+          useAudio &&
+          (response.estado === 'COMPLETADA' || response.texto_transcrito_original?.trim())
+        ) {
           // Set editable text before the result: the watcher invalidates prior interpretations.
+          asrCaptureId.value = response.id
+          settingAsrText = true
           text.value = response.texto_transcrito_original ?? ''
+          settingAsrText = false
           original.value = response.texto_asr_original ?? response.texto_transcrito_original ?? ''
           audio.value = null
-        } else {
+        }
+        if (response.estado === 'ERROR') {
+          error.value =
+            response.error_codigo === 'TRANSCRIPT_TOO_LONG'
+              ? 'La transcripción supera el límite de caracteres. Reduce el texto y vuelve a procesarlo.'
+              : 'No se pudo procesar la captura. Conserva o corrige el texto y vuelve a intentar.'
+          return
+        }
+        if (!useAudio) {
+          lastInterpretationId.value = response.id
+          proposalText = submittedText
+          proposalGeneration = current
           result.value = response
           if (!proposal.value)
             error.value =
@@ -252,8 +290,18 @@ function normalizeText() {
     .trim()
 }
 
+const canApply = computed(() =>
+  Boolean(
+    result.value &&
+    proposal.value &&
+    !busy.value &&
+    !audio.value &&
+    proposalGeneration === generation &&
+    proposalText === text.value,
+  ),
+)
 function apply() {
-  if (!result.value || !proposal.value || processing.value) return
+  if (!canApply.value || !result.value) return
   applied.value = true
   emit('applied', result.value)
   result.value = null
@@ -270,9 +318,9 @@ function apply() {
     <VoiceCaptureControls
       :recording="recording"
       :paused="paused"
-      :disabled="processing || requesting"
+      :disabled="processing || requesting || preparingAudio"
       @record="start"
-      @upload="fileInput?.click()"
+      @upload="chooseAudio"
       @pause="recorder?.pauseRecording()"
       @resume="recorder?.resumeRecording()"
       @finish="recorder?.stopRecording()"
@@ -288,9 +336,9 @@ function apply() {
       aria-label="Archivo de audio para transcribir"
       aria-hidden="true"
       tabindex="-1"
-      accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm,.aac,.opus,.mp4,.flac"
+      accept=".wav,.mp3,.m4a,.ogg,.webm,.aac,.opus,.mp4,.flac"
       class="file-input"
-      :disabled="processing || recording"
+      :disabled="busy"
       @change="upload"
     />
     <AudioReview
@@ -324,15 +372,18 @@ function apply() {
         <p class="original">{{ original }}</p>
       </details>
       <p v-if="text && transcriptError" role="alert">{{ transcriptError }}</p>
-      <Button
-        :disabled="processing || recording || Boolean(transcriptError)"
-        @click="process(false)"
+      <Button :disabled="busy || Boolean(audio) || Boolean(transcriptError)" @click="process(false)"
         >Procesar texto</Button
       >
       <section v-if="result && proposal" aria-label="Revisar propuesta comercial">
         <h3>Revisar propuesta</h3>
         <TranscriptEvidence :text="text" :evidence="evidence" />
-        <pre class="proposal">{{ JSON.stringify(proposal, null, 2) }}</pre>
+        <ProposalSummary
+          :result="result"
+          :evidence="evidence"
+          :options="options"
+          :currency="moneda"
+        />
         <ul v-if="warnings.length">
           <li v-for="warning in warnings" :key="warning">{{ warning }}</li>
         </ul>
@@ -344,10 +395,11 @@ function apply() {
           Confirma la propuesta para incorporarla. Las observaciones pendientes se revisarán en los
           campos del formulario.
         </p>
-        <Button :disabled="processing" @click="apply">Aplicar propuesta</Button>
+        <Button :disabled="!canApply" @click="apply">Aplicar propuesta</Button>
       </section>
     </template>
     <p v-else role="status">Propuesta aplicada. Continúa en los campos del formulario.</p>
+    <p v-if="preparingAudio" role="status">Validando y preparando audio…</p>
     <p v-if="processing" role="status">
       {{
         audio

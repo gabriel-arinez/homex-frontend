@@ -122,7 +122,12 @@ test('catalog voice uses ASR, corrected text, explicit interpretation and explic
   await drawer.getByRole('button', { name: 'Procesar texto', exact: true }).click()
   await expect(drawer.getByRole('button', { name: 'Aplicar propuesta', exact: true })).toBeVisible()
   await expect(drawer.locator('mark.UNRESOLVED')).toHaveText('450')
+  await expect(drawer.locator('pre')).toHaveCount(0)
+  await expect(drawer.getByLabel('Atributos comerciales reconocidos')).toContainText(
+    'Precio de lista (BOB)',
+  )
   await expect(page.locator('input[name=nombre]')).toHaveValue('')
+  await drawer.getByLabel('Atributos comerciales reconocidos').scrollIntoViewIfNeeded()
   await page.screenshot({ path: '/tmp/homex-voice-review-before-apply.png', fullPage: true })
   await drawer.getByRole('button', { name: 'Aplicar propuesta', exact: true }).click()
   await expect(page.locator('input[name=nombre]')).toHaveValue('Silla plegable')

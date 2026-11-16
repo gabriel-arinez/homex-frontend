@@ -38,6 +38,7 @@ function apply(result: ResultadoCatalogo | ResultadoAsistida) {
   <StagedVoiceCapture
     mode="catalog"
     :categoria="props.categoria"
+    :options="props.opciones"
     :sesion="session"
     @applied="apply"
     @recording-state="(active, paused, elapsed) => emit('recording-state', active, paused, elapsed)"
