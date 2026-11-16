@@ -21,6 +21,7 @@ import {
   CheckCircle2,
   CircleAlert,
   FileText,
+  IdCard,
   Info,
   MapPin,
   Pencil,
@@ -29,7 +30,9 @@ import {
   RotateCcw,
   Save,
   StickyNote,
-  UserRound,
+  User,
+  UserCheck,
+  Users,
 } from '@lucide/vue'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
@@ -348,7 +351,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         <Button variant="secondary" @click="router.push('/clientes')">
           <ArrowLeft :size="17" aria-hidden="true" /> Volver a clientes
         </Button>
-        <Button v-if="client && canEdit && !editing" variant="secondary" @click="editing = true">
+        <Button v-if="client && canEdit && !editing" variant="warning" @click="editing = true">
           <Pencil :size="17" aria-hidden="true" /> Editar
         </Button>
         <Button
@@ -420,7 +423,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           <div class="stat">
             <span class="stat__icon">
               <Building2 v-if="isCompany" :size="18" aria-hidden="true" />
-              <UserRound v-else :size="18" aria-hidden="true" />
+              <UserCheck v-else :size="18" aria-hidden="true" />
             </span>
             <div class="stat__body">
               <span>Tipo de cliente</span>
@@ -461,7 +464,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           <div class="section-heading">
             <div class="section-heading__identity">
               <span class="section-icon section-icon--compact">
-                <UserRound :size="18" aria-hidden="true" />
+                <IdCard :size="18" aria-hidden="true" />
               </span>
               <div>
                 <h2 id="client-data-title">Datos registrados del cliente</h2>
@@ -483,7 +486,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               </div>
               <div class="client-field-card">
                 <span class="client-field-card__icon">
-                  <UserRound :size="17" aria-hidden="true" />
+                  <UserCheck :size="17" aria-hidden="true" />
                 </span>
                 <div class="client-field-card__body">
                   <span class="client-field-card__label">Contacto responsable</span>
@@ -499,7 +502,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <template v-else>
               <div class="client-field-card">
                 <span class="client-field-card__icon">
-                  <UserRound :size="17" aria-hidden="true" />
+                  <User :size="17" aria-hidden="true" />
                 </span>
                 <div class="client-field-card__body">
                   <span class="client-field-card__label">Nombres</span>
@@ -513,7 +516,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               </div>
               <div class="client-field-card">
                 <span class="client-field-card__icon">
-                  <UserRound :size="17" aria-hidden="true" />
+                  <Users :size="17" aria-hidden="true" />
                 </span>
                 <div class="client-field-card__body">
                   <span class="client-field-card__label">Apellidos</span>

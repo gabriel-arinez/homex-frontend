@@ -115,6 +115,7 @@ onBeforeUnmount(() => {
         <RouterLink
           v-if="estado === 'BORRADOR' || estado === 'EN_REVISION'"
           role="menuitem"
+          class="proforma-actions__item--edit"
           :to="{
             path: `/proformas/${id}/editar`,
             query: props.returnTo ? { returnTo: props.returnTo } : {},
@@ -249,5 +250,12 @@ onBeforeUnmount(() => {
 .proforma-actions__menu-btn:focus-visible {
   outline: 2px solid var(--color-primary-accent);
   outline-offset: -2px;
+}
+.proforma-actions__menu a.proforma-actions__item--edit {
+  color: var(--color-warning);
+}
+.proforma-actions__menu a.proforma-actions__item--edit:hover,
+.proforma-actions__menu a.proforma-actions__item--edit:focus-visible {
+  color: var(--color-warning);
 }
 </style>

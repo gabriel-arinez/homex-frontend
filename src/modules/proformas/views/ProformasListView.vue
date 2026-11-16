@@ -1,7 +1,19 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChevronLeft, ChevronRight, Eye, Plus, RotateCcw } from '@lucide/vue'
+import {
+  Ban,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Eye,
+  FileEdit,
+  FileText,
+  Plus,
+  RotateCcw,
+  Send,
+} from '@lucide/vue'
 import type { ProformaListado, ValorCatalogoPublico } from '@/generated/api'
 import { proformasService } from '../services/proformasService'
 import { presentarCreacion } from '../utils/fechaCreacion'
@@ -146,6 +158,14 @@ function tone(code: string): 'neutral' | 'success' | 'warning' | 'danger' | 'inf
   if (code === 'ENVIADA') return 'info'
   if (code === 'NO_CONCRETADA' || code === 'CANCELADA' || code === 'ANULADA') return 'danger'
   return 'neutral'
+}
+function quoteIcon(code: string) {
+  if (code === 'APROBADA') return CheckCircle2
+  if (code === 'EN_REVISION') return Clock
+  if (code === 'ENVIADA') return Send
+  if (code === 'NO_CONCRETADA' || code === 'CANCELADA' || code === 'ANULADA') return Ban
+  if (code === 'BORRADOR') return FileEdit
+  return FileText
 }
 function editable(row: ProformaListado) {
   return ['BORRADOR', 'EN_REVISION'].includes(row.estado_info.codigo)
@@ -431,10 +451,21 @@ onBeforeUnmount(() => {
           <tbody>
             <tr v-for="row in filasConCreacion" :key="row.id">
               <td class="quote-cell">
-                <strong>#{{ row.numero }}</strong>
-                <span :title="row.titulo || 'Sin título'">{{
-                  row.titulo?.trim() || 'Sin título'
-                }}</span>
+                <div class="quote-identity">
+                  <span class="quote-badge" :class="`quote-badge--${tone(row.estado_info.codigo)}`">
+                    <component
+                      :is="quoteIcon(row.estado_info.codigo)"
+                      :size="16"
+                      aria-hidden="true"
+                    />
+                  </span>
+                  <div class="quote-identity__text">
+                    <strong>#{{ row.numero }}</strong>
+                    <span :title="row.titulo || 'Sin título'">{{
+                      row.titulo?.trim() || 'Sin título'
+                    }}</span>
+                  </div>
+                </div>
               </td>
               <td class="client-cell">
                 <div class="client-content">
@@ -721,6 +752,51 @@ onBeforeUnmount(() => {
 }
 .quote-cell,
 .client-cell {
+  min-width: 0;
+}
+.quote-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+}
+.quote-badge {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: none;
+  place-items: center;
+  border-radius: 0.65rem;
+  border: 1px solid var(--color-border);
+}
+.quote-badge--info {
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+  border-color: color-mix(in srgb, var(--color-info) 35%, transparent);
+}
+.quote-badge--warning {
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  border-color: color-mix(in srgb, var(--color-warning) 35%, transparent);
+}
+.quote-badge--success {
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border-color: color-mix(in srgb, var(--color-success) 35%, transparent);
+}
+.quote-badge--danger {
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
+  border-color: color-mix(in srgb, var(--color-danger) 35%, transparent);
+}
+.quote-badge--neutral {
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
+  border-color: var(--color-border);
+}
+.quote-identity__text {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
 }
 .client-content {

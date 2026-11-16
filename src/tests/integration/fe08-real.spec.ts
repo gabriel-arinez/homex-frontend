@@ -129,7 +129,7 @@ test.describe.serial('FE08 backend real', () => {
 
     await page.goto(`/pedidos/${pedidoId}`)
     await page.getByRole('button', { name: 'Otras transiciones de estado' }).click()
-    await page.getByRole('menuitem', { name: 'Pasar a "Listo para entrega"' }).click()
+    await page.getByRole('menuitem', { name: /Listo para entrega/ }).click()
     await expect(page.getByRole('status')).toContainText('Estado actualizado')
     await expect(page.getByRole('button', { name: 'Emitir nota de entrega' })).toBeVisible()
     await page.getByRole('button', { name: 'Emitir nota de entrega' }).click()

@@ -388,8 +388,8 @@ watch(() => route.params.id, load)
               :disabled="processing"
               @click="advanceTo(nextLogicalStep.codigo as EstadoCodigoEnum)"
             >
-              Pasar a "{{ stepLabel(nextLogicalStep) }}"
               <ArrowRight :size="16" aria-hidden="true" />
+              "{{ stepLabel(nextLogicalStep) }}"
             </Button>
             <button
               v-if="alternativeTransitions.length"
@@ -412,7 +412,8 @@ watch(() => route.params.id, load)
                 role="menuitem"
                 @click="advanceTo(alt.codigo as EstadoCodigoEnum)"
               >
-                Pasar a "{{ stepLabel(alt) }}"
+                <ArrowRight :size="14" aria-hidden="true" />
+                "{{ stepLabel(alt) }}"
               </button>
             </div>
           </div>

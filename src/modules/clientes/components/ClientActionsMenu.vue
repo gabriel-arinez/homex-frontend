@@ -133,6 +133,7 @@ onBeforeUnmount(() => {
         <RouterLink
           v-if="canEdit"
           role="menuitem"
+          class="client-actions__item--edit"
           :to="{ path: `/clientes/${id}`, query: { editar: '1' } }"
           @click="close(false)"
         >
@@ -243,6 +244,13 @@ onBeforeUnmount(() => {
 .client-actions__menu a:focus-visible,
 .client-actions__menu-btn:focus-visible {
   outline: 2px solid var(--color-primary-accent);
+}
+.client-actions__menu a.client-actions__item--edit {
+  color: var(--color-warning);
+}
+.client-actions__menu a.client-actions__item--edit:hover,
+.client-actions__menu a.client-actions__item--edit:focus-visible {
+  color: var(--color-warning);
 }
 .client-actions__menu-btn--danger:hover,
 .client-actions__menu-btn--danger:focus-visible {

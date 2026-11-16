@@ -1,7 +1,7 @@
 <script setup lang="ts">
 withDefaults(
   defineProps<{
-    variant?: 'primary' | 'secondary' | 'danger' | 'success' | 'info'
+    variant?: 'primary' | 'secondary' | 'danger' | 'success' | 'info' | 'warning'
     type?: 'button' | 'submit' | 'reset'
     disabled?: boolean
     processing?: boolean
@@ -92,5 +92,13 @@ withDefaults(
 }
 .button--info:hover:not(:disabled) {
   background: color-mix(in srgb, var(--color-info-soft) 80%, var(--color-info));
+}
+.button--warning {
+  color: var(--color-warning);
+  background: var(--color-warning-soft);
+  border-color: var(--color-warning);
+}
+.button--warning:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-warning-soft) 80%, var(--color-warning));
 }
 </style>

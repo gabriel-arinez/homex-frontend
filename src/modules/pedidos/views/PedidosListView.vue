@@ -1,7 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ChevronLeft, ChevronRight, ClipboardList, FileText, RotateCcw } from '@lucide/vue'
+import {
+  Ban,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardCheck,
+  ClipboardList,
+  FileText,
+  Hammer,
+  PackageCheck,
+  RotateCcw,
+  Truck,
+} from '@lucide/vue'
 import type { Pedido, ProformaListado, ValorCatalogoPublico } from '@/generated/api'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import { pedidosService } from '../services/pedidosService'
@@ -45,6 +56,23 @@ const dateError = computed(() => dateRangeError(dateFrom.value, dateTo.value, to
 
 const statusName = (id: number) => states.value.find((x) => x.id === id)?.nombre ?? `Estado ${id}`
 const statusCode = (id: number) => states.value.find((x) => x.id === id)?.codigo ?? ''
+
+function orderStatusIcon(code: string) {
+  if (code === 'CONFIRMADO') return ClipboardCheck
+  if (code === 'EN_PRODUCCION') return Hammer
+  if (code === 'LISTO_ENTREGA') return PackageCheck
+  if (code === 'ENTREGADO') return Truck
+  if (code === 'CANCELADO') return Ban
+  return ClipboardList
+}
+
+function orderStatusTone(code: string): 'info' | 'warning' | 'success' | 'danger' | 'neutral' {
+  if (code === 'CONFIRMADO' || code === 'LISTO_ENTREGA') return 'info'
+  if (code === 'EN_PRODUCCION') return 'warning'
+  if (code === 'ENTREGADO') return 'success'
+  if (code === 'CANCELADO') return 'danger'
+  return 'neutral'
+}
 
 function proformaOf(pedido: Pedido): ProformaListado | undefined {
   return proformasById.value[pedido.proforma]
@@ -292,8 +320,15 @@ onMounted(load)
             <tr v-for="row in paginated" :key="row.id">
               <td class="order-cell">
                 <div class="order-identity">
-                  <span class="order-badge">
-                    <ClipboardList :size="16" aria-hidden="true" />
+                  <span
+                    class="order-badge"
+                    :class="`order-badge--${orderStatusTone(statusCode(row.estado))}`"
+                  >
+                    <component
+                      :is="orderStatusIcon(statusCode(row.estado))"
+                      :size="16"
+                      aria-hidden="true"
+                    />
                   </span>
                   <div class="order-identity__text">
                     <RouterLink :to="`/pedidos/${row.id}`" class="order-code">
@@ -498,10 +533,33 @@ onMounted(load)
   height: 2.25rem;
   flex: none;
   place-items: center;
-  border: 1px solid color-mix(in srgb, var(--color-primary) 16%, transparent);
   border-radius: 0.65rem;
-  color: var(--color-primary-accent);
-  background: var(--color-primary-soft);
+  border: 1px solid var(--color-border);
+}
+.order-badge--info {
+  background: var(--badge-info-bg);
+  color: var(--badge-info-text);
+  border-color: color-mix(in srgb, var(--color-info) 35%, transparent);
+}
+.order-badge--warning {
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  border-color: color-mix(in srgb, var(--color-warning) 35%, transparent);
+}
+.order-badge--success {
+  background: var(--badge-success-bg);
+  color: var(--badge-success-text);
+  border-color: color-mix(in srgb, var(--color-success) 35%, transparent);
+}
+.order-badge--danger {
+  background: var(--badge-danger-bg);
+  color: var(--badge-danger-text);
+  border-color: color-mix(in srgb, var(--color-danger) 35%, transparent);
+}
+.order-badge--neutral {
+  background: var(--badge-neutral-bg);
+  color: var(--badge-neutral-text);
+  border-color: var(--color-border);
 }
 .order-identity__text {
   display: grid;

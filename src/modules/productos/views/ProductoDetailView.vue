@@ -7,6 +7,7 @@ import { ApiError } from '@/shared/api'
 import ImageGallery from '@/shared/media/ImageGallery.vue'
 import ProductoForm from '../components/ProductoForm.vue'
 import { productosService } from '../services/productosService'
+import { Pencil } from '@lucide/vue'
 import Button from '@/shared/ui/Button.vue'
 import ConfirmDialog from '@/shared/ui/ConfirmDialog.vue'
 import Card from '@/shared/ui/Card.vue'
@@ -138,8 +139,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           variant="secondary"
           @click="returnToProforma"
           >Volver a proforma</Button
-        ><Button v-if="product && canEdit && !editing" variant="secondary" @click="editing = true"
-          >Editar datos comerciales</Button
+        ><Button v-if="product && canEdit && !editing" variant="warning" @click="editing = true"
+          ><Pencil :size="16" aria-hidden="true" /> Editar datos comerciales</Button
         ></template
       ></PageHeader
     ><LoadingSkeleton v-if="loading" :lines="8" /><ErrorState
