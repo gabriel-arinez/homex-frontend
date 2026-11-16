@@ -115,12 +115,22 @@ onBeforeUnmount(() => {
         :aria-label="`Acciones del pedido #${id}`"
         :style="menuPosition"
       >
-        <RouterLink role="menuitem" :to="`/pedidos/${id}`" @click="close(false)">
+        <RouterLink
+          role="menuitem"
+          class="order-actions__item--info"
+          :to="`/pedidos/${id}`"
+          @click="close(false)"
+        >
           <Eye :size="17" aria-hidden="true" />
           Ver detalle
         </RouterLink>
 
-        <RouterLink role="menuitem" :to="`/proformas/${proformaId}/editar`" @click="close(false)">
+        <RouterLink
+          role="menuitem"
+          class="order-actions__item--info"
+          :to="`/proformas/${proformaId}/editar`"
+          @click="close(false)"
+        >
           <FileText :size="17" aria-hidden="true" />
           Ver proforma #{{ proformaId }}
         </RouterLink>
@@ -128,6 +138,7 @@ onBeforeUnmount(() => {
         <RouterLink
           v-if="estadoCodigo === 'CONFIRMADO'"
           role="menuitem"
+          class="order-actions__item--success"
           :to="{ path: `/pedidos/${id}`, query: { accion: 'recibo' } }"
           @click="close(false)"
         >
@@ -138,6 +149,7 @@ onBeforeUnmount(() => {
         <RouterLink
           v-if="estadoCodigo === 'LISTO_ENTREGA'"
           role="menuitem"
+          class="order-actions__item--info"
           :to="{ path: `/pedidos/${id}`, query: { accion: 'nota' } }"
           @click="close(false)"
         >
@@ -148,7 +160,7 @@ onBeforeUnmount(() => {
         <RouterLink
           v-if="!['CANCELADO', 'ENTREGADO'].includes(estadoCodigo)"
           role="menuitem"
-          class="order-actions__menu-danger"
+          class="order-actions__item--danger"
           :to="{ path: `/pedidos/${id}`, query: { accion: 'cancelar' } }"
           @click="close(false)"
         >
@@ -224,8 +236,30 @@ onBeforeUnmount(() => {
 .order-actions__menu a:focus-visible {
   outline: 2px solid var(--color-primary-accent);
 }
-.order-actions__menu a.order-actions__menu-danger:hover,
-.order-actions__menu a.order-actions__menu-danger:focus-visible {
+.order-actions__menu a.order-actions__item--info {
+  color: var(--color-info);
+}
+.order-actions__menu a.order-actions__item--info:hover,
+.order-actions__menu a.order-actions__item--info:focus-visible {
+  background: var(--color-info-soft);
+  color: var(--color-info);
+}
+
+.order-actions__menu a.order-actions__item--success {
+  color: var(--color-success);
+}
+.order-actions__menu a.order-actions__item--success:hover,
+.order-actions__menu a.order-actions__item--success:focus-visible {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.order-actions__menu a.order-actions__item--danger {
+  color: var(--color-danger);
+}
+.order-actions__menu a.order-actions__item--danger:hover,
+.order-actions__menu a.order-actions__item--danger:focus-visible {
+  background: var(--color-danger-soft);
   color: var(--color-danger);
 }
 </style>

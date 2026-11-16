@@ -537,29 +537,32 @@ onMounted(load)
   border: 1px solid var(--color-border);
 }
 .order-badge--info {
-  background: var(--badge-info-bg);
-  color: var(--badge-info-text);
+  background: var(--color-info-soft);
+  color: var(--color-info);
   border-color: color-mix(in srgb, var(--color-info) 35%, transparent);
 }
 .order-badge--warning {
-  background: var(--badge-warning-bg);
-  color: var(--badge-warning-text);
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
   border-color: color-mix(in srgb, var(--color-warning) 35%, transparent);
 }
 .order-badge--success {
-  background: var(--badge-success-bg);
-  color: var(--badge-success-text);
+  background: var(--color-success-soft);
+  color: var(--color-success);
   border-color: color-mix(in srgb, var(--color-success) 35%, transparent);
 }
 .order-badge--danger {
-  background: var(--badge-danger-bg);
-  color: var(--badge-danger-text);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
   border-color: color-mix(in srgb, var(--color-danger) 35%, transparent);
 }
 .order-badge--neutral {
-  background: var(--badge-neutral-bg);
-  color: var(--badge-neutral-text);
+  background: var(--color-surface-hover);
+  color: var(--color-text-secondary);
   border-color: var(--color-border);
+}
+.order-badge svg {
+  color: currentColor;
 }
 .order-identity__text {
   display: grid;

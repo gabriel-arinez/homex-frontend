@@ -125,7 +125,12 @@ onBeforeUnmount(() => {
         :aria-label="`Acciones de ${nombre}`"
         :style="menuPosition"
       >
-        <RouterLink role="menuitem" :to="`/clientes/${id}`" @click="close(false)">
+        <RouterLink
+          role="menuitem"
+          class="client-actions__item--info"
+          :to="`/clientes/${id}`"
+          @click="close(false)"
+        >
           <Eye :size="17" aria-hidden="true" />
           Ver detalle
         </RouterLink>
@@ -133,7 +138,7 @@ onBeforeUnmount(() => {
         <RouterLink
           v-if="canEdit"
           role="menuitem"
-          class="client-actions__item--edit"
+          class="client-actions__item--warning"
           :to="{ path: `/clientes/${id}`, query: { editar: '1' } }"
           @click="close(false)"
         >
@@ -144,6 +149,7 @@ onBeforeUnmount(() => {
         <RouterLink
           v-if="activo"
           role="menuitem"
+          class="client-actions__item--success"
           :to="{ path: '/proformas/nueva', query: { cliente: String(id) } }"
           @click="close(false)"
         >
@@ -153,6 +159,7 @@ onBeforeUnmount(() => {
 
         <RouterLink
           role="menuitem"
+          class="client-actions__item--info"
           :to="{ path: '/proformas', query: { cliente: String(id) } }"
           @click="close(false)"
         >
@@ -165,7 +172,7 @@ onBeforeUnmount(() => {
           type="button"
           role="menuitem"
           class="client-actions__menu-btn"
-          :class="{ 'client-actions__menu-btn--danger': activo }"
+          :class="activo ? 'client-actions__item--danger' : 'client-actions__item--success'"
           @click="handleToggleStatus"
         >
           <RotateCcw v-if="!activo" :size="17" aria-hidden="true" />
@@ -245,15 +252,51 @@ onBeforeUnmount(() => {
 .client-actions__menu-btn:focus-visible {
   outline: 2px solid var(--color-primary-accent);
 }
-.client-actions__menu a.client-actions__item--edit {
+.client-actions__menu a.client-actions__item--warning,
+.client-actions__menu .client-actions__item--warning {
   color: var(--color-warning);
 }
-.client-actions__menu a.client-actions__item--edit:hover,
-.client-actions__menu a.client-actions__item--edit:focus-visible {
+.client-actions__menu a.client-actions__item--warning:hover,
+.client-actions__menu a.client-actions__item--warning:focus-visible,
+.client-actions__menu .client-actions__item--warning:hover,
+.client-actions__menu .client-actions__item--warning:focus-visible {
+  background: var(--color-warning-soft);
   color: var(--color-warning);
 }
-.client-actions__menu-btn--danger:hover,
-.client-actions__menu-btn--danger:focus-visible {
+
+.client-actions__menu a.client-actions__item--info,
+.client-actions__menu .client-actions__item--info {
+  color: var(--color-info);
+}
+.client-actions__menu a.client-actions__item--info:hover,
+.client-actions__menu a.client-actions__item--info:focus-visible,
+.client-actions__menu .client-actions__item--info:hover,
+.client-actions__menu .client-actions__item--info:focus-visible {
+  background: var(--color-info-soft);
+  color: var(--color-info);
+}
+
+.client-actions__menu a.client-actions__item--success,
+.client-actions__menu .client-actions__item--success {
+  color: var(--color-success);
+}
+.client-actions__menu a.client-actions__item--success:hover,
+.client-actions__menu a.client-actions__item--success:focus-visible,
+.client-actions__menu .client-actions__item--success:hover,
+.client-actions__menu .client-actions__item--success:focus-visible {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.client-actions__menu a.client-actions__item--danger,
+.client-actions__menu .client-actions__item--danger {
+  color: var(--color-danger);
+}
+.client-actions__menu a.client-actions__item--danger:hover,
+.client-actions__menu a.client-actions__item--danger:focus-visible,
+.client-actions__menu .client-actions__item--danger:hover,
+.client-actions__menu .client-actions__item--danger:focus-visible {
+  background: var(--color-danger-soft);
   color: var(--color-danger);
 }
 </style>
