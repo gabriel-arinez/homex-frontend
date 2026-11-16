@@ -305,4 +305,160 @@ describe('AP4 clientes consolidados', () => {
     expect(router.currentRoute.value.path).toBe('/clientes/42')
     expect(wrapper.text()).toContain('Nombre 42')
   })
+
+  it('muestra el contacto de la empresa, dirección y acceso a proformas en la bandeja', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/clientes/', () =>
+        HttpResponse.json({
+          count: 1,
+          next: null,
+          previous: null,
+          results: [
+            {
+              id: 55,
+              tipo_cliente: 2,
+              tipo_cliente_info: typeInfo,
+              nombres: 'Carlos',
+              apellidos: 'Mendoza',
+              empresa: 'Carpintería Sur',
+              celular: '71234567',
+              direccion: 'Av. Blanco Galindo Km 5',
+              activo: true,
+              revision: 'a'.repeat(64),
+              created_by: 7,
+              updated_by: 7,
+            },
+          ],
+        }),
+      ),
+    )
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/clientes', component: ClientesListView },
+        { path: '/clientes/:id', component: { template: '<div />' } },
+        { path: '/proformas', component: { template: '<div />' } },
+      ],
+    })
+    await router.push('/clientes')
+    const wrapper = mount(ClientesListView, { global: { plugins: [createPinia(), router] } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Carpintería Sur')
+    expect(wrapper.text()).toContain('Contacto: Carlos Mendoza')
+    expect(wrapper.text()).toContain('71234567')
+    expect(wrapper.text()).toContain('Av. Blanco Galindo Km 5')
+    const actionsTrigger = wrapper.find('[aria-label="Acciones de Carpintería Sur"]')
+    expect(actionsTrigger.exists()).toBe(true)
+    await actionsTrigger.trigger('click')
+    await flushPromises()
+    const proformasLink = document.body.querySelector('a[href="/proformas?cliente=55"]')
+    expect(proformasLink).not.toBeNull()
+    const nuevaProformaLink = document.body.querySelector('a[href="/proformas/nueva?cliente=55"]')
+    expect(nuevaProformaLink).not.toBeNull()
+  })
+
+  it('muestra las proformas recientes asociadas en la ficha del cliente', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/clientes/55/', () =>
+        HttpResponse.json({
+          id: 55,
+          tipo_cliente: 2,
+          tipo_cliente_info: typeInfo,
+          nombres: 'Carlos',
+          apellidos: 'Mendoza',
+          empresa: 'Carpintería Sur',
+          celular: '71234567',
+          direccion: 'Av. Blanco Galindo Km 5',
+          observaciones: 'Llamar antes de entregar',
+          activo: true,
+          revision: 'a'.repeat(64),
+          created_by: 7,
+          updated_by: 7,
+        }),
+      ),
+      http.get('http://localhost:8000/api/v1/proformas/', () =>
+        HttpResponse.json({
+          count: 1,
+          next: null,
+          previous: null,
+          results: [
+            {
+              id: 901,
+              numero: 108,
+              titulo: 'Escritorios gerenciales',
+              fecha: '2026-11-10',
+              total: '4500.00',
+              estado_info: { id: 1, codigo: 'EN_REVISION', nombre: 'En revisión' },
+              moneda_info: { id: 1, codigo: 'BOB', nombre: 'Bolivianos' },
+            },
+          ],
+        }),
+      ),
+    )
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/clientes/:id', component: ClienteDetailView },
+        { path: '/proformas', component: { template: '<div />' } },
+        { path: '/proformas/:id/editar', component: { template: '<div />' } },
+      ],
+    })
+    await router.push('/clientes/55')
+    const wrapper = mount(ClienteDetailView, { global: { plugins: [createPinia(), router] } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Ver proformas (1)')
+    expect(wrapper.text()).toContain('#108')
+    expect(wrapper.text()).toContain('Escritorios gerenciales')
+    expect(wrapper.text()).toContain('En revisión')
+    const nuevaProformaBtn = wrapper.find('button.button--primary')
+    expect(nuevaProformaBtn.text()).toContain('Nueva proforma')
+  })
+
+  it('autoselecciona el cliente en ProformaEditorView cuando viene por query param ?cliente=id', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/clientes/55/', () =>
+        HttpResponse.json({
+          id: 55,
+          tipo_cliente: 2,
+          tipo_cliente_info: typeInfo,
+          nombres: 'Carlos',
+          apellidos: 'Mendoza',
+          empresa: 'Carpintería Sur',
+          celular: '71234567',
+          direccion: 'Av. Blanco Galindo Km 5',
+          observaciones: 'Llamar antes de entregar',
+          activo: true,
+          revision: 'a'.repeat(64),
+          created_by: 7,
+          updated_by: 7,
+        }),
+      ),
+      http.get('http://localhost:8000/api/v1/catalogo/familias/', () =>
+        HttpResponse.json({ count: 0, next: null, previous: null, results: [] }),
+      ),
+      http.get('http://localhost:8000/api/v1/proformas/conceptos/:concepto/', ({ params }) => {
+        const concepto = String(params.concepto)
+        return HttpResponse.json([
+          { id: 1, concepto_codigo: concepto, codigo: 'COD1', nombre: 'Opcion 1' },
+        ])
+      }),
+    )
+    const { default: ProformaEditorView } =
+      await import('@/modules/proformas/views/ProformaEditorView.vue')
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/proformas/nueva', component: ProformaEditorView }],
+    })
+    await router.push('/proformas/nueva?cliente=55')
+    const wrapper = mount(ProformaEditorView, {
+      global: { plugins: [createPinia(), router] },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Carpintería Sur')
+    wrapper.unmount()
+  })
 })

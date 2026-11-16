@@ -3,6 +3,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 import PedidoDetailView from '@/modules/pedidos/views/PedidoDetailView.vue'
+import PedidosListView from '@/modules/pedidos/views/PedidosListView.vue'
 import ReciboDetailView from '@/modules/recibos/views/ReciboDetailView.vue'
 import { pedidosService } from '@/modules/pedidos/services/pedidosService'
 import { recibosService } from '@/modules/recibos/services/recibosService'
@@ -216,5 +217,71 @@ describe('FE05 operaciones', () => {
     expect(Object.keys(movimientosStockService)).not.toContain('create')
     expect(Object.keys(movimientosStockService)).not.toContain('update')
     expect(Object.keys(movimientosStockService)).not.toContain('remove')
+  })
+
+  it('muestra bandeja de pedidos con menú de acciones y filtros', async () => {
+    options()
+    server.use(
+      http.get('http://localhost:8000/api/v1/pedidos/', () => HttpResponse.json([pedido(1)])),
+      http.get('http://localhost:8000/api/v1/proformas/', () =>
+        HttpResponse.json({
+          count: 1,
+          next: null,
+          previous: null,
+          results: [
+            {
+              id: 4,
+              numero: 4,
+              titulo: 'Oficina directorio',
+              total: '3500.00',
+              estado_info: { id: 1, codigo: 'APROBADA', nombre: 'Aprobada' },
+              moneda_info: { id: 1, codigo: 'BOB', nombre: 'Bolivianos' },
+              cliente_resumen: { id: 10, nombre: 'Constructora Norte' },
+            },
+          ],
+        }),
+      ),
+    )
+    const w = await mountAt(PedidosListView, '/pedidos')
+    await flushPromises()
+    expect(w.text()).toContain('Pedido #9')
+    expect(w.text()).toContain('Constructora Norte')
+    expect(w.text()).toContain('Oficina directorio')
+    const trigger = w.find('[aria-label="Acciones del pedido #9"]')
+    expect(trigger.exists()).toBe(true)
+  })
+
+  it('lista recibos emitidos vinculados en la ficha del pedido', async () => {
+    options()
+    server.use(
+      http.get('http://localhost:8000/api/v1/pedidos/9/', () => HttpResponse.json(pedido(1))),
+      http.get('http://localhost:8000/api/v1/recibos/', () => HttpResponse.json([recibo()])),
+      http.get('http://localhost:8000/api/v1/notas-entrega/', () => HttpResponse.json([])),
+    )
+    const w = await mountAt(PedidoDetailView, '/pedidos/9')
+    await flushPromises()
+    expect(w.text()).toContain('Recibo #18')
+    expect(w.text()).toContain('Anticipo')
+  })
+
+  it('muestra stepper interactivo sin tecnicismos y avanza al siguiente estado en un clic', async () => {
+    options()
+    let postedBody: unknown = null
+    server.use(
+      http.get('http://localhost:8000/api/v1/pedidos/9/', () => HttpResponse.json(pedido(1))),
+      http.post('http://localhost:8000/api/v1/pedidos/9/cambiar-estado/', async ({ request }) => {
+        postedBody = (await request.json()) as Record<string, unknown>
+        return HttpResponse.json(pedido(2))
+      }),
+    )
+    const w = await mountAt(PedidoDetailView, '/pedidos/9')
+    await flushPromises()
+    expect(w.text().toLowerCase()).not.toContain('backend')
+    const mainAdvanceBtn = w.find('button.split-action__main')
+    expect(mainAdvanceBtn.exists()).toBe(true)
+    expect(mainAdvanceBtn.text()).toContain('En producción')
+    await mainAdvanceBtn.trigger('click')
+    await flushPromises()
+    expect(postedBody).toEqual({ estado_codigo: 'EN_PRODUCCION' })
   })
 })

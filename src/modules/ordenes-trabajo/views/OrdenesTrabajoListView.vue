@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router'
 import type { OrdenTrabajo } from '@/generated/api'
 import { ordenesTrabajoService } from '../services/ordenesTrabajoService'
 import DataTable from '@/shared/ui/DataTable.vue'
+import DatePresentation from '@/shared/ui/DatePresentation.vue'
 import StatusBadge from '@/shared/ui/StatusBadge.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
@@ -66,6 +67,9 @@ const columns = [
       <template #cell-numero="{ row }">OT #{{ row.numero }}</template>
       <template #cell-pedido="{ row }">
         <RouterLink :to="`/pedidos/${row.pedido}`">#{{ row.pedido }}</RouterLink>
+      </template>
+      <template #cell-fecha="{ row }">
+        <DatePresentation :timestamp="String(row.fecha)" :date="String(row.fecha)" />
       </template>
       <template #cell-estado="{ row }">
         <StatusBadge :status="String(row.estadoCodigo)" :label="String(row.estadoLabel)" />

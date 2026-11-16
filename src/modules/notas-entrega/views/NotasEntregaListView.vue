@@ -8,6 +8,7 @@ import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
 import DataTable from '@/shared/ui/DataTable.vue'
+import DatePresentation from '@/shared/ui/DatePresentation.vue'
 const emit = defineEmits<{ openMenu: [] }>(),
   rows = ref<NotaEntrega[]>([]),
   loading = ref(true),
@@ -50,6 +51,8 @@ const columns = [
       ><template #cell-numero="{ row }">#{{ row.numero }}</template
       ><template #cell-pedido="{ row }"
         ><RouterLink :to="`/pedidos/${row.pedido}`">#{{ row.pedido }}</RouterLink></template
+      ><template #cell-fecha="{ row }"
+        ><DatePresentation :timestamp="String(row.fecha)" :date="String(row.fecha)" /></template
       ><template #cell-acciones="{ row }"
         ><RouterLink :to="`/notas-entrega/${row.id}`">Ver detalle</RouterLink></template
       ></DataTable

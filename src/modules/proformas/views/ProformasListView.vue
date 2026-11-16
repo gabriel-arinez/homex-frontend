@@ -1,7 +1,19 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChevronLeft, ChevronRight, Clock3, Eye, Plus, RotateCcw } from '@lucide/vue'
+import {
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  FileCheck,
+  FileClock,
+  FileEdit,
+  FileText,
+  FileX,
+  Plus,
+  RotateCcw,
+  Send,
+} from '@lucide/vue'
 import type { ProformaListado, ValorCatalogoPublico } from '@/generated/api'
 import { proformasService } from '../services/proformasService'
 import { presentarCreacion } from '../utils/fechaCreacion'
@@ -13,6 +25,7 @@ import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
 import ClientAvatar from '@/shared/ui/ClientAvatar.vue'
+import DatePresentation from '@/shared/ui/DatePresentation.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
@@ -145,6 +158,14 @@ function tone(code: string): 'neutral' | 'success' | 'warning' | 'danger' | 'inf
   if (code === 'ENVIADA') return 'info'
   if (code === 'NO_CONCRETADA' || code === 'CANCELADA' || code === 'ANULADA') return 'danger'
   return 'neutral'
+}
+function quoteIcon(code: string) {
+  if (code === 'APROBADA') return FileCheck
+  if (code === 'EN_REVISION') return FileClock
+  if (code === 'ENVIADA') return Send
+  if (code === 'NO_CONCRETADA' || code === 'CANCELADA' || code === 'ANULADA') return FileX
+  if (code === 'BORRADOR') return FileEdit
+  return FileText
 }
 function editable(row: ProformaListado) {
   return ['BORRADOR', 'EN_REVISION'].includes(row.estado_info.codigo)
@@ -430,10 +451,21 @@ onBeforeUnmount(() => {
           <tbody>
             <tr v-for="row in filasConCreacion" :key="row.id">
               <td class="quote-cell">
-                <strong>#{{ row.numero }}</strong>
-                <span :title="row.titulo || 'Sin título'">{{
-                  row.titulo?.trim() || 'Sin título'
-                }}</span>
+                <div class="quote-identity">
+                  <span class="quote-badge" :class="`quote-badge--${tone(row.estado_info.codigo)}`">
+                    <component
+                      :is="quoteIcon(row.estado_info.codigo)"
+                      :size="16"
+                      aria-hidden="true"
+                    />
+                  </span>
+                  <div class="quote-identity__text">
+                    <strong>#{{ row.numero }}</strong>
+                    <span :title="row.titulo || 'Sin título'">{{
+                      row.titulo?.trim() || 'Sin título'
+                    }}</span>
+                  </div>
+                </div>
               </td>
               <td class="client-cell">
                 <div class="client-content">
@@ -445,30 +477,7 @@ onBeforeUnmount(() => {
                 </div>
               </td>
               <td class="date-cell" data-label="Creación">
-                <div
-                  class="creation-cell"
-                  :title="
-                    row.creacion.historica ? 'Registro histórico sin hora de creación' : undefined
-                  "
-                >
-                  <div
-                    class="creation-primary"
-                    :class="{ 'creation-primary--recent': row.creacion.reciente }"
-                  >
-                    <Clock3 :size="15" aria-hidden="true" />
-                    <strong>{{ row.creacion.principal }}</strong>
-                  </div>
-                  <time
-                    v-if="row.creacion.hora"
-                    class="creation-hour"
-                    :datetime="row.creado_en ?? undefined"
-                    >{{ row.creacion.hora }}</time
-                  >
-                  <span v-else class="creation-hour">Hora no registrada</span>
-                  <span v-if="row.creacion.mostrarFechaSeparada" class="creation-date">{{
-                    row.creacion.fecha
-                  }}</span>
-                </div>
+                <DatePresentation :presentation="row.creacion" :timestamp="row.creado_en" />
               </td>
               <td class="status-cell" data-label="Estado">
                 <Badge :tone="tone(row.estado_info.codigo)">{{ row.estado_info.nombre }}</Badge>
@@ -745,6 +754,54 @@ onBeforeUnmount(() => {
 .client-cell {
   min-width: 0;
 }
+.quote-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+}
+.quote-badge {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: none;
+  place-items: center;
+  border-radius: 0.65rem;
+  border: 1px solid var(--color-border);
+}
+.quote-badge--info {
+  background: var(--color-info-soft);
+  color: var(--color-info);
+  border-color: color-mix(in srgb, var(--color-info) 35%, transparent);
+}
+.quote-badge--warning {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+  border-color: color-mix(in srgb, var(--color-warning) 35%, transparent);
+}
+.quote-badge--success {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+  border-color: color-mix(in srgb, var(--color-success) 35%, transparent);
+}
+.quote-badge--danger {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 35%, transparent);
+}
+.quote-badge--neutral {
+  background: var(--color-surface-hover);
+  color: var(--color-text-secondary);
+  border-color: var(--color-border);
+}
+.quote-badge svg {
+  color: currentColor;
+}
+.quote-identity__text {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
 .client-content {
   display: flex;
   align-items: center;
@@ -765,7 +822,7 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.quote-cell span {
+.quote-identity__text span {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -773,8 +830,7 @@ onBeforeUnmount(() => {
   line-height: 1.35;
   word-break: break-word;
   color: var(--color-text-secondary);
-  font-size: 0.75rem;
-  margin-top: 0.25rem;
+  font-size: 0.78rem;
 }
 .client-cell span {
   display: block;
@@ -962,7 +1018,7 @@ onBeforeUnmount(() => {
   .quote-cell strong {
     font-size: 1rem;
   }
-  .quote-cell span {
+  .quote-identity__text span {
     font-size: 0.81rem;
   }
   .client-cell {

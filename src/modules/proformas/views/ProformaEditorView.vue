@@ -1785,6 +1785,12 @@ onMounted(async () => {
   await Promise.all([loadReferences(), load()])
   if (!persisted.value) savedContent.value = currentContent()
   restoreContextualDraft()
+  const queryCliente = Number(route.query.cliente)
+  if (!persisted.value && queryCliente && !header.cliente) {
+    header.cliente = String(queryCliente)
+    clienteMode.value = 'existente'
+    void ensureFullClient(queryCliente)
+  }
   editorReady.value = true
 })
 onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))

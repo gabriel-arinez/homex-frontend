@@ -115,6 +115,7 @@ onBeforeUnmount(() => {
         <RouterLink
           v-if="estado === 'BORRADOR' || estado === 'EN_REVISION'"
           role="menuitem"
+          class="proforma-actions__item--warning"
           :to="{
             path: `/proformas/${id}/editar`,
             query: props.returnTo ? { returnTo: props.returnTo } : {},
@@ -124,13 +125,19 @@ onBeforeUnmount(() => {
           <Pencil :size="17" aria-hidden="true" />
           Continuar edición
         </RouterLink>
-        <button type="button" role="menuitem" class="proforma-actions__menu-btn" @click="viewPdf">
+        <button
+          type="button"
+          role="menuitem"
+          class="proforma-actions__menu-btn proforma-actions__item--info"
+          @click="viewPdf"
+        >
           <FileText :size="17" aria-hidden="true" />
           Ver Proforma
         </button>
         <RouterLink
           v-if="estado === 'EN_REVISION'"
           role="menuitem"
+          class="proforma-actions__item--success"
           :to="{
             path: `/proformas/${id}`,
             query: { accion: 'approve', ...(returnTo ? { returnTo } : {}) },
@@ -143,6 +150,7 @@ onBeforeUnmount(() => {
         <RouterLink
           v-if="estado === 'EN_REVISION'"
           role="menuitem"
+          class="proforma-actions__item--danger"
           :to="{
             path: `/proformas/${id}`,
             query: { accion: 'not-completed', ...(returnTo ? { returnTo } : {}) },
@@ -155,6 +163,7 @@ onBeforeUnmount(() => {
         <RouterLink
           v-if="estado === 'BORRADOR' || estado === 'EN_REVISION'"
           role="menuitem"
+          class="proforma-actions__item--danger"
           :to="{
             path: `/proformas/${id}`,
             query: { accion: 'cancel', ...(returnTo ? { returnTo } : {}) },
@@ -167,6 +176,7 @@ onBeforeUnmount(() => {
         <RouterLink
           v-if="estado === 'NO_CONCRETADA'"
           role="menuitem"
+          class="proforma-actions__item--warning"
           :to="{
             path: `/proformas/${id}`,
             query: { accion: 'reopen', ...(returnTo ? { returnTo } : {}) },
@@ -249,5 +259,52 @@ onBeforeUnmount(() => {
 .proforma-actions__menu-btn:focus-visible {
   outline: 2px solid var(--color-primary-accent);
   outline-offset: -2px;
+}
+.proforma-actions__menu a.proforma-actions__item--warning,
+.proforma-actions__menu .proforma-actions__item--warning {
+  color: var(--color-warning);
+}
+.proforma-actions__menu a.proforma-actions__item--warning:hover,
+.proforma-actions__menu a.proforma-actions__item--warning:focus-visible,
+.proforma-actions__menu .proforma-actions__item--warning:hover,
+.proforma-actions__menu .proforma-actions__item--warning:focus-visible {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.proforma-actions__menu a.proforma-actions__item--info,
+.proforma-actions__menu .proforma-actions__item--info {
+  color: var(--color-info);
+}
+.proforma-actions__menu a.proforma-actions__item--info:hover,
+.proforma-actions__menu a.proforma-actions__item--info:focus-visible,
+.proforma-actions__menu .proforma-actions__item--info:hover,
+.proforma-actions__menu .proforma-actions__item--info:focus-visible {
+  background: var(--color-info-soft);
+  color: var(--color-info);
+}
+
+.proforma-actions__menu a.proforma-actions__item--success,
+.proforma-actions__menu .proforma-actions__item--success {
+  color: var(--color-success);
+}
+.proforma-actions__menu a.proforma-actions__item--success:hover,
+.proforma-actions__menu a.proforma-actions__item--success:focus-visible,
+.proforma-actions__menu .proforma-actions__item--success:hover,
+.proforma-actions__menu .proforma-actions__item--success:focus-visible {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.proforma-actions__menu a.proforma-actions__item--danger,
+.proforma-actions__menu .proforma-actions__item--danger {
+  color: var(--color-danger);
+}
+.proforma-actions__menu a.proforma-actions__item--danger:hover,
+.proforma-actions__menu a.proforma-actions__item--danger:focus-visible,
+.proforma-actions__menu .proforma-actions__item--danger:hover,
+.proforma-actions__menu .proforma-actions__item--danger:focus-visible {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
 }
 </style>
