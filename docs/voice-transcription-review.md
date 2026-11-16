@@ -24,3 +24,11 @@ Catalog products and custom furniture now share the same staged workflow in thei
 ## Verification
 
 The feature log is `odd/tasks/voice-hitl-review.md`. Unit tests cover staged requests, explicit confirmation, abstention, stale responses, input bounds, literal span matching and field review. Long decoded WAV validation is distinct from real CPU Whisper inference: report the latter separately when no real model/audio fixture is available.
+
+## Final verification evidence
+
+The final candidate passed 338 unit tests and 110 browser tests; one existing attachment-freezing E2E remains explicitly skipped. Lint, typecheck, production build and generated OpenAPI contract checks passed. Browser tests use controlled API fixtures; backend/API and installed NLP artifact tests run separately against disposable PostgreSQL.
+
+A real cached Whisper-small model also processed 240.0 seconds of locally synthesized Spanish speech using CPU/int8 and four threads, without network access. ASR took 42.32 seconds and produced 2,807 characters over 29 timestamped segments, with the final segment ending at 239.28 seconds. The ASR-only backend stage made no NLP or commercial writes; a subsequent explicit text request ran NLP without repeating ASR and preserved the complete transcript/origin link.
+
+This demonstrates long-audio pipeline continuity, not perfect recognition or human-microphone accuracy: the synthetic closing word “Cierre” was recognized as “Sierra”, among other ASR errors. Those errors remain editable before interpretation. Remote CI was not triggered; its applicable checks were run locally.
