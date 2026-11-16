@@ -798,8 +798,8 @@ onBeforeUnmount(() => {
   color: currentColor;
 }
 .quote-identity__text {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  gap: 0.15rem;
   min-width: 0;
 }
 .client-content {
@@ -822,7 +822,7 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.quote-cell span {
+.quote-identity__text span {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -830,8 +830,7 @@ onBeforeUnmount(() => {
   line-height: 1.35;
   word-break: break-word;
   color: var(--color-text-secondary);
-  font-size: 0.75rem;
-  margin-top: 0.25rem;
+  font-size: 0.78rem;
 }
 .client-cell span {
   display: block;
@@ -1019,7 +1018,7 @@ onBeforeUnmount(() => {
   .quote-cell strong {
     font-size: 1rem;
   }
-  .quote-cell span {
+  .quote-identity__text span {
     font-size: 0.81rem;
   }
   .client-cell {
