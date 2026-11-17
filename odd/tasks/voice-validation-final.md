@@ -253,9 +253,9 @@ Dar por completada la intervención únicamente cuando todos los criterios de ac
 ## Tasks
 
 T1 | S1,S4,S6,S8 | delegated: independent NLP linguistic/fallback unit | verified | bf67a50; source and installed suites 1209 passed; independent backend/NLP verifier passed
-T2 | S2,S3,S7,S8 | inline: coordinated frontend/backend voice-only thresholds | verified; frontend commit pending | backend 2ccab9a; backend 752 passed, frontend 412 passed, browser 108 passed + 7 correction rechecks passed
+T2 | S2,S3,S7,S8 | inline: coordinated frontend/backend voice-only thresholds | verified | frontend 169c138; backend 2ccab9a; backend 752 passed, frontend 412 passed, browser 108 passed + 7 correction rechecks passed
 T3 | S5,S7,S8 | delegated: independent thickness provenance unit | verified | backend f311c8d, frontend 23d3343; independent verification passed
-T4 | S8,S9 | inline packaging/integration + independent high-risk verification | pending
+T4 | S8,S9 | inline packaging/integration + independent high-risk verification | verified | NLP bf67a50, backend f311c8d/2ccab9a, frontend 23d3343/980720c/169c138; final evidence JSON
 
 ## Log
 
@@ -490,3 +490,7 @@ L4. NLP unit committed as bf67a50. Removed linguistic/name blacklist gates and w
 
 L5. Thickness units committed as backend f311c8d and frontend 23d3343; catalog note preservation as frontend 980720c; backend admission and package integration as 2ccab9a. Corrective commits preserve previous history and unpublished historical wheels. Backend admission unit exceeds the advisory 400-line heuristic because its decoder-before-job boundary, endpoint contract, installed package identity and regression fixtures must agree; no whitespace/tests were removed to shrink it. PR slicing remains deferred under the explicit no-PR/existing-branches constraint.
 L6. Final independent verification: backend 752 passed; NLP source and installed suites 1209 passed each; frontend 412 passed. Frontend static checks, typecheck, build and generated OpenAPI contract passed. Browser full run: 108 passed and 7 threshold-invalidated fixture failures; all 7 passed the single scoped correction recheck after real 15-second WAV/20-word edits and specific short-mobile-duration assertions. No production correction was needed. Parent spot check reran 23 voice tests and backend Ruff successfully. API web-runtime environment installed offline in the backend feature worktree's ignored .venv; metadata and all 32 installed NLP files match 0.1.29 wheel exactly. No remote CI, physical microphone, package publication, push, PR or main merge is claimed.
+
+L7. Frontend admission unit committed as 169c138, including the exact authorized request/specification log (the principal reason its raw line count exceeds the advisory slice heuristic). All four tasks are verified. Final evidence: docs/evidence/voice-validation-final.json; source commits listed above. The remaining closure commit in each repository changes documentation/evidence only; clean-worktree and artifact readback precede delivery. No pending product blocker, remote operation or new linguistic restriction remains. Scratch services/copies will be stopped/removed after evidence capture; the backend branch's ignored .venv retains the verified package.
+
+L8. Additional closure checks: configured NLP Makefile Ruff scope (src/tests/tools/training), schema export and offline lock passed. An extra whole-tree Ruff scan outside that configured scope reproduced the baseline's 338 errors and 30 unformatted frozen-audit files; these existing artifacts remain untouched. This is documented explicitly rather than reported as a passing whole-tree check. Python has no configured separate typechecker; frontend vue-tsc passed.
