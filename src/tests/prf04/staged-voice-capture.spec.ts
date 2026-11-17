@@ -1,3 +1,4 @@
+import { defineComponent } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, expect, it, vi } from 'vitest'
 import CapturaCatalogo from '@/modules/productos/components/CapturaCatalogo.vue'
@@ -215,3 +216,34 @@ it('rejects oversized paste or typing without deleting existing content and allo
   expect(w.text()).toContain('2999 / 3000')
   w.unmount()
 })
+
+it.each(['catalog', 'furniture'] as const)(
+  '%s explicitly configures the commercial recorder minimum',
+  async (mode) => {
+    const recorder = defineComponent({
+      props: ['minDurationSeconds'],
+      setup(_, { expose }) {
+        expose({ startRecording: async () => true, cancelRecording: () => undefined })
+        return () => null
+      },
+    })
+    const wrapper =
+      mode === 'catalog'
+        ? mount(CapturaCatalogo, {
+            props: { categoria: 'SILLA' },
+            global: { stubs: { AudioRecorder: recorder } },
+          })
+        : mount(CapturaAsistida, {
+            props: { dirty: false, sesion: 'test', moneda: 'BOB' },
+            global: { stubs: { AudioRecorder: recorder } },
+          })
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Grabar descripción'))!
+      .trigger('click')
+    await flushPromises()
+    expect(wrapper.findComponent(recorder).props('minDurationSeconds')).toBe(15)
+    expect(create).not.toHaveBeenCalled()
+    wrapper.unmount()
+  },
+)

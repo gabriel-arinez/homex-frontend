@@ -5,6 +5,7 @@ import { catalogoCapturaService } from '@/modules/productos/services/catalogoCap
 import { asistidasService } from '../services/asistidasService'
 import {
   MAX_AUDIO_BYTES,
+  MIN_AUDIO_SECONDS,
   MAX_TRANSCRIPT_CHARACTERS,
   CAPTURE_TIMEOUT_MS,
   validateTranscript,
@@ -376,7 +377,13 @@ function apply() {
       @cancel="discard"
     >
       <template #recorder
-        ><AudioRecorder v-if="recording" ref="recorder" compact @ready="recorded" @status="status"
+        ><AudioRecorder
+          v-if="recording"
+          ref="recorder"
+          compact
+          :min-duration-seconds="MIN_AUDIO_SECONDS"
+          @ready="recorded"
+          @status="status"
       /></template>
     </VoiceCaptureControls>
     <input

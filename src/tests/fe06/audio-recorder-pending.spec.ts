@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import AudioRecorder from '@/modules/capturas/components/AudioRecorder.vue'
+import { MIN_AUDIO_SECONDS } from '@/modules/capturas/audioLimits'
 
 function setup() {
   let resolve!: (stream: MediaStream) => void
@@ -122,11 +123,11 @@ describe('recorder pending permission', () => {
 })
 
 it.each([14, 15, 16, 240, 241])(
-  'enforces operational microphone bounds at %s seconds',
+  'enforces commercial microphone bounds at %s seconds',
   async (seconds) => {
     const media = setup()
     vi.useFakeTimers()
-    const wrapper = mount(AudioRecorder)
+    const wrapper = mount(AudioRecorder, { props: { minDurationSeconds: MIN_AUDIO_SECONDS } })
     const pending = controls(wrapper).start()
     media.resolve()
     await pending
@@ -141,3 +142,20 @@ it.each([14, 15, 16, 240, 241])(
     wrapper.unmount()
   },
 )
+
+it.each([1, 2, 14])('preserves legacy microphone minimum at %s seconds', async (seconds) => {
+  const media = setup()
+  vi.useFakeTimers()
+  const wrapper = mount(AudioRecorder)
+  const pending = controls(wrapper).start()
+  media.resolve()
+  await pending
+  await vi.advanceTimersByTimeAsync(seconds * 1000)
+  controls(wrapper).stop()
+  await flushPromises()
+  const ready = wrapper.emitted('ready')?.filter(([blob]) => blob instanceof Blob) ?? []
+  expect(ready).toHaveLength(seconds < 2 ? 0 : 1)
+  expect(wrapper.text().includes('2 segundos')).toBe(seconds < 2)
+  expect(wrapper.text()).not.toContain('15 segundos')
+  wrapper.unmount()
+})

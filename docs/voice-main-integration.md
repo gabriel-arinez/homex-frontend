@@ -5,3 +5,9 @@ Normal PR/push/main contract and real-stack jobs now use backend revision `7c9e7
 Gitleaks initially reported two unsigned browser mock JWTs from historical commits. Their decoded header uses `alg:none` and the signature is a literal test marker, not a real credential. Only those two exact commit/file/rule/line fingerprints were added to the existing `.gitleaksignore` convention. No rule/path is disabled, no actual secret is exempted, and the security workflow still scans history. See the [official fingerprint documentation](https://github.com/gitleaks/gitleaks#-gitleaksignore).
 
 These fixes preserve the entire feature history, the assistant's 15-second/20-word validation and all CI gates. Earlier integration runs using old peer schemas failed and their obsolete long-running jobs were cancelled before replacement runs; cancellation is not counted as success.
+
+## Recorder scope correction
+
+The 15-second microphone minimum belongs to the staged commercial assistant only, for both catalog and furniture capture. `StagedVoiceCapture` passes the existing commercial audio minimum explicitly to the shared recorder. The legacy `/capturas/nueva` flow retains its 2-second minimum; the shared recorder defaults to that minimum. Maximum duration, size, pause/resume, cancellation, and automatic commercial ASR behavior remain unchanged.
+
+The real-stack FE08 recorder test now waits for the visible `Grabando 00:02` elapsed state before finalizing its fixture-backed recording. Immediate finalization produces zero elapsed seconds even when the fixture itself contains valid audio. Unit regressions cover legacy 1/2/14-second recordings, commercial 14/15/16/240/241-second recordings, and explicit commercial configuration in both assistant consumers.

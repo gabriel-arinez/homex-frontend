@@ -4,12 +4,15 @@ import { Mic, Square, X, RotateCcw, Pause, Play } from '@lucide/vue'
 import { MAX_RECORD_SECONDS } from '../audioLimits'
 import Button from '@/shared/ui/Button.vue'
 import { useAudioRecorder } from '../composables/useAudioRecorder'
-const props = withDefaults(defineProps<{ compact?: boolean }>(), { compact: false })
+const props = withDefaults(defineProps<{ compact?: boolean; minDurationSeconds?: number }>(), {
+  compact: false,
+  minDurationSeconds: 2,
+})
 const emit = defineEmits<{
   ready: [blob: Blob | null]
   status: [state: string, elapsed: number]
 }>()
-const r = useAudioRecorder(),
+const r = useAudioRecorder(props.minDurationSeconds),
   time = computed(
     () =>
       `${String(Math.floor(r.elapsed.value / 60)).padStart(2, '0')}:${String(r.elapsed.value % 60).padStart(2, '0')}`,
