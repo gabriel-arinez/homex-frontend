@@ -10,7 +10,7 @@ import { readAudioDuration } from '@/modules/capturas/audioLimits'
 
 vi.mock('@/modules/capturas/audioLimits', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/modules/capturas/audioLimits')>()
-  return { ...actual, readAudioDuration: vi.fn<() => Promise<number>>().mockResolvedValue(10) }
+  return { ...actual, readAudioDuration: vi.fn<() => Promise<number>>().mockResolvedValue(15) }
 })
 
 afterEach(() => vi.restoreAllMocks())
@@ -31,7 +31,8 @@ function mockResult(category: CategoriaEnum) {
     captura_origen: null,
     texto_asr_original: null,
     texto_corregido: null,
-    texto_transcrito_original: 'nombre: Zócalo',
+    texto_transcrito_original:
+      'nombre: Zócalo para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
     error_codigo: null,
     propuesta: {
       category,
@@ -66,7 +67,11 @@ describe('Voz en creación de catálogo', () => {
       )
       expect(w.emitted('apply')).toBeUndefined()
       expect(w.emitted('applied')).toBeUndefined()
-      await w.get('textarea').setValue('nombre: Zócalo')
+      await w
+        .get('textarea')
+        .setValue(
+          'nombre: Zócalo para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+        )
       await button(w, 'Procesar texto').trigger('click')
       await flushPromises()
       await button(w, 'Aplicar propuesta').trigger('click')
@@ -76,7 +81,7 @@ describe('Voz en creación de catálogo', () => {
             capture_id: 1,
             field_reviews: [],
             fields: { nombre: 'Zócalo' },
-            text: 'nombre: Zócalo',
+            text: 'nombre: Zócalo para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
             warnings: ['Revisar'],
             evidence: [],
           },
@@ -352,3 +357,44 @@ it('retains active catalog warnings and validates pending prices on confirm, cor
   expect(evidence[0]!.decision).toBe('UNRESOLVED')
   w.unmount()
 })
+
+it.each([true, false])(
+  'preserves manual notes and rejects full-transcript observations: %s',
+  async (legacy) => {
+    vi.spyOn(proformasService, 'families').mockResolvedValue({
+      count: 0,
+      next: null,
+      previous: null,
+      results: [],
+    })
+    vi.spyOn(proformasService, 'options').mockImplementation(async (key) =>
+      key === 'CATEGORIA_PRODUCTO'
+        ? [{ id: 10, codigo: 'OTRO', nombre: 'Otro', concepto_codigo: key }]
+        : [],
+    )
+    const w = mount(ProductoForm, {
+      props: { preselectCategory: 'OTRO' },
+      global: { stubs: { CapturaCatalogo: true } },
+    })
+    await flushPromises()
+    await w.get('#observaciones').setValue('Customer requested delivery on Friday.')
+    await button(w, 'Completar por voz').trigger('click')
+    const transcript =
+      'Nombre Silla Buenas de madera de 18 mm precio 450 bolivianos observaciones entregar con protección adicional.'
+    w.findComponent({ name: 'CapturaCatalogo' }).vm.$emit('applied', {
+      fields: {
+        nombre: 'Silla Buenas',
+        precio_lista: '450',
+        observaciones: legacy ? transcript : 'entregar con protección adicional',
+      },
+      text: transcript,
+      warnings: [],
+    })
+    await flushPromises()
+    const notes = (w.get('#observaciones').element as HTMLTextAreaElement).value
+    expect(notes).toContain('Customer requested delivery on Friday.')
+    expect(notes).not.toContain('Nombre Silla Buenas')
+    expect(notes.includes('entregar con protección adicional')).toBe(!legacy)
+    w.unmount()
+  },
+)

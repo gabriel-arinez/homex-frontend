@@ -309,7 +309,13 @@ const opts = (key: string, empty = 'Sin seleccionar') => [
 function applyProposals(proposals: Array<[string, unknown]>) {
   const current = form as Record<string, unknown>
   for (const [key, value] of proposals) {
-    if (key === 'especificaciones') {
+    if (key === 'observaciones') {
+      const note = String(value ?? '').trim()
+      if (note && !form.observaciones.includes(note))
+        form.observaciones = form.observaciones.trim()
+          ? `${form.observaciones.trim()}\n${note}`
+          : note
+    } else if (key === 'especificaciones') {
       form.especificaciones = JSON.stringify(value)
       camposSilla.value = camposSimples(value)
     } else {
@@ -339,6 +345,13 @@ function onVoiceApplied(payload: {
   capture_id?: number
   field_reviews?: VoiceFieldReview[]
 }) {
+  // Older proposals may carry the entire dictation as fallback notes. Never apply it.
+  const fields = { ...payload.fields }
+  const normalized = (value: string) => value.normalize('NFC').replace(/\s+/gu, ' ').trim()
+  if (fields.observaciones && normalized(fields.observaciones) === normalized(payload.text)) {
+    delete fields.observaciones
+  }
+  payload = { ...payload, fields }
   voiceCaptureId.value = payload.capture_id
   voiceFieldReviews.value = [
     ...(payload.field_reviews ?? []),
