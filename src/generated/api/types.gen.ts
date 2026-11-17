@@ -647,6 +647,7 @@ export type PatchedProducto = {
   unidad_stock_info?: ValorCatalogoPublico
   activo?: boolean
   observaciones?: string | null
+  revision_humana_voz?: unknown
   imagen_principal?: ImagenPrincipal | null
   silla?: ProductoSilla | null
   piso?: ProductoPiso | null
@@ -748,6 +749,7 @@ export type Producto = {
   unidad_stock_info: ValorCatalogoPublico
   activo?: boolean
   observaciones?: string | null
+  revision_humana_voz?: unknown
   imagen_principal: ImagenPrincipal | null
   silla?: ProductoSilla | null
   piso?: ProductoPiso | null
@@ -865,6 +867,7 @@ export type PropuestaCatalogo = {
   category: CategoryEnum
   fields: CamposCatalogo
   evidence: Array<EvidenciaCatalogo>
+  field_reviews?: Array<RevisionCampoCatalogo>
   warnings: Array<string>
   unrecognized: Array<string>
   version: string
@@ -947,6 +950,22 @@ export type ResultadoCatalogo = {
  */
 export type ResultadoEnum =
   'PROCESSING' | 'TRANSCRIBED' | 'REQUIRES_REVIEW' | 'NO_PROPOSAL' | 'ERROR'
+
+export type RevisionCampoCatalogo = {
+  review_id: string
+  code: string
+  severity: SeverityEnum
+  message: string
+  field: string
+  evidence_ids: Array<string>
+}
+
+/**
+ * * `INFO` - INFO
+ * * `REVIEW` - REVIEW
+ * * `CRITICAL` - CRITICAL
+ */
+export type SeverityEnum = 'INFO' | 'REVIEW' | 'CRITICAL'
 
 /**
  * * `DIMENSION` - DIMENSION
@@ -1237,6 +1256,7 @@ export type PatchedProductoWritable = {
   unidad_stock?: number
   activo?: boolean
   observaciones?: string | null
+  revision_humana_voz?: unknown
   silla?: ProductoSillaWritable | null
   piso?: ProductoPisoWritable | null
   promocion?: DescuentoProductoWritable | null
@@ -1286,6 +1306,7 @@ export type ProductoWritable = {
   unidad_stock: number
   activo?: boolean
   observaciones?: string | null
+  revision_humana_voz?: unknown
   silla?: ProductoSillaWritable | null
   piso?: ProductoPisoWritable | null
   promocion?: DescuentoProductoWritable | null

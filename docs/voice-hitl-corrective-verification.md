@@ -1,52 +1,89 @@
-# Corrective voice/HITL audit
+# Definitive ASR, NLP and HITL verification
 
-The existing staged Drawer architecture and prior commits are preserved. Corrections were made only on `feat/voice-hitl-review`; no PR, publishing or main merge was performed.
+The requested correction is complete on the existing `feat/voice-hitl-review` branches. The staged architecture and previous commits are preserved. No PR, package publication, push or main merge was performed.
 
-## Definitive automatic-ASR correction
+## Verified seller flow
 
-Valid recording completion or validated file selection now starts ASR automatically in the shared Drawer. There is no additional transcription confirmation. Playback remains available separately from pending submission; retry is explicit only after a failure or cancellation. Empty ASR results explain the problem without enabling NLP or application.
+**Valid audio → automatic ASR → editable transcript → explicit Procesar texto → structured proposal → explicit Aplicar propuesta → structured form only.**
 
-NLP still requires **Procesar texto**, and form mutation still requires **Aplicar propuesta**. Generation, current-text and busy-state checks invalidate old proposals and ignore cancelled/stale requests. Applying hides the free transcript and playback editor while retaining server evidence.
+ASR does not run NLP. Editing/reinterpreting text does not repeat Whisper. Recording, conversion and processing invalidate old proposals immediately; only the current text/generation can be applied. Applying removes free transcription from normal editing without deleting server evidence.
 
-Specific automatic-ASR tests observed RED before implementation and now pass all nine scenarios. Positive/negative staged component checks, mobile browser codecs and accessibility checks pass. Full cross-component closure evidence is recorded in the task log and completed with the human-review correction.
+## Corrections and principal files
 
-## Corrected behavior
+| Finding                                               | Correction / main files                                                                                                                                                                                                                                       |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Explicit names bypassed commercial validation         | `homex-nlp/src/homex_nlp/catalog.py`: prefix-independent rejection, real attribute values, primary-product category contradictions, open-vocabulary new names. Related nouns do not falsely change the primary category.                                      |
+| Audio required another transcription click            | `StagedVoiceCapture.vue`, `AudioReview.vue`: automatic ASR after valid recording/file preparation, independent playback, explicit retry, empty-ASR explanation, cancellation/generation protection.                                                           |
+| Accepted attributes missed commercial review          | Typed backend `field_reviews`, `ProductoForm.vue`, `EspecificacionForm.vue`: source warning/evidence/field linkage, contextual reasons, suggested/pending/confirmed/corrected/discarded states and critical-only blocking.                                    |
+| Creation actions and dynamic fields were unreviewable | `fieldVoiceReview.ts`, `EspecificacionForm.vue`: input/select/textarea and action controls; section/focus navigation, populated-dimension creation, component UID stability and real resolution/reversion checks. Existing pending validators are reused.     |
+| Repeated saves duplicated or lost decisions           | Shared audit helpers preserve latest-state idempotence and distinct B→C→B transitions. Nested specifications, accepted-only evidence, raw null originals and actual serialized final values are recorded.                                                     |
+| Browser metadata was not authoritative                | Backend `apps/capturas/revision_voz.py`, catalog serializers/model/migration and proforma services validate ownership, context, immutable attempt/origin, source values, actual evidence, history and saved values. Historical decisions cannot be rewritten. |
+| Real clicks silently failed                           | Equivalent directive updates no longer replace a confirmation button between pointerdown and click. Actual control references are checked so dynamic replacements still rebind.                                                                               |
+| Valid manual operations became invalid with audit     | Backend final-value projection includes notes and category fields. Catalog zero-price policy and supported inch dimensions remain compatible with manual operations; furniture positivity rules remain intact.                                                |
+| Resolved warnings remained visible                    | Populated textarea review works; legacy duplicate strings are removed only when tied to the same real field reason. The voice-only blocking alert clears after the final critical resolution; unrelated information remains.                                  |
 
-| Finding                                          | Main implementation                                                                                                                                                                                |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Successive interpretations changed audio origin  | `StagedVoiceCapture.vue` separates stable ASR identity from the last text-only interpretation; backend canonicalizes real ASR ancestry while preserving legacy text-only links.                    |
-| Obsolete proposals remained actionable           | Immediate invalidation, exact text/generation apply guard, busy-state checks and instance-scoped cancellation.                                                                                     |
-| Mobile extensions could fail server upload       | Existing WAV encoder restored for AAC/Opus/MP4/FLAC, decoded-duration and preallocation-size guards, explicit codec/browser errors before submission.                                              |
-| Pending fields and visual confirmations diverged | `pendientesAsistencia.ts`, `EspecificacionForm.vue`, `ProductoForm.vue` and `fieldVoiceReview.ts` use actual valid values; navigation targets real controls; corrections/reversions update status. |
-| Human discards lacked reliable identity          | Existing additive technical JSON stores original pending evidence, explicit reasons and assignment destinations, bound to the actual interpretation ID.                                            |
-| Generic marker words created proposals           | NLP requires recognized commercial values or properly introduced identity, preserving legitimate brief/new names.                                                                                  |
-| Technical JSON was seller-facing                 | `ProposalSummary.vue` displays commercial groups, real option labels, only present attributes and actual pending indicators.                                                                       |
+The existing 2-second minimum, 240-second microphone maximum, 300-second upload maximum, 20 MB limit, mobile-to-WAV conversion and coherent text limits remain covered. No price/color interpretation regex was reintroduced into the form.
 
-## Previous correction verification (0.1.27)
+## Final executed checks
 
-| Component                                | Final result                  |
-| ---------------------------------------- | ----------------------------- |
-| NLP source and installed 0.1.27 artifact | 1,137 passed each             |
-| Backend full suite                       | 681 passed                    |
-| Frontend unit/component suite            | 369 passed                    |
-| Browser suite                            | 114 passed, one existing skip |
-| Independent backend / NLP checks         | 92 / 219 passed               |
-| Parent backend / frontend spot checks    | 92 / 29 passed                |
+| Component / scope                                          | Final observed result                                                                        |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| NLP full source suite                                      | **1,185 passed**                                                                             |
+| NLP full suite against actual installed .28 wheel          | **1,185 passed**                                                                             |
+| Backend full suite after final normalization               | **704 passed, zero skips**                                                                   |
+| Frontend unit/component suite                              | **397 passed, 67 files**                                                                     |
+| Mocked browser suite, including accessibility              | **115 passed, zero skips**                                                                   |
+| Real local ASR/API/Redis/Celery/browser integration        | **8 passed**: SILLA/PISO_FLOTANTE/OTRO upload and recording, furniture save and cancellation |
+| Independent NLP regression subset                          | **197 passed**                                                                               |
+| Independent backend public API/audit/legacy/package subset | **78 passed**, plus final refreshed **23 audit tests passed**                                |
+| Parent focused checks                                      | NLP **197**, backend audit **23**, frontend **33** passed                                    |
 
-Lint, formatting, typecheck, builds, schemas/OpenAPI drift, generated frontend contract, offline locks, reproducible artifact and installed-byte identity checks passed in their applicable project scopes. Mobile tests include real, locally generated synthetic tone files; they exercise conversion, not speech accuracy. Browser tests use controlled API fixtures. Backend tests use disposable PostgreSQL.
+Applicable lint, formatting, typecheck, production build, offline lock, Django system/migration checks, extraction schemas, OpenAPI drift and frontend type generation/checks pass. The frontend OpenAPI snapshot is byte-identical to the backend export. Full checks ran after source normalization; later changes only record documentation/evidence.
 
-Regressions caught and corrected before delivery: ASR canonicalization initially changed legacy text-only links; Vue-proxied pending cloning raised `DataCloneError`; a generic confirmation action displaced explicit thickness assignment; the new summary initially assumed a complete technical fixture. Existing contract behavior and tests remain intact.
+Frontend commands include `npm run test:unit -- --run`, `lint:check`, `format:check`, `type-check`, `build`, `contract:check` and `test:e2e`. Mocked browser runs use an explicit local API origin; Vitest runs without that override. Live tests use isolated synthetic PostgreSQL, Redis, workers, API and cached CPU Whisper, not production services or ambient credentials.
 
-## Previous artifact compatibility (0.1.27)
+### Regression and critical-review evidence
 
-Backend pins the new local `homex_nlp-0.1.27-py3-none-any.whl`, built with `SOURCE_DATE_EPOCH=0`. Runtime guard, locks, checksum gates and installed package files agree. The 0.1.25 and 0.1.26 wheels and checksum files are byte-identical to the correction baseline. OpenAPI shape is unchanged. Backend evidence: `docs/evidence/voice-hitl-corrective-review.json` in its feature worktree.
+- Matched historical NLP baseline: **24 expected failures / 20 passes** in 44 selected final tests, including explicit greetings, category contradictions and exact microphone-test phrases. Current cases pass; brief legitimate and novel names remain valid.
+- Matched historical backend plus its actual .27 wheel: the forged-pending regression accepted HTTP 201 and persisted a proforma; the final implementation rejects it atomically. A mismatched-runtime setup attempt was excluded from RED evidence.
+- Specific frontend RED → GREEN tests cover automatic ASR, empty ASR, transition history, nested/boolean attributes, rejected candidate IDs, notes, missing originals, trimmed final values, stable pointer controls, negotiated-price null and resolved legacy warnings.
+- Real integration exposed issues synthetic clicks missed: blur-driven DOM replacement, UI-empty versus source-null audit values, and missing stored notes during validation. These were corrected, not bypassed with forced DOM clicks.
+- Stale integration fixtures assumed automatic NLP/application, permanent original-description cards and short fake recordings. They now use explicit stages, actual WAV duration and valid partial-ASR outcomes without requiring invented optional attributes. The historically skipped attachment test is re-enabled using current Studio/gallery fixtures; no gallery production behavior changed.
 
-## Limits and remaining checks
+### Four-minute CPU proof and visual evidence
 
-- One preexisting attachment-freezing E2E is still explicitly skipped.
-- No new physical microphone or actual-ASR benchmark was needed for the unchanged ASR implementation; prior synthetic long-audio evidence is retained, not represented as a new run.
-- A clean offline worker-extra installation needs an uncached `ctranslate2` wheel. Existing cached ASR imports work; no download was attempted.
-- Unscoped NLP Ruff findings under historical audit/docs paths reproduce at baseline; the applicable Makefile source/test/tool/training scope passes.
-- Remote CI was not triggered; equivalent applicable checks ran locally.
+The final installed `.28` public `homex-asr` CLI decoded a **240.000-second**, mono 16 kHz synthetic WAV offline on cached CPU/int8 Whisper in **26.53 seconds**: **638 characters, 9 segments**, including late audio. Whisper timestamps are approximate (last segment 241.0 seconds); decoded duration is independently 240.0 seconds. This run executed ASR only.
 
-The current feature worktrees are frontend's existing workspace, `../.worktrees/voice-backend` and `../.worktrees/voice-nlp`. Source changes are `feef4de`, `5fd9956`, `b3019f9` and `cb15f7e`; the shared task log records the full requirement and evidence history.
+- [Sanitized benchmark result and fixture checksum](evidence/voice-hitl-asr-240s.json)
+- [Proposal before application](evidence/voice-hitl-before-apply.png)
+- [Structured form after application and confirmation](evidence/voice-hitl-after-apply.png)
+
+Both screenshot states were visually inspected. Free transcription is absent after application, price is confirmed, and neither the duplicate price warning nor the obsolete voice-blocking alert remains. Full-page captures reflect the current scroll position of fixed navigation; they are voice-flow evidence, not a global navigation redesign.
+
+## Package compatibility and change control
+
+New local package: **homex-nlp 0.1.28**.
+
+Wheel: `homex_nlp-0.1.28-py3-none-any.whl`.
+
+SHA256: `abf68e16979c9cdf64eff534051798cec3a12b9d27672fd0f9fcd4805e825fea`.
+
+Canonical builds use `SOURCE_DATE_EPOCH=0`; wheel/sdist reproducibility was checked. Vendor, checksum file, lock, adapter guard, operational pins, metadata and installed bytes agree. Operational verification checked 35 installed files; independent comparison checked all 27 packaged Python files. Historical .25/.26/.27 artifacts remain unchanged.
+
+Source work-unit commits:
+
+| Repository | Corrective commits                                                                            |
+| ---------- | --------------------------------------------------------------------------------------------- |
+| NLP        | `50216e5` — commercial names/category coherence and .28                                       |
+| Backend    | `dd21735` — trusted review history/package/schema; `3d6d728` — supported manual measure units |
+| Frontend   | `5bafb69` — automatic ASR; field/audit commit recorded in the final task log                  |
+
+Worktrees: frontend workspace, `../.worktrees/voice-backend`, `../.worktrees/voice-nlp`. All remain on `feat/voice-hitl-review`. Local source/test commits deliberately keep coupled shared-form/audit behavior together; PR slicing remains deferred because PRs were explicitly prohibited. The complete request, task status and commit evidence are in `odd/tasks/voice-hitl-review.md`.
+
+## Limits, not hidden passes
+
+- No physical microphone/human field-speech accuracy or WER assessment was performed. Browser MediaRecorder and ASR used synthetic fixtures; codec tests also exercise clear pre-upload rejection where a browser lacks decoding support.
+- Remote CI was not triggered. Applicable checks ran locally; no package or model download was needed for the cached ASR verification.
+- The sole OpenAPI `CategoryEnum` naming warning reproduces at baseline and has no validation errors. No new related failures, skips or known functional blockers remain.
+
+Risk: items **1/2/3/4/5** — persisted audit, ownership/provenance, additive shared contracts, async/pointer ordering and coordinated package integration. Regression, independent, real-stack and final frozen-source checks cover these surfaces.

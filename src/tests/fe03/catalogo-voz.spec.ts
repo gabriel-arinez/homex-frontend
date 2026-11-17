@@ -73,6 +73,8 @@ describe('Voz en creación de catálogo', () => {
       expect(w.emitted('applied')).toEqual([
         [
           {
+            capture_id: 1,
+            field_reviews: [],
             fields: { nombre: 'Zócalo' },
             text: 'nombre: Zócalo',
             warnings: ['Revisar'],

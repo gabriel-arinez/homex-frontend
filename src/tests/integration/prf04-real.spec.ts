@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test'
+import { recordingFixtureDurationMs } from './audioFixture'
 
 test('PRF-04 voz real hasta guardado integral sin escrituras prematuras', async ({ page }) => {
+  test.setTimeout(300_000)
   if (!process.env.HOMEX_PRF04_AUDIO)
     throw new Error('Falta HOMEX_PRF04_AUDIO para integración real.')
   const comerciales: string[] = []
@@ -22,8 +24,17 @@ test('PRF-04 voz real hasta guardado integral sin escrituras prematuras', async 
   await assistant.getByRole('button', { name: 'Grabar descripción' }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Grabando' })).toBeVisible()
   // Reproducir el fixture completo a través de MediaRecorder real de Chromium.
-  await page.waitForTimeout(12000)
-  await assistant.getByRole('button', { name: 'Finalizar' }).click()
+  await page.waitForTimeout(recordingFixtureDurationMs(process.env.HOMEX_PRF04_AUDIO))
+  await assistant.getByRole('button', { name: 'Finalizar grabación' }).click()
+  const transcript = assistant.getByLabel('Revisar y corregir transcripción')
+  await expect(transcript).toHaveValue(/escritorio/i, { timeout: 240_000 })
+  expect(comerciales).toEqual([])
+  await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('')
+  await assistant.getByRole('button', { name: 'Procesar texto', exact: true }).click()
+  await assistant
+    .getByRole('button', { name: 'Aplicar propuesta', exact: true })
+    .click({ timeout: 60_000 })
+  await expect(assistant.locator('textarea')).toHaveCount(0)
   await page
     .getByRole('navigation', { name: 'Apartados del mueble a pedido' })
     .getByRole('button', { name: /General/ })

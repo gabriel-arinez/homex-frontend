@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { vVoiceFields, type FieldVoiceReview } from '@/modules/capturas/fieldVoiceReview'
+import {
+  vVoiceFields,
+  appendVoiceAudit,
+  humanVoiceDecision,
+  type FieldVoiceReview,
+} from '@/modules/capturas/fieldVoiceReview'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import type {
   AtributoMueble,
@@ -231,6 +236,7 @@ const descartes = reactive<Record<number, { pendiente: PendienteAsistida; motivo
 watch(
   () => [props.voiceCaptureId, props.pendientesAsistencia],
   () => {
+    reviewedVoiceFields.value = {}
     for (const indice of Object.keys(descartes)) delete descartes[Number(indice)]
     for (const indice of Object.keys(motivosDescarte)) delete motivosDescarte[Number(indice)]
     for (const indice of Object.keys(destinosEspesor)) delete destinosEspesor[Number(indice)]
@@ -247,6 +253,13 @@ function descartarPendiente(p: PendienteAsistida & { indice: number }) {
   }
   const original = props.pendientesAsistencia?.[p.indice]
   if (!original) return
+  if (
+    (p.codigo === 'NO_QUANTITY' && !cantidadValida.value) ||
+    (p.codigo === 'INVALID_PRICE' && !precioValido.value)
+  ) {
+    error.value = 'Corrige el valor comercial obligatorio antes de descartar la observación.'
+    return
+  }
   descartes[p.indice] = { pendiente: clonarTecnica(original), motivo }
   error.value = ''
   changed()
@@ -264,11 +277,109 @@ const pendientesVisibles = computed(() =>
         const valor = p.resolucion?.valor?.trim()
         return !uid || !componentes.some((c) => c.uid === uid && c.espesor?.trim() === valor)
       }
-      return !pendienteResuelto(p, medidas, componentes, atributosGenerales)
+      if (!pendienteResuelto(p, medidas, componentes, atributosGenerales)) return true
+      if (p.codigo === 'CONFLICTING_VALUES') {
+        const field = fieldForPending(p)
+        return (
+          tecnicaIgual(pendingValue(p), originalPendingDisplayValues[p.indice]) &&
+          (!field ||
+            voiceResolution(field)?.state !== 'reviewed' ||
+            voiceResolution(field)?.snapshot !== JSON.stringify(pendingValue(p)))
+        )
+      }
+      return false
     }),
 )
 
-const reviewedVoiceFields = ref<Record<string, 'edited' | 'reviewed'>>({})
+const reviewedVoiceFields = ref<
+  Record<string, { state: 'edited' | 'reviewed'; value: string; snapshot?: string }>
+>({})
+function voiceIdentity(field: string): string {
+  const match = /^componente-(.+)-(\d+)$/.exec(field)
+  if (!match) return field
+  const uid = componentes[Number(match[2])]?.uid
+  return uid ? `componentes.${uid}.${match[1]}` : field
+}
+function rawSuggestedValue(
+  field: string,
+): { field: string; original: unknown; final: unknown } | null {
+  const commercial: Record<string, keyof typeof comercial> = {
+    'mueble-nombre-comercial': 'nombre',
+    'mueble-cantidad': 'cantidad',
+    'mueble-precio': 'precio_unitario',
+    'mueble-descuento': 'descuento',
+    'mueble-unidad': 'unidad',
+  }
+  const key = commercial[field]
+  if (key) {
+    if (key === 'unidad')
+      return {
+        field: 'unidad_codigo',
+        original:
+          props.unidades?.find((u) => String(u.id) === String(props.detalle?.unidad))?.codigo ??
+          null,
+        final: props.unidades?.find((u) => String(u.id) === comercial.unidad)?.codigo ?? null,
+      }
+    return { field: key, original: props.detalle?.[key] ?? null, final: comercial[key] }
+  }
+  const match = /^componente-(.+)-(\d+)$/.exec(field)
+  if (match) {
+    const c = componentes[Number(match[2])]
+    if (!c?.uid) return null
+    const original = (base.componentes as ComponenteTecnico[] | undefined)?.find(
+      (item) => item.uid === c.uid,
+    )
+    return {
+      field: `componentes.${c.uid}.${match[1]}`,
+      original: original?.[match[1]!] ?? null,
+      final: c[match[1]!] ?? null,
+    }
+  }
+  const clave = field.replace(/^unidad-/, '')
+  const m = medidas.find((m) => m.clave === clave)
+  return m
+    ? {
+        field: `dimensiones.${clave}`,
+        original: dimensiones[clave] ?? null,
+        final: { valor: m.valor, unidad: m.unidad },
+      }
+    : null
+}
+function suggestedValue(field: string) {
+  const value = rawSuggestedValue(field)
+  if (!value || !Array.isArray(base.revision_humana_voz)) return value
+  for (const entry of base.revision_humana_voz) {
+    if (!entry || typeof entry !== 'object') continue
+    const audit = entry as {
+      captura_asistida_id?: number
+      decisiones?: Array<{ review_id: string; valor_original: unknown }>
+    }
+    if (audit.captura_asistida_id !== props.voiceCaptureId) continue
+    const original = audit.decisiones?.find(
+      (decision) => decision.review_id === `field:${value.field}`,
+    )
+    if (original) return { ...value, original: original.valor_original }
+  }
+  return value
+}
+function voiceResolution(field: string) {
+  const resolution = reviewedVoiceFields.value[voiceIdentity(field)]
+  const suggested = suggestedValue(field)
+  if (
+    suggested &&
+    resolution?.state === 'edited' &&
+    tecnicaIgual(suggested.final, suggested.original)
+  )
+    return undefined
+  return resolution
+}
+function suggestedField(field: string): string | null {
+  const match = /^componente-(.+)-(\d+)$/.exec(field)
+  if (!match) return field
+  const original = (base.componentes as ComponenteTecnico[] | undefined)?.[Number(match[2])]
+  const index = componentes.findIndex((c) => c.uid === original?.uid)
+  return index >= 0 ? `componente-${match[1]}-${index}` : null
+}
 function resolveVoiceField(field: string, edited: boolean) {
   const control = Array.from(
     formElement.value?.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
@@ -281,12 +392,24 @@ function resolveVoiceField(field: string, edited: boolean) {
     (field === 'mueble-cantidad' && !cantidadValida.value) ||
     (field === 'mueble-precio' && !precioValido.value)
   ) {
-    delete reviewedVoiceFields.value[field]
+    delete reviewedVoiceFields.value[voiceIdentity(field)]
     return
   }
   reviewedVoiceFields.value = {
     ...reviewedVoiceFields.value,
-    [field]: edited ? 'edited' : 'reviewed',
+    [voiceIdentity(field)]: {
+      state: edited ? 'edited' : 'reviewed',
+      value: control.value,
+      snapshot: JSON.stringify(
+        pendingValue(
+          (props.pendientesAsistencia ?? []).find((p) => fieldForPending(p) === field) ?? {
+            codigo: '',
+            ruta: '',
+            mensaje: '',
+          },
+        ),
+      ),
+    },
   }
 }
 function fieldForPending(p: PendienteAsistida): string | null {
@@ -313,7 +436,10 @@ function fieldForPending(p: PendienteAsistida): string | null {
         : 'buscar-atributo'
   }
   if (p.resolucion?.tipo === 'DIMENSIONES_NUEVAS')
-    return medidas.find((m) => !m.valor.trim())?.clave ?? 'agregar-medida'
+    return (
+      medidas.find((m) => !m.valor.trim())?.clave ??
+      (props.studio ? 'agregar-medida' : 'nueva-medida')
+    )
   if (p.codigo === 'ESPESOR_SIN_COMPONENTE')
     return p.resolucion?.valor
       ? `espesor-destino-${'indice' in p ? p.indice : 0}`
@@ -338,24 +464,40 @@ const criticalPending = computed(() =>
   ),
 )
 const voiceReview = computed(() => {
-  const fields: FieldVoiceReview[] = (props.voiceSuggestedFields ?? []).map((field) => ({
-    field,
-    state: reviewedVoiceFields.value[field] ?? 'suggested',
-    reason: '',
-    critical: false,
-  }))
-  for (const pending of pendientesVisibles.value) {
+  const fields: FieldVoiceReview[] = (props.voiceSuggestedFields ?? [])
+    .map(suggestedField)
+    .filter((field): field is string => field !== null)
+    .map((field) => ({
+      field,
+      state: voiceResolution(field)?.state ?? 'suggested',
+      reason: '',
+      critical: false,
+    }))
+  for (const pending of (props.pendientesAsistencia ?? []).map((p, indice) => ({ ...p, indice }))) {
     const field = fieldForPending(pending)
     if (!field) continue
     const previous = fields.findIndex((f) => f.field === field)
     if (previous >= 0) fields.splice(previous, 1)
     fields.push({
       field,
-      state: 'pending',
+      state: descartes[pending.indice]
+        ? 'discarded'
+        : pendientesVisibles.value.some((p) => p.indice === pending.indice)
+          ? 'pending'
+          : (voiceResolution(field)?.state ?? 'edited'),
       reason: pending.mensaje,
-      critical: criticalPending.value.includes(pending),
-      confirmable: pending.resolucion?.tipo !== 'ESPESOR_SIN_COMPONENTE',
+      critical: criticalPending.value.some((p) => p.indice === pending.indice),
+      confirmable:
+        pending.resolucion?.tipo !== 'ESPESOR_SIN_COMPONENTE' && field !== 'nueva-medida',
     })
+    if (field === 'nueva-medida')
+      fields.push({
+        field: 'agregar-medida',
+        state: 'pending',
+        reason: pending.mensaje,
+        critical: true,
+        confirmable: false,
+      })
   }
   return { fields, resolve: resolveVoiceField }
 })
@@ -628,6 +770,55 @@ const destinoDelConjunto = ref('')
 const atributosGenerales = reactive<AtributoTecnico[]>(
   structuredClone((generales.atributos as AtributoTecnico[] | undefined) ?? []),
 )
+function pendingField(p: PendienteAsistida, indice: number): string {
+  const r = p.resolucion
+  if (r?.tipo === 'COMPONENTE') return `componentes.${r.uid}.${r.campo}`
+  if (r?.tipo === 'DIMENSION') return r.clave ?? 'dimensiones'
+  if (r?.tipo === 'ATRIBUTO_GENERAL') return r.clave ?? 'atributos'
+  if (r?.tipo === 'DIMENSIONES_NUEVAS') return 'dimensiones'
+  if (r?.tipo === 'ESPESOR_SIN_COMPONENTE')
+    return `componentes.${espesoresConfirmados[indice] ?? destinosEspesor[indice] ?? ''}.espesor`
+  if (p.codigo === 'NO_QUANTITY') return 'cantidad'
+  if (['INVALID_PRICE', 'TOTAL_NEGOCIADO'].includes(p.codigo)) return 'precio_unitario'
+  if (p.codigo === 'TIPO_NO_RESUELTO') return 'tipo_mueble'
+  return p.ruta || p.codigo
+}
+function pendingValue(p: PendienteAsistida): unknown {
+  const r = p.resolucion
+  if (r?.tipo === 'DIMENSION') {
+    const m = medidas.find((m) => m.clave === r.clave)
+    return m ? { valor: m.valor, unidad: m.unidad } : null
+  }
+  if (r?.tipo === 'COMPONENTE')
+    return componentes.find((c) => c.uid === r.uid)?.[r.campo ?? ''] ?? null
+  if (r?.tipo === 'ATRIBUTO_GENERAL')
+    return (
+      atributosGenerales.find((a) => normalized(a.codigo ?? a.nombre) === normalized(r.clave ?? ''))
+        ?.valor ?? null
+    )
+  if (r?.tipo === 'DIMENSIONES_NUEVAS')
+    return Object.fromEntries(
+      medidas
+        .filter((m) => m.valor.trim())
+        .map((m) => [m.clave, { valor: m.valor, unidad: m.unidad }]),
+    )
+  if (r?.tipo === 'ESPESOR_SIN_COMPONENTE') return r.valor ?? null
+  if (p.codigo === 'NO_QUANTITY') return comercial.cantidad
+  if (['INVALID_PRICE', 'TOTAL_NEGOCIADO'].includes(p.codigo)) return comercial.precio_unitario
+  if (p.codigo === 'TIPO_NO_RESUELTO') return form.tipo_mueble
+  return null
+}
+const originalPendingDisplayValues = (props.pendientesAsistencia ?? []).map((p) =>
+  clonarTecnica(pendingValue(p)),
+)
+const originalPendingValues = (props.pendientesAsistencia ?? []).map((p) => {
+  const r = p.resolucion
+  if (r?.tipo === 'DIMENSION') return clonarTecnica(dimensiones[r.clave ?? ''] ?? null)
+  if (r?.tipo === 'DIMENSIONES_NUEVAS') return clonarTecnica(dimensiones)
+  const value = pendingValue(p)
+  return clonarTecnica(value === '' ? null : value)
+})
+let voiceAuditHistory: unknown = clonarTecnica(base.revision_humana_voz ?? [])
 // Restore only decisions bound to the exact pending list, never to a newly interpreted warning.
 if (Array.isArray(base.revision_humana_voz)) {
   for (const entrada of base.revision_humana_voz) {
@@ -637,6 +828,12 @@ if (Array.isArray(base.revision_humana_voz)) {
       pendientes_originales?: unknown
       descartes?: unknown[]
       asignaciones_espesor?: unknown[]
+      decisiones?: Array<{
+        review_id: string
+        valor_original: unknown
+        valor_final: unknown
+        estado: string
+      }>
     }
     if (
       !props.voiceCaptureId ||
@@ -644,6 +841,25 @@ if (Array.isArray(base.revision_humana_voz)) {
       !tecnicaIgual(audit.pendientes_originales, props.pendientesAsistencia ?? [])
     )
       continue
+    for (const decision of audit.decisiones ?? []) {
+      const indice = Number(decision.review_id.replace('pending:', ''))
+      if (Number.isInteger(indice) && props.pendientesAsistencia?.[indice]) {
+        originalPendingValues[indice] = clonarTecnica(decision.valor_original)
+        const p = props.pendientesAsistencia[indice]!
+        const field = fieldForPending(p)
+        if (
+          field &&
+          decision.estado === 'confirmado' &&
+          tecnicaIgual(pendingValue(p), decision.valor_final)
+        ) {
+          reviewedVoiceFields.value[voiceIdentity(field)] = {
+            state: 'reviewed',
+            value: String(decision.valor_final ?? ''),
+            snapshot: JSON.stringify(decision.valor_final),
+          }
+        }
+      }
+    }
     for (const value of Array.isArray(audit.descartes) ? audit.descartes : []) {
       if (!value || typeof value !== 'object') continue
       const decision = value as {
@@ -1260,26 +1476,81 @@ function submit(): boolean {
   if (Object.prototype.hasOwnProperty.call(base, 'accesorios') || accesorios.length)
     cambios.accesorios = accesorios
   const datos = fusionarDatosTecnicos(base, cambios)
-  if (Object.keys(descartes).length || Object.keys(espesoresConfirmados).length) {
-    const anterior = base.revision_humana_voz
-    datos.revision_humana_voz = [
-      ...(Array.isArray(anterior) ? anterior : anterior === undefined ? [] : [anterior]),
-      {
-        captura_asistida_id: props.voiceCaptureId ?? null,
-        pendientes_originales: clonarTecnica(props.pendientesAsistencia ?? []),
-        asignaciones_espesor: Object.entries(espesoresConfirmados).map(([indice, uid]) => ({
-          indice: Number(indice),
-          componente_uid: uid,
-          pendiente_original: clonarTecnica(props.pendientesAsistencia?.[Number(indice)]),
-        })),
-        descartes: Object.entries(descartes).map(([indice, decision]) => ({
-          indice: Number(indice),
-          pendiente_original: clonarTecnica(decision.pendiente),
-          motivo: decision.motivo,
-          accion_humana: 'descartado',
-        })),
-      },
-    ]
+  const decisiones = props.voiceCaptureId
+    ? (props.pendientesAsistencia ?? []).flatMap((p, indice) => {
+        if (pendientesVisibles.value.some((item) => item.indice === indice)) return []
+        const field = fieldForPending(p)
+        const state = field ? voiceResolution(field)?.state : undefined
+        return [
+          humanVoiceDecision(props.voiceCaptureId!, {
+            review_id: `pending:${indice}`,
+            field: pendingField(p, indice),
+            evidence_ids: [],
+            estado: descartes[indice]
+              ? 'descartado'
+              : state === 'reviewed'
+                ? 'confirmado'
+                : 'corregido',
+            valor_original: originalPendingValues[indice] ?? null,
+            valor_final: descartes[indice] ? null : clonarTecnica(pendingValue(p)),
+            ...(descartes[indice] ? { motivo: descartes[indice]!.motivo } : {}),
+          }),
+        ]
+      })
+    : []
+  if (props.voiceCaptureId) {
+    const known = new Set(decisiones.map((decision) => decision.field))
+    for (const originalField of props.voiceSuggestedFields ?? []) {
+      const field = suggestedField(originalField)
+      if (!field) continue
+      const resolution = voiceResolution(field)
+      const suggested = suggestedValue(field)
+      const control = Array.from(
+        formElement.value?.querySelectorAll<
+          HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+        >('input,select,textarea') ?? [],
+      ).find((control) => control.name === field || control.id === field)
+      if (
+        !resolution ||
+        !suggested ||
+        known.has(suggested.field) ||
+        !control?.value.trim() ||
+        !control.checkValidity()
+      )
+        continue
+      known.add(suggested.field)
+      decisiones.push(
+        humanVoiceDecision(props.voiceCaptureId, {
+          review_id: `field:${suggested.field}`,
+          field: suggested.field,
+          evidence_ids: [],
+          estado: resolution.state === 'reviewed' ? 'confirmado' : 'corregido',
+          valor_original: clonarTecnica(suggested.original),
+          valor_final: clonarTecnica(suggested.final),
+        }),
+      )
+    }
+  }
+  let nextVoiceAuditHistory = voiceAuditHistory
+  if (decisiones.length) {
+    const snapshot = {
+      captura_asistida_id: props.voiceCaptureId ?? null,
+      pendientes_originales: clonarTecnica(props.pendientesAsistencia ?? []),
+      asignaciones_espesor: Object.entries(espesoresConfirmados).map(([indice, uid]) => ({
+        indice: Number(indice),
+        componente_uid: uid,
+        pendiente_original: clonarTecnica(props.pendientesAsistencia?.[Number(indice)]),
+      })),
+      descartes: Object.entries(descartes).map(([indice, decision]) => ({
+        indice: Number(indice),
+        pendiente_original: clonarTecnica(decision.pendiente),
+        motivo: decision.motivo,
+        accion_humana: 'descartado',
+      })),
+      decisiones,
+    }
+    nextVoiceAuditHistory = appendVoiceAudit(voiceAuditHistory, snapshot)
+    datos.revision_humana_voz = clonarTecnica(nextVoiceAuditHistory)
   }
   // Un histórico anterior a PRF-03 puede exceder 10/40.
   // Solo admitir ese exceso si las colecciones permanecen idénticas.
@@ -1343,6 +1614,7 @@ function submit(): boolean {
     error.value = errores.join(' ')
     return false
   }
+  voiceAuditHistory = nextVoiceAuditHistory
   emit(
     'save',
     {
@@ -1606,12 +1878,21 @@ onMounted(loadCatalog)
           <div v-if="!studio" class="inline">
             <label
               >Nueva medida
-              <input v-model="nuevaMedida" list="medidas-sugeridas" aria-label="Nueva medida" />
+              <input
+                id="nueva-medida"
+                v-model="nuevaMedida"
+                list="medidas-sugeridas"
+                aria-label="Nueva medida"
+              />
             </label>
             <datalist id="medidas-sugeridas">
               <option v-for="opcion in opcionesMedidas" :key="opcion" :value="opcion" />
             </datalist>
-            <Button variant="secondary" :disabled="!nuevaMedida.trim()" @click="agregarMedida"
+            <Button
+              id="agregar-medida"
+              variant="secondary"
+              :disabled="!nuevaMedida.trim()"
+              @click="agregarMedida"
               >Añadir medida</Button
             >
           </div>
@@ -1889,6 +2170,7 @@ onMounted(loadCatalog)
                 (componentes.length >= limites.max_componentes ||
                   componentes.some((c) => !c.nombre.trim()))
               "
+              :id="!studio ? 'nuevo-componente' : undefined"
               @click="addComponente()"
               ><Plus v-if="studio" :size="15" aria-hidden="true" />Agregar componente</Button
             >

@@ -1,0 +1,87 @@
+{
+  "scope": "Offline synthetic 240-second ASR-only verification; no NLP execution",
+  "package_version": "0.1.28",
+  "wheel_sha256": "abf68e16979c9cdf64eff534051798cec3a12b9d27672fd0f9fcd4805e825fea",
+  "model": {
+    "family": "faster-whisper-small",
+    "revision": "536b0662742c02347bc0e980a01041f333bce120",
+    "device": "cpu",
+    "compute_type": "int8",
+    "offline": true,
+    "faster_whisper": "1.2.1",
+    "ctranslate2": "4.8.2"
+  },
+  "audio": {
+    "duration_seconds": 240,
+    "sample_rate_hz": 16000,
+    "channels": 1,
+    "bytes": 7680078,
+    "sha256": "68b2ac5b808de88007546759a5f160d1c78cd6285788c823e2e62f6e46260395",
+    "fixture": "Looped synthetic furniture speech, not customer audio"
+  },
+  "wall_seconds": 26.53,
+  "result": {
+    "schema_version": "1.0",
+    "text_original": "Quiero un escritorio de oficina con dos cajones, total 100 bolivianos. Quiero un escritorio de oficina con dos cajones, total 100 bolivianos. Quiero un escritorio de oficina con dos cajones, total 100 bolivianos. Quiero un escritorio de oficina con dos cajones, total 100 bolivianos. Quiero un escritorio de oficina con dos cajones, total 100 bolivianos. Quiero un escritorio de oficina con dos cajones, total 100 bolivianos. Quiero un escritorio de oficina con dos cajones, total 100 bolivianos. Quiero un escritorio de oficina con dos cajones, total 100 bolivianos. Quiero un escritorio de oficina con dos cajones, total 100 bolivianos.",
+    "language": "es",
+    "segments": [
+      {
+        "start_seconds": "0.000000",
+        "end_seconds": "7.000000",
+        "text": " Quiero un escritorio de oficina con dos cajones, total 100 bolivianos."
+      },
+      {
+        "start_seconds": "7.000000",
+        "end_seconds": "33.000000",
+        "text": " Quiero un escritorio de oficina con dos cajones, total 100 bolivianos."
+      },
+      {
+        "start_seconds": "37.000000",
+        "end_seconds": "61.000000",
+        "text": " Quiero un escritorio de oficina con dos cajones, total 100 bolivianos."
+      },
+      {
+        "start_seconds": "67.000000",
+        "end_seconds": "87.000000",
+        "text": " Quiero un escritorio de oficina con dos cajones, total 100 bolivianos."
+      },
+      {
+        "start_seconds": "97.000000",
+        "end_seconds": "117.000000",
+        "text": " Quiero un escritorio de oficina con dos cajones, total 100 bolivianos."
+      },
+      {
+        "start_seconds": "127.000000",
+        "end_seconds": "143.000000",
+        "text": " Quiero un escritorio de oficina con dos cajones, total 100 bolivianos."
+      },
+      {
+        "start_seconds": "157.000000",
+        "end_seconds": "167.000000",
+        "text": " Quiero un escritorio de oficina con dos cajones, total 100 bolivianos."
+      },
+      {
+        "start_seconds": "187.000000",
+        "end_seconds": "215.000000",
+        "text": " Quiero un escritorio de oficina con dos cajones, total 100 bolivianos."
+      },
+      {
+        "start_seconds": "215.000000",
+        "end_seconds": "241.000000",
+        "text": " Quiero un escritorio de oficina con dos cajones, total 100 bolivianos."
+      }
+    ],
+    "duration_seconds": null,
+    "latency_ms": 24674
+  },
+  "checks": {
+    "nonempty_transcript": true,
+    "transcript_characters": 638,
+    "segments": 9,
+    "late_audio_covered": true
+  },
+  "limitations": [
+    "Synthetic speech is not a field WER assessment.",
+    "Whisper timestamps are approximate; the final segment ends at 241.0s for this 240.0s clip."
+  ]
+}

@@ -6,6 +6,7 @@ import type {
   ResultadoAsistida,
   ValorCatalogoPublico,
 } from '@/generated/api'
+import type { VoiceFieldReview } from '@/modules/capturas/fieldVoiceReview'
 import StagedVoiceCapture from '@/modules/capturas/components/StagedVoiceCapture.vue'
 const props = defineProps<{
   categoria: CategoriaEnum
@@ -14,6 +15,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   applied: [
     payload: {
+      capture_id: number
+      field_reviews: VoiceFieldReview[]
       fields: CamposCatalogo
       text: string
       warnings: string[]
@@ -27,6 +30,10 @@ const session = crypto.randomUUID()
 function apply(result: ResultadoCatalogo | ResultadoAsistida) {
   if (!('propuesta' in result) || !result.propuesta) return
   emit('applied', {
+    capture_id: result.id,
+    field_reviews:
+      (result.propuesta as typeof result.propuesta & { field_reviews?: VoiceFieldReview[] })
+        .field_reviews ?? [],
     fields: result.propuesta.fields,
     text: result.texto_transcrito_original ?? '',
     warnings: result.propuesta.warnings,

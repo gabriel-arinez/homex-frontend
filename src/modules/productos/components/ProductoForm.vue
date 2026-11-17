@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { vVoiceFields, type FieldVoiceReview } from '@/modules/capturas/fieldVoiceReview'
+import {
+  vVoiceFields,
+  appendVoiceAudit,
+  humanVoiceDecision,
+  type VoiceFieldReview,
+  type FieldVoiceReview,
+} from '@/modules/capturas/fieldVoiceReview'
 import type { VoiceEvidence } from '@/modules/capturas/voiceEvidence'
 import { dateRangeError } from '@/shared/validation/dateRange'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
@@ -50,9 +56,22 @@ const recordingActive = ref(false)
 const recordingPaused = ref(false)
 const recordingElapsed = ref(0)
 const voiceObservations = ref<FieldVoiceReview[]>([])
+const VOICE_REVIEW_REQUIRED = 'Revisa los campos señalados antes de guardar el producto.'
 const voiceWarnings = ref<string[]>([])
+const voiceCaptureId = ref<number>()
+const voiceFieldReviews = ref<VoiceFieldReview[]>([])
+let voiceAuditHistory: unknown = (
+  props.initial as (Producto & { revision_humana_voz?: unknown }) | undefined
+)?.revision_humana_voz
 const voiceOriginalValues = ref<Record<string, string>>({})
+const voiceAuditOriginalValues = ref<Record<string, unknown>>({})
 const voiceResolutions = ref<Record<string, { value: string; state: 'edited' | 'reviewed' }>>({})
+function catalogAuditValue(fields: unknown, field: string): unknown {
+  let value = fields
+  for (const key of field.split('.'))
+    value = value && typeof value === 'object' ? (value as Record<string, unknown>)[key] : null
+  return value ?? null
+}
 function voiceValue(field: string): string {
   if (field.startsWith('especificaciones.'))
     return camposSilla.value.find((c) => `especificaciones.${c.clave}` === field)?.valor ?? ''
@@ -67,7 +86,9 @@ function validVoiceValue(field: string): boolean {
   if (['espesor', 'largo', 'ancho', 'm2-caja'].includes(field))
     return Number.isFinite(Number(value)) && Number(value) > 0
   const control = Array.from(
-    formElement.value?.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input,select') ?? [],
+    formElement.value?.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
+      'input,select,textarea',
+    ) ?? [],
   ).find((el) => el.name === field)
   return !!control && control.checkValidity()
 }
@@ -91,6 +112,14 @@ function resolveVoiceField(field: string, edited: boolean) {
     value: voiceValue(field),
     state: edited ? 'edited' : 'reviewed',
   }
+  clearResolvedVoiceError()
+}
+function clearResolvedVoiceError() {
+  if (
+    error.value === VOICE_REVIEW_REQUIRED &&
+    !voiceFields.value.some((field) => field.critical && field.state === 'pending')
+  )
+    error.value = ''
 }
 const voiceReview = computed(() => ({ fields: voiceFields.value, resolve: resolveVoiceField }))
 
@@ -307,8 +336,39 @@ function onVoiceApplied(payload: {
   text: string
   warnings: string[]
   evidence?: VoiceEvidence[]
+  capture_id?: number
+  field_reviews?: VoiceFieldReview[]
 }) {
+  voiceCaptureId.value = payload.capture_id
+  voiceFieldReviews.value = [
+    ...(payload.field_reviews ?? []),
+    ...Object.keys(payload.fields)
+      .flatMap((field) =>
+        field === 'especificaciones' && payload.fields.especificaciones
+          ? Object.keys(payload.fields.especificaciones).map((key) => `especificaciones.${key}`)
+          : [field],
+      )
+      .filter((field) => !(payload.field_reviews ?? []).some((r) => r.field === field))
+      .map((field): VoiceFieldReview => ({
+        review_id: `field:${field}`,
+        field,
+        code: 'VOICE_SUGGESTION',
+        severity: 'INFO',
+        message: '',
+        evidence_ids: (payload.evidence ?? [])
+          .filter((e) => e.label === field && e.decision === 'ACCEPTED' && 'candidate_id' in e)
+          .map((e) => String((e as VoiceEvidence & { candidate_id: string }).candidate_id)),
+      })),
+  ]
+  // Audit source values come from the NLP payload, not defaulted/stringified controls.
+  voiceAuditOriginalValues.value = Object.fromEntries(
+    voiceFieldReviews.value.map((review) => [
+      review.field,
+      catalogAuditValue(payload.fields, review.field),
+    ]),
+  )
   const names = new Set([
+    ...(payload.field_reviews ?? []).map((review) => review.field),
     ...Object.keys(payload.fields).flatMap((key) =>
       key === 'especificaciones' && payload.fields.especificaciones
         ? Object.keys(payload.fields.especificaciones).map((name) => `especificaciones.${name}`)
@@ -320,19 +380,28 @@ function onVoiceApplied(payload: {
     const pending = (payload.evidence ?? []).find(
       (e) => e.label === field && e.decision === 'UNRESOLVED',
     )
+    const review = payload.field_reviews?.find(
+      (review) => review.field === field && review.severity !== 'INFO',
+    )
     return {
       field: catalogFieldNames[field] ?? field,
-      state: pending ? 'pending' : 'suggested',
-      reason: pending?.reason || (pending ? 'Confirma o corrige este dato.' : ''),
-      critical: Boolean(pending),
+      state: pending || review ? 'pending' : 'suggested',
+      reason:
+        review?.message || pending?.reason || (pending ? 'Confirma o corrige este dato.' : ''),
+      critical: review ? review.severity === 'CRITICAL' : Boolean(pending),
     }
   })
-  voiceWarnings.value = [...payload.warnings]
+  voiceWarnings.value = [...new Set(payload.warnings)].filter(
+    (warning) =>
+      !payload.field_reviews?.some((review) => review.message === warning) &&
+      !voiceObservations.value.some((observation) => observation.reason === warning),
+  )
   voiceResolutions.value = {}
   applyProposals(Object.entries(payload.fields))
   voiceOriginalValues.value = Object.fromEntries(
     voiceObservations.value.map((item) => [item.field, voiceValue(item.field)]),
   )
+  clearResolvedVoiceError()
 }
 
 async function load() {
@@ -396,7 +465,7 @@ function nullable(value: string) {
 
 function submit(): boolean {
   if (voiceFields.value.some((item) => item.critical && item.state === 'pending')) {
-    error.value = 'Revisa los campos señalados antes de guardar el producto.'
+    error.value = VOICE_REVIEW_REQUIRED
     return false
   }
   if ((loading.value && !props.initial) || props.processing) return false
@@ -488,6 +557,38 @@ function submit(): boolean {
       activo: form.promo_enabled,
     }
 
+  if (voiceCaptureId.value) {
+    const finalValues = { ...body, ...body.silla, ...body.piso }
+    const decisiones = voiceFieldReviews.value.flatMap((review) => {
+      const field = catalogFieldNames[review.field] ?? review.field
+      const resolution = voiceResolutions.value[field]
+      if (!resolution || resolution.value !== voiceValue(field) || !validVoiceValue(field))
+        return []
+      const finalValue = catalogAuditValue(finalValues, review.field)
+      // DRF trims textual model fields; JSON specification values retain their actual types.
+      const storedValue =
+        typeof finalValue === 'string' && !review.field.startsWith('especificaciones.')
+          ? finalValue.trim()
+          : finalValue
+      return [
+        humanVoiceDecision(voiceCaptureId.value!, {
+          review_id: review.review_id,
+          field: review.field,
+          evidence_ids: review.evidence_ids,
+          estado: resolution.state === 'reviewed' ? 'confirmado' : 'corregido',
+          valor_original: voiceAuditOriginalValues.value[review.field] ?? null,
+          valor_final: storedValue,
+        }),
+      ]
+    })
+    if (decisiones.length) {
+      voiceAuditHistory = appendVoiceAudit(voiceAuditHistory, {
+        captura_asistida_id: voiceCaptureId.value,
+        decisiones,
+      })
+      Object.assign(body, { revision_humana_voz: voiceAuditHistory })
+    }
+  }
   emit('save', body, images.value)
   return true
 }
