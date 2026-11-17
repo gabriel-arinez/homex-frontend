@@ -495,18 +495,19 @@ test('FURNITURE STUDIO ubica los controles de imágenes al lado y los apila en m
   await expect(viewer).not.toBeVisible()
   await page.setViewportSize({ width: 390, height: 844 })
   await noOverflow(page)
+  // Read all geometry in one browser frame; separate awaits can mix scroll/resize states.
   await expect
-    .poll(async () => {
-      const h = await hero.boundingBox()
-      const t = await pageThumbs.boundingBox()
-      return t && h ? t.y - (h.y + h.height - 1) : -999
-    })
-    .toBeGreaterThanOrEqual(0)
-  const mobileHero = await hero.boundingBox()
-  const mobilePageThumbs = await pageThumbs.boundingBox()
-  const mobileControls = await controls.boundingBox()
-  expect(mobilePageThumbs!.y).toBeGreaterThanOrEqual(mobileHero!.y + mobileHero!.height - 1)
-  expect(mobileControls!.y).toBeGreaterThan(mobileHero!.y + mobileHero!.height - 1)
+    .poll(() =>
+      gallery.evaluate((region) => {
+        const h = region.querySelector('.hero')?.getBoundingClientRect()
+        const t = region.querySelector('.thumbs')?.getBoundingClientRect()
+        const c = Array.from(region.querySelectorAll('.actions > button'))
+          .find((button) => button.textContent?.includes('Agregar imágenes'))
+          ?.getBoundingClientRect()
+        return Boolean(h && t && c && t.y >= h.bottom - 1 && c.y > h.bottom - 1)
+      }),
+    )
+    .toBe(true)
   await page.setViewportSize({ width: 1280, height: 800 })
   await studioStep(page, 'Revisar')
   const reviewGallery = page.locator('.studio-review-layout > .studio-review-gallery')
