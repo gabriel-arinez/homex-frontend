@@ -36,8 +36,8 @@ Encárgate de completar la integración de `feat/voice-hitl-review` en los tres 
 
 ## Tasks
 
-T1 | S1 | inline GitHub publication after read-only policy map | pending | current branches clean and conflict-free
-T2 | S1 | inline NLP PR/CI and main merge, verify main CI before T3 | pending
+T1 | S1 | inline GitHub publication after read-only policy map | done | NLP PR47, backend PR62, frontend PR70
+T2 | S1 | inline NLP PR/CI and main merge, verify main CI before T3 | done | PR47 merge5fa4ace; main CI44129312955 success
 T3 | S1 | inline backend PR/CI with NLP0.1.29 and exact frontend peer, merge and verify main | pending
 T4 | S1 | inline frontend PR/CI with exact backend main, merge and verify main | pending
 T5 | S1 | inline final cross-repo CI, local main synchronization and clean readback | pending
@@ -47,3 +47,8 @@ T5 | S1 | inline final cross-repo CI, local main synchronization and clean readb
 L1. Original request is quoted verbatim in S1. User subsequently answered `si` to current authenticated gh-session authorization for these three repositories, and `si` to exactly one PR per repository without an approved linked issue and with size exception. Those waivers do not waive any CI or repository protection/review.
 L2. Preflight: all three existing feature branches clean; git fetch completed, origin/main fully contained; zero main-only commits and merge-tree exit0 each. NLP8/backend10/frontend13 feature commits. Approximate full changed-line counts1012/3251/7631 include generated files/docs. No main protections/rulesets and no existing feature PRs found; no approved issue open/closed. No unrelated PRs will change. Parent owns remote/git mutations; delegated read-only map was used for CI/policy mapping.
 L3. Actual main CI must be verified after each ordered merge. Ordinary backend/frontend CI uses historical pinned peer refs; workflow_dispatch supports integration_peer_ref for exact final source/merged peer compatibility. Preserve historical verification gates; fix only demonstrated CI/integration issues. RDD remains globallyoff, independent checking retained for any high-risk CI/dependency correction.
+
+L4. Published all three branches and created NLP https://github.com/gabriel-arinez/homex-nlp/pull/47, backend https://github.com/gabriel-arinez/homex-backend/pull/62, frontend https://github.com/gabriel-arinez/homex-frontend/pull/70. Explicit maintainer waivers recorded in each PR; exactly one type:feature label and size:exception. No merge performed; GitHub CI pending.
+
+L5. NLP PR47 merged via merge commit5fa4ace20e69bf1ba876b59b61a7edac4118ed15 after all current PR checks passed. Post-merge main CI44129312955 success confirms ordered step1 before any backend/frontend merge. Actual initial failure was a stale current release pointer25; corrected in2123155, preserving published25manifest and all29archive members. SOURCE_DATE_EPOCH=0 canonicalCIhasha559... differs only ZIPtimestamps from existing backendvendor4e8...; both same36members. RED2/GREEN2 plus1211fullsource tests and independent exact-epoch assertion passed.
+L6. Backend initialf09CI fails oldfrontendOpenAPI; frontend initialcontractCI fails oldbackendOpenAPI. Current local snapshots match exactly. Plan immutablepeerupdates plus explicitfinalmain dispatch. Gitleaks flags exactlytwo historical unsignedmockJWTs, verifiedalg:none/literal fake signature; scopedexistingfingerprint convention preserveshistory/securityworkflow. Obsolete frontend integration runs44126892011/44126873829 cancelled, never counted as passing. Syntheticcommercialdictations were too short despite valid-durationaudio; backendfixturetexts/regressiontest corrected in7c9e748 withoutchanging appvalidation. CI/security config corrections remain independently checked before publication/merge.
