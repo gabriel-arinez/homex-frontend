@@ -1288,14 +1288,33 @@ for (const width of [360, 768, 1440]) {
     await page.getByRole('button', { name: 'Seleccionar archivo' }).click()
     expect(captures).toBe(0)
     await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Mueble previo')
+    const pcm = Buffer.alloc(44 + 16000 * 2 * 15)
+    pcm.write('RIFF')
+    pcm.writeUInt32LE(pcm.length - 8, 4)
+    pcm.write('WAVEfmt ', 8)
+    pcm.writeUInt32LE(16, 16)
+    pcm.writeUInt16LE(1, 20)
+    pcm.writeUInt16LE(1, 22)
+    pcm.writeUInt32LE(16000, 24)
+    pcm.writeUInt32LE(32000, 28)
+    pcm.writeUInt16LE(2, 32)
+    pcm.writeUInt16LE(16, 34)
+    pcm.write('data', 36)
+    pcm.writeUInt32LE(pcm.length - 44, 40)
     await page
       .getByRole('dialog', { name: 'Completar mueble por voz' })
       .locator('input[type="file"]')
-      .setInputFiles({ name: '24.wav', mimeType: 'audio/wav', buffer: Buffer.from('fixture') })
+      .setInputFiles({ name: '24.wav', mimeType: 'audio/wav', buffer: pcm })
     const drawer = page.getByRole('dialog', { name: 'Completar mueble por voz' })
     await expect(drawer.locator('textarea')).toHaveValue(captura24.texto_transcrito_original!)
     expect(captures).toBe(1)
     await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Mueble previo')
+    await expect(drawer.getByRole('button', { name: 'Procesar texto', exact: true })).toBeDisabled()
+    await drawer
+      .locator('textarea')
+      .fill(
+        `${captura24.texto_transcrito_original} para oficina con acabado natural y entrega programada por el vendedor`,
+      )
     await drawer.getByRole('button', { name: 'Procesar texto', exact: true }).click()
     await expect(
       drawer.getByRole('button', { name: 'Aplicar propuesta', exact: true }),

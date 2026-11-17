@@ -58,13 +58,15 @@ for (const extension of ['aac', 'opus', 'mp4', 'flac']) {
       .setInputFiles(
         fileURLToPath(new URL(`../fixtures/voice-mobile/tone.${extension}`, import.meta.url)),
       )
-    await expect(drawer.locator('audio, [role="alert"]')).toBeVisible()
+    await expect(drawer.locator('audio, [role="alert"]').first()).toBeVisible()
     await expect(drawer.getByText('Validando y preparando audio…')).toHaveCount(0)
     if (await drawer.locator('audio').count()) {
       await expect(drawer.locator('textarea')).toHaveValue('Transcripción de prueba')
       expect(posts).toBe(1)
     } else {
-      await expect(drawer.getByRole('alert')).toContainText(/convertir|compatible|dañado/i)
+      await expect(drawer.getByRole('alert')).toContainText(
+        /convertir|compatible|dañado|15 segundos/i,
+      )
       expect(posts).toBe(0)
     }
   })

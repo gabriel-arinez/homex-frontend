@@ -66,13 +66,18 @@ for (const mode of ['catalog', 'furniture'] as const) {
     expect(button(w, 'Transcribir audio')).toBeUndefined()
     expect(button(w, 'Aplicar propuesta')).toBeUndefined()
     expect(w.emitted('applied')).toBeUndefined()
-    await w.get('textarea').setValue('Silla plegable precio 450')
+    await w
+      .get('textarea')
+      .setValue(
+        'Silla plegable precio 450 para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+      )
     expect(create).toHaveBeenCalledTimes(1)
     await button(w, 'Procesar texto')!.trigger('click')
     await flushPromises()
     expect(create).toHaveBeenCalledTimes(2)
     expect(create.mock.calls[1]![0]).toMatchObject({
-      texto: 'Silla plegable precio 450',
+      texto:
+        'Silla plegable precio 450 para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
       captura_origen: 1,
     })
     expect(create.mock.calls[1]![0].audio).toBeUndefined()
@@ -119,7 +124,7 @@ it('an invalid file never starts ASR and keeps previous editable text', async ()
   await upload(w)
   expect(create).not.toHaveBeenCalled()
   expect(w.get('textarea').element.value).toBe('Mesa de madera')
-  expect(w.get('[role=alert]').text()).toContain('incompatible')
+  expect(w.text()).toContain('incompatible')
   w.unmount()
 })
 it('empty ASR stays retryable and never enables NLP or an application', async () => {

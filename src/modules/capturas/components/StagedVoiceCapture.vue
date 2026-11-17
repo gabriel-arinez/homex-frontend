@@ -8,6 +8,8 @@ import {
   MAX_TRANSCRIPT_CHARACTERS,
   CAPTURE_TIMEOUT_MS,
   validateTranscript,
+  countTranscriptWords,
+  countTranscriptCharacters,
 } from '../audioLimits'
 import { prepareAudioForCapture } from '../audioConversion'
 import ProposalSummary from './ProposalSummary.vue'
@@ -54,6 +56,9 @@ const busy = computed(
 let proposalGeneration = -1
 let proposalText = ''
 let settingAsrText = false
+const editError = ref('')
+const transcriptWords = computed(() => countTranscriptWords(text.value))
+const transcriptCharacters = computed(() => countTranscriptCharacters(text.value))
 const transcriptError = computed(() => validateTranscript(text.value))
 const catalog = computed(() => (result.value && 'propuesta' in result.value ? result.value : null))
 const furniture = computed(() =>
@@ -297,6 +302,36 @@ async function process(useAudio = false) {
     }
   }
 }
+function updateTranscript(event: Event) {
+  const input = event.target as HTMLTextAreaElement
+  const next = input.value
+  if (
+    countTranscriptCharacters(next) > MAX_TRANSCRIPT_CHARACTERS &&
+    countTranscriptCharacters(next) > transcriptCharacters.value
+  ) {
+    input.value = text.value
+    editError.value =
+      'No se añadió el texto: el máximo es 3000 caracteres. Reduce la transcripción para continuar.'
+    return
+  }
+  editError.value = ''
+  text.value = next
+}
+function pasteTranscript(event: ClipboardEvent) {
+  const input = event.target as HTMLTextAreaElement
+  if (!event.clipboardData) return
+  const pasted = event.clipboardData.getData('text')
+  const next =
+    text.value.slice(0, input.selectionStart) + pasted + text.value.slice(input.selectionEnd)
+  if (
+    countTranscriptCharacters(next) > MAX_TRANSCRIPT_CHARACTERS &&
+    countTranscriptCharacters(next) > transcriptCharacters.value
+  ) {
+    event.preventDefault()
+    editError.value =
+      'No se pegó el texto: el máximo es 3000 caracteres. El contenido existente se conserva.'
+  }
+}
 function normalizeText() {
   text.value = text.value
     .normalize('NFC')
@@ -366,9 +401,11 @@ function apply() {
     <template v-if="!applied">
       <label
         >Revisar y corregir transcripción<textarea
-          v-model="text"
+          :value="text"
+          aria-describedby="voice-transcript-count voice-transcript-error"
+          @input="updateTranscript"
+          @paste="pasteTranscript"
           :aria-invalid="Boolean(transcriptError && text)"
-          :maxlength="MAX_TRANSCRIPT_CHARACTERS + 1"
           rows="7"
           :disabled="recording"
         />
@@ -379,14 +416,18 @@ function apply() {
         @click="normalizeText"
         >Normalizar espacios</Button
       >
-      <small aria-live="polite"
-        >{{ text.length }} / {{ MAX_TRANSCRIPT_CHARACTERS }} caracteres</small
+      <small id="voice-transcript-count" aria-live="polite"
+        >{{ transcriptWords }} / 20 palabras mínimas · {{ transcriptCharacters }} /
+        {{ MAX_TRANSCRIPT_CHARACTERS }} caracteres</small
       >
       <details v-if="original">
         <summary>Transcripción original del ASR (evidencia)</summary>
         <p class="original">{{ original }}</p>
       </details>
-      <p v-if="text && transcriptError" role="alert">{{ transcriptError }}</p>
+      <p id="voice-transcript-error" :role="text && transcriptError ? 'alert' : undefined">
+        {{ transcriptError }}
+      </p>
+      <p v-if="editError" role="alert">{{ editError }}</p>
       <Button :disabled="busy || Boolean(audio) || Boolean(transcriptError)" @click="process(false)"
         >Procesar texto</Button
       >

@@ -94,7 +94,8 @@ export function useAudioRecorder() {
       recorder.onstop = () => {
         const captured = new Blob(chunks, { type: recorder?.mimeType || 'audio/webm' })
         if (elapsed.value < MIN_AUDIO_SECONDS || captured.size === 0) {
-          error.value = 'Graba al menos 2 segundos de audio antes de continuar.'
+          error.value =
+            'Graba al menos 15 segundos y dicta una descripción más completa antes de continuar.'
           blob.value = null
           state.value = 'ERROR'
         } else if (captured.size > MAX_AUDIO_BYTES) {

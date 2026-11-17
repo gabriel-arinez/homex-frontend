@@ -28,21 +28,33 @@ export function readAudioDuration(file: File): Promise<number | null> {
   })
 }
 
-export const MIN_AUDIO_SECONDS = 2
-export const MAX_TRANSCRIPT_CHARACTERS = 20_000
+export const MIN_AUDIO_SECONDS = 15
+export const MAX_TRANSCRIPT_CHARACTERS = 3_000
 /** CPU transcription can take longer than the recording itself. */
 export const CAPTURE_TIMEOUT_MS = 22 * 60_000
 
+/** Whitespace-delimited commercial tokens; isolated punctuation is not a word. */
+export function countTranscriptWords(text: string): number {
+  return text.split(/\s+/u).filter((token) => /[\p{L}\p{N}]/u.test(token)).length
+}
+
+export function countTranscriptCharacters(text: string): number {
+  return Array.from(text).length
+}
+
 export function validateTranscript(text: string): string {
-  if (!text.trim() || !/\p{L}/u.test(text)) return 'Escribe una descripción con contenido textual.'
-  if (text.length > MAX_TRANSCRIPT_CHARACTERS)
-    return `La descripción supera ${MAX_TRANSCRIPT_CHARACTERS} caracteres.`
+  if (countTranscriptWords(text) < 20)
+    return 'Completa la descripción con al menos 20 palabras antes de procesarla.'
+  if (countTranscriptCharacters(text) > MAX_TRANSCRIPT_CHARACTERS)
+    return `La descripción supera ${MAX_TRANSCRIPT_CHARACTERS} caracteres. Reduce el texto antes de procesarlo.`
   return ''
 }
 
 export function validateAudioDuration(seconds: number | null): string {
-  if (seconds !== null && seconds < MIN_AUDIO_SECONDS)
-    return 'El audio debe durar al menos 2 segundos.'
+  if (seconds === null || !Number.isFinite(seconds) || seconds <= 0)
+    return 'No se pudo comprobar la duración. Selecciona otro archivo de audio.'
+  if (seconds < MIN_AUDIO_SECONDS)
+    return 'El audio debe durar al menos 15 segundos. Dicta una descripción más completa.'
   if (seconds !== null && seconds > MAX_UPLOAD_SECONDS)
     return 'El audio supera los 5 minutos permitidos.'
   return ''

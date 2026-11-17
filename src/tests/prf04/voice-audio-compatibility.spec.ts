@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { audioBufferToWavBlob, prepareAudioForCapture } from '@/modules/capturas/audioConversion'
-const decoded = (duration = 3): AudioBuffer =>
+const decoded = (duration = 15): AudioBuffer =>
   ({
     duration,
     length: duration * 16000,
@@ -32,7 +32,7 @@ it.each(['aac', 'opus', 'mp4', 'flac'])(
     const file = await prepareAudioForCapture(mobile(`phone.${extension}`))
     expect(file.name).toBe('phone.wav')
     expect(file.type).toBe('audio/wav')
-    expect(file.size).toBe(44 + 3 * 16000 * 2)
+    expect(file.size).toBe(44 + 15 * 16000 * 2)
   },
 )
 it('rejects unavailable or failed conversion explicitly, never sending the original extension', async () => {
@@ -49,13 +49,10 @@ it('rejects unavailable or failed conversion explicitly, never sending the origi
   )
   await expect(prepareAudioForCapture(mobile())).rejects.toThrow(/convertir|dañado/i)
 })
-it.each([1.99, 301])(
-  'rejects converted duration %s before producing an upload',
-  async (seconds) => {
-    decoder(decoded(seconds))
-    await expect(prepareAudioForCapture(mobile())).rejects.toThrow(/2 segundos|5 minutos/)
-  },
-)
+it.each([14, 301])('rejects converted duration %s before producing an upload', async (seconds) => {
+  decoder(decoded(seconds))
+  await expect(prepareAudioForCapture(mobile())).rejects.toThrow(/15 segundos|5 minutos/)
+})
 it('refuses oversized decoded PCM before allocating or silently truncating samples', () => {
   const buffer = {
     duration: 300,

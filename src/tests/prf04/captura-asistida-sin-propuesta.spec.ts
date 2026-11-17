@@ -19,7 +19,11 @@ async function enviarArchivo() {
     props: { dirty: false, sesion: 'piloto-v13', moneda: 'BOB' },
     global: { stubs: { AudioRecorder: true, Modal: true } },
   })
-  await wrapper.get('textarea').setValue('Un escritorio')
+  await wrapper
+    .get('textarea')
+    .setValue(
+      'Un escritorio para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+    )
   await wrapper
     .findAll('button')
     .find((b) => b.text() === 'Procesar texto')!
@@ -57,7 +61,8 @@ describe('PRF-04 transcripción visible tras respuesta terminal NLP', () => {
       estado: 'COMPLETADA',
       pendientes: [],
       resultado: 'REQUIRES_REVIEW',
-      texto_transcrito_original: 'Un escritorio',
+      texto_transcrito_original:
+        'Un escritorio para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
       propuesta_configurador: { comercial: { nombre: 'Escritorio' } },
       version_proyeccion: 'PRF04_2',
     } as never)
@@ -77,7 +82,8 @@ describe('PRF-04 transcripción visible tras respuesta terminal NLP', () => {
       estado: 'COMPLETADA',
       pendientes: [],
       resultado: 'REQUIRES_REVIEW',
-      texto_transcrito_original: 'Un escritorio',
+      texto_transcrito_original:
+        'Un escritorio para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
       propuesta_configurador: { comercial: { nombre: 'Escritorio' } },
       version_proyeccion: 'PRF04_1',
     } as never)

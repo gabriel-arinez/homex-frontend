@@ -16,7 +16,9 @@ test('@a11y catalog voice uses automatic ASR, corrected text, explicit interpret
   let audioRequests = 0,
     textRequests = 0,
     saves = 0
-  const corrected = 'silla plegable precio 450'
+  const corrected =
+    'silla plegable de madera para oficina con respaldo asiento patas acabado natural cantidad dos unidades precio de lista 450' +
+    ' bolivianos'
   await page.route('**/api/v1/**', async (route) => {
     const path = new URL(route.request().url()).pathname
     if (path.endsWith('/auth/me/'))
@@ -75,7 +77,7 @@ test('@a11y catalog voice uses automatic ASR, corrected text, explicit interpret
                 candidate_id: 'price',
                 label: 'precio_lista',
                 start: corrected.indexOf('450'),
-                end: corrected.length,
+                end: corrected.indexOf('450') + 3,
                 text: '450',
                 decision: 'UNRESOLVED',
                 reason: 'Confirmar precio comercial',
@@ -94,8 +96,8 @@ test('@a11y catalog voice uses automatic ASR, corrected text, explicit interpret
   await page.goto('/productos/nuevo?categoria=SILLA')
   await page.getByRole('button', { name: 'Completar por voz', exact: true }).click()
   const drawer = page.getByRole('dialog', { name: 'Completar por voz', exact: true })
-  // Two seconds of valid PCM. Silence warning is advisory, not a blocker.
-  const wav = Buffer.alloc(44 + 16000 * 2 * 2)
+  // Fifteen seconds of valid PCM. Silence warning is advisory, not a blocker.
+  const wav = Buffer.alloc(44 + 16000 * 2 * 15)
   wav.write('RIFF')
   wav.writeUInt32LE(wav.length - 8, 4)
   wav.write('WAVEfmt ', 8)
@@ -108,6 +110,14 @@ test('@a11y catalog voice uses automatic ASR, corrected text, explicit interpret
   wav.writeUInt16LE(16, 34)
   wav.write('data', 36)
   wav.writeUInt32LE(wav.length - 44, 40)
+  const shortWav = Buffer.from(wav.subarray(0, 44 + 16000 * 2 * 14))
+  shortWav.writeUInt32LE(shortWav.length - 8, 4)
+  shortWav.writeUInt32LE(shortWav.length - 44, 40)
+  await drawer
+    .locator('input[type=file]')
+    .setInputFiles({ name: 'short.wav', mimeType: 'audio/wav', buffer: shortWav })
+  await expect(drawer.getByRole('alert').filter({ hasText: '15 segundos' })).toBeVisible()
+  expect(audioRequests).toBe(0)
   await drawer
     .locator('input[type=file]')
     .setInputFiles({ name: 'voice.wav', mimeType: 'audio/wav', buffer: wav })
@@ -118,6 +128,11 @@ test('@a11y catalog voice uses automatic ASR, corrected text, explicit interpret
   expect(textRequests).toBe(0)
   expect((await new AxeBuilder({ page }).include('.staged-voice').analyze()).violations).toEqual([])
   await expect(page.locator('input[name=nombre]')).toHaveValue('')
+  await drawer.locator('textarea').fill('dato '.repeat(19).trim())
+  await expect(drawer.getByRole('button', { name: 'Procesar texto', exact: true })).toBeDisabled()
+  await drawer.locator('textarea').fill('dato '.repeat(20).trim())
+  await expect(drawer.getByRole('button', { name: 'Procesar texto', exact: true })).toBeEnabled()
+  expect(textRequests).toBe(0)
   await drawer.locator('textarea').fill(corrected)
   await drawer.getByRole('button', { name: 'Procesar texto', exact: true }).click()
   await expect(drawer.getByRole('button', { name: 'Aplicar propuesta', exact: true })).toBeVisible()

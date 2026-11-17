@@ -45,6 +45,11 @@ describe('Furniture Studio: emisión de propuesta PRF04', () => {
       await flushPromises()
       expect(wrapper.emitted('proposed')).toBeUndefined()
       await wrapper
+        .get('textarea')
+        .setValue(
+          'Un escritorio de madera para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+        )
+      await wrapper
         .findAll('button')
         .find((b) => b.text() === 'Procesar texto')!
         .trigger('click')

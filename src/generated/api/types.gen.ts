@@ -172,6 +172,9 @@ export type ConfirmarCaptura = {
 export type CrearAsistida = {
   clave_idempotencia: string
   proforma?: number | null
+  /**
+   * Descripción comercial revisada: al menos 20 palabras y hasta 3000 caracteres.
+   */
   texto?: string
   sesion_borrador: string
   moneda_codigo?: MonedaCodigoEnum
@@ -201,6 +204,9 @@ export type CrearCapturaTexto = {
 
 export type CrearCatalogo = {
   clave_idempotencia: string
+  /**
+   * Descripción comercial revisada: al menos 20 palabras y hasta 3000 caracteres.
+   */
   texto?: string
   sesion_borrador: string
   captura_origen?: number | null
@@ -1053,6 +1059,9 @@ export type ClienteWritable = {
 export type CrearAsistidaWritable = {
   clave_idempotencia: string
   proforma?: number | null
+  /**
+   * Descripción comercial revisada: al menos 20 palabras y hasta 3000 caracteres.
+   */
   texto?: string
   audio?: Blob | File
   sesion_borrador: string
@@ -1074,6 +1083,9 @@ export type CrearCapturaMultipartWritable = {
 
 export type CrearCatalogoWritable = {
   clave_idempotencia: string
+  /**
+   * Descripción comercial revisada: al menos 20 palabras y hasta 3000 caracteres.
+   */
   texto?: string
   audio?: Blob | File
   sesion_borrador: string

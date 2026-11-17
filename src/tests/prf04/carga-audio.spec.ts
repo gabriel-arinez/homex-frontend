@@ -51,7 +51,8 @@ describe('PRF-04 carga de grabaciones', () => {
       captura_origen: null,
       texto_asr_original: null,
       texto_corregido: null,
-      texto_transcrito_original: 'Un escritorio con mesón engrosado',
+      texto_transcrito_original:
+        'Un escritorio con mesón engrosado para oficina con acabado material medidas cantidad precio marca modelo unidad diseño color entrega y transporte',
       resultado: 'REQUIRES_REVIEW',
       propuesta_configurador: {
         comercial: {
@@ -167,7 +168,11 @@ describe('PRF-04 carga de grabaciones', () => {
 
   it('conserva los datos existentes hasta confirmación explícita de la propuesta', async () => {
     const wrapper = montar(true)
-    await wrapper.get('textarea').setValue('Un escritorio')
+    await wrapper
+      .get('textarea')
+      .setValue(
+        'Un escritorio para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+      )
     expect(wrapper.emitted('applied')).toBeUndefined()
     expect(wrapper.findAll('button').some((b) => b.text() === 'Aplicar propuesta')).toBe(false)
     wrapper.unmount()

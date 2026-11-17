@@ -74,7 +74,11 @@ describe('PRF-04 confirmación del reemplazo', () => {
     const wrapper = mount(CapturaAsistida, {
       props: { dirty: true, sesion: crypto.randomUUID(), moneda: 'BOB' },
     })
-    await wrapper.get('textarea').setValue('Un escritorio de madera')
+    await wrapper
+      .get('textarea')
+      .setValue(
+        'Un escritorio de madera para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+      )
     expect(wrapper.emitted('applied')).toBeUndefined()
     expect(wrapper.findAll('button').some((b) => b.text() === 'Aplicar propuesta')).toBe(false)
     wrapper.unmount()
@@ -102,7 +106,8 @@ describe('PRF-04 aplicación de capturas por voz', () => {
         captura_origen: null,
         texto_asr_original: null,
         texto_corregido: null,
-        texto_transcrito_original: 'Un escritorio con cajones',
+        texto_transcrito_original:
+          'Un escritorio con cajones para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
         resultado: 'REQUIRES_REVIEW',
         propuesta_configurador: propuesta(),
         pendientes: [],
@@ -117,7 +122,11 @@ describe('PRF-04 aplicación de capturas por voz', () => {
       global: { stubs: { AudioRecorder: true, Teleport: true } },
     })
     try {
-      await wrapper.get('textarea').setValue('Un escritorio con cajones')
+      await wrapper
+        .get('textarea')
+        .setValue(
+          'Un escritorio con cajones para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+        )
       await wrapper
         .findAll('button')
         .find((b) => b.text() === 'Procesar texto')!

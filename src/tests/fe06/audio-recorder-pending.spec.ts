@@ -78,7 +78,7 @@ describe('recorder pending permission', () => {
     media.resolve()
     await second
     expect(wrapper.text()).toContain('Grabando')
-    await vi.advanceTimersByTimeAsync(2000)
+    await vi.advanceTimersByTimeAsync(15000)
     controls(wrapper).stop()
     await flushPromises()
     expect(wrapper.text()).toContain('Audio listo')
@@ -99,7 +99,7 @@ describe('recorder pending permission', () => {
     controls(wrapper).resume()
     await flushPromises()
     expect(wrapper.text()).toContain('Grabando')
-    await vi.advanceTimersByTimeAsync(2000)
+    await vi.advanceTimersByTimeAsync(15000)
     controls(wrapper).pause()
     controls(wrapper).stop()
     await flushPromises()
@@ -120,3 +120,24 @@ describe('recorder pending permission', () => {
     expect(wrapper.emitted('ready')).toBeUndefined()
   })
 })
+
+it.each([14, 15, 16, 240, 241])(
+  'enforces operational microphone bounds at %s seconds',
+  async (seconds) => {
+    const media = setup()
+    vi.useFakeTimers()
+    const wrapper = mount(AudioRecorder)
+    const pending = controls(wrapper).start()
+    media.resolve()
+    await pending
+    await vi.advanceTimersByTimeAsync(seconds * 1000)
+    controls(wrapper).stop()
+    await flushPromises()
+    const ready = wrapper.emitted('ready')?.filter(([blob]) => blob instanceof Blob) ?? []
+    expect(ready.length).toBe(seconds < 15 ? 0 : 1)
+    expect(wrapper.text().includes('15 segundos')).toBe(seconds < 15)
+    // Auto-stop at 240 prevents a 241-second recording, rather than sending oversized audio.
+    expect(wrapper.text().includes('04:01')).toBe(false)
+    wrapper.unmount()
+  },
+)

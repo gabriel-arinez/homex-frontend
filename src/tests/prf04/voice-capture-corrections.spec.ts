@@ -31,7 +31,12 @@ beforeEach(() => {
   vi.resetAllMocks()
   vi.mocked(readAudioDuration).mockResolvedValue(30)
   create.mockResolvedValue({ id: 1 })
-  get.mockResolvedValue(proposal(1, 'Silla plegable'))
+  get.mockResolvedValue(
+    proposal(
+      1,
+      'Silla plegable para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+    ),
+  )
 })
 it('links three successive corrected interpretations to one stable ASR origin', async () => {
   let id = 0
@@ -54,13 +59,17 @@ it('links three successive corrected interpretations to one stable ASR origin', 
   })
   await input.trigger('change')
   await flushPromises()
-  for (const text of ['Silla corregida uno', 'Silla corregida dos', 'Silla corregida tres'])
+  for (const text of [
+    'Silla corregida uno para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+    'Silla corregida dos para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+    'Silla corregida tres para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+  ])
     await interpret(w, text)
   expect(create.mock.calls.slice(1).map((call) => call[0].captura_origen)).toEqual([1, 1, 1])
   expect(create.mock.calls.slice(1).map((call) => call[0].texto)).toEqual([
-    'Silla corregida uno',
-    'Silla corregida dos',
-    'Silla corregida tres',
+    'Silla corregida uno para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+    'Silla corregida dos para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+    'Silla corregida tres para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
   ])
   expect(create.mock.calls.filter((call) => call[0].audio)).toHaveLength(1)
   expect(w.text()).toContain('Silla original')
@@ -84,7 +93,10 @@ it('invalidates a previous proposal immediately while a new microphone request i
     props: { categoria: 'SILLA' },
     global: { stubs: { AudioRecorder: recorder } },
   })
-  await interpret(w, 'Silla plegable')
+  await interpret(
+    w,
+    'Silla plegable para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+  )
   const oldApply = button(w, 'Aplicar propuesta')
   expect(oldApply).toBeDefined()
   await w.get('.source-record').trigger('click')
@@ -96,21 +108,31 @@ it('invalidates a previous proposal immediately while a new microphone request i
   grant()
   await flushPromises()
   expect(button(w, 'Aplicar propuesta')).toBeUndefined()
-  expect(w.get('textarea').element.value).toBe('Silla plegable')
+  expect(w.get('textarea').element.value).toBe(
+    'Silla plegable para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+  )
   w.unmount()
 })
 it('invalidates on opening a new file chooser even when selection is cancelled', async () => {
   const w = mount(CapturaCatalogo, { props: { categoria: 'SILLA' } })
-  await interpret(w, 'Silla plegable')
+  await interpret(
+    w,
+    'Silla plegable para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+  )
   await w.get('.voice-upload').trigger('click')
   expect(button(w, 'Aplicar propuesta')).toBeUndefined()
-  expect(w.get('textarea').element.value).toBe('Silla plegable')
+  expect(w.get('textarea').element.value).toBe(
+    'Silla plegable para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+  )
   expect(w.emitted('applied')).toBeUndefined()
   w.unmount()
 })
 it('does not apply an old proposal during slow file validation or after a failed replacement', async () => {
   const w = mount(CapturaCatalogo, { props: { categoria: 'SILLA' } })
-  await interpret(w, 'Silla plegable')
+  await interpret(
+    w,
+    'Silla plegable para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+  )
   let validate!: (seconds: number) => void
   vi.mocked(readAudioDuration).mockImplementationOnce(
     () =>
@@ -127,7 +149,9 @@ it('does not apply an old proposal during slow file validation or after a failed
   validate(301)
   await flushPromises()
   expect(button(w, 'Aplicar propuesta')).toBeUndefined()
-  expect(w.get('textarea').element.value).toBe('Silla plegable')
+  expect(w.get('textarea').element.value).toBe(
+    'Silla plegable para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+  )
   w.unmount()
 })
 it('does not let a cancelled ASR overwrite a newer audio transcript', async () => {
@@ -184,7 +208,12 @@ it('keeps an obtained ASR transcript editable after a terminal validation error 
       texto_asr_original: 'Silla original extensa',
       propuesta: null,
     })
-    .mockResolvedValue(proposal(8, 'Silla corregida'))
+    .mockResolvedValue(
+      proposal(
+        8,
+        'Silla corregida para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+      ),
+    )
   const w = mount(CapturaCatalogo, { props: { categoria: 'SILLA' } })
   const input = w.get('input[type=file]')
   Object.defineProperty(input.element, 'files', { value: [new File(['audio'], 'voz.wav')] })
@@ -192,7 +221,10 @@ it('keeps an obtained ASR transcript editable after a terminal validation error 
   await flushPromises()
   expect(w.get('textarea').element.value).toBe('Silla original extensa')
   expect(button(w, 'Aplicar propuesta')).toBeUndefined()
-  await interpret(w, 'Silla corregida')
+  await interpret(
+    w,
+    'Silla corregida para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+  )
   expect(create.mock.calls[1]![0].captura_origen).toBe(7)
   expect(create.mock.calls[1]![0].audio).toBeUndefined()
   w.unmount()
@@ -202,7 +234,12 @@ it('preserves the previous text-only lineage when no original ASR capture exists
   create.mockImplementation(async () => ({ id: ++id }))
   get.mockImplementation(async (current) => proposal(current, `Texto ${current}`))
   const w = mount(CapturaCatalogo, { props: { categoria: 'SILLA' } })
-  for (const text of ['Silla uno', 'Silla dos', 'Silla tres']) await interpret(w, text)
+  for (const text of [
+    'Silla uno para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+    'Silla dos para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+    'Silla tres para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+  ])
+    await interpret(w, text)
   expect(create.mock.calls.map((call) => call[0].captura_origen)).toEqual([undefined, 1, 2])
   expect(create.mock.calls.every((call) => !call[0].audio)).toBe(true)
   w.unmount()
