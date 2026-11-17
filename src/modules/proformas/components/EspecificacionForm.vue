@@ -41,7 +41,12 @@ import {
   Trash2,
   Copy,
 } from '@lucide/vue'
-import { asignarEspesorPendiente, pendienteResuelto } from '../services/pendientesAsistencia'
+import {
+  asignarEspesorPendiente,
+  pendienteResuelto,
+  sameThickness,
+  normalizedThickness,
+} from '../services/pendientesAsistencia'
 import { proformasService } from '../services/proformasService'
 import {
   clonarTecnica,
@@ -163,6 +168,7 @@ const unidadComercialNombre = computed(
 )
 const destinosEspesor = reactive<Record<number, string>>({})
 const espesoresConfirmados = reactive<Record<number, string>>({})
+const correccionesEspesor = reactive<Record<number, { uid: string; valor: string }>>({})
 
 // El total dictado llega estructurado; nunca se extraen números de mensajes.
 type PendienteComercial = PendienteAsistida & {
@@ -242,6 +248,8 @@ watch(
     for (const indice of Object.keys(destinosEspesor)) delete destinosEspesor[Number(indice)]
     for (const indice of Object.keys(espesoresConfirmados))
       delete espesoresConfirmados[Number(indice)]
+    for (const indice of Object.keys(correccionesEspesor))
+      delete correccionesEspesor[Number(indice)]
   },
   { flush: 'sync' },
 )
@@ -274,8 +282,9 @@ const pendientesVisibles = computed(() =>
       if (p.codigo === 'TOTAL_NEGOCIADO' || p.codigo === 'INVALID_PRICE') return !precioValido.value
       if (p.codigo === 'ESPESOR_SIN_COMPONENTE') {
         const uid = espesoresConfirmados[p.indice]
-        const valor = p.resolucion?.valor?.trim()
-        return !uid || !componentes.some((c) => c.uid === uid && c.espesor?.trim() === valor)
+        const correction = correccionesEspesor[p.indice]
+        const valor = correction?.valor ?? p.resolucion?.valor
+        return !uid || !componentes.some((c) => c.uid === uid && sameThickness(c.espesor, valor))
       }
       if (!pendienteResuelto(p, medidas, componentes, atributosGenerales)) return true
       if (p.codigo === 'CONFLICTING_VALUES') {
@@ -549,6 +558,25 @@ function aplicarEspesor(p: PendienteAsistida & { indice: number }) {
     return
   }
   espesoresConfirmados[p.indice] = uid
+  delete correccionesEspesor[p.indice]
+  error.value = ''
+  changed()
+}
+function corregirEspesor(p: PendienteAsistida & { indice: number }) {
+  const uid = destinosEspesor[p.indice]
+  const valor = componentes.find((c) => c.uid === uid)?.espesor
+  if (
+    !uid ||
+    !valor ||
+    normalizedThickness(valor) === null ||
+    sameThickness(valor, p.resolucion?.valor)
+  ) {
+    error.value =
+      'Seleccione un componente con un espesor corregido válido y diferente del original.'
+    return
+  }
+  espesoresConfirmados[p.indice] = uid
+  correccionesEspesor[p.indice] = { uid, valor }
   error.value = ''
   changed()
 }
@@ -802,7 +830,11 @@ function pendingValue(p: PendienteAsistida): unknown {
         .filter((m) => m.valor.trim())
         .map((m) => [m.clave, { valor: m.valor, unidad: m.unidad }]),
     )
-  if (r?.tipo === 'ESPESOR_SIN_COMPONENTE') return r.valor ?? null
+  if (r?.tipo === 'ESPESOR_SIN_COMPONENTE') {
+    const indice = (props.pendientesAsistencia ?? []).indexOf(p)
+    const uid = espesoresConfirmados[indice]
+    return componentes.find((c) => c.uid === uid)?.espesor ?? r.valor ?? null
+  }
   if (p.codigo === 'NO_QUANTITY') return comercial.cantidad
   if (['INVALID_PRICE', 'TOTAL_NEGOCIADO'].includes(p.codigo)) return comercial.precio_unitario
   if (p.codigo === 'TIPO_NO_RESUELTO') return form.tipo_mueble
@@ -833,6 +865,7 @@ if (Array.isArray(base.revision_humana_voz)) {
         valor_original: unknown
         valor_final: unknown
         estado: string
+        field: string
       }>
     }
     if (
@@ -846,6 +879,16 @@ if (Array.isArray(base.revision_humana_voz)) {
       if (Number.isInteger(indice) && props.pendientesAsistencia?.[indice]) {
         originalPendingValues[indice] = clonarTecnica(decision.valor_original)
         const p = props.pendientesAsistencia[indice]!
+        if (p.resolucion?.tipo === 'ESPESOR_SIN_COMPONENTE') delete correccionesEspesor[indice]
+        if (
+          p.resolucion?.tipo === 'ESPESOR_SIN_COMPONENTE' &&
+          decision.estado === 'corregido' &&
+          sameThickness(decision.valor_original, p.resolucion.valor) &&
+          typeof decision.valor_final === 'string'
+        ) {
+          const uid = decision.field?.split('.')[1]
+          if (uid) correccionesEspesor[indice] = { uid, valor: decision.valor_final }
+        }
         const field = fieldForPending(p)
         if (
           field &&
@@ -1488,9 +1531,13 @@ function submit(): boolean {
             evidence_ids: [],
             estado: descartes[indice]
               ? 'descartado'
-              : state === 'reviewed'
-                ? 'confirmado'
-                : 'corregido',
+              : p.resolucion?.tipo === 'ESPESOR_SIN_COMPONENTE'
+                ? correccionesEspesor[indice]
+                  ? 'corregido'
+                  : 'confirmado'
+                : state === 'reviewed'
+                  ? 'confirmado'
+                  : 'corregido',
             valor_original: originalPendingValues[indice] ?? null,
             valor_final: descartes[indice] ? null : clonarTecnica(pendingValue(p)),
             ...(descartes[indice] ? { motivo: descartes[indice]!.motivo } : {}),
@@ -1695,6 +1742,9 @@ onMounted(loadCatalog)
                   </select>
                 </label>
                 <Button variant="secondary" @click="aplicarEspesor(p)"> Asignar espesor </Button>
+                <Button variant="secondary" @click="corregirEspesor(p)">
+                  Confirmar corrección de espesor
+                </Button>
               </div>
               <Button variant="secondary" @click="reviewPending(p)"
                 >Revisar {{ p.resolucion?.clave || 'campo' }}</Button

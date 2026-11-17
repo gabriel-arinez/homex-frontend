@@ -31,6 +31,7 @@ describe('PRF-04: resolución de espesor en el configurador', () => {
           },
         ],
         moneda: 'BOB',
+        voiceCaptureId: 7,
         especificacion: {
           id: 0,
           proforma_detalle: 0,
@@ -47,9 +48,9 @@ describe('PRF-04: resolución de espesor en el configurador', () => {
         },
         detalle: {
           nombre: 'Mesa de reunión para 10 personas',
-          cantidad: '',
+          cantidad: '1',
           unidad: 10,
-          precio_unitario: '',
+          precio_unitario: '100',
           descuento: '0.00',
         },
         pendientesAsistencia: [
@@ -90,6 +91,29 @@ describe('PRF-04: resolución de espesor en el configurador', () => {
 
       await estructura.setValue('25 mm')
 
+      expect(wrapper.find('aside[aria-label="Información pendiente"]').exists()).toBe(true)
+      const reopened = wrapper.get('aside[aria-label="Información pendiente"]')
+      await reopened.get('select').setValue('estructura')
+      const correction = reopened
+        .findAll('button')
+        .find((button) => button.text() === 'Confirmar corrección de espesor')!
+      expect(correction).toBeDefined()
+      await correction.trigger('click')
+      expect(wrapper.find('aside[aria-label="Información pendiente"]').exists()).toBe(false)
+      await wrapper.get('form').trigger('submit')
+      const saved = wrapper.emitted('save')?.[0]?.[0] as {
+        datos_tecnicos: { revision_humana_voz: Array<{ decisiones: unknown[] }> }
+      }
+      expect(saved.datos_tecnicos.revision_humana_voz[0]!.decisiones).toContainEqual(
+        expect.objectContaining({
+          review_id: 'pending:0',
+          field: 'componentes.estructura.espesor',
+          estado: 'corregido',
+          valor_original: '27 mm',
+          valor_final: '25 mm',
+        }),
+      )
+      await estructura.setValue('27 mm')
       expect(wrapper.find('aside[aria-label="Información pendiente"]').exists()).toBe(true)
     } finally {
       wrapper.unmount()
