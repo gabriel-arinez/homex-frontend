@@ -2,6 +2,14 @@
 
 The existing staged Drawer architecture and prior commits are preserved. Corrections were made only on `feat/voice-hitl-review`; no PR, publishing or main merge was performed.
 
+## Definitive automatic-ASR correction
+
+Valid recording completion or validated file selection now starts ASR automatically in the shared Drawer. There is no additional transcription confirmation. Playback remains available separately from pending submission; retry is explicit only after a failure or cancellation. Empty ASR results explain the problem without enabling NLP or application.
+
+NLP still requires **Procesar texto**, and form mutation still requires **Aplicar propuesta**. Generation, current-text and busy-state checks invalidate old proposals and ignore cancelled/stale requests. Applying hides the free transcript and playback editor while retaining server evidence.
+
+Specific automatic-ASR tests observed RED before implementation and now pass all nine scenarios. Positive/negative staged component checks, mobile browser codecs and accessibility checks pass. Full cross-component closure evidence is recorded in the task log and completed with the human-review correction.
+
 ## Corrected behavior
 
 | Finding                                          | Main implementation                                                                                                                                                                                |
@@ -14,7 +22,7 @@ The existing staged Drawer architecture and prior commits are preserved. Correct
 | Generic marker words created proposals           | NLP requires recognized commercial values or properly introduced identity, preserving legitimate brief/new names.                                                                                  |
 | Technical JSON was seller-facing                 | `ProposalSummary.vue` displays commercial groups, real option labels, only present attributes and actual pending indicators.                                                                       |
 
-## Verification
+## Previous correction verification (0.1.27)
 
 | Component                                | Final result                  |
 | ---------------------------------------- | ----------------------------- |
@@ -29,7 +37,7 @@ Lint, formatting, typecheck, builds, schemas/OpenAPI drift, generated frontend c
 
 Regressions caught and corrected before delivery: ASR canonicalization initially changed legacy text-only links; Vue-proxied pending cloning raised `DataCloneError`; a generic confirmation action displaced explicit thickness assignment; the new summary initially assumed a complete technical fixture. Existing contract behavior and tests remain intact.
 
-## Artifact compatibility
+## Previous artifact compatibility (0.1.27)
 
 Backend pins the new local `homex_nlp-0.1.27-py3-none-any.whl`, built with `SOURCE_DATE_EPOCH=0`. Runtime guard, locks, checksum gates and installed package files agree. The 0.1.25 and 0.1.26 wheels and checksum files are byte-identical to the correction baseline. OpenAPI shape is unchanged. Backend evidence: `docs/evidence/voice-hitl-corrective-review.json` in its feature worktree.
 

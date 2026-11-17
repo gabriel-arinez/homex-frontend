@@ -41,11 +41,7 @@ describe('Furniture Studio: emisión de propuesta PRF04', () => {
       Object.defineProperty(input.element, 'files', { configurable: true, value: [audio] })
       await input.trigger('change')
       await flushPromises()
-      expect(crear).not.toHaveBeenCalled()
-      await wrapper
-        .findAll('button')
-        .find((b) => b.text() === 'Transcribir audio')!
-        .trigger('click')
+      expect(crear).toHaveBeenCalledTimes(1)
       await flushPromises()
       expect(wrapper.emitted('proposed')).toBeUndefined()
       await wrapper

@@ -1301,8 +1301,6 @@ for (const width of [360, 768, 1440]) {
       .locator('input[type="file"]')
       .setInputFiles({ name: '24.wav', mimeType: 'audio/wav', buffer: Buffer.from('fixture') })
     const drawer = page.getByRole('dialog', { name: 'Completar mueble por voz' })
-    expect(captures).toBe(0)
-    await drawer.getByRole('button', { name: 'Transcribir audio', exact: true }).click()
     await expect(drawer.locator('textarea')).toHaveValue(captura24.texto_transcrito_original!)
     expect(captures).toBe(1)
     await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Mueble previo')

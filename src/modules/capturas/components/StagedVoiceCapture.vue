@@ -38,6 +38,7 @@ const recording = ref(false),
   processing = ref(false),
   requesting = ref(false),
   preparingAudio = ref(false)
+const previewAudio = ref<Blob | null>(null)
 const audio = ref<Blob | null>(null),
   text = ref(''),
   original = ref(''),
@@ -88,6 +89,7 @@ function cancel() {
 function discard() {
   cancel()
   audio.value = null
+  previewAudio.value = null
   error.value = ''
   recorder.value?.cancelRecording?.()
   recording.value = false
@@ -148,17 +150,23 @@ function status(state: string, seconds: number) {
   )
 }
 function recorded(blob: Blob | null) {
-  if (!blob) return
+  if (!blob || !recording.value) return
   recording.value = false
   paused.value = false
+  requesting.value = false
   emit('recording-state', false, false, 0)
+  acceptAudio(blob)
+}
+function acceptAudio(blob: Blob) {
   if (!blob.size || blob.size > MAX_AUDIO_BYTES) {
     error.value = 'Audio vacío o superior a 20 MB.'
     return
   }
   audio.value = blob
+  previewAudio.value = blob
   result.value = null
   applied.value = false
+  void process(true)
 }
 function chooseAudio() {
   if (busy.value) return
@@ -176,7 +184,8 @@ async function upload(event: Event) {
   try {
     const prepared = await prepareAudioForCapture(file)
     if (current !== generation) return
-    recorded(prepared)
+    preparingAudio.value = false
+    acceptAudio(prepared)
   } catch (cause) {
     if (current === generation)
       error.value = cause instanceof Error ? cause.message : 'No se pudo validar el audio.'
@@ -239,7 +248,12 @@ async function process(useAudio = false) {
           text.value = response.texto_transcrito_original ?? ''
           settingAsrText = false
           original.value = response.texto_asr_original ?? response.texto_transcrito_original ?? ''
-          audio.value = null
+          if (text.value.trim()) audio.value = null
+          else if (response.estado === 'COMPLETADA') {
+            error.value =
+              'No se reconoció texto. Escucha el audio, repite la grabación o reintenta la transcripción.'
+            return
+          }
         }
         if (response.estado === 'ERROR') {
           error.value =
@@ -342,10 +356,11 @@ function apply() {
       @change="upload"
     />
     <AudioReview
-      v-if="audio"
-      :audio="audio"
+      v-if="previewAudio && !applied"
+      :audio="previewAudio"
       :disabled="processing"
-      @transcribe="process(true)"
+      :retry="Boolean(audio) && !processing"
+      @retry="process(true)"
       @discard="discard"
     />
     <template v-if="!applied">
@@ -399,7 +414,9 @@ function apply() {
       </section>
     </template>
     <p v-else role="status">Propuesta aplicada. Continúa en los campos del formulario.</p>
-    <p v-if="preparingAudio" role="status">Validando y preparando audio…</p>
+    <p v-if="preparingAudio" role="status">
+      Validando y preparando audio…<Button variant="secondary" @click="discard">Cancelar</Button>
+    </p>
     <p v-if="processing" role="status">
       {{
         audio

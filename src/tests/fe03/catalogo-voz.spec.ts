@@ -59,9 +59,7 @@ describe('Voz en creación de catálogo', () => {
       Object.defineProperty(input.element, 'files', { value: [file] })
       await input.trigger('change')
       await flushPromises()
-      expect(catalogoCapturaService.create).not.toHaveBeenCalled()
-      await button(w, 'Transcribir audio').trigger('click')
-      await flushPromises()
+      expect(catalogoCapturaService.create).toHaveBeenCalledTimes(1)
       expect(catalogoCapturaService.create).toHaveBeenCalledWith(
         expect.objectContaining({ categoria: category, audio: file }),
         expect.anything(),
@@ -86,7 +84,7 @@ describe('Voz en creación de catálogo', () => {
     },
   )
 
-  it('detener la grabación permite escuchar antes de transcribir', async () => {
+  it('detener la grabación transcribe automáticamente y conserva la reproducción', async () => {
     mockResult('SILLA')
     const audioRecorder = defineComponent({
       emits: ['ready'],
@@ -110,9 +108,6 @@ describe('Voz en creación de catálogo', () => {
     expect(w.text()).toContain('Pausar')
     expect(w.text()).toContain('Cancelar')
     await w.get('button[aria-label="Finalizar grabación"]').trigger('click')
-    await flushPromises()
-    expect(catalogoCapturaService.create).not.toHaveBeenCalled()
-    await button(w, 'Transcribir audio').trigger('click')
     await flushPromises()
     expect(catalogoCapturaService.create).toHaveBeenCalledTimes(1)
     expect(catalogoCapturaService.create).toHaveBeenCalledWith(
@@ -198,8 +193,6 @@ describe('Voz en creación de catálogo', () => {
     Object.defineProperty(input.element, 'files', { value: [file] })
     await input.trigger('change')
     await flushPromises()
-    await button(w, 'Transcribir audio').trigger('click')
-    await flushPromises()
     expect(w.text()).toContain('No se pudo procesar')
     expect(w.emitted('apply')).toBeUndefined()
     w.unmount()
@@ -213,8 +206,6 @@ describe('Voz en creación de catálogo', () => {
     const input = w.get('input[type="file"]')
     Object.defineProperty(input.element, 'files', { value: [file] })
     await input.trigger('change')
-    await flushPromises()
-    await button(w, 'Transcribir audio').trigger('click')
     await flushPromises()
     expect(w.text()).toContain('Transcribiendo audio')
     await button(w, 'Cancelar').trigger('click')

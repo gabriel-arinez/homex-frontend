@@ -94,12 +94,7 @@ it('runs ASR alone, then NLP on corrected text linked to the original capture', 
   })
   await input.trigger('change')
   await flushPromises()
-  expect(create).not.toHaveBeenCalled()
-  await wrapper
-    .findAll('button')
-    .find((b) => b.text() === 'Transcribir audio')!
-    .trigger('click')
-  await flushPromises()
+  expect(create).toHaveBeenCalledTimes(1)
   expect(create.mock.calls[0]![0]).toMatchObject({ solo_transcribir: true })
   expect(wrapper.get('textarea').element.value).toBe('silla precio 40')
   expect(wrapper.emitted('applied')).toBeUndefined()

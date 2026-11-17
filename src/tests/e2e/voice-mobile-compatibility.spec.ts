@@ -60,9 +60,7 @@ for (const extension of ['aac', 'opus', 'mp4', 'flac']) {
       )
     await expect(drawer.locator('audio, [role="alert"]')).toBeVisible()
     await expect(drawer.getByText('Validando y preparando audio…')).toHaveCount(0)
-    expect(posts).toBe(0)
     if (await drawer.locator('audio').count()) {
-      await drawer.getByRole('button', { name: 'Transcribir audio', exact: true }).click()
       await expect(drawer.locator('textarea')).toHaveValue('Transcripción de prueba')
       expect(posts).toBe(1)
     } else {

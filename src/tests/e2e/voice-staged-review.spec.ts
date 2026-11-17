@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
+import AxeBuilder from '@axe-core/playwright'
 
-test('catalog voice uses ASR, corrected text, explicit interpretation and explicit application', async ({
+test('@a11y catalog voice uses automatic ASR, corrected text, explicit interpretation and explicit application', async ({
   page,
 }) => {
   const access = 'eyJhbGciOiJub25lIn0.eyJ1c2VyX2lkIjo3fQ.signature'
@@ -111,12 +112,11 @@ test('catalog voice uses ASR, corrected text, explicit interpretation and explic
     .locator('input[type=file]')
     .setInputFiles({ name: 'voice.wav', mimeType: 'audio/wav', buffer: wav })
   await expect(drawer.locator('audio')).toBeVisible()
-  expect(audioRequests).toBe(0)
   expect(textRequests).toBe(0)
-  await drawer.getByRole('button', { name: 'Transcribir audio', exact: true }).click()
   await expect(drawer.locator('textarea')).toHaveValue('silla plegable precio 40')
   expect(audioRequests).toBe(1)
   expect(textRequests).toBe(0)
+  expect((await new AxeBuilder({ page }).include('.staged-voice').analyze()).violations).toEqual([])
   await expect(page.locator('input[name=nombre]')).toHaveValue('')
   await drawer.locator('textarea').fill(corrected)
   await drawer.getByRole('button', { name: 'Procesar texto', exact: true }).click()

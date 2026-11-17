@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from 'vue'
 import Button from '@/shared/ui/Button.vue'
-const props = defineProps<{ audio: Blob; disabled?: boolean }>()
-const emit = defineEmits<{ transcribe: []; discard: [] }>()
+const props = defineProps<{ audio: Blob; disabled?: boolean; retry?: boolean }>()
+const emit = defineEmits<{ retry: []; discard: [] }>()
 const url = ref('')
 const warning = ref('')
 let generation = 0
@@ -15,8 +15,9 @@ watch(
     warning.value = ''
     // Silence is advisory: low-volume speech must never be blocked.
     if (!window.AudioContext) return
-    const context = new AudioContext()
+    let context: AudioContext | undefined
     try {
+      context = new AudioContext()
       const decoded = await context.decodeAudioData(await blob.arrayBuffer())
       let peak = 0
       for (let channel = 0; channel < decoded.numberOfChannels; channel++) {
@@ -26,11 +27,11 @@ watch(
       }
       if (current === generation && peak < 0.001)
         warning.value =
-          'Es posible que no haya voz audible. Escucha el audio; puedes enviarlo si se entiende.'
+          'Es posible que no haya voz audible. Escucha el audio; puedes repetirlo si no se entiende.'
     } catch {
       // The server performs authoritative decoded-audio validation.
     } finally {
-      await context.close().catch(() => undefined)
+      await context?.close().catch(() => undefined)
     }
   },
   { immediate: true },
@@ -41,11 +42,13 @@ onBeforeUnmount(() => {
 })
 </script>
 <template>
-  <section aria-label="Revisar audio antes de transcribir">
+  <section aria-label="Audio capturado">
     <audio :src="url" controls aria-label="Escuchar audio capturado" />
     <p v-if="warning" role="status">{{ warning }}</p>
     <div class="actions">
-      <Button :disabled="disabled" @click="emit('transcribe')">Transcribir audio</Button>
+      <Button v-if="retry" :disabled="disabled" @click="emit('retry')"
+        >Reintentar transcripción</Button
+      >
       <Button variant="secondary" :disabled="disabled" @click="emit('discard')"
         >Descartar y repetir</Button
       >

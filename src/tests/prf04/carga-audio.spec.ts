@@ -84,12 +84,7 @@ describe('PRF-04 carga de grabaciones', () => {
       await seleccionar(wrapper, archivo)
       await flushPromises()
 
-      expect(crear).not.toHaveBeenCalled()
-      await wrapper
-        .findAll('button')
-        .find((b) => b.text() === 'Transcribir audio')!
-        .trigger('click')
-      await flushPromises()
+      expect(crear).toHaveBeenCalledTimes(1)
       expect(crear).toHaveBeenCalledWith(
         expect.objectContaining({ audio: archivo }),
         expect.anything(),
@@ -142,7 +137,7 @@ describe('PRF-04 carga de grabaciones', () => {
       )
       expect(wrapper.text()).toContain('Formato de audio no admitido')
 
-      // Cada nuevo archivo requiere una acción expresa del vendedor.
+      // A new file is validated before automatic transcription.
       await wrapper
         .findAll('button')
         .find((button) => button.text().includes('Seleccionar archivo'))!

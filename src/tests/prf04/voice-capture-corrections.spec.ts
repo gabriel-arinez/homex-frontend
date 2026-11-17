@@ -54,8 +54,6 @@ it('links three successive corrected interpretations to one stable ASR origin', 
   })
   await input.trigger('change')
   await flushPromises()
-  await button(w, 'Transcribir audio').trigger('click')
-  await flushPromises()
   for (const text of ['Silla corregida uno', 'Silla corregida dos', 'Silla corregida tres'])
     await interpret(w, text)
   expect(create.mock.calls.slice(1).map((call) => call[0].captura_origen)).toEqual([1, 1, 1])
@@ -161,12 +159,8 @@ it('does not let a cancelled ASR overwrite a newer audio transcript', async () =
     await flushPromises()
   }
   await choose('primero.wav')
-  await button(w, 'Transcribir audio').trigger('click')
-  await flushPromises()
   await button(w, 'Cancelar').trigger('click')
   await choose('segundo.wav')
-  await button(w, 'Transcribir audio').trigger('click')
-  await flushPromises()
   expect(w.get('textarea').element.value).toBe('Audio nuevo')
   oldResponse({
     id: 1,
@@ -195,8 +189,6 @@ it('keeps an obtained ASR transcript editable after a terminal validation error 
   const input = w.get('input[type=file]')
   Object.defineProperty(input.element, 'files', { value: [new File(['audio'], 'voz.wav')] })
   await input.trigger('change')
-  await flushPromises()
-  await button(w, 'Transcribir audio').trigger('click')
   await flushPromises()
   expect(w.get('textarea').element.value).toBe('Silla original extensa')
   expect(button(w, 'Aplicar propuesta')).toBeUndefined()
