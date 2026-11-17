@@ -72,11 +72,11 @@ Canonical builds use `SOURCE_DATE_EPOCH=0`; wheel/sdist reproducibility was chec
 
 Source work-unit commits:
 
-| Repository | Corrective commits                                                                            |
-| ---------- | --------------------------------------------------------------------------------------------- |
-| NLP        | `50216e5` — commercial names/category coherence and .28                                       |
-| Backend    | `dd21735` — trusted review history/package/schema; `3d6d728` — supported manual measure units |
-| Frontend   | `5bafb69` — automatic ASR; field/audit commit recorded in the final task log                  |
+| Repository | Corrective commits                                                                                                   |
+| ---------- | -------------------------------------------------------------------------------------------------------------------- |
+| NLP        | `50216e5` — commercial names/category coherence and .28                                                              |
+| Backend    | `dd21735` — trusted review history/package/schema; `3d6d728` — supported manual measure units                        |
+| Frontend   | `5bafb69` — automatic ASR; `74a1e49` — field review, stable controls, trusted audit payloads and end-to-end evidence |
 
 Worktrees: frontend workspace, `../.worktrees/voice-backend`, `../.worktrees/voice-nlp`. All remain on `feat/voice-hitl-review`. Local source/test commits deliberately keep coupled shared-form/audit behavior together; PR slicing remains deferred because PRs were explicitly prohibited. The complete request, task status and commit evidence are in `odd/tasks/voice-hitl-review.md`.
 

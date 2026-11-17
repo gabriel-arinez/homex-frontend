@@ -1,7 +1,7 @@
 # Voice capture with human review
 
-Current objective: correct audited voice/HITL defects without replacing the staged architecture. Original implementation remains below as history. No PRs or main merges.
-Branches: feat/voice-hitl-review from each local main. Delivery: local phase commits; PR strategy deferred because PRs are explicitly prohibited. Runners: pytest, Vitest, Playwright, lint, typecheck, build.
+Current objective: definitive ASR/NLP/HITL corrections implemented and independently verified; delivery completed with clean-worktree readback. Original implementation remains below as history. No PRs, publication or main merges.
+Branches: existing feat/voice-hitl-review in each repository; earlier commits retained. Delivery: local corrective work units; PR strategy deferred because PRs are explicitly prohibited. Runners: pytest, Vitest, Playwright, lint, typecheck, build.
 
 ## Specs
 
@@ -25,6 +25,17 @@ C5. «el NLP distingue entre palabras que anuncian información comercial y valo
 C6. «el vendedor puede comprender y comprobar la propuesta sin interpretar estructuras JSON.» Replace visible JSON with module-specific real extracted product/quantity/dimensions/material/components/accessories/prices or catalog name/category/brand/model/features/price; differentiate pending attributes, retain exact spans, text correction/reinterpret/apply; hide free text after apply.
 C7. «Trabajar exclusivamente sobre las ramas `feat/voice-hitl-review` existentes.» Preserve prior commits/published artifacts, corrective commits only, no unrelated changes/PR/main merge; rerun affected/full tests, E2E/accessibility, lint/format/typecheck/build/OpenAPI and actual package compatibility. Update this same feature log and finish clean. Final report: corrections/files, tests/results, regressions/fixes, compatibility, commits/branches, real limitations.
 
+### Definitive corrective requirements (2026-11-16)
+
+D1. «Verificar la validez comercial del contenido incluso cuando se utilizan prefijos como `producto:`, `nombre:` o `nombre comercial:`.» All exact negative/positive examples in L-final, category contradictions and legitimate new names.
+D2. «Cuando un atributo requiera revisión comercial, señalar directamente su campo, aunque su evidencia tenga decisión `ACCEPTED`.» «sugerido, pendiente, confirmado, corregido y descartado». Real evidence and critical-only blocking.
+D3. «No limitar el resaltado a `input`, `select` y `textarea` cuando existan controles interactivos relevantes.» Functional typed resolutions, stable dynamic links, real validation and reopen on reversal.
+D4. «guardar repetidamente una ficha sin nuevas decisiones no debe generar duplicaciones, y cada corrección o descarte debe mantener su relación con la evidencia correspondiente.» Server provenance/permission/shape/coherence validation and preserved history.
+D5. «se inicia automáticamente el ASR» «No ejecutar NLP todavía.» Explicit «Procesar texto» and «Aplicar propuesta»; playback, cancellation/stale/duplicate safety, hidden text after apply. Supersedes earlier manual ASR confirmation.
+D6. «Que los cambios no afecten a las capturas históricas ni a los flujos legados compatibles.» Preventive directly related scenarios specified verbatim in L-final.
+D7. «cada defecto identificado está corregido, que su prueba de regresión falla con el comportamiento antiguo y pasa con el nuevo». Full final suites, static checks, contracts, actual new artifact, a11y, historical E2E skip investigation; exact scope in L-final.
+D8. «Actualizar `docs/voice-hitl-corrective-verification.md`» Corrective local commits, preserved history/artifacts, clean worktrees, no PR/publish/main merge; exact delivery in L-final.
+
 ## Tasks
 
 T1 | S1,S6 | delegated: independent NLP commercial-validation unit | implemented; independently checked | b52e979, 814aac4
@@ -36,6 +47,11 @@ R1 | C1-C3,C6 | inline: shared capture controller/audio/presentation | verified;
 R2 | C4 | delegated: disjoint HITL unit | verified; actual value resolution and source-bound human audit | 5fd9956
 R3 | C1,C3,C5,C7 | delegated: invariant/artifact corrections | verified; source/installed NLP1137 and backend681 pass | cb15f7e (NLP), b3019f9 (backend)
 R4 | C7 | independent high-risk verification and final local CI | verified; existing skip and offline ASR-install limitation documented | corrective source commits above
+
+U1 | D5,D6,D7 | inline parent auto-ASR and browser regressions | verified | 5bafb69; Risk4. Automatic capture-to-ASR only, editable text, explicit NLP/application.
+U2 | D2,D3,D4,D6,D7 | delegated parallel disjoint frontend HITL unit; parent scoped independent/live/visual corrections | verified | 74a1e49; Risk1/3/4. Field resolution, stable controls, canonical provenance and transition history.
+U3 | D1,D2,D3,D4,D6,D7 | delegated independent NLP/backend unit; parent manual-policy parity corrections | verified | 50216e5, dd21735, 3d6d728; Risk1/2/3/5. New .28 artifact, trusted audit, preserved manual rules.
+U4 | D6,D7,D8 | delegated independent frozen-source verification, parent spot/visual checks | verified; cleanup complete | evidence 74a1e49; RDD remains disabled.
 
 ## Log
 
@@ -224,3 +240,217 @@ L20. Final frontend independent verification:65 files/369 unit tests, full Playw
 
 L21. Independent service verifier found no blockers:92 backend API/legacy/identity tests and219 NLP semantic/consumer tests passed in fresh isolated state against actual installed0.1.27; old .25/.26 artifacts and sidecars match baseline exactly. Parent repeated the same backend92 and four frontend corrective files29 tests successfully. Independent final frontend full Playwright rerun against exact final controller/test bytes:114 passed/1 existing skip, no new failures. Static checks/369unit tests all pass. Parent compared ASR subpackage modules and historical artifacts directly; no ASR implementation changes.
 L22. Corrective source commits, preserving every prior commit: frontend feef4de (stable ASR/current-operation guard, mobile format validation and commercial presentation),5fd9956 (real HITL validation/resolution/navigation and source-bound audit); NLP cb15f7e (semantic sufficiency/version0.1.27); backend b3019f9 (canonical real-ASR provenance, preserved text-only contract and actual0.1.27 consumer). Existing global RDD remains off; read-only risk assessment is informational and no receipt/native review approval is claimed. No remote CI/push/PR/main merge. Durable feature worktrees are now ../.worktrees/voice-backend and ../.worktrees/voice-nlp relative to frontend, not the historical /tmp paths.
+
+### L-final — definitive user correction (2026-11-16)
+
+# HOMEX — Corrección definitiva y cierre técnico del flujo ASR, NLP y HITL
+
+Realizar una última intervención correctiva sobre las ramas existentes `feat/voice-hitl-review` de `homex-nlp`, `homex-backend` y `homex-frontend`.
+
+La auditoría anterior confirmó que la arquitectura principal funciona, pero identificó defectos residuales de validación comercial, observaciones por campo, trazabilidad HITL y automatización de la transcripción.
+
+**Objetivo:** resolver integralmente estos problemas, incluyendo casos límite relacionados, para evitar nuevas rondas de correcciones sobre los mismos comportamientos.
+
+No rehacer la arquitectura, no modificar los commits anteriores ni realizar cambios ajenos al alcance. Localizar los worktrees correctos de cada repositorio y trabajar exclusivamente sobre las ramas existentes.
+
+## 1. Corregir definitivamente la validación comercial del NLP
+
+La última auditoría comprobó que expresiones como `producto: hola buenas` todavía pueden convertirse en nombres comerciales válidos porque el NLP confía excesivamente en los prefijos explícitos.
+
+**Correcciones requeridas:**
+
+1. Verificar la validez comercial del contenido incluso cuando se utilizan prefijos como `producto:`, `nombre:` o `nombre comercial:`.
+2. Rechazar saludos, pruebas, frases incoherentes y marcadores de atributos sin valores reales, independientemente de cómo estén introducidos.
+3. Comprobar la coherencia entre el nombre extraído y la categoría seleccionada:
+   - SILLA: detectar nombres claramente incompatibles con esta categoría.
+   - PISO_FLOTANTE: detectar productos inequívocamente ajenos a pisos y accesorios relacionados.
+   - OTRO: permitir nombres comerciales diversos sin imponer vocabularios excesivamente restrictivos.
+4. Ante contradicciones claras de categoría, evitar la aceptación automática del nombre y generar una advertencia comprensible.
+5. Conservar la aceptación de productos nuevos y nombres legítimos que no estén incluidos en un léxico cerrado.
+6. Mantener las abstenciones cuando no exista evidencia comercial suficiente, sin inventar atributos.
+
+**Casos mínimos de regresión:**
+
+- `hola buenas`
+- `producto: hola buenas`
+- `nombre: probando`
+- `nombre comercial: uno dos tres`
+- `hola producto`
+- `mueble precio`
+- `mueble color`
+- `silla plegable` en SILLA y PISO_FLOTANTE
+- Nombres comerciales nuevos y legítimos.
+- Descripciones completas con dimensiones, materiales, cantidades y precios.
+
+Los casos inválidos no deben producir propuestas artificiales. Los casos válidos deben conservar su interpretación anterior.
+
+## 2. Completar la asociación de advertencias con campos comerciales
+
+Actualmente algunas advertencias del NLP no se convierten en pendientes específicos dentro de los formularios.
+
+Por ejemplo, una extracción válida de precio puede contener una advertencia de revisión comercial, pero el campo solamente aparece como sugerido.
+
+**Correcciones requeridas:**
+
+1. Revisar conjuntamente `ProductoForm.vue`, `EspecificacionForm.vue`, `fieldVoiceReview.ts`, `pendientesAsistencia.ts` y los contratos del Backend.
+2. Establecer una correspondencia consistente entre:
+   - Atributo extraído.
+   - Evidencia NLP.
+   - Advertencia.
+   - Campo del formulario.
+   - Estado de revisión.
+3. Cuando un atributo requiera revisión comercial, señalar directamente su campo, aunque su evidencia tenga decisión `ACCEPTED`.
+4. Incorporar indicadores contextuales visibles y discretos: borde o subrayado, icono y explicación del motivo.
+5. Distinguir claramente los estados **sugerido, pendiente, confirmado, corregido y descartado**.
+6. Evitar advertencias duplicadas, contradictorias o que permanezcan abiertas después de resolverse.
+7. Actualizar inmediatamente los indicadores cuando el vendedor modifica un valor, lo confirma o revierte una corrección.
+8. Impedir el guardado si permanecen pendientes críticos sin resolver. Las advertencias informativas no deben bloquear operaciones válidas.
+
+**Criterio de aceptación:** si el NLP advierte sobre un precio, medida, material, cantidad o componente, el vendedor identifica exactamente qué campo debe revisar y puede resolver la observación desde ese mismo formulario.
+
+## 3. Corregir navegación, resaltados y acciones de resolución HITL
+
+La auditoría encontró casos donde las advertencias se vinculan a acciones o destinos que no corresponden a controles resaltables.
+
+**Correcciones requeridas:**
+
+1. Revisar todas las resoluciones tipadas del Backend, especialmente `ESPESOR_SIN_COMPONENTE`, `MISSING_UNIT`, `MISSING_AXIS`, `DIMENSIONES_NUEVAS` y `CONFLICTING_VALUES`.
+2. Garantizar que cada pendiente crítico tenga una acción concreta para resolverlo.
+3. Permitir que «Revisar campo» navegue y enfoque correctamente el control correspondiente.
+4. Cuando la solución requiera crear una medida, componente o atributo, resaltar también el control o botón que permite realizar esa acción.
+5. No limitar el resaltado a `input`, `select` y `textarea` cuando existan controles interactivos relevantes.
+6. Mantener correctamente el vínculo de las advertencias con componentes dinámicos, aunque estos se agreguen, eliminen o reordenen.
+7. No considerar resuelta una advertencia únicamente por pulsar «Confirmar»: comprobar que exista un valor válido o una resolución explícita.
+8. Permitir descartar una propuesta con motivo justificado cuando el tipo de pendiente lo permita, sin convertir el descarte en una forma de saltarse validaciones comerciales obligatorias.
+9. Verificar que una observación vuelva a abrirse si el usuario revierte una corrección que la había resuelto.
+
+**Criterio de aceptación:** ninguna advertencia crítica debe quedar sin un mecanismo funcional y comprensible de resolución.
+
+## 4. Fortalecer la trazabilidad y evitar registros duplicados
+
+Se identificó que `revision_humana_voz` puede incorporar reiteradamente decisiones previamente registradas cuando un mismo formulario se guarda varias veces.
+
+**Correcciones requeridas:**
+
+1. Evitar duplicar confirmaciones, correcciones y descartes de una misma interpretación.
+2. Utilizar identificadores estables para relacionar cada decisión con la captura, interpretación, evidencia y campo correspondiente.
+3. Conservar los motivos de descarte, los valores originales y los valores finalmente confirmados cuando corresponda.
+4. Garantizar que nuevas correcciones no sobrescriban indebidamente decisiones históricas.
+5. Validar en Backend la estructura, los permisos y la coherencia de los datos de revisión enviados por Frontend.
+6. No confiar exclusivamente en el JSON construido por el navegador como evidencia de auditoría.
+7. Comprobar idempotencia, guardados repetidos, reintentos y modificaciones posteriores sin generar registros inconsistentes.
+
+**Criterio de aceptación:** guardar repetidamente una ficha sin nuevas decisiones no debe generar duplicaciones, y cada corrección o descarte debe mantener su relación con la evidencia correspondiente.
+
+## 5. Automatizar la transcripción inmediatamente después del audio
+
+**Este es un requisito funcional importante que debe quedar exactamente como se describe.**
+
+Actualmente se requiere pulsar «Transcribir audio» después de finalizar una grabación o seleccionar un archivo. El comportamiento deseado es diferente.
+
+**Flujo definitivo:**
+
+1. El vendedor graba o selecciona un archivo de audio.
+2. Al finalizar la grabación o completar la selección y validación del archivo, **se inicia automáticamente el ASR**, sin requerir un botón adicional.
+3. Mientras se procesa, mostrar un estado de transcripción comprensible.
+4. Al terminar, presentar inmediatamente el texto reconocido dentro del Drawer, con la puntuación y normalización disponibles.
+5. Permitir al vendedor editar palabras, números, cantidades, medidas, precios o especificaciones.
+6. **No ejecutar NLP todavía.**
+7. Ejecutar NLP únicamente cuando el vendedor pulse «Procesar texto».
+8. Mostrar la propuesta estructurada y sus observaciones.
+9. Aplicarla al formulario únicamente después de pulsar «Aplicar propuesta».
+10. Una vez aplicada, ocultar la transcripción libre y continuar la revisión en los campos estructurados.
+
+Mantener la posibilidad de reproducir el audio cuando esté disponible, sin imponer una confirmación adicional que retrase la transcripción automática.
+
+Revisar especialmente cancelaciones, errores, cambios de archivo, grabaciones sucesivas, solicitudes duplicadas y respuestas asíncronas antiguas.
+
+**Criterio de aceptación:** finalizar una grabación válida debe llevar automáticamente a la transcripción editable, pero nunca a una interpretación NLP automática ni a una modificación prematura del formulario.
+
+## 6. Auditoría preventiva de los flujos relacionados
+
+No limitarse a corregir literalmente los cinco puntos anteriores. Revisar también los comportamientos directamente relacionados para detectar fallos que podrían reaparecer después de las modificaciones.
+
+Comprobar:
+
+1. Que todas las reinterpretaciones mantengan el identificador ASR original.
+2. Que cancelar o iniciar una nueva captura invalide las propuestas antiguas.
+3. Que los formularios no pierdan datos previamente introducidos.
+4. Que una propuesta vacía o inválida nunca pueda aplicarse.
+5. Que los atributos aceptados, pendientes y descartados mantengan correspondencia con las evidencias reales.
+6. Que los formatos móviles, la conversión a WAV y los límites de audio continúen funcionando.
+7. Que los módulos de Catálogo y Muebles a Medida utilicen criterios coherentes de revisión, sin alterar sus reglas comerciales particulares.
+8. Que la interfaz muestre mensajes claros cuando el NLP no consiga generar una propuesta.
+9. Que la aplicación de una propuesta no deje transcripciones libres duplicadas en el formulario.
+10. Que los cambios no afecten a las capturas históricas ni a los flujos legados compatibles.
+
+Corregir cualquier defecto comprobable de este mismo alcance antes de declarar finalizada la intervención.
+
+## 7. Pruebas exhaustivas y criterios de cierre
+
+Ampliar las pruebas existentes y ejecutar una verificación integral después de todas las correcciones.
+
+**NLP:**
+
+- Pruebas positivas y negativas de nombres explícitos, nombres nuevos y coherencia de categoría.
+- Regresiones de muebles, catálogo, dimensiones, precios y rectificaciones.
+- Comprobación de abstenciones y ausencia de atributos inventados.
+
+**Backend:**
+
+- Separación efectiva ASR/NLP.
+- Trazabilidad de reinterpretaciones y revisiones.
+- Permisos, idempotencia, validaciones de datos y registros repetidos.
+- Compatibilidad del paquete NLP instalado y contratos OpenAPI.
+
+**Frontend:**
+
+- Transcripción automática al finalizar grabaciones o seleccionar archivos válidos.
+- Edición de texto previa al NLP.
+- Propuestas y respuestas obsoletas.
+- Señalización, navegación y resolución de advertencias.
+- Guardado, corrección, reversión y descarte.
+- Compatibilidad de audio y funcionamiento de ambos formularios.
+
+**Verificación integral:**
+
+1. Ejecutar las suites unitarias, integración y E2E correspondientes.
+2. Incluir pruebas de accesibilidad para los nuevos estados y controles visuales.
+3. Ejecutar lint, formato, typecheck y build.
+4. Comprobar OpenAPI y generación de tipos del Frontend.
+5. Verificar los contratos entre los tres repositorios.
+6. Si cambia el NLP, generar una nueva versión y su artefacto, actualizar el Backend y comprobar checksum, lockfile y paquete realmente instalado.
+7. No modificar ni sobrescribir artefactos de versiones anteriores.
+8. Revisar el E2E históricamente omitido y determinar si puede habilitarse; documentar su causa si continúa omitido.
+9. Comprobar los escenarios completos con datos válidos, inválidos y parcialmente corregidos.
+10. Repetir las verificaciones después de la última modificación, no solamente durante el desarrollo.
+
+**No cerrar el trabajo con pruebas fallidas o problemas conocidos relacionados con estas correcciones.**
+
+## 8. Entrega final
+
+- Mantener las modificaciones en `feat/voice-hitl-review` de cada repositorio.
+- Crear commits correctivos identificables, conservando el historial anterior.
+- Actualizar `docs/voice-hitl-corrective-verification.md` y los registros técnicos correspondientes.
+- Documentar los escenarios efectivamente comprobados, las pruebas ejecutadas y sus resultados.
+- Incluir los commits finales, versiones, checksums y estado de los worktrees.
+- Diferenciar las verificaciones realizadas de las que no pudieron ejecutarse.
+- No crear PR, publicar paquetes ni fusionar a `main` sin autorización.
+
+### Condición para considerar terminada la intervención
+
+Antes de finalizar, realizar una revisión crítica de los propios cambios como si se tratara de una auditoría independiente.
+
+Comprobar expresamente que **cada defecto identificado está corregido, que su prueba de regresión falla con el comportamiento antiguo y pasa con el nuevo, y que la solución no provoca un problema equivalente en otro módulo o etapa del flujo**.
+
+No basta con que las suites existentes pasen: los escenarios problemáticos señalados deben quedar cubiertos por pruebas específicas.
+
+El objetivo es entregar las tres ramas funcionalmente completas, compatibles entre sí y listas para una revisión final previa a los PR, sin dejar correcciones parciales ni problemas conocidos dentro de este alcance.
+
+Plan: ~900–1500 authored lines in coherent corrective units. Existing local branches only, PR slicing deferred because prohibited. Parallel independent frontend HITL and NLP/backend units, parent owns auto-ASR and git. Earlier manual ASR confirmation superseded by D5.
+
+Definitive correction evidence (in progress): U1 automatic-ASR regressions initially RED 5/6, empty-ASR RED 1/8, current GREEN 9/9; related staged tests GREEN 35, real-codec browser/Axe GREEN 5. U2 writer RED 8/22 against baseline, current pre-review unit suite GREEN 387; attachment-freezing E2E re-enabled using current fixtures only. Independent frontend sweep: unit 387, browser 115 (zero skips), type/build/contract/ESLint passed; found three D4 blockers (B→C→B transition loss, missing nested catalog audit, rejected candidate IDs) plus lint/format issues. One parent correction batch: new regression RED 3/7 then GREEN 16 including ASR9, full lint/format GREEN; limited independent recheck/final suites pending. Original-value restoration on edit/reload verified present. Real integration specs updated from obsolete auto-NLP/apply assumptions to explicit staged flow; live disposable-stack verification pending. Final NLP candidate 0.1.28 has additional exact microphone-test phrase negatives; authoritative final artifact/source/installed/backend results pending writer handoff. No completion claimed yet.
+
+Definitive closure evidence: NLP source/installed 1185 each; backend final704; frontend397 unit/115 browser (zero skips); independent API78 plus final audit23, NLP197; parent197/23/33. Real local audio integration8 and offline CPU240s ASR26.53s (638 chars/9 segments); final display-only snapshot recheck recorded in main report. Specific RED→GREEN added for null UI sentinels, raw/serialized values including booleans and whitespace, pointer/blur identity, legacy warnings, stored notes and valid zero-price/inch policies. The old backend with its actual .27 wheel accepted a forged pending (HTTP201), a valid behavioral RED. Actual authoring exceeded forecast because trusted history/validation and cross-module regressions are coupled; no tests omitted or code compressed. No PR/publish/push/main merge. Detailed results, artifact SHA and visual/ASR evidence: docs/voice-hitl-corrective-verification.md and docs/evidence/. All source work units and closure checks are complete; owned services, PostgreSQL and disposable scratch were stopped/removed. Durable sanitized evidence is committed; original checkouts/caches were not cleaned or modified. Final branch/main and clean-tree readback accompany the delivery metadata commit.
+
+Final exact-source closure: independent frontend397/115 plus all static/build/contracts passed; real-audio rerun8/8 passed in4.1m on the matching source hashes, and refreshed audit23/23 passed. Baseline-only OpenAPI naming warning remains informational. Physical microphone/field WER and remote CI were not executed; MediaRecorder, local workers and offline CPU Whisper were real. ASR240s evidence is current, not the prior benchmark. No related failed/skipped check or known functional blocker remains. Source commits: frontend5bafb69/74a1e49, backenddd21735/3d6d728, NLP50216e5. No PR, publication, push or main merge.
