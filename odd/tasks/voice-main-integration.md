@@ -38,9 +38,9 @@ Encárgate de completar la integración de `feat/voice-hitl-review` en los tres 
 
 T1 | S1 | inline GitHub publication after read-only policy map | done | NLP PR47, backend PR62, frontend PR70
 T2 | S1 | inline NLP PR/CI and main merge, verify main CI before T3 | done | PR47 merge5fa4ace; main CI44129312955 success
-T3 | S1 | inline backend PR/CI with NLP0.1.29 and exact frontend peer, merge and verify main | pending
-T4 | S1 | inline frontend PR/CI with exact backend main, merge and verify main | pending
-T5 | S1 | inline final cross-repo CI, local main synchronization and clean readback | pending
+T3 | S1 | inline backend PR/CI with NLP0.1.29 and exact frontend peer, merge and verify main | done | PR62 merge50a55f9; main CI44172765317 and reciprocal dispatch44216101993 success
+T4 | S1 | inline frontend PR/CI with exact backend main, merge and verify main | done | PR70 mergefe6e257; main CI44215952116 and exact-peer dispatch44216097535 success
+T5 | S1 | inline final cross-repo CI, local main synchronization and clean readback | done | all three mains synchronized; see frontend-security-merge.md
 
 ## Log
 
@@ -60,3 +60,5 @@ L8. Frontend CI/security correction7d19395 and backend fixture7c9e748/correspond
 L9. User resumed with `continue`. Replacement runs backend44130568735 and frontend44130569801 failed the same real FE08 legacy recording test: no Audio listo after immediate stop. Source confirms legacy CapturaCreateView shares the recorder now globally enforcing15seconds; scope correction must restore legacy2seconds while commercial StagedVoiceCapture explicitly retains15. No validation is removed. Frontend PR E2E also exposed a non-atomic mobile geometry assertion (727.296875 vs730); identical-head push E2E passed. The assertion now reads hero/thumb/control geometry in one browser frame, preserving both original bounds; targeted test repeated3times passed. Delegated recorder writer initially could not start due runtime usage limit; current explicit resume retries it with the same bounded scope. No backend/frontend merge is authorized until replacement checks pass.
 
 L10. Scoped recorder correction observed RED5fail/14pass, then focused19pass, full417pass across68files, and typecheck/lint/formatpass. Independent fresh candidate/baseline verification passed19/14tests and parent reran19successfully. Legacy recorder nowdefaults2seconds; commercial catalog/furniture explicitly pass existing15secondconstant. FE08 waits for visible00:02 before stopping instead of submitting a zero-second browser recording. Cancellation, max240seconds and20MBguards stay unchanged. Real API was unavailable locally; replacement live integration CI remains required. Risk:item3(sharedrecordercontract). No backend/frontend merge yet.
+
+L11. Integration completed after explicit authorization of a verified local picomatch patch and only GHSA-fc5q-39xc-vjpf exception until2026-12-17. Minimatch/glob fixed; raw npm audit remains nonzero for accepted picomatch. PR70 mergedfe6e257 after full successful replacement CI; frontend and backend exact merged-main reciprocal dispatches passed. All3local main checkouts clean0/0; frontend pre-existing .atl changes preserved in identified stash. See odd/tasks/frontend-security-merge.md for final evidence and docs/dependency-security.md for removal/expiry.
