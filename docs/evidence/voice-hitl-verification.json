@@ -1,0 +1,87 @@
+{
+  "scope": "Final frozen-source verification; synthetic local data only",
+  "repositories": {
+    "frontend": {
+      "branch": "feat/voice-hitl-review",
+      "source_head": "74a1e49703c46f10e5618aafbead62cee24b5936",
+      "unchanged_main": "914ed58297e45e42131e05072d2957564d6153f7"
+    },
+    "backend": {
+      "branch": "feat/voice-hitl-review",
+      "source_head": "3d6d7285a9dca974782a2d97129a65caa7013461",
+      "unchanged_main": "0b4299a8761496ec40410e1833e818cc237bb6ed"
+    },
+    "nlp": {
+      "branch": "feat/voice-hitl-review",
+      "source_head": "50216e5adcd9eb773b629b8c4de845bb62834877",
+      "unchanged_main": "702d22bdeb8780699bbe75594e5dd9125ac38260"
+    }
+  },
+  "source_sha256": {
+    "frontend": {
+      "src/modules/capturas/components/StagedVoiceCapture.vue": "57bd74a93b9dfcd46be5cff3603e954416842b5fc06f3bc203352fe8f6e919f2",
+      "src/modules/capturas/fieldVoiceReview.ts": "a04609b0f7da2280c36d28c5068e753424c435809b0e1171bb5a8bf4eb1c114e",
+      "src/modules/productos/components/ProductoForm.vue": "75eeda3b968785f14b595d52972f88f51646f5142bc553c304a0a7abd11b34f6",
+      "src/modules/proformas/components/EspecificacionForm.vue": "f2efc7c2ee12eadad354f4103779feb52499f46f2b1e637eae148f982a5c73ce"
+    },
+    "backend": {
+      "apps/capturas/revision_voz.py": "1b65c2c3a5a0e3d5ad30d8e7ad06203001dc2077d787e4cd76fdcb47a8f25455",
+      "apps/catalogo/api/serializers.py": "faa5c54854db2cf7ff81f62298d46eb4e3a01a07eb7759435a0ff288b14a74ff",
+      "apps/proformas/services.py": "0f5b9ee86a5a082bb18f0ff07f94ab2747443b5eecacd66c5bd180f7ceddb098"
+    },
+    "nlp": {
+      "src/homex_nlp/catalog.py": "58bc6e7cf81b43d782be27c1520b1256bbb57daa40b01720f4d5f25137dc20c8",
+      "src/homex_nlp/__init__.py": "dba6fb6eb6a5809e68b62cdd9afa057a0c63fcf7ed6f2dc75d78f561329c3b33"
+    }
+  },
+  "package": {
+    "version": "0.1.28",
+    "wheel_sha256": "abf68e16979c9cdf64eff534051798cec3a12b9d27672fd0f9fcd4805e825fea",
+    "historical_artifacts_unchanged": ["0.1.25", "0.1.26", "0.1.27"]
+  },
+  "passed": {
+    "nlp_source": 1185,
+    "nlp_installed": 1185,
+    "backend_full": 704,
+    "frontend_unit": 397,
+    "frontend_unit_files": 67,
+    "mocked_browser": 115,
+    "mocked_browser_skipped": 0,
+    "real_audio_browser": 8,
+    "independent_nlp": 197,
+    "independent_backend_subset": 78,
+    "independent_final_audit": 23,
+    "parent_nlp": 197,
+    "parent_backend_audit": 23,
+    "parent_frontend": 33
+  },
+  "other_checks": [
+    "lint",
+    "format",
+    "typecheck",
+    "production build",
+    "offline lock",
+    "Django system and migrations",
+    "extraction schema drift",
+    "OpenAPI drift and identical frontend snapshot",
+    "generated frontend types",
+    "wheel/sdist reproducibility",
+    "installed package identity",
+    "accessibility",
+    "historical attachment E2E enabled"
+  ],
+  "red_evidence": {
+    "nlp_matched_baseline": {
+      "expected_failures": 24,
+      "passes": 20
+    },
+    "backend_matched_baseline": "Forged pending accepted with HTTP201 and persisted proforma; final rejects atomically",
+    "frontend": "Specific pre-fix automatic ASR, state transitions, pointer identity, source/null and typed values, notes and legacy-warning regressions failed then passed"
+  },
+  "asr_240s_evidence": "voice-hitl-asr-240s.json",
+  "not_executed": [
+    "Physical microphone and field speech/WER assessment",
+    "Remote CI, publication, push, PR or merge"
+  ],
+  "known_nonblocking_warning": "Preexisting OpenAPI CategoryEnum naming warning; zero validation errors"
+}

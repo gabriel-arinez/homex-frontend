@@ -120,6 +120,8 @@ export type {
   ResultadoAsistida,
   ResultadoCatalogo,
   ResultadoEnum,
+  RevisionCampoCatalogo,
+  SeverityEnum,
   TipoEnum,
   TipoMuebleConflicto,
   TipoMuebleCrear,

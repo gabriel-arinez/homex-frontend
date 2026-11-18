@@ -220,7 +220,7 @@ test.describe.serial('FE08 backend real', () => {
     await page.goto('/capturas/nueva')
     await page.getByLabel('Proforma').fill(String(proformaId))
     await page.getByRole('button', { name: 'Grabar' }).click()
-    await expect(page.getByRole('status')).toContainText('Grabando')
+    await expect(page.getByRole('status')).toContainText('Grabando 00:02')
     await page.getByRole('button', { name: 'Finalizar', exact: true }).click()
     await expect(page.getByRole('status')).toContainText(/Audio listo/)
     await page.getByRole('button', { name: 'Enviar a procesamiento' }).click()

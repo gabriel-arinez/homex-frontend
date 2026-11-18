@@ -172,10 +172,14 @@ export type ConfirmarCaptura = {
 export type CrearAsistida = {
   clave_idempotencia: string
   proforma?: number | null
+  /**
+   * Descripción comercial revisada: al menos 20 palabras y hasta 3000 caracteres.
+   */
   texto?: string
   sesion_borrador: string
   moneda_codigo?: MonedaCodigoEnum
   captura_origen?: number | null
+  solo_transcribir?: boolean
 }
 
 /**
@@ -200,9 +204,13 @@ export type CrearCapturaTexto = {
 
 export type CrearCatalogo = {
   clave_idempotencia: string
+  /**
+   * Descripción comercial revisada: al menos 20 palabras y hasta 3000 caracteres.
+   */
   texto?: string
   sesion_borrador: string
   captura_origen?: number | null
+  solo_transcribir?: boolean
   categoria: CategoriaEnum
 }
 
@@ -645,6 +653,7 @@ export type PatchedProducto = {
   unidad_stock_info?: ValorCatalogoPublico
   activo?: boolean
   observaciones?: string | null
+  revision_humana_voz?: unknown
   imagen_principal?: ImagenPrincipal | null
   silla?: ProductoSilla | null
   piso?: ProductoPiso | null
@@ -746,6 +755,7 @@ export type Producto = {
   unidad_stock_info: ValorCatalogoPublico
   activo?: boolean
   observaciones?: string | null
+  revision_humana_voz?: unknown
   imagen_principal: ImagenPrincipal | null
   silla?: ProductoSilla | null
   piso?: ProductoPiso | null
@@ -863,6 +873,7 @@ export type PropuestaCatalogo = {
   category: CategoryEnum
   fields: CamposCatalogo
   evidence: Array<EvidenciaCatalogo>
+  field_reviews?: Array<RevisionCampoCatalogo>
   warnings: Array<string>
   unrecognized: Array<string>
   version: string
@@ -905,6 +916,10 @@ export type ResolucionPendiente = {
 }
 
 export type ResultadoAsistida = {
+  solo_transcribir: boolean
+  captura_origen: number | null
+  texto_asr_original: string | null
+  texto_corregido: string | null
   id: number
   estado: string
   intento_id: number | null
@@ -913,11 +928,17 @@ export type ResultadoAsistida = {
   propuesta_configurador: PropuestaConfigurador | null
   pendientes: Array<PendienteAsistida>
   version_proyeccion: string
+  candidatos: Array<unknown>
+  advertencias: Array<unknown>
   motor: MotorAsistida | null
   error_codigo: string | null
 }
 
 export type ResultadoCatalogo = {
+  solo_transcribir: boolean
+  captura_origen: number | null
+  texto_asr_original: string | null
+  texto_corregido: string | null
   id: number
   estado: string
   categoria: CategoriaEnum
@@ -928,11 +949,29 @@ export type ResultadoCatalogo = {
 
 /**
  * * `PROCESSING` - PROCESSING
+ * * `TRANSCRIBED` - TRANSCRIBED
  * * `REQUIRES_REVIEW` - REQUIRES_REVIEW
  * * `NO_PROPOSAL` - NO_PROPOSAL
  * * `ERROR` - ERROR
  */
-export type ResultadoEnum = 'PROCESSING' | 'REQUIRES_REVIEW' | 'NO_PROPOSAL' | 'ERROR'
+export type ResultadoEnum =
+  'PROCESSING' | 'TRANSCRIBED' | 'REQUIRES_REVIEW' | 'NO_PROPOSAL' | 'ERROR'
+
+export type RevisionCampoCatalogo = {
+  review_id: string
+  code: string
+  severity: SeverityEnum
+  message: string
+  field: string
+  evidence_ids: Array<string>
+}
+
+/**
+ * * `INFO` - INFO
+ * * `REVIEW` - REVIEW
+ * * `CRITICAL` - CRITICAL
+ */
+export type SeverityEnum = 'INFO' | 'REVIEW' | 'CRITICAL'
 
 /**
  * * `DIMENSION` - DIMENSION
@@ -1020,11 +1059,15 @@ export type ClienteWritable = {
 export type CrearAsistidaWritable = {
   clave_idempotencia: string
   proforma?: number | null
+  /**
+   * Descripción comercial revisada: al menos 20 palabras y hasta 3000 caracteres.
+   */
   texto?: string
   audio?: Blob | File
   sesion_borrador: string
   moneda_codigo?: MonedaCodigoEnum
   captura_origen?: number | null
+  solo_transcribir?: boolean
 }
 
 /**
@@ -1040,10 +1083,14 @@ export type CrearCapturaMultipartWritable = {
 
 export type CrearCatalogoWritable = {
   clave_idempotencia: string
+  /**
+   * Descripción comercial revisada: al menos 20 palabras y hasta 3000 caracteres.
+   */
   texto?: string
   audio?: Blob | File
   sesion_borrador: string
   captura_origen?: number | null
+  solo_transcribir?: boolean
   categoria: CategoriaEnum
 }
 
@@ -1221,6 +1268,7 @@ export type PatchedProductoWritable = {
   unidad_stock?: number
   activo?: boolean
   observaciones?: string | null
+  revision_humana_voz?: unknown
   silla?: ProductoSillaWritable | null
   piso?: ProductoPisoWritable | null
   promocion?: DescuentoProductoWritable | null
@@ -1270,6 +1318,7 @@ export type ProductoWritable = {
   unidad_stock: number
   activo?: boolean
   observaciones?: string | null
+  revision_humana_voz?: unknown
   silla?: ProductoSillaWritable | null
   piso?: ProductoPisoWritable | null
   promocion?: DescuentoProductoWritable | null

@@ -34,13 +34,13 @@ describe('corrección manual de avisos asistidos', () => {
       ),
     ).toBe(true)
   })
-  it('sigue el componente por UID incluso al renombrarlo y permite quitarlo', () => {
+  it('sigue el componente por UID y no descarta silenciosamente una observación al quitarlo', () => {
     const p = aviso({ tipo: 'COMPONENTE', uid: 'pieza', campo: 'espesor' })
     expect(pendienteResuelto(p, [], [{ uid: 'pieza', nombre: 'Renombrado' }], [])).toBe(false)
     expect(
       pendienteResuelto(p, [], [{ uid: 'pieza', nombre: 'Renombrado', espesor: '18 mm' }], []),
     ).toBe(true)
-    expect(pendienteResuelto(p, [], [], [])).toBe(true)
+    expect(pendienteResuelto(p, [], [], [])).toBe(false)
   })
   it('retira un conflicto general al completar su atributo visible', () => {
     const p = aviso({ tipo: 'ATRIBUTO_GENERAL', clave: 'material' })

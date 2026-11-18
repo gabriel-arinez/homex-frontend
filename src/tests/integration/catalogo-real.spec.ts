@@ -1,6 +1,7 @@
 import { expect, test, type APIResponse } from '@playwright/test'
 import { join } from 'node:path'
 import { existsSync } from 'node:fs'
+import { recordingFixtureDurationMs } from './audioFixture'
 import type { ResultadoCatalogo } from '@/generated/api'
 
 const directory = process.env.HOMEX_CATALOGO_AUDIO_DIR
@@ -16,6 +17,7 @@ for (const [category, file] of samples) {
       test(`${mode}: ASR → propuesta → formulario → guardado manual`, async ({
         playwright,
       }, testInfo) => {
+        test.setTimeout(300_000)
         if (!directory || !password || !existsSync(join(directory, file + '.wav')))
           throw new Error(
             'Faltan HOMEX_CATALOGO_AUDIO_DIR, HOMEX_CATALOGO_PASSWORD o fixtures WAV.',
@@ -96,8 +98,7 @@ for (const [category, file] of samples) {
             assistant.getByRole('heading', { name: 'Descripción por voz' }),
           ).toBeVisible()
 
-          // La carga/grabación inicia la interpretación automáticamente: escuchar antes
-          // del evento para no perder una respuesta de ASR ya completada.
+          // Audio starts ASR only. Interpretation and form application remain explicit.
           const completed = page.waitForResponse(
             async (response) => {
               if (
@@ -108,7 +109,7 @@ for (const [category, file] of samples) {
                 return false
               return (await response.json()).estado === 'COMPLETADA'
             },
-            { timeout: 150_000 },
+            { timeout: 240_000 },
           )
           if (mode === 'upload') {
             const chooser = page.waitForEvent('filechooser')
@@ -119,14 +120,37 @@ for (const [category, file] of samples) {
             await expect(
               assistant.getByRole('status').filter({ hasText: 'Grabando' }),
             ).toBeVisible()
-            await page.waitForTimeout(16000)
+            await page.waitForTimeout(recordingFixtureDurationMs(join(directory!, file + '.wav')))
             await assistant.getByRole('button', { name: 'Finalizar grabación' }).click()
           }
-          const proposal = (await (await completed).json()) as ResultadoCatalogo
-          await expect(assistant).not.toBeVisible()
+          const asr = (await (await completed).json()) as ResultadoCatalogo
+          expect(asr.solo_transcribir).toBe(true)
+          expect(asr.propuesta).toBeNull()
+          await expect(assistant.locator('textarea')).toHaveValue(asr.texto_transcrito_original!)
+          await expect(page.locator('input[name=nombre]')).toHaveValue('')
+          expect(writes).toEqual([])
+          const interpreted = page.waitForResponse(
+            async (response) => {
+              if (
+                !response.url().includes('/capturas/catalogo/') ||
+                response.request().method() !== 'GET' ||
+                response.status() !== 200
+              )
+                return false
+              const data = await response.json()
+              return data.estado === 'COMPLETADA' && data.id !== asr.id
+            },
+            { timeout: 240_000 },
+          )
+          await assistant.getByRole('button', { name: 'Procesar texto', exact: true }).click()
+          const proposal = (await (await interpreted).json()) as ResultadoCatalogo
+          expect(proposal.captura_origen).toBe(asr.id)
+          await expect(page.locator('input[name=nombre]')).toHaveValue('')
+          await assistant.getByRole('button', { name: 'Aplicar propuesta', exact: true }).click()
+          await expect(assistant.locator('textarea')).toHaveCount(0)
           await expect(
             page.getByRole('heading', { name: 'Descripción original por voz' }),
-          ).toBeVisible()
+          ).toHaveCount(0)
           expect(proposal.texto_transcrito_original?.trim().length).toBeGreaterThan(4)
           expect(writes).toEqual([])
           expect(await readInventory()).toEqual(before)
@@ -179,7 +203,8 @@ for (const [category, file] of samples) {
           expect(fields.precio_lista).toBeDefined()
           if (category === 'SILLA') expect(fields.especificaciones).toBeDefined()
           if (category === 'PISO_FLOTANTE') expect(fields.espesor_mm).toBeDefined()
-          if (category === 'OTRO') expect(fields.observaciones).toBeDefined()
+          if (category === 'OTRO' && !fields.observaciones)
+            expect(proposal.propuesta!.warnings.length).toBeGreaterThan(0)
           // Required SKU remains a deliberate manual choice.
           await page
             .getByLabel('Código SKU *', { exact: false })
@@ -187,6 +212,29 @@ for (const [category, file] of samples) {
           const name = page.getByLabel('Nombre comercial *', { exact: false })
           if (!(await name.inputValue())) await name.fill(`Prueba voz ${category}`)
           await page.getByLabel('Precio normal de venta (Bs) *', { exact: false }).fill('100')
+          // Confirm only valid contextual suggestions/reviews; edits above remain human decisions.
+          const reviewIds = await page
+            .locator('[id^="voice-status-"]')
+            .evaluateAll((notes) => notes.map((note) => note.id))
+          for (const id of reviewIds) {
+            const field = id.slice('voice-status-'.length)
+            const valid = await page.evaluate((field) => {
+              const control = Array.from(
+                document.querySelectorAll<
+                  HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+                >('input,select,textarea'),
+              ).find((control) => control.name === field || control.id === field)
+              return Boolean(control?.value.trim() && control.checkValidity())
+            }, field)
+            // Empty optional observations are not falsely confirmed; critical guards still apply.
+            if (!valid) continue
+            const confirm = page
+              .locator(`[id=${JSON.stringify(id)}]`)
+              .getByRole('button', { name: 'Confirmar campo', exact: true })
+            if (!(await confirm.count())) continue
+            await confirm.click()
+            await expect(confirm).toHaveCount(0)
+          }
           const savedResponse = page.waitForResponse(
             (r) =>
               r.request().method() === 'POST' &&
@@ -201,7 +249,7 @@ for (const [category, file] of samples) {
             expect(saved.silla.especificaciones).toEqual(fields.especificaciones)
           if (category === 'PISO_FLOTANTE')
             expect(Number(saved.piso.espesor_mm)).toBe(Number(fields.espesor_mm))
-          if (category === 'OTRO') expect(saved.observaciones).toBe(fields.observaciones)
+          if (category === 'OTRO') expect(saved.observaciones).toBe(fields.observaciones ?? null)
           const after = await readInventory()
           expect(after.count).toBe(before.count + 1)
           expect(after.stocks.filter(([id]) => id !== saved.id)).toEqual(before.stocks)

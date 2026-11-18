@@ -1,0 +1,21 @@
+{
+  "source": "https://github.com/micromatch/picomatch/pull/235",
+  "commit": "0150ed18b7971894bfd1824c8f96d6b63c70ad1f",
+  "version": "4.0.7",
+  "originalSha256": "4e1e05447668aa1e94366c5516a2bcd8f5fff800cc92b1d0cd7d77703b8618c4",
+  "patchedSha256": "cb0abec27579ed10bd7cba39d612825a01a0e1a2635e6b32769a2ccf3f8cdcac",
+  "replacements": [
+    {
+      "before": "  return true;\n};\n\nconst normalizeSimpleBranch = branch => {\n  let value = branch.trim();\n  let changed = true;\n",
+      "after": "  return true;\n};\n\nconst branchContainsGlobStar = branch => {\n  let escaped = false;\n  let bracket = 0;\n\n  for (let i = 0; i < branch.length; i++) {\n    const ch = branch[i];\n\n    if (escaped === true) {\n      escaped = false;\n      continue;\n    }\n\n    if (ch === '\\\\') {\n      escaped = true;\n      continue;\n    }\n\n    if (ch === '[') {\n      bracket++;\n      continue;\n    }\n\n    if (ch === ']' && bracket > 0) {\n      bracket--;\n      continue;\n    }\n\n    if (bracket === 0 && ch === '*' && branch[i + 1] !== '(') {\n      return true;\n    }\n  }\n\n  return false;\n};\n\nconst normalizeSimpleBranch = branch => {\n  let value = branch.trim();\n  let changed = true;\n"
+    },
+    {
+      "before": "  return value.replace(/\\\\(.)/g, '$1');\n};\n\nconst hasRepeatedCharPrefixOverlap = branches => {\n  const values = branches.map(normalizeSimpleBranch).filter(Boolean);\n\n  for (let i = 0; i < values.length; i++) {\n    for (let j = i + 1; j < values.length; j++) {\n      const a = values[i];\n      const b = values[j];\n      const char = a[0];\n\n      if (!char || a !== char.repeat(a.length) || b !== char.repeat(b.length)) {\n        continue;\n      }\n\n      if (a === b || a.startsWith(b) || b.startsWith(a)) {\n        return true;\n      }\n    }\n",
+      "after": "  return value.replace(/\\\\(.)/g, '$1');\n};\n\nconst hasBranchRepetitionOverlap = branches => {\n  const values = branches.map(normalizeSimpleBranch).filter(Boolean);\n\n  for (let i = 0; i < values.length; i++) {\n    for (let j = i + 1; j < values.length; j++) {\n      const a = values[i];\n      const b = values[j];\n      const [short, long] = a.length <= b.length ? [a, b] : [b, a];\n\n      if (short.length > 0\n        && long.length % short.length === 0\n        && long === short.repeat(long.length / short.length)) {\n        return true;\n      }\n    }\n"
+    },
+    {
+      "before": "\n  const branches = splitTopLevel(body).map(branch => branch.trim());\n\n  if (branches.length > 1) {\n    if (\n      branches.some(branch => branch === '') ||\n      branches.some(branch => /^[*?]+$/.test(branch)) ||\n      hasRepeatedCharPrefixOverlap(branches)\n    ) {\n      return { risky: true };\n    }\n",
+      "after": "\n  const branches = splitTopLevel(body).map(branch => branch.trim());\n\n  if (branches.some(branchContainsGlobStar)) {\n    return { risky: true };\n  }\n\n  if (branches.length > 1) {\n    if (\n      branches.some(branch => branch === '') ||\n      branches.some(branch => /^[*?]+$/.test(branch)) ||\n      hasBranchRepetitionOverlap(branches)\n    ) {\n      return { risky: true };\n    }\n"
+    }
+  ]
+}

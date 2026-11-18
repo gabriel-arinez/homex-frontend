@@ -12,7 +12,6 @@ import {
   Wallet,
   ImagePlus,
   Mic,
-  FileText,
 } from '@lucide/vue'
 import type {
   EspecificacionMueble,
@@ -27,7 +26,6 @@ import CapturaAsistida from './CapturaAsistida.vue'
 import EspecificacionForm from './EspecificacionForm.vue'
 import ImageGallery from '@/shared/media/ImageGallery.vue'
 import { galleryService } from '@/shared/media/gallery'
-import { leerDatosTecnicos } from '../services/muebleTecnico'
 
 type Seccion = 'general' | 'estructura' | 'accesorios' | 'imagenes' | 'comercial' | 'revision'
 type DatosComerciales = {
@@ -62,6 +60,7 @@ const props = defineProps<{
   } | null
   unidades: ValorCatalogoPublico[]
   pendientesAsistencia?: PendienteAsistida[]
+  voiceCaptureId?: number
   processing?: boolean
   externalError?: string
 }>()
@@ -76,6 +75,7 @@ const emit = defineEmits<{
   typeCreated: [tipo: ValorCatalogoPublico]
 }>()
 const voiceOpen = ref(false)
+const voiceSuggestedFields = ref<string[]>([])
 const leaveVoiceConfirm = ref(false)
 function requestCloseStudio() {
   if (voiceActive.value) {
@@ -184,10 +184,6 @@ watch(imageStepStatus, (state) => {
 const volverARevision = ref(false)
 const indice = computed(() => secciones.findIndex((item) => item.id === seccion.value))
 const titulo = computed(() => props.detalle?.nombre?.trim() || 'Nuevo mueble a pedido')
-const descripcionOriginal = computed(() => {
-  const datos = leerDatosTecnicos(props.especificacion?.datos_tecnicos)
-  return typeof datos.descripcion_original === 'string' ? datos.descripcion_original.trim() : ''
-})
 watch(seccion, async () => {
   await nextTick()
   tituloSeccion.value?.focus({ preventScroll: true })
@@ -207,6 +203,32 @@ function editarDesdeRevision(section: Seccion) {
   seccion.value = section
 }
 function recibirCaptura(result: ResultadoAsistida) {
+  const proposal = result.propuesta_configurador
+  if (proposal) {
+    const commercialFields: Record<string, string> = {
+      nombre: 'mueble-nombre-comercial',
+      cantidad: 'mueble-cantidad',
+      precio_unitario: 'mueble-precio',
+      descuento: 'mueble-descuento',
+      unidad_codigo: 'mueble-unidad',
+    }
+    voiceSuggestedFields.value = Object.entries(proposal.comercial)
+      .filter(([, value]) => value != null)
+      .flatMap(([key]) => (commercialFields[key] ? [commercialFields[key]!] : []))
+    const technical = proposal.especificacion.datos_tecnicos as Record<string, unknown>
+    const general = technical.caracteristicas_generales as
+      { dimensiones?: Record<string, unknown> } | undefined
+    for (const key of Object.keys(general?.dimensiones ?? {}))
+      voiceSuggestedFields.value.push(key, `unidad-${key}`)
+    const pieces = technical.componentes
+    if (Array.isArray(pieces))
+      pieces.forEach((piece, index) => {
+        if (!piece || typeof piece !== 'object') return
+        for (const key of ['nombre', 'material', 'espesor', 'color', 'dimensiones'])
+          if (piece[key] != null) voiceSuggestedFields.value.push(`componente-${key}-${index}`)
+      })
+  }
+
   voiceOpen.value = false
   volverARevision.value = false
   seccion.value = 'revision'
@@ -393,16 +415,6 @@ defineExpose({ save: guardarDesdeEstudio, hasRealChanges })
           @click="seccion = 'imagenes'"
           ><ImagePlus :size="16" aria-hidden="true" />Gestionar imágenes</Button
         >
-        <article
-          v-if="seccion === 'revision' && descripcionOriginal"
-          class="studio-review-transcript"
-        >
-          <header class="studio-review-transcript__header">
-            <FileText :size="15" aria-hidden="true" />
-            <h4>Descripción técnica original conservada</h4>
-          </header>
-          <p class="studio-review-transcript__text">{{ descripcionOriginal }}</p>
-        </article>
       </section>
       <fieldset
         v-show="seccion !== 'imagenes' || Boolean(externalError)"
@@ -417,6 +429,8 @@ defineExpose({ save: guardarDesdeEstudio, hasRealChanges })
           :detalle="detalle"
           :unidades="unidades"
           :pendientes-asistencia="pendientesAsistencia"
+          :voice-capture-id="voiceCaptureId"
+          :voice-suggested-fields="voiceSuggestedFields"
           :moneda="moneda"
           :processing="processing"
           :external-error="externalError"

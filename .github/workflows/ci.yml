@@ -124,7 +124,7 @@ jobs:
         with:
           repository: gabriel-arinez/homex-backend
           # Contrato y consumidor de galerías coordinados por revisión inmutable.
-          ref: ${{ inputs.integration_peer_ref || 'a4c9cfc25077ba11e281e52cf1e993ea2e145538' }}
+          ref: ${{ inputs.integration_peer_ref || '7c9e748213a23e650d76120e64d9a8b2fdd6a3df' }}
           path: backend-prf04-contract
       - name: Verificar snapshot OpenAPI idéntico al backend coordinado
         run: cmp contracts/backend-openapi.yaml backend-prf04-contract/docs/openapi.yaml
@@ -140,7 +140,8 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 24.18.1, cache: npm }
       - run: npm ci
-      - run: npm audit --audit-level=high
+      - name: Full audit with verified, expiring advisory-specific mitigation
+        run: npm run security:check
 
   release:
     runs-on: ubuntu-latest
@@ -221,7 +222,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: gabriel-arinez/homex-backend
-          ref: ${{ inputs.integration_peer_ref || 'a4c9cfc25077ba11e281e52cf1e993ea2e145538' }}
+          ref: ${{ inputs.integration_peer_ref || '7c9e748213a23e650d76120e64d9a8b2fdd6a3df' }}
           path: backend
       - name: Record exact frontend and backend revisions
         run: |

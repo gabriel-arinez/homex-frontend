@@ -1,8 +1,18 @@
+import {
+  ALLOWED_AUDIO_EXTENSIONS,
+  MAX_AUDIO_BYTES,
+  readAudioDuration,
+  validateAudioDuration,
+} from './audioLimits'
 export function audioBufferToWavBlob(buffer: AudioBuffer): Blob {
   const numChannels = Math.min(buffer.numberOfChannels, 2)
   const sampleRate = buffer.sampleRate
   const format = 1 // PCM
   const bitDepth = 16
+
+  const expectedSize = 44 + buffer.length * numChannels * 2
+  if (!Number.isFinite(expectedSize) || expectedSize > MAX_AUDIO_BYTES)
+    throw new Error('El audio convertido supera 20 MB. Divide el archivo antes de continuar.')
 
   let interleaved: Float32Array
   if (numChannels === 2) {
@@ -76,16 +86,47 @@ export async function convertAudioFileToWav(file: File): Promise<File> {
     window.AudioContext ||
     (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
   if (!AudioCtx) {
-    return file
+    throw new Error(
+      'Este navegador no puede convertir el audio móvil. Utiliza WAV, MP3, M4A, OGG o WebM.',
+    )
   }
   const audioCtx = new AudioCtx()
   try {
     const arrayBuffer = await file.arrayBuffer()
-    const decoded = await audioCtx.decodeAudioData(arrayBuffer)
+    let decoded: AudioBuffer
+    try {
+      decoded = await audioCtx.decodeAudioData(arrayBuffer)
+    } catch {
+      throw new Error(
+        'No se pudo convertir el archivo móvil: está dañado o su códec no es compatible. Utiliza WAV, MP3, M4A, OGG o WebM.',
+      )
+    }
+    const validation = validateAudioDuration(decoded.duration)
+    if (!Number.isFinite(decoded.duration) || decoded.duration <= 0)
+      throw new Error('El archivo no contiene audio decodificable.')
+    if (validation) throw new Error(validation)
     const wavBlob = audioBufferToWavBlob(decoded)
     const originalName = file.name.substring(0, file.name.lastIndexOf('.')) || 'audio'
     return new File([wavBlob], `${originalName}.wav`, { type: 'audio/wav' })
   } finally {
     void audioCtx.close().catch(() => undefined)
   }
+}
+
+/** Keep announced formats aligned with the backend's native upload whitelist. */
+export async function prepareAudioForCapture(file: File): Promise<File> {
+  if (!file.size || file.size > MAX_AUDIO_BYTES)
+    throw new Error('El archivo está vacío o supera 20 MB.')
+  if (!ALLOWED_AUDIO_EXTENSIONS.test(file.name)) throw new Error('Formato de audio no admitido.')
+  if (/\.(aac|opus|mp4|flac)$/i.test(file.name)) {
+    const converted = await convertAudioFileToWav(file)
+    if (!/\.wav$/i.test(converted.name) || converted.type !== 'audio/wav')
+      throw new Error('La conversión a WAV no pudo completarse. Selecciona un formato compatible.')
+    if (!converted.size || converted.size > MAX_AUDIO_BYTES)
+      throw new Error('El audio convertido está vacío o supera 20 MB.')
+    return converted
+  }
+  const validation = validateAudioDuration(await readAudioDuration(file))
+  if (validation) throw new Error(validation)
+  return file
 }

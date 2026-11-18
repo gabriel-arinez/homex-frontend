@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import AudioRecorder from '@/modules/capturas/components/AudioRecorder.vue'
+import { MIN_AUDIO_SECONDS } from '@/modules/capturas/audioLimits'
 
 function setup() {
   let resolve!: (stream: MediaStream) => void
@@ -30,6 +31,7 @@ function setup() {
     }
     stop() {
       this.state = 'inactive'
+      this.ondataavailable?.({ data: new Blob(['audio']) })
       this.onstop?.()
     }
   }
@@ -37,7 +39,10 @@ function setup() {
   return { getUserMedia, stopTrack, stream, resolve: () => resolve(stream) }
 }
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.useRealTimers()
+})
 
 function controls(wrapper: ReturnType<typeof mount>) {
   return (
@@ -58,6 +63,7 @@ function controls(wrapper: ReturnType<typeof mount>) {
 describe('recorder pending permission', () => {
   it('discards a late stream after cancel and allows a new capture', async () => {
     const media = setup()
+    vi.useFakeTimers()
     const wrapper = mount(AudioRecorder)
     const first = controls(wrapper).start()
     const duplicate = controls(wrapper).start()
@@ -73,6 +79,7 @@ describe('recorder pending permission', () => {
     media.resolve()
     await second
     expect(wrapper.text()).toContain('Grabando')
+    await vi.advanceTimersByTimeAsync(15000)
     controls(wrapper).stop()
     await flushPromises()
     expect(wrapper.text()).toContain('Audio listo')
@@ -82,6 +89,7 @@ describe('recorder pending permission', () => {
 
   it('pausa y reanuda sin descartar audio, y acepta finalizar desde pausa', async () => {
     const media = setup()
+    vi.useFakeTimers()
     const wrapper = mount(AudioRecorder)
     const pending = controls(wrapper).start()
     media.resolve()
@@ -92,6 +100,7 @@ describe('recorder pending permission', () => {
     controls(wrapper).resume()
     await flushPromises()
     expect(wrapper.text()).toContain('Grabando')
+    await vi.advanceTimersByTimeAsync(15000)
     controls(wrapper).pause()
     controls(wrapper).stop()
     await flushPromises()
@@ -102,6 +111,7 @@ describe('recorder pending permission', () => {
 
   it('stops a stream received after unmount without creating audio', async () => {
     const media = setup()
+    vi.useFakeTimers()
     const wrapper = mount(AudioRecorder)
     const pending = controls(wrapper).start()
     wrapper.unmount()
@@ -110,4 +120,42 @@ describe('recorder pending permission', () => {
     expect(media.stopTrack).toHaveBeenCalledTimes(1)
     expect(wrapper.emitted('ready')).toBeUndefined()
   })
+})
+
+it.each([14, 15, 16, 240, 241])(
+  'enforces commercial microphone bounds at %s seconds',
+  async (seconds) => {
+    const media = setup()
+    vi.useFakeTimers()
+    const wrapper = mount(AudioRecorder, { props: { minDurationSeconds: MIN_AUDIO_SECONDS } })
+    const pending = controls(wrapper).start()
+    media.resolve()
+    await pending
+    await vi.advanceTimersByTimeAsync(seconds * 1000)
+    controls(wrapper).stop()
+    await flushPromises()
+    const ready = wrapper.emitted('ready')?.filter(([blob]) => blob instanceof Blob) ?? []
+    expect(ready.length).toBe(seconds < 15 ? 0 : 1)
+    expect(wrapper.text().includes('15 segundos')).toBe(seconds < 15)
+    // Auto-stop at 240 prevents a 241-second recording, rather than sending oversized audio.
+    expect(wrapper.text().includes('04:01')).toBe(false)
+    wrapper.unmount()
+  },
+)
+
+it.each([1, 2, 14])('preserves legacy microphone minimum at %s seconds', async (seconds) => {
+  const media = setup()
+  vi.useFakeTimers()
+  const wrapper = mount(AudioRecorder)
+  const pending = controls(wrapper).start()
+  media.resolve()
+  await pending
+  await vi.advanceTimersByTimeAsync(seconds * 1000)
+  controls(wrapper).stop()
+  await flushPromises()
+  const ready = wrapper.emitted('ready')?.filter(([blob]) => blob instanceof Blob) ?? []
+  expect(ready).toHaveLength(seconds < 2 ? 0 : 1)
+  expect(wrapper.text().includes('2 segundos')).toBe(seconds < 2)
+  expect(wrapper.text()).not.toContain('15 segundos')
+  wrapper.unmount()
 })

@@ -7,6 +7,12 @@ export const captura24: ResultadoAsistida = {
   intento_id: 24,
   resultado: 'REQUIRES_REVIEW',
   version_proyeccion: 'PRF04_2',
+  candidatos: [],
+  advertencias: [],
+  solo_transcribir: false,
+  captura_origen: null,
+  texto_asr_original: null,
+  texto_corregido: null,
   texto_transcrito_original:
     'Dos escritorios de ancho 120, alto 75 centímetros y profundidad 60 centímetros',
   propuesta_configurador: {

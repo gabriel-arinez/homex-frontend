@@ -2978,6 +2978,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       :detalle="editableSpecDetail"
       :unidades="unidades"
       :pendientes-asistencia="draftingFurniture ? pendientesAsistencia : []"
+      :voice-capture-id="editableSpecDetail?.captura_asistida_id"
       :processing="voiceProcessing"
       :external-error="error"
       @save="saveSpec"

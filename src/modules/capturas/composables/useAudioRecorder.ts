@@ -1,6 +1,6 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { MAX_RECORD_SECONDS, MAX_AUDIO_BYTES } from '../audioLimits'
-export function useAudioRecorder() {
+export function useAudioRecorder(minDurationSeconds = 2) {
   const state = ref<
       'IDLE' | 'REQUESTING' | 'RECORDING' | 'PAUSED' | 'READY' | 'DENIED' | 'UNSUPPORTED' | 'ERROR'
     >('IDLE'),
@@ -93,7 +93,11 @@ export function useAudioRecorder() {
       }
       recorder.onstop = () => {
         const captured = new Blob(chunks, { type: recorder?.mimeType || 'audio/webm' })
-        if (captured.size > MAX_AUDIO_BYTES) {
+        if (elapsed.value < minDurationSeconds || captured.size === 0) {
+          error.value = `Graba al menos ${minDurationSeconds} segundos y dicta una descripción más completa antes de continuar.`
+          blob.value = null
+          state.value = 'ERROR'
+        } else if (captured.size > MAX_AUDIO_BYTES) {
           error.value = 'La grabación supera el límite de 20 MB. Graba una descripción más corta.'
           blob.value = null
           state.value = 'ERROR'

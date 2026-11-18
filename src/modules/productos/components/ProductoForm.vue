@@ -1,4 +1,12 @@
 <script setup lang="ts">
+import {
+  vVoiceFields,
+  appendVoiceAudit,
+  humanVoiceDecision,
+  type VoiceFieldReview,
+  type FieldVoiceReview,
+} from '@/modules/capturas/fieldVoiceReview'
+import type { VoiceEvidence } from '@/modules/capturas/voiceEvidence'
 import { dateRangeError } from '@/shared/validation/dateRange'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import type {
@@ -11,18 +19,7 @@ import type {
 } from '@/generated/api'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import CapturaCatalogo from './CapturaCatalogo.vue'
-import {
-  AlertTriangle,
-  Armchair,
-  Check,
-  FileText,
-  Layers,
-  Mic,
-  Package,
-  Save,
-  Tag,
-  Trash2,
-} from '@lucide/vue'
+import { Armchair, Check, FileText, Layers, Mic, Package, Save, Tag, Trash2 } from '@lucide/vue'
 import VoiceDrawer from '@/modules/capturas/components/VoiceDrawer.vue'
 import ImageGallery from '@/shared/media/ImageGallery.vue'
 import type { LocalImage } from '@/shared/media/gallery'
@@ -48,6 +45,7 @@ const opciones = reactive<Record<string, ValorCatalogoPublico[]>>({})
 const familias = ref<FamiliaProducto[]>([])
 const loading = ref(true)
 const error = ref('')
+const formElement = ref<HTMLFormElement | null>(null)
 const fields = ref<Record<string, string[]>>({})
 const images = ref<LocalImage[]>([])
 
@@ -57,8 +55,73 @@ const assistantProcessing = ref(false)
 const recordingActive = ref(false)
 const recordingPaused = ref(false)
 const recordingElapsed = ref(0)
-const voiceTranscribedText = ref('')
-const voicePendingWarnings = ref<string[]>([])
+const voiceObservations = ref<FieldVoiceReview[]>([])
+const VOICE_REVIEW_REQUIRED = 'Revisa los campos señalados antes de guardar el producto.'
+const voiceWarnings = ref<string[]>([])
+const voiceCaptureId = ref<number>()
+const voiceFieldReviews = ref<VoiceFieldReview[]>([])
+let voiceAuditHistory: unknown = (
+  props.initial as (Producto & { revision_humana_voz?: unknown }) | undefined
+)?.revision_humana_voz
+const voiceOriginalValues = ref<Record<string, string>>({})
+const voiceAuditOriginalValues = ref<Record<string, unknown>>({})
+const voiceResolutions = ref<Record<string, { value: string; state: 'edited' | 'reviewed' }>>({})
+function catalogAuditValue(fields: unknown, field: string): unknown {
+  let value = fields
+  for (const key of field.split('.'))
+    value = value && typeof value === 'object' ? (value as Record<string, unknown>)[key] : null
+  return value ?? null
+}
+function voiceValue(field: string): string {
+  if (field.startsWith('especificaciones.'))
+    return camposSilla.value.find((c) => `especificaciones.${c.clave}` === field)?.valor ?? ''
+  const key =
+    Object.keys(catalogFieldNames).find((key) => catalogFieldNames[key] === field) ?? field
+  return String((form as Record<string, unknown>)[key] ?? '')
+}
+function validVoiceValue(field: string): boolean {
+  const value = voiceValue(field).trim()
+  if (!value) return false
+  if (field === 'precio') return Number.isFinite(Number(value)) && Number(value) >= 0
+  if (['espesor', 'largo', 'ancho', 'm2-caja'].includes(field))
+    return Number.isFinite(Number(value)) && Number(value) > 0
+  const control = Array.from(
+    formElement.value?.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
+      'input,select,textarea',
+    ) ?? [],
+  ).find((el) => el.name === field)
+  return !!control && control.checkValidity()
+}
+const voiceFields = computed(() =>
+  voiceObservations.value.map((item) => {
+    const resolution = voiceResolutions.value[item.field]
+    return resolution && resolution.value === voiceValue(item.field) && validVoiceValue(item.field)
+      ? { ...item, state: resolution.state }
+      : item
+  }),
+)
+function resolveVoiceField(field: string, edited: boolean) {
+  if (
+    !validVoiceValue(field) ||
+    (edited && voiceValue(field) === voiceOriginalValues.value[field])
+  ) {
+    delete voiceResolutions.value[field]
+    return
+  }
+  voiceResolutions.value[field] = {
+    value: voiceValue(field),
+    state: edited ? 'edited' : 'reviewed',
+  }
+  clearResolvedVoiceError()
+}
+function clearResolvedVoiceError() {
+  if (
+    error.value === VOICE_REVIEW_REQUIRED &&
+    !voiceFields.value.some((field) => field.critical && field.state === 'pending')
+  )
+    error.value = ''
+}
+const voiceReview = computed(() => ({ fields: voiceFields.value, resolve: resolveVoiceField }))
 
 function updateRecording(active: boolean, paused: boolean, elapsed: number) {
   recordingActive.value = active
@@ -246,7 +309,13 @@ const opts = (key: string, empty = 'Sin seleccionar') => [
 function applyProposals(proposals: Array<[string, unknown]>) {
   const current = form as Record<string, unknown>
   for (const [key, value] of proposals) {
-    if (key === 'especificaciones') {
+    if (key === 'observaciones') {
+      const note = String(value ?? '').trim()
+      if (note && !form.observaciones.includes(note))
+        form.observaciones = form.observaciones.trim()
+          ? `${form.observaciones.trim()}\n${note}`
+          : note
+    } else if (key === 'especificaciones') {
       form.especificaciones = JSON.stringify(value)
       camposSilla.value = camposSimples(value)
     } else {
@@ -257,49 +326,95 @@ function applyProposals(proposals: Array<[string, unknown]>) {
   voiceOpen.value = false
 }
 
-// Aplicación directa e inteligente desde el asistente de voz
-function onVoiceApplied(payload: { fields: CamposCatalogo; text: string; warnings: string[] }) {
-  voiceTranscribedText.value = payload.text || ''
-  voicePendingWarnings.value = [...(payload.warnings || [])]
-
-  const suggested = { ...payload.fields }
-
-  // Evitar volcar la transcripción completa en observaciones si el NLP la incluyó por fallback.
-  // La transcripción completa se preserva y muestra en la tarjeta lateral.
-  if (suggested.observaciones && suggested.observaciones.trim() === (payload.text || '').trim()) {
-    delete suggested.observaciones
-  }
-
-  // Heurística de precio si no vino en fields pero se dictó en el texto
-  if (!suggested.precio_lista && payload.text) {
-    const match = payload.text.match(
-      /\b(?:precio(?:\s+de\s+lista)?|total|valor|cuesta)\b\s*[,;:]?\s*(?:(?:es\s+de|es|de)\s+)?(?:(?:bs\.?|bob|bolivianos?|bolivios?|d[oó]lares?|usd)\s*)?(\d+(?:[.,]\d+)?)/i,
-    )
-    if (match?.[1]) {
-      const num = match[1].replace(',', '.')
-      if (Number(num) > 0) suggested.precio_lista = num
-    }
-  }
-
-  // Heurística de color para sillas
-  if (categoria.value === 'SILLA' && !suggested.color_primario && payload.text) {
-    const colorOpts = opciones.COLOR || []
-    for (const opt of colorOpts) {
-      const reg = new RegExp(`\\b${opt.nombre}\\b`, 'i')
-      if (reg.test(payload.text)) {
-        suggested.color_primario = opt.id
-        break
-      }
-    }
-  }
-
-  applyProposals(Object.entries(suggested))
-  voiceOpen.value = false
+const catalogFieldNames: Record<string, string> = {
+  precio_lista: 'precio',
+  unidad_stock: 'unidad',
+  color_primario: 'color1',
+  color_secundario: 'color2',
+  tipo: 'tipo-piso',
+  espesor_mm: 'espesor',
+  largo_mm: 'largo',
+  ancho_mm: 'ancho',
+  m2_por_caja: 'm2-caja',
 }
-
-function applyVoice(suggested: CamposCatalogo) {
-  applyProposals(Object.entries(suggested))
-  voiceOpen.value = false
+function onVoiceApplied(payload: {
+  fields: CamposCatalogo
+  text: string
+  warnings: string[]
+  evidence?: VoiceEvidence[]
+  capture_id?: number
+  field_reviews?: VoiceFieldReview[]
+}) {
+  // Older proposals may carry the entire dictation as fallback notes. Never apply it.
+  const fields = { ...payload.fields }
+  const normalized = (value: string) => value.normalize('NFC').replace(/\s+/gu, ' ').trim()
+  if (fields.observaciones && normalized(fields.observaciones) === normalized(payload.text)) {
+    delete fields.observaciones
+  }
+  payload = { ...payload, fields }
+  voiceCaptureId.value = payload.capture_id
+  voiceFieldReviews.value = [
+    ...(payload.field_reviews ?? []),
+    ...Object.keys(payload.fields)
+      .flatMap((field) =>
+        field === 'especificaciones' && payload.fields.especificaciones
+          ? Object.keys(payload.fields.especificaciones).map((key) => `especificaciones.${key}`)
+          : [field],
+      )
+      .filter((field) => !(payload.field_reviews ?? []).some((r) => r.field === field))
+      .map((field): VoiceFieldReview => ({
+        review_id: `field:${field}`,
+        field,
+        code: 'VOICE_SUGGESTION',
+        severity: 'INFO',
+        message: '',
+        evidence_ids: (payload.evidence ?? [])
+          .filter((e) => e.label === field && e.decision === 'ACCEPTED' && 'candidate_id' in e)
+          .map((e) => String((e as VoiceEvidence & { candidate_id: string }).candidate_id)),
+      })),
+  ]
+  // Audit source values come from the NLP payload, not defaulted/stringified controls.
+  voiceAuditOriginalValues.value = Object.fromEntries(
+    voiceFieldReviews.value.map((review) => [
+      review.field,
+      catalogAuditValue(payload.fields, review.field),
+    ]),
+  )
+  const names = new Set([
+    ...(payload.field_reviews ?? []).map((review) => review.field),
+    ...Object.keys(payload.fields).flatMap((key) =>
+      key === 'especificaciones' && payload.fields.especificaciones
+        ? Object.keys(payload.fields.especificaciones).map((name) => `especificaciones.${name}`)
+        : [key],
+    ),
+    ...(payload.evidence ?? []).flatMap((e) => (e.label ? [e.label] : [])),
+  ])
+  voiceObservations.value = Array.from(names).map((field) => {
+    const pending = (payload.evidence ?? []).find(
+      (e) => e.label === field && e.decision === 'UNRESOLVED',
+    )
+    const review = payload.field_reviews?.find(
+      (review) => review.field === field && review.severity !== 'INFO',
+    )
+    return {
+      field: catalogFieldNames[field] ?? field,
+      state: pending || review ? 'pending' : 'suggested',
+      reason:
+        review?.message || pending?.reason || (pending ? 'Confirma o corrige este dato.' : ''),
+      critical: review ? review.severity === 'CRITICAL' : Boolean(pending),
+    }
+  })
+  voiceWarnings.value = [...new Set(payload.warnings)].filter(
+    (warning) =>
+      !payload.field_reviews?.some((review) => review.message === warning) &&
+      !voiceObservations.value.some((observation) => observation.reason === warning),
+  )
+  voiceResolutions.value = {}
+  applyProposals(Object.entries(payload.fields))
+  voiceOriginalValues.value = Object.fromEntries(
+    voiceObservations.value.map((item) => [item.field, voiceValue(item.field)]),
+  )
+  clearResolvedVoiceError()
 }
 
 async function load() {
@@ -362,6 +477,10 @@ function nullable(value: string) {
 }
 
 function submit(): boolean {
+  if (voiceFields.value.some((item) => item.critical && item.state === 'pending')) {
+    error.value = VOICE_REVIEW_REQUIRED
+    return false
+  }
   if ((loading.value && !props.initial) || props.processing) return false
   error.value = ''
   fields.value = {}
@@ -451,6 +570,38 @@ function submit(): boolean {
       activo: form.promo_enabled,
     }
 
+  if (voiceCaptureId.value) {
+    const finalValues = { ...body, ...body.silla, ...body.piso }
+    const decisiones = voiceFieldReviews.value.flatMap((review) => {
+      const field = catalogFieldNames[review.field] ?? review.field
+      const resolution = voiceResolutions.value[field]
+      if (!resolution || resolution.value !== voiceValue(field) || !validVoiceValue(field))
+        return []
+      const finalValue = catalogAuditValue(finalValues, review.field)
+      // DRF trims textual model fields; JSON specification values retain their actual types.
+      const storedValue =
+        typeof finalValue === 'string' && !review.field.startsWith('especificaciones.')
+          ? finalValue.trim()
+          : finalValue
+      return [
+        humanVoiceDecision(voiceCaptureId.value!, {
+          review_id: review.review_id,
+          field: review.field,
+          evidence_ids: review.evidence_ids,
+          estado: resolution.state === 'reviewed' ? 'confirmado' : 'corregido',
+          valor_original: voiceAuditOriginalValues.value[review.field] ?? null,
+          valor_final: storedValue,
+        }),
+      ]
+    })
+    if (decisiones.length) {
+      voiceAuditHistory = appendVoiceAudit(voiceAuditHistory, {
+        captura_asistida_id: voiceCaptureId.value,
+        decisiones,
+      })
+      Object.assign(body, { revision_humana_voz: voiceAuditHistory })
+    }
+  }
   emit('save', body, images.value)
   return true
 }
@@ -461,6 +612,8 @@ onMounted(load)
 
 <template>
   <form
+    ref="formElement"
+    v-voice-fields="voiceReview"
     class="product-form"
     :aria-busy="loading || processing"
     @input="emit('change')"
@@ -484,6 +637,9 @@ onMounted(load)
       </Button>
     </header>
 
+    <aside v-if="voiceWarnings.length" aria-label="Observaciones de voz" role="status">
+      <p v-for="(warning, index) in voiceWarnings" :key="index">{{ warning }}</p>
+    </aside>
     <button
       v-if="(recordingActive || assistantProcessing) && !voiceOpen"
       type="button"
@@ -743,6 +899,7 @@ onMounted(load)
                   <span>Detalle o valor</span>
                   <input
                     v-model="campo.valor"
+                    :name="`especificaciones.${campo.clave}`"
                     class="extra-input"
                     :aria-label="'Valor ' + (index + 1)"
                     placeholder="Ej. Ajustable en altura"
@@ -975,35 +1132,6 @@ onMounted(load)
           </p>
         </section>
 
-        <!-- Tarjeta de Transcripción Original Conservada por Voz -->
-        <section
-          v-if="voiceTranscribedText"
-          class="catalog-section aside-card voice-transcription-card"
-          aria-labelledby="transcription-title"
-        >
-          <div class="aside-heading">
-            <Mic :size="18" aria-hidden="true" />
-            <div class="heading-split">
-              <h3 id="transcription-title">Descripción original por voz</h3>
-              <span class="voice-badge-done">Captura procesada</span>
-            </div>
-          </div>
-          <div class="transcription-text-box">
-            {{ voiceTranscribedText }}
-          </div>
-          <div v-if="voicePendingWarnings.length" class="voice-warnings-box">
-            <div class="warnings-title">
-              <AlertTriangle :size="15" aria-hidden="true" />
-              <strong>Datos a revisar</strong>
-            </div>
-            <ul>
-              <li v-for="warning in voicePendingWarnings" :key="warning">
-                {{ warning }}
-              </li>
-            </ul>
-          </div>
-        </section>
-
         <!-- Disponibilidad y existencias -->
         <section class="catalog-section aside-card" aria-labelledby="status-title">
           <div class="aside-heading">
@@ -1056,7 +1184,7 @@ onMounted(load)
   <VoiceDrawer
     :open="voiceOpen"
     title="Completar por voz"
-    description="Describe tu producto y los datos se completarán automáticamente en el formulario."
+    description="Revisa la transcripción, interpreta el texto y confirma la propuesta antes de aplicarla."
     close-label="Cerrar asistente de voz"
     @close="voiceOpen = false"
   >
@@ -1065,7 +1193,6 @@ onMounted(load)
       :key="categoria"
       :categoria="categoria as CategoriaEnum"
       :opciones="opciones"
-      @apply="applyVoice"
       @applied="onVoiceApplied"
       @recording-state="updateRecording"
       @processing-state="assistantProcessing = $event"

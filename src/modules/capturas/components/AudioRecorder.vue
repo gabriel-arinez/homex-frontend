@@ -4,12 +4,15 @@ import { Mic, Square, X, RotateCcw, Pause, Play } from '@lucide/vue'
 import { MAX_RECORD_SECONDS } from '../audioLimits'
 import Button from '@/shared/ui/Button.vue'
 import { useAudioRecorder } from '../composables/useAudioRecorder'
-const props = withDefaults(defineProps<{ compact?: boolean }>(), { compact: false })
+const props = withDefaults(defineProps<{ compact?: boolean; minDurationSeconds?: number }>(), {
+  compact: false,
+  minDurationSeconds: 2,
+})
 const emit = defineEmits<{
   ready: [blob: Blob | null]
   status: [state: string, elapsed: number]
 }>()
-const r = useAudioRecorder(),
+const r = useAudioRecorder(props.minDurationSeconds),
   time = computed(
     () =>
       `${String(Math.floor(r.elapsed.value / 60)).padStart(2, '0')}:${String(r.elapsed.value % 60).padStart(2, '0')}`,
@@ -49,7 +52,9 @@ function cancel() {
       class="recording"
     >
       <span aria-hidden="true"></span>{{ r.state.value === 'PAUSED' ? 'Pausado' : 'Grabando' }}
-      {{ time }} / 03:00
+      {{ time }} / {{ String(Math.floor(MAX_RECORD_SECONDS / 60)).padStart(2, '0') }}:{{
+        String(MAX_RECORD_SECONDS % 60).padStart(2, '0')
+      }}
     </p>
     <p v-if="r.elapsed.value >= MAX_RECORD_SECONDS - 30 && r.state.value !== 'READY'" role="status">
       Quedan {{ MAX_RECORD_SECONDS - r.elapsed.value }} segundos para finalizar automáticamente.
@@ -67,7 +72,7 @@ function cancel() {
       />
     </div>
     <p v-else-if="r.state.value === 'READY'" role="status">
-      Audio listo. Se enviará para su interpretación.
+      Audio listo. Escúchalo antes de enviarlo a transcribir.
     </p>
     <p v-if="r.error.value" role="alert" class="error">{{ r.error.value }}</p>
     <div v-if="!props.compact" class="actions">

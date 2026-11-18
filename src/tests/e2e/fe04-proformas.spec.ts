@@ -495,18 +495,19 @@ test('FURNITURE STUDIO ubica los controles de imágenes al lado y los apila en m
   await expect(viewer).not.toBeVisible()
   await page.setViewportSize({ width: 390, height: 844 })
   await noOverflow(page)
+  // Read all geometry in one browser frame; separate awaits can mix scroll/resize states.
   await expect
-    .poll(async () => {
-      const h = await hero.boundingBox()
-      const t = await pageThumbs.boundingBox()
-      return t && h ? t.y - (h.y + h.height - 1) : -999
-    })
-    .toBeGreaterThanOrEqual(0)
-  const mobileHero = await hero.boundingBox()
-  const mobilePageThumbs = await pageThumbs.boundingBox()
-  const mobileControls = await controls.boundingBox()
-  expect(mobilePageThumbs!.y).toBeGreaterThanOrEqual(mobileHero!.y + mobileHero!.height - 1)
-  expect(mobileControls!.y).toBeGreaterThan(mobileHero!.y + mobileHero!.height - 1)
+    .poll(() =>
+      gallery.evaluate((region) => {
+        const h = region.querySelector('.hero')?.getBoundingClientRect()
+        const t = region.querySelector('.thumbs')?.getBoundingClientRect()
+        const c = Array.from(region.querySelectorAll('.actions > button'))
+          .find((button) => button.textContent?.includes('Agregar imágenes'))
+          ?.getBoundingClientRect()
+        return Boolean(h && t && c && t.y >= h.bottom - 1 && c.y > h.bottom - 1)
+      }),
+    )
+    .toBe(true)
   await page.setViewportSize({ width: 1280, height: 800 })
   await studioStep(page, 'Revisar')
   const reviewGallery = page.locator('.studio-review-layout > .studio-review-gallery')
@@ -753,9 +754,7 @@ test('FE04 representa conflicto de stock y doble aprobación sin éxito aparente
   await expect(page.getByText(/Pedido #/)).toHaveCount(0)
 })
 
-test.skip('FE04 mantiene adjuntos editables en revisión y los congela al aprobar', async ({
-  page,
-}) => {
+test('FE04 mantiene adjuntos editables en revisión y los congela al aprobar', async ({ page }) => {
   const state = await mockBackend(page)
   state.quote().detalles = [
     {
@@ -769,9 +768,9 @@ test.skip('FE04 mantiene adjuntos editables en revisión y los congela al aproba
       cantidad: 1,
       unidad: 20,
       unidad_info: options.UNIDAD_MEDIDA[0],
-      modo_calculo: 'TOTAL_NEGOCIADO',
-      precio_unitario: '0',
-      importe_negociado: '100.00',
+      modo_calculo: 'PRECIO_UNITARIO',
+      precio_unitario: '100.00',
+      importe_negociado: null,
       descuento: '0',
       precio_antes_snapshot: null,
       precio_ahora_snapshot: null,
@@ -781,72 +780,66 @@ test.skip('FE04 mantiene adjuntos editables en revisión y los congela al aproba
   ]
   state.quote().total = '100.00'
   state.quote().estado_info = { id: 3, codigo: 'EN_REVISION', nombre: 'En revisión' }
+  await page.route('**/api/v1/proformas/1/integral/', (route) => {
+    const body = route.request().postDataJSON()
+    const quote = state.quote()
+    const previous = quote.detalles
+    Object.assign(quote, body)
+    quote.detalles = body.detalles.map((line: Record<string, unknown>, index: number) => ({
+      ...previous[index],
+      ...line,
+    }))
+    return route.fulfill({ json: quote })
+  })
+  await page.route('**/api/v1/galerias/', (route) =>
+    route.fulfill({ json: { id: 'review-gallery' } }),
+  )
+  let uploaded = false
+  await page.route('**/api/v1/galerias/review-gallery/imagenes/', (route) => {
+    if (route.request().method() === 'POST') uploaded = true
+    return route.fulfill({
+      json: {
+        limite: 8,
+        imagenes: uploaded
+          ? [
+              {
+                id: 9,
+                nombre: 'referencia.png',
+                url: '/api/v1/imagenes-privadas/9/',
+                principal: true,
+                posicion: 0,
+              },
+            ]
+          : [],
+      },
+    })
+  })
   await page.goto('/proformas/1')
-  const input = page.getByLabel('Agregar imágenes', { exact: true })
+  await page.getByRole('button', { name: 'Acciones de Escritorio' }).click()
+  await page.getByRole('menuitem', { name: 'Editar', exact: true }).click()
+  await studioStep(page, 'Imágenes')
+  const gallery = page.getByRole('region', { name: 'Imágenes del mueble' })
+  const input = gallery.getByLabel('Agregar imágenes', { exact: true })
   await input.setInputFiles({
     name: 'referencia.png',
     mimeType: 'image/png',
     buffer: readFileSync('src/tests/fixtures/galerias/red.png'),
   })
-  await expect(page.getByAltText('referencia.png').first()).toHaveAttribute('src', /^blob:/)
-  const loaded = page.waitForResponse(
-    (r) => r.url().endsWith('/imagenes-privadas/9/') && r.status() === 200,
-  )
-  await page.getByRole('button', { name: 'Confirmar carga / Reintentar' }).click()
-  await loaded
-  await expect(page.getByText('imágenes listas para confirmar.')).toHaveCount(0)
-  await expect(page.getByAltText('referencia.png').first()).toHaveAttribute('src', /^blob:/)
+  await expect.poll(() => uploaded).toBe(true)
+  await expect(gallery.getByRole('button', { name: 'Ver referencia.png' })).toBeVisible()
   await input.setInputFiles({
     name: 'referencia.svg',
     mimeType: 'image/svg+xml',
     buffer: Buffer.from('<svg/>'),
   })
-  await expect(page.getByRole('alert')).toContainText('usa JPEG, PNG o WebP')
-  await page.route('**/api/v1/proformas/1/detalles/10/archivos/', (r) =>
-    r.request().method() === 'POST'
-      ? r.fulfill({
-          status: 400,
-          contentType: 'application/json',
-          body: JSON.stringify({ archivo: ['La imagen supera el máximo de 10 MiB.'] }),
-        })
-      : r.fallback(),
-  )
-  await input.setInputFiles({
-    name: 'grande.png',
-    mimeType: 'image/png',
-    buffer: readFileSync('src/tests/fixtures/galerias/green.png'),
-  })
-  await page.getByRole('button', { name: 'Confirmar carga / Reintentar' }).click()
-  await expect(page.getByText('La imagen supera el máximo de 10 MiB.')).toBeVisible()
-  await page.getByRole('button', { name: 'Gestionar imágenes', exact: true }).click()
-  await expect(
-    page
-      .getByRole('dialog', { name: 'Gestionar imágenes', exact: true })
-      .getByRole('button', { name: 'Eliminar', exact: true }),
-  ).toHaveCount(2)
-  await page
-    .getByRole('dialog', { name: 'Gestionar imágenes', exact: true })
-    .getByRole('button', { name: 'Cerrar', exact: true })
-    .click()
+  await expect(gallery.getByRole('alert')).toContainText('usa JPEG, PNG o WebP')
+  await studioStep(page, 'Revisar')
+  await page.getByRole('button', { name: 'Guardar mueble', exact: true }).click()
   await page.getByRole('button', { name: 'Aprobar', exact: true }).click()
+  await page.getByRole('button', { name: 'Guardar y continuar', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Aprobar y crear pedido' }).click()
-  await expect(page.getByRole('button', { name: 'Eliminar' })).toHaveCount(0)
-  await expect(page.getByAltText('grande.png')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Confirmar carga / Reintentar' })).toHaveCount(0)
-  await page.reload()
-  await expect(page.getByAltText('grande.png')).toHaveCount(0)
-  expect(
-    await page.evaluate(async () =>
-      fetch('http://localhost:8000/api/v1/proformas/999/detalles/10/archivos/9/', {
-        method: 'DELETE',
-        headers: { Authorization: 'Bearer x' },
-      }).then((r) => r.status),
-    ),
-  ).toBe(403)
-  const publicMedia = await page.goto('https://media.example/reference.webp')
-  expect(publicMedia?.status()).toBe(404)
-  const unauthorized = await page.goto('http://localhost:8000/api/v1/imagenes-privadas/9/')
-  expect(unauthorized?.status()).toBe(401)
+  await expect(page.getByLabel('Agregar imágenes', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Guardar cambios', exact: true })).toHaveCount(0)
 })
 
 test('FE04 protege ruta por capacidad y recurso ajeno como 404', async ({ page }) => {
@@ -1264,7 +1257,7 @@ test('@a11y PRF04 acciones directas de voz accesibles y sin reemplazo prematuro'
   await page.getByRole('button', { name: 'Completar por voz' }).click()
   await expect(page.getByRole('button', { name: 'Grabar descripción' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Seleccionar archivo' })).toBeVisible()
-  const results = await new AxeBuilder({ page }).include('.voice-workflow').analyze()
+  const results = await new AxeBuilder({ page }).include('.staged-voice').analyze()
   expect(results.violations).toEqual([])
   await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Mueble previo')
 })
@@ -1296,17 +1289,45 @@ for (const width of [360, 768, 1440]) {
     await page.getByRole('button', { name: 'Seleccionar archivo' }).click()
     expect(captures).toBe(0)
     await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Mueble previo')
+    const pcm = Buffer.alloc(44 + 16000 * 2 * 15)
+    pcm.write('RIFF')
+    pcm.writeUInt32LE(pcm.length - 8, 4)
+    pcm.write('WAVEfmt ', 8)
+    pcm.writeUInt32LE(16, 16)
+    pcm.writeUInt16LE(1, 20)
+    pcm.writeUInt16LE(1, 22)
+    pcm.writeUInt32LE(16000, 24)
+    pcm.writeUInt32LE(32000, 28)
+    pcm.writeUInt16LE(2, 32)
+    pcm.writeUInt16LE(16, 34)
+    pcm.write('data', 36)
+    pcm.writeUInt32LE(pcm.length - 44, 40)
     await page
       .getByRole('dialog', { name: 'Completar mueble por voz' })
       .locator('input[type="file"]')
-      .setInputFiles({ name: '24.wav', mimeType: 'audio/wav', buffer: Buffer.from('fixture') })
-    // El asistente aplica la propuesta directamente al mueble y posiciona en revisión
+      .setInputFiles({ name: '24.wav', mimeType: 'audio/wav', buffer: pcm })
+    const drawer = page.getByRole('dialog', { name: 'Completar mueble por voz' })
+    await expect(drawer.locator('textarea')).toHaveValue(captura24.texto_transcrito_original!)
+    expect(captures).toBe(1)
+    await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Mueble previo')
+    await expect(drawer.getByRole('button', { name: 'Procesar texto', exact: true })).toBeDisabled()
+    await drawer
+      .locator('textarea')
+      .fill(
+        `${captura24.texto_transcrito_original} para oficina con acabado natural y entrega programada por el vendedor`,
+      )
+    await drawer.getByRole('button', { name: 'Procesar texto', exact: true }).click()
+    await expect(
+      drawer.getByRole('button', { name: 'Aplicar propuesta', exact: true }),
+    ).toBeVisible()
+    await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Mueble previo')
+    await drawer.getByRole('button', { name: 'Aplicar propuesta', exact: true }).click()
+    await expect(drawer.locator('textarea')).toHaveCount(0)
+    // Only explicit confirmation applies the proposal and opens structured review.
     await expect(
       page.locator('.review-pending').getByText('unidad del ancho', { exact: false }),
     ).toBeVisible()
-    await expect(page.locator('.studio-review-transcript')).toContainText(
-      captura24.texto_transcrito_original!,
-    )
+    await expect(page.locator('.studio-review-transcript')).toHaveCount(0)
     await studioStep(page, 'General')
     await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Escritorio')
     await studioStep(page, 'Precio')

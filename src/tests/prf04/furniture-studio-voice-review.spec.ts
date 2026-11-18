@@ -27,7 +27,7 @@ describe('Furniture Studio: emisión de propuesta PRF04', () => {
     try {
       expect(wrapper.text()).toContain('Descripción por voz')
       expect(wrapper.text()).toContain(
-        'Dicta nombre, medidas, materiales o características del mueble.',
+        'Dicta nombre, medidas, materiales o características del mueble o producto.',
       )
       const upload = wrapper
         .findAll('button')
@@ -42,6 +42,23 @@ describe('Furniture Studio: emisión de propuesta PRF04', () => {
       await input.trigger('change')
       await flushPromises()
       expect(crear).toHaveBeenCalledTimes(1)
+      await flushPromises()
+      expect(wrapper.emitted('proposed')).toBeUndefined()
+      await wrapper
+        .get('textarea')
+        .setValue(
+          'Un escritorio de madera para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+        )
+      await wrapper
+        .findAll('button')
+        .find((b) => b.text() === 'Procesar texto')!
+        .trigger('click')
+      await flushPromises()
+      await wrapper
+        .findAll('button')
+        .find((b) => b.text() === 'Aplicar propuesta')!
+        .trigger('click')
+      expect(crear).toHaveBeenCalledTimes(2)
       expect(wrapper.emitted('proposed')).toHaveLength(1)
       expect(wrapper.emitted('applied')).toBeUndefined()
     } finally {

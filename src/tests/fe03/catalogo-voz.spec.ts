@@ -10,7 +10,7 @@ import { readAudioDuration } from '@/modules/capturas/audioLimits'
 
 vi.mock('@/modules/capturas/audioLimits', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/modules/capturas/audioLimits')>()
-  return { ...actual, readAudioDuration: vi.fn<() => Promise<number>>().mockResolvedValue(10) }
+  return { ...actual, readAudioDuration: vi.fn<() => Promise<number>>().mockResolvedValue(15) }
 })
 
 afterEach(() => vi.restoreAllMocks())
@@ -27,7 +27,12 @@ function mockResult(category: CategoriaEnum) {
     id: 1,
     estado: 'COMPLETADA',
     categoria: category,
-    texto_transcrito_original: 'nombre: Zócalo',
+    solo_transcribir: false,
+    captura_origen: null,
+    texto_asr_original: null,
+    texto_corregido: null,
+    texto_transcrito_original:
+      'nombre: Zócalo para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
     error_codigo: null,
     propuesta: {
       category,
@@ -46,7 +51,7 @@ function button(wrapper: ReturnType<typeof mount>, label: string) {
 
 describe('Voz en creación de catálogo', () => {
   it.each(['SILLA', 'PISO_FLOTANTE', 'OTRO'] as const)(
-    'sube audio, conserva categoría y aplica propuesta directamente: %s',
+    'sube audio, conserva categoría y revisa y confirma propuesta: %s',
     async (category) => {
       mockResult(category)
       const w = mount(CapturaCatalogo, { props: { categoria: category } })
@@ -55,17 +60,30 @@ describe('Voz en creación de catálogo', () => {
       Object.defineProperty(input.element, 'files', { value: [file] })
       await input.trigger('change')
       await flushPromises()
+      expect(catalogoCapturaService.create).toHaveBeenCalledTimes(1)
       expect(catalogoCapturaService.create).toHaveBeenCalledWith(
         expect.objectContaining({ categoria: category, audio: file }),
         expect.anything(),
       )
-      expect(w.emitted('apply')).toEqual([[{ nombre: 'Zócalo' }]])
+      expect(w.emitted('apply')).toBeUndefined()
+      expect(w.emitted('applied')).toBeUndefined()
+      await w
+        .get('textarea')
+        .setValue(
+          'nombre: Zócalo para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+        )
+      await button(w, 'Procesar texto').trigger('click')
+      await flushPromises()
+      await button(w, 'Aplicar propuesta').trigger('click')
       expect(w.emitted('applied')).toEqual([
         [
           {
+            capture_id: 1,
+            field_reviews: [],
             fields: { nombre: 'Zócalo' },
-            text: 'nombre: Zócalo',
+            text: 'nombre: Zócalo para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
             warnings: ['Revisar'],
+            evidence: [],
           },
         ],
       ])
@@ -73,7 +91,7 @@ describe('Voz en creación de catálogo', () => {
     },
   )
 
-  it('detener la grabación lanza la transcripción automáticamente sin pasos extra', async () => {
+  it('detener la grabación transcribe automáticamente y conserva la reproducción', async () => {
     mockResult('SILLA')
     const audioRecorder = defineComponent({
       emits: ['ready'],
@@ -103,7 +121,7 @@ describe('Voz en creación de catálogo', () => {
       expect.objectContaining({ categoria: 'SILLA', audio: expect.any(Blob) }),
       expect.anything(),
     )
-    expect(w.emitted('apply')).toBeDefined()
+    expect(w.emitted('apply')).toBeUndefined()
     w.unmount()
   })
 
@@ -126,7 +144,7 @@ describe('Voz en creación de catálogo', () => {
     })
     await input.trigger('change')
     await flushPromises()
-    expect(w.text()).toContain('supera el límite de 20 MB')
+    expect(w.text()).toContain('supera 20 MB')
     expect(catalogoCapturaService.create).not.toHaveBeenCalled()
     w.unmount()
   })
@@ -152,13 +170,13 @@ describe('Voz en creación de catálogo', () => {
     await flushPromises()
     await w.get('.voice-trigger').trigger('click')
     const assistant = w.getComponent(CapturaCatalogo)
-    assistant.vm.$emit('recording-state', true, false, 12)
+    await assistant.get('textarea').setValue('Silla plegable corregida')
     await flushPromises()
     await w.get('button[aria-label="Cerrar asistente de voz"]').trigger('click')
     expect(w.findComponent(CapturaCatalogo).exists()).toBe(true)
-    expect(w.get('.voice-mini').text()).toContain('Grabación en curso')
-    await w.get('.voice-mini').trigger('click')
-    expect(w.get('.voice-backdrop').isVisible()).toBe(true)
+    await w.get('.voice-trigger').trigger('click')
+    expect(assistant.get('textarea').element.value).toBe('Silla plegable corregida')
+    expect(w.findComponent(CapturaCatalogo).exists()).toBe(true)
     w.unmount()
   })
 
@@ -168,6 +186,10 @@ describe('Voz en creación de catálogo', () => {
       id: 1,
       estado: 'ERROR',
       categoria: 'OTRO',
+      solo_transcribir: false,
+      captura_origen: null,
+      texto_asr_original: null,
+      texto_corregido: null,
       texto_transcrito_original: 'texto original',
       propuesta: null,
       error_codigo: 'PIPELINE_ERROR',
@@ -178,7 +200,7 @@ describe('Voz en creación de catálogo', () => {
     Object.defineProperty(input.element, 'files', { value: [file] })
     await input.trigger('change')
     await flushPromises()
-    expect(w.text()).toContain('No se obtuvo una propuesta')
+    expect(w.text()).toContain('No se pudo procesar')
     expect(w.emitted('apply')).toBeUndefined()
     w.unmount()
   })
@@ -192,10 +214,10 @@ describe('Voz en creación de catálogo', () => {
     Object.defineProperty(input.element, 'files', { value: [file] })
     await input.trigger('change')
     await flushPromises()
-    expect(w.text()).toContain('Analizando descripción comercial')
+    expect(w.text()).toContain('Transcribiendo audio')
     await button(w, 'Cancelar').trigger('click')
     await flushPromises()
-    expect(w.text()).not.toContain('Analizando descripción comercial')
+    expect(w.text()).not.toContain('Transcribiendo audio')
     expect(w.emitted('apply')).toBeUndefined()
     w.unmount()
   })
@@ -235,9 +257,9 @@ describe('Voz en creación de catálogo', () => {
     expect((w.get('input[name="precio"]').element as HTMLInputElement).value).toBe('4500.00')
 
     // La barra lateral muestra la transcripción conservada y sus avisos
-    expect(w.text()).toContain('Descripción original por voz')
-    expect(w.text()).toContain('Nombre Silla Ergonómica Pro precio 4500')
-    expect(w.text()).toContain('Complete manualmente: SKU')
+    expect(w.text()).not.toContain('Descripción original por voz')
+    expect(w.text()).not.toContain('Nombre Silla Ergonómica Pro precio 4500')
+    expect(w.text()).toContain('Sugerido por voz')
     expect(w.emitted('save')).toBeUndefined()
     w.unmount()
   })
@@ -283,3 +305,96 @@ describe('Voz en creación de catálogo', () => {
     w.unmount()
   })
 })
+
+it('retains active catalog warnings and validates pending prices on confirm, correction and reversion', async () => {
+  vi.spyOn(proformasService, 'families').mockResolvedValue({
+    count: 0,
+    next: null,
+    previous: null,
+    results: [],
+  })
+  vi.spyOn(proformasService, 'options').mockImplementation(async (key) =>
+    key === 'CATEGORIA_PRODUCTO'
+      ? [{ id: 10, codigo: 'OTRO', nombre: 'Otro', concepto_codigo: key }]
+      : [],
+  )
+  const w = mount(ProductoForm, {
+    props: { preselectCategory: 'OTRO' },
+    global: { stubs: { CapturaCatalogo: true } },
+  })
+  await flushPromises()
+  await button(w, 'Completar por voz').trigger('click')
+  const evidence = [
+    {
+      label: 'precio_lista',
+      start: 0,
+      end: 2,
+      text: '-1',
+      decision: 'UNRESOLVED',
+      reason: 'Revise precio',
+    },
+  ]
+  w.getComponent({ name: 'CapturaCatalogo' }).vm.$emit('applied', {
+    fields: { nombre: 'Mesa', precio_lista: '-1' },
+    text: '-1',
+    warnings: ['Verifique la disponibilidad'],
+    evidence,
+  })
+  await flushPromises()
+  expect(w.text()).toContain('Verifique la disponibilidad')
+  const price = w.get('[name="precio"]')
+  expect(price.attributes('data-voice-state')).toBe('pending')
+  const confirm = w
+    .findAll('.voice-field-status')
+    .find((n) => n.text().includes('Revise precio'))!
+    .get('button')
+  await confirm.trigger('click')
+  expect(price.attributes('data-voice-state')).toBe('pending')
+  await price.setValue('120')
+  expect(price.attributes('data-voice-state')).toBe('edited')
+  await price.setValue('-1')
+  expect(price.attributes('data-voice-state')).toBe('pending')
+  expect(evidence[0]!.decision).toBe('UNRESOLVED')
+  w.unmount()
+})
+
+it.each([true, false])(
+  'preserves manual notes and rejects full-transcript observations: %s',
+  async (legacy) => {
+    vi.spyOn(proformasService, 'families').mockResolvedValue({
+      count: 0,
+      next: null,
+      previous: null,
+      results: [],
+    })
+    vi.spyOn(proformasService, 'options').mockImplementation(async (key) =>
+      key === 'CATEGORIA_PRODUCTO'
+        ? [{ id: 10, codigo: 'OTRO', nombre: 'Otro', concepto_codigo: key }]
+        : [],
+    )
+    const w = mount(ProductoForm, {
+      props: { preselectCategory: 'OTRO' },
+      global: { stubs: { CapturaCatalogo: true } },
+    })
+    await flushPromises()
+    await w.get('#observaciones').setValue('Customer requested delivery on Friday.')
+    await button(w, 'Completar por voz').trigger('click')
+    const transcript =
+      'Nombre Silla Buenas de madera de 18 mm precio 450 bolivianos observaciones entregar con protección adicional.'
+    w.findComponent({ name: 'CapturaCatalogo' }).vm.$emit('applied', {
+      fields: {
+        nombre: 'Silla Buenas',
+        precio_lista: '450',
+        observaciones: legacy ? transcript : 'entregar con protección adicional',
+      },
+      text: transcript,
+      warnings: [],
+    })
+    await flushPromises()
+    const notes = (w.get('#observaciones').element as HTMLTextAreaElement).value
+    expect(notes).toContain('Customer requested delivery on Friday.')
+    expect(notes).not.toContain('Nombre Silla Buenas')
+    expect(notes.includes('entregar con protección adicional')).toBe(!legacy)
+    w.unmount()
+  },
+)

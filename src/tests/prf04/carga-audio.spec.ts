@@ -45,7 +45,14 @@ describe('PRF-04 carga de grabaciones', () => {
       id: 41,
       estado: 'COMPLETADA',
       intento_id: 41,
-      texto_transcrito_original: 'Un escritorio con mesón engrosado',
+      candidatos: [],
+      advertencias: [],
+      solo_transcribir: false,
+      captura_origen: null,
+      texto_asr_original: null,
+      texto_corregido: null,
+      texto_transcrito_original:
+        'Un escritorio con mesón engrosado para oficina con acabado material medidas cantidad precio marca modelo unidad diseño color entrega y transporte',
       resultado: 'REQUIRES_REVIEW',
       propuesta_configurador: {
         comercial: {
@@ -71,7 +78,6 @@ describe('PRF-04 carga de grabaciones', () => {
     const wrapper = montar()
 
     try {
-      await wrapper.get('button').trigger('click')
       const archivo = new File(['audio de prueba'], 'escritorio.m4a', {
         type: 'audio/mp4',
       })
@@ -79,10 +85,21 @@ describe('PRF-04 carga de grabaciones', () => {
       await seleccionar(wrapper, archivo)
       await flushPromises()
 
+      expect(crear).toHaveBeenCalledTimes(1)
       expect(crear).toHaveBeenCalledWith(
         expect.objectContaining({ audio: archivo }),
         expect.anything(),
       )
+      expect(wrapper.emitted('applied')).toBeUndefined()
+      await wrapper
+        .findAll('button')
+        .find((b) => b.text() === 'Procesar texto')!
+        .trigger('click')
+      await flushPromises()
+      await wrapper
+        .findAll('button')
+        .find((b) => b.text() === 'Aplicar propuesta')!
+        .trigger('click')
       expect(wrapper.emitted('applied')).toHaveLength(1)
     } finally {
       wrapper.unmount()
@@ -108,9 +125,9 @@ describe('PRF-04 carga de grabaciones', () => {
       // AAC es procesado y transcodificado a WAV si el navegador soporta Web Audio
       await seleccionar(wrapper, new File(['audio'], 'escritorio.aac', { type: 'audio/aac' }))
       await flushPromises()
-      expect(wrapper.text()).not.toContain('Formato no admitido')
+      expect(wrapper.text()).not.toContain('Formato de audio no admitido')
 
-      // Formato no admitido (ej. ejecutable o video no soportado)
+      // Formato de audio no admitido (ej. ejecutable o video no soportado)
       await wrapper
         .findAll('button')
         .find((button) => button.text().includes('Seleccionar archivo'))!
@@ -119,16 +136,16 @@ describe('PRF-04 carga de grabaciones', () => {
         wrapper,
         new File(['binario'], 'invalido.exe', { type: 'application/octet-stream' }),
       )
-      expect(wrapper.text()).toContain('Formato no admitido')
+      expect(wrapper.text()).toContain('Formato de audio no admitido')
 
-      // Cada nuevo archivo requiere una acción expresa del vendedor.
+      // A new file is validated before automatic transcription.
       await wrapper
         .findAll('button')
         .find((button) => button.text().includes('Seleccionar archivo'))!
         .trigger('click')
       await seleccionar(wrapper, new File([], 'vacio.m4a', { type: 'audio/mp4' }))
-      expect(wrapper.text()).toContain('archivo de audio está vacío')
-      expect(crear).toHaveBeenCalled()
+      expect(wrapper.text()).toContain('archivo está vacío')
+      expect(crear).not.toHaveBeenCalled()
     } finally {
       wrapper.unmount()
     }
@@ -144,27 +161,20 @@ describe('PRF-04 carga de grabaciones', () => {
       .trigger('click')
     await seleccionar(wrapper, new File(['audio'], 'excesivo.wav', { type: 'audio/wav' }))
     await flushPromises()
-    expect(wrapper.text()).toContain('superar 5 minutos')
+    expect(wrapper.text()).toContain('supera los 5 minutos')
     expect(crear).not.toHaveBeenCalled()
     wrapper.unmount()
   })
 
-  it('mantiene la confirmación antes de reemplazar un mueble', async () => {
+  it('conserva los datos existentes hasta confirmación explícita de la propuesta', async () => {
     const wrapper = montar(true)
-
-    try {
-      await wrapper.get('button').trigger('click')
-      expect(wrapper.get('input[type="file"]').attributes('disabled')).toBeDefined()
-      expect(wrapper.text()).toContain('reemplazará toda la información')
-
-      const continuar = wrapper
-        .findAll('button')
-        .find((button) => button.text() === 'Continuar con voz')
-      expect(continuar).toBeDefined()
-      await continuar!.trigger('click')
-      expect(wrapper.get('input[type="file"]').attributes('disabled')).toBeUndefined()
-    } finally {
-      wrapper.unmount()
-    }
+    await wrapper
+      .get('textarea')
+      .setValue(
+        'Un escritorio para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+      )
+    expect(wrapper.emitted('applied')).toBeUndefined()
+    expect(wrapper.findAll('button').some((b) => b.text() === 'Aplicar propuesta')).toBe(false)
+    wrapper.unmount()
   })
 })
