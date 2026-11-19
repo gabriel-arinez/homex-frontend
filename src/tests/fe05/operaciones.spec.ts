@@ -4,6 +4,8 @@ import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 import PedidoDetailView from '@/modules/pedidos/views/PedidoDetailView.vue'
 import PedidosListView from '@/modules/pedidos/views/PedidosListView.vue'
+import OrdenTrabajoDetailView from '@/modules/ordenes-trabajo/views/OrdenTrabajoDetailView.vue'
+import OrdenesTrabajoListView from '@/modules/ordenes-trabajo/views/OrdenesTrabajoListView.vue'
 import ReciboDetailView from '@/modules/recibos/views/ReciboDetailView.vue'
 import { pedidosService } from '@/modules/pedidos/services/pedidosService'
 import { recibosService } from '@/modules/recibos/services/recibosService'
@@ -61,8 +63,10 @@ async function mountAt(component: unknown, path: string) {
     history: createMemoryHistory(),
     routes: [
       { path: '/pedidos/:id', component: component as never },
+      { path: '/ordenes-trabajo/:id', component: component as never },
       { path: '/recibos/:id', component: component as never },
       { path: '/pedidos', component: { template: '<div/>' } },
+      { path: '/ordenes-trabajo', component: { template: '<div/>' } },
       { path: '/recibos', component: { template: '<div/>' } },
       { path: '/proformas/:id', component: { template: '<div/>' } },
     ],
@@ -283,5 +287,137 @@ describe('FE05 operaciones', () => {
     await mainAdvanceBtn.trigger('click')
     await flushPromises()
     expect(postedBody).toEqual({ estado_codigo: 'EN_PRODUCCION' })
+  })
+
+  it('muestra bandeja de órdenes de trabajo con contexto de cliente y menú de acciones', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/ordenes-trabajo/', () =>
+        HttpResponse.json([
+          {
+            id: 3,
+            pedido: 9,
+            proforma_numero: 4,
+            jefe_taller: null,
+            numero: 40,
+            fecha: '2026-09-26',
+            fecha_inicio: null,
+            fecha_fin: null,
+            responsable_recepcion: null,
+            fecha_entrega: '2026-10-05',
+            lugar_entrega: 'Obra Norte',
+            estado_saldo: null,
+            estado_saldo_info: null,
+            estado: 20,
+            estado_info: { id: 20, codigo: 'PENDIENTE', nombre: 'Pendiente' },
+            created_by: 2,
+            updated_by: 2,
+            detalles: [
+              {
+                id: 88,
+                tipo_item_info: { id: 9, codigo: 'MUEBLE_MEDIDA', nombre: 'A medida' },
+                producto: null,
+                familia_producto: null,
+                nombre: 'Escritorio a medida',
+                descripcion: null,
+                cantidad: '1.0000',
+                unidad_info: { id: 2, codigo: 'PIEZA', nombre: 'Pieza' },
+                especificacion: {
+                  tipo_mueble_info: null,
+                  observaciones: 'Conservar pieza original',
+                  datos_tecnicos: { componentes: [{ nombre: 'Mesón', color: 'Nogal' }] },
+                },
+              },
+            ],
+          },
+        ]),
+      ),
+      http.get('http://localhost:8000/api/v1/proformas/', () =>
+        HttpResponse.json({
+          count: 1,
+          next: null,
+          previous: null,
+          results: [
+            {
+              id: 4,
+              numero: 4,
+              titulo: 'Oficina directorio',
+              total: '3500.00',
+              estado_info: { id: 1, codigo: 'APROBADA', nombre: 'Aprobada' },
+              moneda_info: { id: 1, codigo: 'BOB', nombre: 'Bolivianos' },
+              cliente_resumen: { id: 10, nombre: 'Constructora Norte' },
+            },
+          ],
+        }),
+      ),
+    )
+    const w = await mountAt(OrdenesTrabajoListView, '/ordenes-trabajo')
+    await flushPromises()
+    expect(w.text()).toContain('OT #40')
+    expect(w.text()).toContain('Constructora Norte')
+    expect(w.text()).toContain('Oficina directorio')
+    expect(w.text()).toContain('Pedido #9')
+    expect(w.find('[aria-label="Acciones de la orden de trabajo #40"]').exists()).toBe(true)
+  })
+
+  it('muestra detalle de OT con ficha técnica estructurada sin JSON crudo', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/ordenes-trabajo/3/', () =>
+        HttpResponse.json({
+          id: 3,
+          pedido: 9,
+          proforma_numero: 4,
+          jefe_taller: null,
+          numero: 40,
+          fecha: '2026-09-26',
+          fecha_inicio: null,
+          fecha_fin: null,
+          responsable_recepcion: 'Carlos Méndez',
+          fecha_entrega: '2026-10-05',
+          lugar_entrega: 'Av. Banzer Km 6',
+          estado_saldo: null,
+          estado_saldo_info: null,
+          estado: 20,
+          estado_info: { id: 20, codigo: 'PENDIENTE', nombre: 'Pendiente' },
+          created_by: 2,
+          updated_by: 2,
+          detalles: [
+            {
+              id: 88,
+              tipo_item_info: { id: 9, codigo: 'MUEBLE_MEDIDA', nombre: 'A medida' },
+              producto: null,
+              familia_producto: null,
+              nombre: 'Escritorio a medida',
+              descripcion: 'Módulo gerencial',
+              cantidad: '1.0000',
+              unidad_info: { id: 2, codigo: 'PIEZA', nombre: 'Pieza' },
+              especificacion: {
+                tipo_mueble_info: null,
+                observaciones: 'Conservar pieza original',
+                datos_tecnicos: {
+                  componentes: [
+                    { nombre: 'Mesón', color: 'Nogal', espesor: '25 mm' },
+                    { nombre: 'Estructura', material: 'Melamina' },
+                  ],
+                  advertencias: ['color a elección'],
+                },
+              },
+            },
+          ],
+        }),
+      ),
+      http.get('http://localhost:8000/api/v1/imagenes-privadas/', () => HttpResponse.json([])),
+    )
+    const w = await mountAt(OrdenTrabajoDetailView, '/ordenes-trabajo/3')
+    await flushPromises()
+    expect(w.text()).toContain('Orden de trabajo #40')
+    expect(w.text()).toContain('Carlos Méndez')
+    expect(w.text()).toContain('Av. Banzer Km 6')
+    expect(w.text()).toContain('2 componentes')
+    expect(w.text()).toContain('Mesón')
+    expect(w.text()).toContain('Nogal')
+    expect(w.text()).toContain('Conservar pieza original')
+    expect(w.text()).toContain('color a elección')
+    expect(w.find('pre').exists()).toBe(false)
+    expect(w.text()).not.toContain('precio_unitario')
   })
 })
