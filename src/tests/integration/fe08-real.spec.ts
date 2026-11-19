@@ -124,7 +124,10 @@ test.describe.serial('FE08 backend real', () => {
     consoleErrors.length = 0
 
     await page.goto('/recibos')
-    await page.getByRole('link', { name: 'Ver detalle' }).first().click()
+    await page
+      .getByRole('link', { name: /Recibo #\d+/ })
+      .first()
+      .click()
     await page.getByRole('button', { name: 'Anular recibo' }).click()
     await page.getByRole('dialog').getByRole('button', { name: 'Anular' }).click()
     await expect(page.getByRole('status').filter({ hasText: 'Recibo anulado' })).toBeVisible()
