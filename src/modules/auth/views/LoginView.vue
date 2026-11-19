@@ -136,16 +136,17 @@ async function submit() {
 <style scoped>
 .login-shell {
   display: grid;
-  grid-template-columns: 1fr minmax(25rem, 34rem);
+  grid-template-columns: 1fr minmax(24rem, 32rem);
   width: 100%;
   min-height: 100dvh;
+  height: 100dvh;
   background: var(--color-surface);
+  overflow: hidden;
 }
 
 .login-visual {
-  position: sticky;
-  top: 0;
-  height: 100dvh;
+  position: relative;
+  height: 100%;
   background: var(--color-surface-muted);
   overflow: hidden;
 }
@@ -159,20 +160,24 @@ async function submit() {
 }
 
 .login-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: var(--space-6);
-  min-height: 100dvh;
-  padding: clamp(1.5rem, 3vw, 2.75rem);
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  max-height: 100dvh;
+  overflow-y: auto;
+  padding: 1.5rem 2rem;
   background: var(--color-surface);
   min-width: 0;
 }
 
 .login-panel__topbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
+  position: absolute;
+  top: 1.25rem;
+  right: 1.5rem;
+  z-index: 10;
 }
 
 .theme-toggle {
@@ -200,7 +205,7 @@ async function submit() {
 
 .login-card {
   display: grid;
-  gap: var(--space-5);
+  gap: 1.15rem;
   width: 100%;
   max-width: 23rem;
   margin-inline: auto;
@@ -209,23 +214,25 @@ async function submit() {
 .login-brand {
   display: flex;
   align-items: center;
+  justify-content: center;
 }
 
 .login-logo {
   display: block;
   width: auto;
-  height: 2.85rem;
+  height: 3.5rem;
   max-width: 100%;
 }
 
 .login-heading {
   display: grid;
-  gap: var(--space-1);
+  gap: 0.25rem;
+  text-align: center;
 }
 
 .login-heading h1 {
   margin: 0;
-  font-size: 1.7rem;
+  font-size: 1.65rem;
   font-weight: 800;
   letter-spacing: -0.01em;
   line-height: 1.2;
@@ -234,12 +241,12 @@ async function submit() {
 .login-subtitle {
   margin: 0;
   color: var(--color-text-secondary);
-  font-size: 0.9rem;
+  font-size: 0.88rem;
 }
 
 form {
   display: grid;
-  gap: var(--space-4);
+  gap: 0.85rem;
 }
 
 .password-field {
@@ -293,46 +300,86 @@ form {
 
 .login-submit {
   width: 100%;
-  min-height: 2.85rem;
+  min-height: 2.75rem;
   justify-content: center;
-  margin-top: var(--space-1);
+  margin-top: 0.25rem;
 }
 
 .login-panel__footer {
+  margin-top: 1rem;
   text-align: center;
 }
 
 .login-panel__footer p {
   margin: 0;
   color: var(--color-text-secondary);
-  font-size: 0.75rem;
+  font-size: 0.72rem;
 }
 
-@media (max-width: 53.99rem) {
+/* Celulares en formato vertical (portrait) */
+@media (max-width: 48rem), (orientation: portrait) and (max-width: 54rem) {
   .login-shell {
     grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
+    height: auto;
+    min-height: 100dvh;
+    overflow-y: auto;
   }
 
   .login-visual {
-    position: static;
-    height: 11.5rem;
+    display: none;
   }
 
   .login-panel {
-    min-height: auto;
-    gap: var(--space-5);
-    padding: 1.5rem;
+    min-height: 100dvh;
+    height: auto;
+    padding: 3.5rem 1.5rem 1.5rem;
+    justify-content: center;
+  }
+
+  .login-panel__topbar {
+    top: 1rem;
+    right: 1rem;
   }
 }
 
-@media (max-width: 24rem) {
-  .login-visual {
-    height: 9.5rem;
+/* Dispositivos en formato horizontal con altura reducida */
+@media (orientation: landscape) and (max-height: 48rem) {
+  .login-shell {
+    height: 100dvh;
+    overflow: hidden;
   }
 
   .login-panel {
-    padding: var(--space-4);
+    padding: 1rem 1.5rem;
+  }
+
+  .login-panel__topbar {
+    top: 0.75rem;
+    right: 1rem;
+  }
+
+  .login-card {
+    gap: 0.75rem;
+  }
+
+  .login-logo {
+    height: 3rem;
+  }
+
+  .login-heading h1 {
+    font-size: 1.45rem;
+  }
+
+  form {
+    gap: 0.65rem;
+  }
+
+  .login-submit {
+    min-height: 2.5rem;
+  }
+
+  .login-panel__footer {
+    margin-top: 0.4rem;
   }
 }
 </style>
