@@ -20,7 +20,7 @@ const router = createRouter({
           path: 'resumen',
           name: 'resumen',
           component: () => import('@/modules/resumen/views/ResumenView.vue'),
-          meta: { capability: 'comercial.operar' },
+          meta: { capabilitiesAny: ['comercial.operar', 'taller.operar'] },
         },
         {
           path: 'clientes',
@@ -170,12 +170,14 @@ const router = createRouter({
 export const authGuard: NavigationGuard = async (to) => {
   const session = useSessionStore()
   await session.initialize()
-  if (to.meta.public && session.isAuthenticated && to.name === 'login') return { name: 'resumen' }
+  if (to.meta.public && session.isAuthenticated && to.name === 'login')
+    return { name: session.defaultRouteName }
   if (to.meta.requiresAuth && !session.isAuthenticated)
     return { name: 'login', query: { redirect: to.fullPath } }
   if (
     to.name === 'resumen' &&
     !session.can('comercial.operar') &&
+    !session.can('taller.operar') &&
     session.can('catalogo.crear_producto')
   )
     return { name: 'productos' }

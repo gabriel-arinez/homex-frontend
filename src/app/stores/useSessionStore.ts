@@ -1,7 +1,14 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { authService } from '@/modules/auth/services/authService'
-import { isCapability, type Capability, type SessionIdentity } from '@/modules/auth/types/session'
+import {
+  isCapability,
+  resolveDefaultRouteName,
+  resolveRoleLabel,
+  resolveRoleProfile,
+  type Capability,
+  type SessionIdentity,
+} from '@/modules/auth/types/session'
 import { configureApiAuth } from '@/shared/api'
 
 const STORAGE_KEY = 'homex.session.v1'
@@ -108,6 +115,9 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   const can = (capability?: Capability) => !capability || capabilities.value.includes(capability)
+  const roleProfile = computed(() => resolveRoleProfile(capabilities.value))
+  const roleLabel = computed(() => resolveRoleLabel(roleProfile.value))
+  const defaultRouteName = computed(() => resolveDefaultRouteName(capabilities.value))
 
   configureApiAuth({
     accessToken: () => accessToken.value,
@@ -121,6 +131,9 @@ export const useSessionStore = defineStore('session', () => {
     capabilities,
     initialized,
     isAuthenticated,
+    roleProfile,
+    roleLabel,
+    defaultRouteName,
     initialize,
     login,
     logout,

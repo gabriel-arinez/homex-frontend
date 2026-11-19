@@ -507,6 +507,8 @@ export type OrdenTrabajo = {
   readonly id: number
   readonly pedido: number
   readonly proforma_numero: number
+  readonly proforma_titulo: string | null
+  cliente_resumen: ClienteResumenProforma | null
   readonly jefe_taller: number | null
   readonly numero: number
   readonly fecha: string

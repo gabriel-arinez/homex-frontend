@@ -5,6 +5,9 @@ defineProps<{ description?: string }>()
   <section class="state">
     <strong>Acceso restringido</strong>
     <p>{{ description ?? 'No tienes permisos para ver este contenido.' }}</p>
+    <div v-if="$slots.default" class="state__actions">
+      <slot />
+    </div>
   </section>
 </template>
 <style scoped>
@@ -17,5 +20,11 @@ defineProps<{ description?: string }>()
 }
 .state p {
   color: var(--color-text-secondary);
+}
+.state__actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
 }
 </style>

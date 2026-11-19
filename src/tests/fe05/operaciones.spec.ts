@@ -1,7 +1,10 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
+import { useSessionStore } from '@/app/stores/useSessionStore'
+import type { Capability } from '@/modules/auth/types/session'
 import PedidoDetailView from '@/modules/pedidos/views/PedidoDetailView.vue'
 import PedidosListView from '@/modules/pedidos/views/PedidosListView.vue'
 import OrdenTrabajoDetailView from '@/modules/ordenes-trabajo/views/OrdenTrabajoDetailView.vue'
@@ -62,7 +65,15 @@ function options() {
     ),
   )
 }
-async function mountAt(component: unknown, path: string) {
+async function mountAt(
+  component: unknown,
+  path: string,
+  capabilities: Capability[] = ['comercial.operar', 'catalogo.crear_producto'],
+) {
+  const pinia = createPinia()
+  setActivePinia(pinia)
+  const session = useSessionStore(pinia)
+  session.capabilities = capabilities
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -80,7 +91,9 @@ async function mountAt(component: unknown, path: string) {
   })
   await router.push(path)
   await router.isReady()
-  return mount(component as never, { global: { plugins: [router], stubs: { Teleport: true } } })
+  return mount(component as never, {
+    global: { plugins: [pinia, router], stubs: { Teleport: true } },
+  })
 }
 describe('FE05 operaciones', () => {
   it('envía el código semántico de estado y conserva autoridad backend', async () => {
@@ -426,6 +439,98 @@ describe('FE05 operaciones', () => {
     expect(w.text()).toContain('color a elección')
     expect(w.find('pre').exists()).toBe(false)
     expect(w.text()).not.toContain('precio_unitario')
+  })
+
+  it('permite a JEFE_TALLER ver cliente y título en OT sin consultar /proformas/ ni enlazar a pedidos', async () => {
+    let proformaCalls = 0
+    server.use(
+      http.get('http://localhost:8000/api/v1/proformas/', () => {
+        proformaCalls += 1
+        return HttpResponse.json({ detail: 'Forbidden' }, { status: 403 })
+      }),
+      http.get('http://localhost:8000/api/v1/ordenes-trabajo/', () =>
+        HttpResponse.json([
+          {
+            id: 3,
+            pedido: 9,
+            proforma_numero: 4,
+            proforma_titulo: 'Sala de directorio',
+            cliente_resumen: {
+              id: 10,
+              nombre: 'Ana Pérez',
+              empresa: 'Constructora Norte S.R.L.',
+              celular: '70000001',
+            },
+            jefe_taller: null,
+            numero: 40,
+            fecha: '2026-09-26',
+            fecha_inicio: null,
+            fecha_fin: null,
+            responsable_recepcion: null,
+            fecha_entrega: '2026-10-05',
+            lugar_entrega: 'Obra Norte',
+            estado_saldo: null,
+            estado_saldo_info: null,
+            estado: 20,
+            estado_info: { id: 20, codigo: 'PENDIENTE', nombre: 'Pendiente' },
+            created_by: 2,
+            updated_by: 2,
+            detalles: [],
+          },
+        ]),
+      ),
+    )
+    const w = await mountAt(OrdenesTrabajoListView, '/ordenes-trabajo', ['taller.operar'])
+    await flushPromises()
+    expect(proformaCalls).toBe(0)
+    expect(w.text()).toContain('Constructora Norte S.R.L.')
+    expect(w.text()).toContain('Sala de directorio')
+    expect(w.find('a.origin-chip').exists()).toBe(false)
+  })
+
+  it('identifica mueble a medida para ENCARGADO_TIENDA cuando la ficha técnica está reservada a taller', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/ordenes-trabajo/3/', () =>
+        HttpResponse.json({
+          id: 3,
+          pedido: 9,
+          proforma_numero: 4,
+          proforma_titulo: 'Escritorio gerencial',
+          cliente_resumen: { id: 10, nombre: 'Ana Pérez', empresa: null, celular: null },
+          jefe_taller: null,
+          numero: 40,
+          fecha: '2026-09-26',
+          fecha_inicio: null,
+          fecha_fin: null,
+          responsable_recepcion: 'Carlos Méndez',
+          fecha_entrega: '2026-10-05',
+          lugar_entrega: 'Av. Banzer Km 6',
+          estado_saldo: null,
+          estado_saldo_info: null,
+          estado: 20,
+          estado_info: { id: 20, codigo: 'PENDIENTE', nombre: 'Pendiente' },
+          created_by: 2,
+          updated_by: 2,
+          detalles: [
+            {
+              id: 88,
+              tipo_item_info: { id: 9, codigo: 'MUEBLE_MEDIDA', nombre: 'A medida' },
+              producto: null,
+              familia_producto: null,
+              nombre: 'Escritorio a medida',
+              descripcion: null,
+              cantidad: '1.0000',
+              unidad_info: { id: 2, codigo: 'PIEZA', nombre: 'Pieza' },
+              especificacion: null,
+            },
+          ],
+        }),
+      ),
+    )
+    const w = await mountAt(OrdenTrabajoDetailView, '/ordenes-trabajo/3')
+    await flushPromises()
+    expect(w.text()).toContain('1 fabricación · 0 catálogo')
+    expect(w.text()).toContain('Mueble a medida · Ficha técnica reservada a taller')
   })
 
   it('muestra bandeja de notas de entrega con contexto de cliente y menú de acciones', async () => {

@@ -27,10 +27,16 @@ async function submit() {
   loading.value = true
   try {
     await session.login(username.value, password.value)
+    const fallbackPath =
+      session.defaultRouteName === 'productos'
+        ? '/productos'
+        : session.defaultRouteName === 'forbidden'
+          ? '/forbidden'
+          : '/resumen'
     const redirect =
       typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/')
         ? route.query.redirect
-        : '/resumen'
+        : fallbackPath
     await router.replace(redirect)
   } catch (cause) {
     error.value =

@@ -294,7 +294,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           <ArrowLeft :size="17" aria-hidden="true" /> Volver a productos
         </Button>
         <Button
-          v-if="product && !editing"
+          v-if="product && !editing && session.can('comercial.operar')"
           variant="secondary"
           @click="
             router.push({ path: '/movimientos-stock', query: { producto: String(product.id) } })

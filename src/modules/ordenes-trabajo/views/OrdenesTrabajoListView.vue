@@ -15,6 +15,7 @@ import {
   Truck,
 } from '@lucide/vue'
 import type { OrdenTrabajo, ProformaListado } from '@/generated/api'
+import { useSessionStore } from '@/app/stores/useSessionStore'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import { downloadBlob } from '@/shared/download/downloadBlob'
 import { ordenesTrabajoService } from '../services/ordenesTrabajoService'
@@ -37,6 +38,8 @@ import { dateRangeError, isValidDate, localToday } from '@/shared/validation/dat
 const emit = defineEmits<{ openMenu: [] }>()
 const route = useRoute()
 const router = useRouter()
+const session = useSessionStore()
+const canOperateCommercial = computed(() => session.can('comercial.operar'))
 const today = localToday()
 const routeDate = (key: string) => {
   const val = typeof route.query[key] === 'string' ? String(route.query[key]) : ''
@@ -69,14 +72,18 @@ const availableStates = computed(() => {
   return Array.from(map.entries()).map(([codigo, nombre]) => ({ codigo, nombre }))
 })
 
+function isFabricationLine(line: NonNullable<OrdenTrabajo['detalles']>[number]): boolean {
+  return line.tipo_item_info?.codigo === 'MUEBLE_MEDIDA' || Boolean(line.especificacion)
+}
+
 function hasFabrication(ot: OrdenTrabajo): boolean {
-  return (ot.detalles ?? []).some((line) => Boolean(line.especificacion))
+  return (ot.detalles ?? []).some(isFabricationLine)
 }
 
 function workSummary(ot: OrdenTrabajo): string {
   const detalles = ot.detalles ?? []
   if (!detalles.length) return 'Sin líneas registradas'
-  const fabCount = detalles.filter((d) => Boolean(d.especificacion)).length
+  const fabCount = detalles.filter(isFabricationLine).length
   const totalCount = detalles.length
   const base = `${totalCount} ítem${totalCount === 1 ? '' : 's'}`
   if (fabCount > 0) return `${base} · ${fabCount} a medida`
@@ -89,6 +96,8 @@ function proformaOf(ot: OrdenTrabajo): ProformaListado | undefined {
 
 function clientName(ot: OrdenTrabajo): string {
   return (
+    ot.cliente_resumen?.empresa?.trim() ||
+    ot.cliente_resumen?.nombre?.trim() ||
     proformaOf(ot)?.cliente_resumen?.empresa?.trim() ||
     proformaOf(ot)?.cliente_resumen?.nombre?.trim() ||
     ''
@@ -96,7 +105,7 @@ function clientName(ot: OrdenTrabajo): string {
 }
 
 function quoteTitle(ot: OrdenTrabajo): string {
-  return proformaOf(ot)?.titulo?.trim() || workSummary(ot)
+  return ot.proforma_titulo?.trim() || proformaOf(ot)?.titulo?.trim() || workSummary(ot)
 }
 
 function workOrderStatusIcon(code: string) {
@@ -260,6 +269,16 @@ watch(page, () => {
 })
 
 async function loadQuoteContext() {
+  if (!canOperateCommercial.value) {
+    proformasByNumero.value = {}
+    return
+  }
+  if (
+    rows.value.length > 0 &&
+    rows.value.every((ot) => ot.cliente_resumen !== undefined || ot.proforma_titulo !== undefined)
+  ) {
+    return
+  }
   try {
     const response = await proformasService.list({ page_size: 100 })
     const map: Record<number, ProformaListado> = {}
@@ -460,10 +479,18 @@ onMounted(load)
                       {{ clientName(row) }}
                     </strong>
                     <div class="origin-links">
-                      <RouterLink :to="`/pedidos/${row.pedido}`" class="origin-chip">
+                      <RouterLink
+                        v-if="canOperateCommercial"
+                        :to="`/pedidos/${row.pedido}`"
+                        class="origin-chip"
+                      >
                         <ClipboardList :size="13" aria-hidden="true" />
                         Pedido #{{ row.pedido }}
                       </RouterLink>
+                      <span v-else class="origin-proforma">
+                        <ClipboardList :size="12" aria-hidden="true" />
+                        Pedido #{{ row.pedido }}
+                      </span>
                       <span class="origin-proforma">
                         <FileText :size="12" aria-hidden="true" />
                         Prof. #{{ row.proforma_numero }}
@@ -495,6 +522,7 @@ onMounted(load)
                   :id="row.id"
                   :numero="row.numero"
                   :pedido-id="row.pedido"
+                  :can-view-order="canOperateCommercial"
                   @download="handleDownload"
                 />
               </td>

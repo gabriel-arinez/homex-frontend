@@ -34,6 +34,27 @@ describe('guards de rutas', () => {
     expect(session.can('comercial.administrar')).toBe(false)
     expect(session.can('comercial.operar')).toBe(false)
   })
+  it('dirige a los tres perfiles definitivos a su panel operativo inicial', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/auth/me/', () =>
+        HttpResponse.json({
+          id: 21,
+          username: 'jefe_taller',
+          display_name: 'Jefe Taller',
+          capabilities: ['taller.operar'],
+        }),
+      ),
+    )
+    const session = useSessionStore()
+    await session.login('vendedor', 'correcta')
+    expect(session.roleProfile).toBe('JEFE_TALLER')
+    expect(session.roleLabel).toBe('Jefe de taller')
+    expect(session.defaultRouteName).toBe('resumen')
+    await router.push('/resumen')
+    expect(router.currentRoute.value.name).toBe('resumen')
+    await router.push('/clientes')
+    expect(router.currentRoute.value.name).toBe('forbidden')
+  })
   it('mantiene logout como sesión anónima', () => {
     const session = useSessionStore()
     session.logout()
