@@ -443,3 +443,18 @@ for (const width of [360, 768, 1440])
     ).toBe(true)
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
   })
+
+for (const width of [360, 768, 1440])
+  test(`@a11y FE05 Movimientos de stock responsive ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await mock(page)
+    await page.goto('/movimientos-stock')
+    await expect(page.getByRole('heading', { name: 'Movimientos de stock' })).toBeVisible()
+    await expect(page.getByRole('table').getByText('Silla ejecutiva')).toBeVisible()
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+      ),
+    ).toBe(true)
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
+  })

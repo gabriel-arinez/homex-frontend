@@ -8,6 +8,7 @@ import OrdenTrabajoDetailView from '@/modules/ordenes-trabajo/views/OrdenTrabajo
 import OrdenesTrabajoListView from '@/modules/ordenes-trabajo/views/OrdenesTrabajoListView.vue'
 import NotaEntregaDetailView from '@/modules/notas-entrega/views/NotaEntregaDetailView.vue'
 import NotasEntregaListView from '@/modules/notas-entrega/views/NotasEntregaListView.vue'
+import MovimientosStockListView from '@/modules/movimientos-stock/views/MovimientosStockListView.vue'
 import ReciboDetailView from '@/modules/recibos/views/ReciboDetailView.vue'
 import { pedidosService } from '@/modules/pedidos/services/pedidosService'
 import { recibosService } from '@/modules/recibos/services/recibosService'
@@ -71,6 +72,7 @@ async function mountAt(component: unknown, path: string) {
       { path: '/pedidos', component: { template: '<div/>' } },
       { path: '/ordenes-trabajo', component: { template: '<div/>' } },
       { path: '/notas-entrega', component: { template: '<div/>' } },
+      { path: '/movimientos-stock', component: component as never },
       { path: '/recibos', component: { template: '<div/>' } },
       { path: '/proformas/:id', component: { template: '<div/>' } },
     ],
@@ -528,5 +530,85 @@ describe('FE05 operaciones', () => {
     expect(w.text()).toContain('Pieza')
     expect(w.text()).not.toContain('3500.00')
     expect(w.text()).not.toContain('875.00')
+  })
+
+  it('muestra bandeja de movimientos de stock con trazabilidad, responsable y filtros sincronizados', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/catalogo/opciones/', () =>
+        HttpResponse.json([
+          { id: 12, codigo: 'VENTA', nombre: 'Venta', concepto_codigo: 'TIPO_MOVIMIENTO' },
+          {
+            id: 13,
+            codigo: 'REVERSA_VENTA',
+            nombre: 'Reversa de venta',
+            concepto_codigo: 'TIPO_MOVIMIENTO',
+          },
+        ]),
+      ),
+      http.get('http://localhost:8000/api/v1/movimientos-stock/', () =>
+        HttpResponse.json({
+          count: 2,
+          next: null,
+          previous: null,
+          results: [
+            {
+              id: 31,
+              fecha: '2026-09-26T12:10:00Z',
+              tipo_movimiento: 12,
+              tipo_movimiento_info: { id: 12, codigo: 'VENTA', nombre: 'Venta' },
+              cantidad: '-4.0000',
+              producto: 8,
+              producto_resumen: {
+                id: 8,
+                sku: 'SILLA-EJEC-01',
+                nombre: 'Silla ejecutiva ergonómica',
+                unidad_stock_info: { id: 1, codigo: 'PIEZA', nombre: 'Pieza' },
+              },
+              pedido: 9,
+              pedido_relacionado: 9,
+              movimiento_referencia: null,
+              observaciones: 'Salida por pedido confirmado',
+              created_by: 7,
+              responsable: { id: 7, username: 'vendedor', display_name: 'Carlos Méndez' },
+            },
+            {
+              id: 32,
+              fecha: '2026-09-26T12:20:00Z',
+              tipo_movimiento: 13,
+              tipo_movimiento_info: {
+                id: 13,
+                codigo: 'REVERSA_VENTA',
+                nombre: 'Reversa de venta',
+              },
+              cantidad: '2.5000',
+              producto: 80,
+              producto_resumen: {
+                id: 80,
+                sku: 'PISO-SPC-01',
+                nombre: 'Piso flotante SPC',
+                unidad_stock_info: { id: 24, codigo: 'M2', nombre: 'Metro cuadrado' },
+              },
+              pedido: null,
+              pedido_relacionado: 9,
+              movimiento_referencia: 31,
+              observaciones: 'Reversa automática',
+              created_by: null,
+              responsable: null,
+            },
+          ],
+        }),
+      ),
+    )
+    const w = await mountAt(MovimientosStockListView, '/movimientos-stock')
+    await flushPromises()
+    expect(w.text()).toContain('Silla ejecutiva ergonómica')
+    expect(w.text()).toContain('SILLA-EJEC-01')
+    expect(w.text()).toContain('-4.0000')
+    expect(w.text()).toContain('+2.5000')
+    expect(w.text()).toContain('Metro cuadrado')
+    expect(w.text()).toContain('Pedido #9')
+    expect(w.text()).toContain('Orig. #31')
+    expect(w.text()).toContain('Carlos Méndez')
+    expect(w.text()).toContain('Sistema')
   })
 })
