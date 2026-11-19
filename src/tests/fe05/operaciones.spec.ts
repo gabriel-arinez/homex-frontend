@@ -4,7 +4,13 @@ import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 import PedidoDetailView from '@/modules/pedidos/views/PedidoDetailView.vue'
 import PedidosListView from '@/modules/pedidos/views/PedidosListView.vue'
+import OrdenTrabajoDetailView from '@/modules/ordenes-trabajo/views/OrdenTrabajoDetailView.vue'
+import OrdenesTrabajoListView from '@/modules/ordenes-trabajo/views/OrdenesTrabajoListView.vue'
+import NotaEntregaDetailView from '@/modules/notas-entrega/views/NotaEntregaDetailView.vue'
+import NotasEntregaListView from '@/modules/notas-entrega/views/NotasEntregaListView.vue'
+import MovimientosStockListView from '@/modules/movimientos-stock/views/MovimientosStockListView.vue'
 import ReciboDetailView from '@/modules/recibos/views/ReciboDetailView.vue'
+import RecibosListView from '@/modules/recibos/views/RecibosListView.vue'
 import { pedidosService } from '@/modules/pedidos/services/pedidosService'
 import { recibosService } from '@/modules/recibos/services/recibosService'
 import { movimientosStockService } from '@/modules/movimientos-stock/services/movimientosStockService'
@@ -61,9 +67,14 @@ async function mountAt(component: unknown, path: string) {
     history: createMemoryHistory(),
     routes: [
       { path: '/pedidos/:id', component: component as never },
+      { path: '/ordenes-trabajo/:id', component: component as never },
+      { path: '/notas-entrega/:id', component: component as never },
       { path: '/recibos/:id', component: component as never },
       { path: '/pedidos', component: { template: '<div/>' } },
-      { path: '/recibos', component: { template: '<div/>' } },
+      { path: '/ordenes-trabajo', component: { template: '<div/>' } },
+      { path: '/notas-entrega', component: { template: '<div/>' } },
+      { path: '/movimientos-stock', component: component as never },
+      { path: '/recibos', component: component as never },
       { path: '/proformas/:id', component: { template: '<div/>' } },
     ],
   })
@@ -283,5 +294,360 @@ describe('FE05 operaciones', () => {
     await mainAdvanceBtn.trigger('click')
     await flushPromises()
     expect(postedBody).toEqual({ estado_codigo: 'EN_PRODUCCION' })
+  })
+
+  it('muestra bandeja de órdenes de trabajo con contexto de cliente y menú de acciones', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/ordenes-trabajo/', () =>
+        HttpResponse.json([
+          {
+            id: 3,
+            pedido: 9,
+            proforma_numero: 4,
+            jefe_taller: null,
+            numero: 40,
+            fecha: '2026-09-26',
+            fecha_inicio: null,
+            fecha_fin: null,
+            responsable_recepcion: null,
+            fecha_entrega: '2026-10-05',
+            lugar_entrega: 'Obra Norte',
+            estado_saldo: null,
+            estado_saldo_info: null,
+            estado: 20,
+            estado_info: { id: 20, codigo: 'PENDIENTE', nombre: 'Pendiente' },
+            created_by: 2,
+            updated_by: 2,
+            detalles: [
+              {
+                id: 88,
+                tipo_item_info: { id: 9, codigo: 'MUEBLE_MEDIDA', nombre: 'A medida' },
+                producto: null,
+                familia_producto: null,
+                nombre: 'Escritorio a medida',
+                descripcion: null,
+                cantidad: '1.0000',
+                unidad_info: { id: 2, codigo: 'PIEZA', nombre: 'Pieza' },
+                especificacion: {
+                  tipo_mueble_info: null,
+                  observaciones: 'Conservar pieza original',
+                  datos_tecnicos: { componentes: [{ nombre: 'Mesón', color: 'Nogal' }] },
+                },
+              },
+            ],
+          },
+        ]),
+      ),
+      http.get('http://localhost:8000/api/v1/proformas/', () =>
+        HttpResponse.json({
+          count: 1,
+          next: null,
+          previous: null,
+          results: [
+            {
+              id: 4,
+              numero: 4,
+              titulo: 'Oficina directorio',
+              total: '3500.00',
+              estado_info: { id: 1, codigo: 'APROBADA', nombre: 'Aprobada' },
+              moneda_info: { id: 1, codigo: 'BOB', nombre: 'Bolivianos' },
+              cliente_resumen: { id: 10, nombre: 'Constructora Norte' },
+            },
+          ],
+        }),
+      ),
+    )
+    const w = await mountAt(OrdenesTrabajoListView, '/ordenes-trabajo')
+    await flushPromises()
+    expect(w.text()).toContain('OT #40')
+    expect(w.text()).toContain('Constructora Norte')
+    expect(w.text()).toContain('Oficina directorio')
+    expect(w.text()).toContain('Pedido #9')
+    expect(w.find('[aria-label="Acciones de la orden de trabajo #40"]').exists()).toBe(true)
+  })
+
+  it('muestra detalle de OT con ficha técnica estructurada sin JSON crudo', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/ordenes-trabajo/3/', () =>
+        HttpResponse.json({
+          id: 3,
+          pedido: 9,
+          proforma_numero: 4,
+          jefe_taller: null,
+          numero: 40,
+          fecha: '2026-09-26',
+          fecha_inicio: null,
+          fecha_fin: null,
+          responsable_recepcion: 'Carlos Méndez',
+          fecha_entrega: '2026-10-05',
+          lugar_entrega: 'Av. Banzer Km 6',
+          estado_saldo: null,
+          estado_saldo_info: null,
+          estado: 20,
+          estado_info: { id: 20, codigo: 'PENDIENTE', nombre: 'Pendiente' },
+          created_by: 2,
+          updated_by: 2,
+          detalles: [
+            {
+              id: 88,
+              tipo_item_info: { id: 9, codigo: 'MUEBLE_MEDIDA', nombre: 'A medida' },
+              producto: null,
+              familia_producto: null,
+              nombre: 'Escritorio a medida',
+              descripcion: 'Módulo gerencial',
+              cantidad: '1.0000',
+              unidad_info: { id: 2, codigo: 'PIEZA', nombre: 'Pieza' },
+              especificacion: {
+                tipo_mueble_info: null,
+                observaciones: 'Conservar pieza original',
+                datos_tecnicos: {
+                  componentes: [
+                    { nombre: 'Mesón', color: 'Nogal', espesor: '25 mm' },
+                    { nombre: 'Estructura', material: 'Melamina' },
+                  ],
+                  advertencias: ['color a elección'],
+                },
+              },
+            },
+          ],
+        }),
+      ),
+      http.get('http://localhost:8000/api/v1/imagenes-privadas/', () => HttpResponse.json([])),
+    )
+    const w = await mountAt(OrdenTrabajoDetailView, '/ordenes-trabajo/3')
+    await flushPromises()
+    expect(w.text()).toContain('Orden de trabajo #40')
+    expect(w.text()).toContain('Carlos Méndez')
+    expect(w.text()).toContain('Av. Banzer Km 6')
+    expect(w.text()).toContain('2 componentes')
+    expect(w.text()).toContain('Mesón')
+    expect(w.text()).toContain('Nogal')
+    expect(w.text()).toContain('Conservar pieza original')
+    expect(w.text()).toContain('color a elección')
+    expect(w.find('pre').exists()).toBe(false)
+    expect(w.text()).not.toContain('precio_unitario')
+  })
+
+  it('muestra bandeja de notas de entrega con contexto de cliente y menú de acciones', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/notas-entrega/', () =>
+        HttpResponse.json([
+          {
+            id: 7,
+            numero: 12,
+            fecha: '2026-10-15',
+            pedido: 9,
+            vendedor: 2,
+            created_by: 2,
+            updated_by: 2,
+          },
+        ]),
+      ),
+      http.get('http://localhost:8000/api/v1/pedidos/', () => HttpResponse.json([pedido(2)])),
+      http.get('http://localhost:8000/api/v1/proformas/', () =>
+        HttpResponse.json({
+          count: 1,
+          next: null,
+          previous: null,
+          results: [
+            {
+              id: 4,
+              numero: 4,
+              titulo: 'Oficina directorio',
+              total: '3500.00',
+              estado_info: { id: 1, codigo: 'APROBADA', nombre: 'Aprobada' },
+              moneda_info: { id: 1, codigo: 'BOB', nombre: 'Bolivianos' },
+              cliente_resumen: { id: 10, nombre: 'Constructora Norte' },
+            },
+          ],
+        }),
+      ),
+    )
+    const w = await mountAt(NotasEntregaListView, '/notas-entrega')
+    await flushPromises()
+    expect(w.text()).toContain('Nota #12')
+    expect(w.text()).toContain('Constructora Norte')
+    expect(w.text()).toContain('Oficina directorio')
+    expect(w.text()).toContain('Pedido #9')
+    expect(w.find('[aria-label="Acciones de la nota de entrega #12"]').exists()).toBe(true)
+  })
+
+  it('muestra detalle de nota de entrega con ítems entregados sin exponer precios', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/notas-entrega/7/', () =>
+        HttpResponse.json({
+          id: 7,
+          numero: 12,
+          fecha: '2026-10-15',
+          pedido: 9,
+          vendedor: 2,
+          created_by: 2,
+          updated_by: 2,
+        }),
+      ),
+      http.get('http://localhost:8000/api/v1/pedidos/9/', () => HttpResponse.json(pedido(2))),
+      http.get('http://localhost:8000/api/v1/proformas/4/', () =>
+        HttpResponse.json({
+          id: 4,
+          numero: 4,
+          titulo: 'Oficina directorio',
+          fecha: '2026-09-20',
+          total: '3500.00',
+          subtotal: '3500.00',
+          descuento_total: '0.00',
+          estado_info: { id: 1, codigo: 'APROBADA', nombre: 'Aprobada' },
+          moneda_info: { id: 1, codigo: 'BOB', nombre: 'Bolivianos' },
+          cliente_resumen: {
+            id: 10,
+            nombre: 'Constructora Norte',
+            empresa: 'Constructora Norte S.R.L.',
+          },
+          detalles: [
+            {
+              id: 21,
+              proforma: 4,
+              tipo_item: 1,
+              tipo_item_info: { id: 1, codigo: 'SILLA', nombre: 'Silla' },
+              producto: null,
+              familia_producto: null,
+              nombre: 'Silla ejecutiva',
+              descripcion: 'Respaldo alto',
+              cantidad: '4.0000',
+              unidad: 2,
+              unidad_info: { id: 2, codigo: 'PIEZA', nombre: 'Pieza' },
+              precio_unitario: '875.00',
+              total: '3500.00',
+              especificacion: null,
+            },
+          ],
+        }),
+      ),
+    )
+    const w = await mountAt(NotaEntregaDetailView, '/notas-entrega/7')
+    await flushPromises()
+    expect(w.text()).toContain('Nota de entrega #12')
+    expect(w.text()).toContain('Constructora Norte S.R.L.')
+    expect(w.text()).toContain('Silla ejecutiva')
+    expect(w.text()).toContain('Pieza')
+    expect(w.text()).not.toContain('3500.00')
+    expect(w.text()).not.toContain('875.00')
+  })
+
+  it('muestra bandeja de movimientos de stock con trazabilidad, responsable y filtros sincronizados', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/catalogo/opciones/', () =>
+        HttpResponse.json([
+          { id: 12, codigo: 'VENTA', nombre: 'Venta', concepto_codigo: 'TIPO_MOVIMIENTO' },
+          {
+            id: 13,
+            codigo: 'REVERSA_VENTA',
+            nombre: 'Reversa de venta',
+            concepto_codigo: 'TIPO_MOVIMIENTO',
+          },
+        ]),
+      ),
+      http.get('http://localhost:8000/api/v1/movimientos-stock/', () =>
+        HttpResponse.json({
+          count: 2,
+          next: null,
+          previous: null,
+          results: [
+            {
+              id: 31,
+              fecha: '2026-09-26T12:10:00Z',
+              tipo_movimiento: 12,
+              tipo_movimiento_info: { id: 12, codigo: 'VENTA', nombre: 'Venta' },
+              cantidad: '-4.0000',
+              producto: 8,
+              producto_resumen: {
+                id: 8,
+                sku: 'SILLA-EJEC-01',
+                nombre: 'Silla ejecutiva ergonómica',
+                unidad_stock_info: { id: 1, codigo: 'PIEZA', nombre: 'Pieza' },
+              },
+              pedido: 9,
+              pedido_relacionado: 9,
+              movimiento_referencia: null,
+              observaciones: 'Salida por pedido confirmado',
+              created_by: 7,
+              responsable: { id: 7, username: 'vendedor', display_name: 'Carlos Méndez' },
+            },
+            {
+              id: 32,
+              fecha: '2026-09-26T12:20:00Z',
+              tipo_movimiento: 13,
+              tipo_movimiento_info: {
+                id: 13,
+                codigo: 'REVERSA_VENTA',
+                nombre: 'Reversa de venta',
+              },
+              cantidad: '2.5000',
+              producto: 80,
+              producto_resumen: {
+                id: 80,
+                sku: 'PISO-SPC-01',
+                nombre: 'Piso flotante SPC',
+                unidad_stock_info: { id: 24, codigo: 'M2', nombre: 'Metro cuadrado' },
+              },
+              pedido: null,
+              pedido_relacionado: 9,
+              movimiento_referencia: 31,
+              observaciones: 'Reversa automática',
+              created_by: null,
+              responsable: null,
+            },
+          ],
+        }),
+      ),
+    )
+    const w = await mountAt(MovimientosStockListView, '/movimientos-stock')
+    await flushPromises()
+    expect(w.text()).toContain('Silla ejecutiva ergonómica')
+    expect(w.text()).toContain('SILLA-EJEC-01')
+    expect(w.text()).toContain('-4.0000')
+    expect(w.text()).toContain('+2.5000')
+    expect(w.text()).toContain('Metro cuadrado')
+    expect(w.text()).toContain('Pedido #9')
+    expect(w.text()).toContain('Orig. #31')
+    expect(w.text()).toContain('Carlos Méndez')
+    expect(w.text()).toContain('Sistema')
+  })
+
+  it('muestra bandeja de recibos con pagador, importes y menú de acciones', async () => {
+    options()
+    server.use(
+      http.get('http://localhost:8000/api/v1/recibos/', () =>
+        HttpResponse.json([recibo('EMITIDO')]),
+      ),
+    )
+    const w = await mountAt(RecibosListView, '/recibos')
+    await flushPromises()
+    expect(w.text()).toContain('Recibo #18')
+    expect(w.text()).toContain('Ana Pérez')
+    expect(w.text()).toContain('Anticipo')
+    expect(w.text()).toContain('Pedido #9')
+    expect(w.text()).toContain('Efectivo')
+    expect(w.find('[aria-label="Acciones del recibo #18"]').exists()).toBe(true)
+  })
+
+  it('muestra detalle de recibo con KPIs financieros, monto en letras y datos de cheque', async () => {
+    options()
+    server.use(
+      http.get('http://localhost:8000/api/v1/recibos/5/', () =>
+        HttpResponse.json({
+          ...recibo('EMITIDO'),
+          numero_cheque: 'CHQ-9988',
+          banco: 'Banco Bisa',
+        }),
+      ),
+    )
+    const w = await mountAt(ReciboDetailView, '/recibos/5')
+    await flushPromises()
+    expect(w.text()).toContain('Recibo #18')
+    expect(w.text()).toContain('Cien bolivianos')
+    expect(w.text()).toContain('CHQ-9988')
+    expect(w.text()).toContain('Banco Bisa')
+    expect(w.text()).toContain('Total del pedido')
+    expect(w.text()).toContain('Saldo restante')
   })
 })

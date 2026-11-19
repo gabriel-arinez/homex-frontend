@@ -5,6 +5,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import type { Producto, ValorCatalogoPublico } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import ProductosListView from '@/modules/productos/views/ProductosListView.vue'
+import ProductoDetailView from '@/modules/productos/views/ProductoDetailView.vue'
 import { productosService } from '@/modules/productos/services/productosService'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import { galleryService } from '@/shared/media/gallery'
@@ -204,6 +205,52 @@ describe('Bandeja administrativa de productos', () => {
     } finally {
       wrapper.unmount()
       localStorage.removeItem(key)
+    }
+  })
+
+  it('presenta ficha de detalle de producto con KPIs, enlaces y especificaciones legibles', async () => {
+    vi.spyOn(galleryService, 'list').mockResolvedValue({ imagenes: [], limite: 8 })
+    vi.spyOn(proformasService, 'options').mockResolvedValue([
+      catalog(10, 'MARCA_A', 'Marca A', 'MARCA'),
+      catalog(11, 'AZUL', 'Azul', 'COLOR'),
+    ])
+    vi.spyOn(productosService, 'get').mockResolvedValue({
+      ...sample,
+      precio_lista: '650.00',
+      promocion: { vigente: true, precio_antes: '650.00', precio_ahora: '590.00' },
+      silla: {
+        marca: 10,
+        modelo: 'S-200',
+        color_primario: 11,
+        color_secundario: null,
+        especificaciones: { tapizado: 'Malla', resistencia: 120 },
+      },
+    } as unknown as Producto)
+    const pinia = createPinia()
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/productos', component: { template: '<div />' } },
+        { path: '/productos/:id', component: ProductoDetailView },
+        { path: '/movimientos-stock', component: { template: '<div />' } },
+      ],
+    })
+    await router.push('/productos/13')
+    await router.isReady()
+    const wrapper = mount(ProductoDetailView, { global: { plugins: [pinia, router] } })
+    await flushPromises()
+    try {
+      expect(wrapper.text()).toContain('Silla de visita azul')
+      expect(wrapper.text()).toContain('27 piezas')
+      expect(wrapper.text()).toContain('Promoción vigente')
+      expect(wrapper.text()).toContain('Marca A')
+      expect(wrapper.text()).toContain('Azul')
+      expect(wrapper.text()).toContain('Tapizado')
+      expect(wrapper.text()).toContain('Malla')
+      expect(wrapper.text()).not.toContain('[object Object]')
+      expect(wrapper.text()).toContain('Ver movimientos')
+    } finally {
+      wrapper.unmount()
     }
   })
 })

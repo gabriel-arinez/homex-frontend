@@ -3,13 +3,17 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
   Armchair,
+  ArrowUpRight,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Eye,
   EyeOff,
   LayoutGrid,
   Layers,
   List,
   Package,
+  RotateCcw,
   SlidersHorizontal,
 } from '@lucide/vue'
 import type { FamiliaProducto, Producto, ValorCatalogoPublico } from '@/generated/api'
@@ -387,6 +391,12 @@ function createProduct(code: 'SILLA' | 'PISO_FLOTANTE' | 'OTRO') {
   if (!canCreate.value) return
   void router.push({ path: '/productos/nuevo', query: { categoria: code } })
 }
+function categoryIcon(product: Producto) {
+  const code = product.categoria_info?.codigo
+  if (code === 'SILLA') return Armchair
+  if (code === 'PISO_FLOTANTE') return Layers
+  return Package
+}
 function restoreFilters() {
   restoring = true
   search.value = routeString('q')
@@ -519,18 +529,30 @@ onBeforeUnmount(() => {
             { label: 'Inactivos', value: 'inactivos' },
           ]"
         />
-        <button
-          type="button"
-          class="more-filters"
-          :aria-expanded="showAdvanced"
-          :aria-controls="showAdvanced ? 'productos-filtros-avanzados' : undefined"
-          @click="toggleAdvanced"
-        >
-          <SlidersHorizontal :size="18" aria-hidden="true" />Más filtros<ChevronDown
-            :size="16"
-            aria-hidden="true"
-          />
-        </button>
+        <div class="filters-primary__actions">
+          <button
+            type="button"
+            class="more-filters"
+            :aria-expanded="showAdvanced"
+            :aria-controls="showAdvanced ? 'productos-filtros-avanzados' : undefined"
+            @click="toggleAdvanced"
+          >
+            <SlidersHorizontal :size="18" aria-hidden="true" />Más filtros<ChevronDown
+              :size="16"
+              aria-hidden="true"
+            />
+          </button>
+          <Button
+            v-if="hasFilters"
+            variant="secondary"
+            class="clear-filters-btn"
+            aria-label="Limpiar filtros"
+            title="Limpiar filtros"
+            @click="clearFilters"
+          >
+            <RotateCcw :size="16" aria-hidden="true" />
+          </Button>
+        </div>
       </div>
       <div v-if="showAdvanced" id="productos-filtros-avanzados" class="advanced-filters">
         <p class="advanced-hint">
@@ -728,6 +750,9 @@ onBeforeUnmount(() => {
                       sizes="52px"
                     />
                   </div>
+                  <span v-else class="category-badge-icon" aria-hidden="true">
+                    <component :is="categoryIcon(product)" :size="17" />
+                  </span>
                   <div class="identity-copy">
                     <RouterLink
                       :to="'/productos/' + product.id"
@@ -786,7 +811,7 @@ onBeforeUnmount(() => {
                   :aria-label="'Ver producto ' + product.nombre"
                   title="Ver detalle"
                 >
-                  <Eye :size="18" aria-hidden="true" />
+                  <ArrowUpRight :size="18" aria-hidden="true" />
                 </RouterLink>
               </td>
             </tr>
@@ -796,9 +821,13 @@ onBeforeUnmount(() => {
       <nav class="pagination" aria-label="Paginación de productos">
         <span>Mostrando {{ pageStart }}–{{ pageEnd }} de {{ total }} productos</span>
         <div class="pagination-actions">
-          <Button variant="secondary" :disabled="page <= 1" @click="page--">Anterior</Button>
+          <Button variant="secondary" :disabled="page <= 1" @click="page--">
+            <ChevronLeft :size="16" aria-hidden="true" /> Anterior
+          </Button>
           <span>Página {{ page }} de {{ pages }}</span>
-          <Button variant="secondary" :disabled="page >= pages" @click="page++">Siguiente</Button>
+          <Button variant="secondary" :disabled="page >= pages" @click="page++">
+            Siguiente <ChevronRight :size="16" aria-hidden="true" />
+          </Button>
         </div>
       </nav>
     </template>
@@ -918,6 +947,15 @@ onBeforeUnmount(() => {
 }
 .filters-primary :deep(.search) {
   min-height: 2.75rem;
+}
+.filters-primary__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.clear-filters-btn {
+  min-height: 2.75rem;
+  padding: 0 0.75rem;
 }
 .more-filters {
   display: inline-flex;
@@ -1251,6 +1289,17 @@ onBeforeUnmount(() => {
   width: 1.1rem;
   height: 1.1rem;
 }
+.category-badge-icon {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: none;
+  place-items: center;
+  border-radius: 0.65rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-soft);
+  color: var(--color-primary-accent);
+}
 .identity-copy {
   display: grid;
   gap: 0.3rem;
@@ -1330,12 +1379,17 @@ onBeforeUnmount(() => {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+@media (max-width: 68rem) {
+  .filters-primary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .search-wrap {
+    grid-column: 1 / -1;
+  }
+}
 @media (max-width: 62rem) {
   .product-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .filters-primary {
-    grid-template-columns: minmax(12rem, 1fr) minmax(9rem, 12rem);
   }
   .advanced-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

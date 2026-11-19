@@ -177,10 +177,10 @@ test('FE05 navegación expone OT, notas, recibos y stock como módulos reales', 
   await mock(page)
   await page.goto('/ordenes-trabajo')
   await expect(page.getByRole('heading', { name: 'Órdenes de trabajo' })).toBeVisible()
-  await expect(page.getByText('Pendiente')).toBeVisible()
+  await expect(page.getByRole('table').getByText('Pendiente')).toBeVisible()
 
   await page.goto('/recibos')
-  await expect(page.getByText('Bs 100,00')).toBeVisible()
+  await expect(page.getByText('Bs\u00a0100,00', { exact: true })).toBeVisible()
 
   await page.goto('/notas-entrega')
   await expect(page.getByText('Sin notas de entrega')).toBeVisible()
@@ -361,6 +361,120 @@ for (const width of [360, 390, 768, 1024, 1440])
     await mock(page)
     await page.goto('/pedidos/9')
     await expect(page.getByRole('heading', { name: 'Pedido #9' })).toBeVisible()
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+      ),
+    ).toBe(true)
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
+  })
+
+for (const width of [360, 768, 1440])
+  test(`@a11y FE05 OT responsive ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await mock(page)
+    await page.goto('/ordenes-trabajo')
+    await expect(page.getByRole('heading', { name: 'Órdenes de trabajo' })).toBeVisible()
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+      ),
+    ).toBe(true)
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
+
+    await page.goto('/ordenes-trabajo/3')
+    await expect(page.getByRole('heading', { name: 'Orden de trabajo #40' })).toBeVisible()
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+      ),
+    ).toBe(true)
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
+  })
+
+for (const width of [360, 768, 1440])
+  test(`@a11y FE05 Notas de entrega responsive ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await mock(page)
+    await page.route('**/api/v1/notas-entrega/', (route) =>
+      route.fulfill({
+        json: [
+          {
+            id: 7,
+            numero: 12,
+            fecha: '2026-10-15',
+            pedido: 9,
+            vendedor: 7,
+            created_by: 7,
+            updated_by: 7,
+          },
+        ],
+      }),
+    )
+    await page.route('**/api/v1/notas-entrega/7/', (route) =>
+      route.fulfill({
+        json: {
+          id: 7,
+          numero: 12,
+          fecha: '2026-10-15',
+          pedido: 9,
+          vendedor: 7,
+          created_by: 7,
+          updated_by: 7,
+        },
+      }),
+    )
+    await page.goto('/notas-entrega')
+    await expect(page.getByRole('heading', { name: 'Notas de entrega' })).toBeVisible()
+    await expect(page.getByRole('table').getByText('Nota #12')).toBeVisible()
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+      ),
+    ).toBe(true)
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
+
+    await page.goto('/notas-entrega/7')
+    await expect(page.getByRole('heading', { name: 'Nota de entrega #12' })).toBeVisible()
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+      ),
+    ).toBe(true)
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
+  })
+
+for (const width of [360, 768, 1440])
+  test(`@a11y FE05 Movimientos de stock responsive ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await mock(page)
+    await page.goto('/movimientos-stock')
+    await expect(page.getByRole('heading', { name: 'Movimientos de stock' })).toBeVisible()
+    await expect(page.getByRole('table').getByText('Silla ejecutiva')).toBeVisible()
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+      ),
+    ).toBe(true)
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
+  })
+
+for (const width of [360, 768, 1440])
+  test(`@a11y FE05 Recibos responsive ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await mock(page)
+    await page.goto('/recibos')
+    await expect(page.getByRole('heading', { name: 'Recibos' })).toBeVisible()
+    await expect(page.getByRole('table').getByText('Recibo #18')).toBeVisible()
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+      ),
+    ).toBe(true)
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
+
+    await page.goto('/recibos/5')
+    await expect(page.getByRole('heading', { name: 'Recibo #18' })).toBeVisible()
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
