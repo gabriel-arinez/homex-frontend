@@ -6,6 +6,8 @@ import PedidoDetailView from '@/modules/pedidos/views/PedidoDetailView.vue'
 import PedidosListView from '@/modules/pedidos/views/PedidosListView.vue'
 import OrdenTrabajoDetailView from '@/modules/ordenes-trabajo/views/OrdenTrabajoDetailView.vue'
 import OrdenesTrabajoListView from '@/modules/ordenes-trabajo/views/OrdenesTrabajoListView.vue'
+import NotaEntregaDetailView from '@/modules/notas-entrega/views/NotaEntregaDetailView.vue'
+import NotasEntregaListView from '@/modules/notas-entrega/views/NotasEntregaListView.vue'
 import ReciboDetailView from '@/modules/recibos/views/ReciboDetailView.vue'
 import { pedidosService } from '@/modules/pedidos/services/pedidosService'
 import { recibosService } from '@/modules/recibos/services/recibosService'
@@ -64,9 +66,11 @@ async function mountAt(component: unknown, path: string) {
     routes: [
       { path: '/pedidos/:id', component: component as never },
       { path: '/ordenes-trabajo/:id', component: component as never },
+      { path: '/notas-entrega/:id', component: component as never },
       { path: '/recibos/:id', component: component as never },
       { path: '/pedidos', component: { template: '<div/>' } },
       { path: '/ordenes-trabajo', component: { template: '<div/>' } },
+      { path: '/notas-entrega', component: { template: '<div/>' } },
       { path: '/recibos', component: { template: '<div/>' } },
       { path: '/proformas/:id', component: { template: '<div/>' } },
     ],
@@ -419,5 +423,110 @@ describe('FE05 operaciones', () => {
     expect(w.text()).toContain('color a elección')
     expect(w.find('pre').exists()).toBe(false)
     expect(w.text()).not.toContain('precio_unitario')
+  })
+
+  it('muestra bandeja de notas de entrega con contexto de cliente y menú de acciones', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/notas-entrega/', () =>
+        HttpResponse.json([
+          {
+            id: 7,
+            numero: 12,
+            fecha: '2026-10-15',
+            pedido: 9,
+            vendedor: 2,
+            created_by: 2,
+            updated_by: 2,
+          },
+        ]),
+      ),
+      http.get('http://localhost:8000/api/v1/pedidos/', () => HttpResponse.json([pedido(2)])),
+      http.get('http://localhost:8000/api/v1/proformas/', () =>
+        HttpResponse.json({
+          count: 1,
+          next: null,
+          previous: null,
+          results: [
+            {
+              id: 4,
+              numero: 4,
+              titulo: 'Oficina directorio',
+              total: '3500.00',
+              estado_info: { id: 1, codigo: 'APROBADA', nombre: 'Aprobada' },
+              moneda_info: { id: 1, codigo: 'BOB', nombre: 'Bolivianos' },
+              cliente_resumen: { id: 10, nombre: 'Constructora Norte' },
+            },
+          ],
+        }),
+      ),
+    )
+    const w = await mountAt(NotasEntregaListView, '/notas-entrega')
+    await flushPromises()
+    expect(w.text()).toContain('Nota #12')
+    expect(w.text()).toContain('Constructora Norte')
+    expect(w.text()).toContain('Oficina directorio')
+    expect(w.text()).toContain('Pedido #9')
+    expect(w.find('[aria-label="Acciones de la nota de entrega #12"]').exists()).toBe(true)
+  })
+
+  it('muestra detalle de nota de entrega con ítems entregados sin exponer precios', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/notas-entrega/7/', () =>
+        HttpResponse.json({
+          id: 7,
+          numero: 12,
+          fecha: '2026-10-15',
+          pedido: 9,
+          vendedor: 2,
+          created_by: 2,
+          updated_by: 2,
+        }),
+      ),
+      http.get('http://localhost:8000/api/v1/pedidos/9/', () => HttpResponse.json(pedido(2))),
+      http.get('http://localhost:8000/api/v1/proformas/4/', () =>
+        HttpResponse.json({
+          id: 4,
+          numero: 4,
+          titulo: 'Oficina directorio',
+          fecha: '2026-09-20',
+          total: '3500.00',
+          subtotal: '3500.00',
+          descuento_total: '0.00',
+          estado_info: { id: 1, codigo: 'APROBADA', nombre: 'Aprobada' },
+          moneda_info: { id: 1, codigo: 'BOB', nombre: 'Bolivianos' },
+          cliente_resumen: {
+            id: 10,
+            nombre: 'Constructora Norte',
+            empresa: 'Constructora Norte S.R.L.',
+          },
+          detalles: [
+            {
+              id: 21,
+              proforma: 4,
+              tipo_item: 1,
+              tipo_item_info: { id: 1, codigo: 'SILLA', nombre: 'Silla' },
+              producto: null,
+              familia_producto: null,
+              nombre: 'Silla ejecutiva',
+              descripcion: 'Respaldo alto',
+              cantidad: '4.0000',
+              unidad: 2,
+              unidad_info: { id: 2, codigo: 'PIEZA', nombre: 'Pieza' },
+              precio_unitario: '875.00',
+              total: '3500.00',
+              especificacion: null,
+            },
+          ],
+        }),
+      ),
+    )
+    const w = await mountAt(NotaEntregaDetailView, '/notas-entrega/7')
+    await flushPromises()
+    expect(w.text()).toContain('Nota de entrega #12')
+    expect(w.text()).toContain('Constructora Norte S.R.L.')
+    expect(w.text()).toContain('Silla ejecutiva')
+    expect(w.text()).toContain('Pieza')
+    expect(w.text()).not.toContain('3500.00')
+    expect(w.text()).not.toContain('875.00')
   })
 })

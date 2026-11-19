@@ -391,3 +391,55 @@ for (const width of [360, 768, 1440])
     ).toBe(true)
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
   })
+
+for (const width of [360, 768, 1440])
+  test(`@a11y FE05 Notas de entrega responsive ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await mock(page)
+    await page.route('**/api/v1/notas-entrega/', (route) =>
+      route.fulfill({
+        json: [
+          {
+            id: 7,
+            numero: 12,
+            fecha: '2026-10-15',
+            pedido: 9,
+            vendedor: 7,
+            created_by: 7,
+            updated_by: 7,
+          },
+        ],
+      }),
+    )
+    await page.route('**/api/v1/notas-entrega/7/', (route) =>
+      route.fulfill({
+        json: {
+          id: 7,
+          numero: 12,
+          fecha: '2026-10-15',
+          pedido: 9,
+          vendedor: 7,
+          created_by: 7,
+          updated_by: 7,
+        },
+      }),
+    )
+    await page.goto('/notas-entrega')
+    await expect(page.getByRole('heading', { name: 'Notas de entrega' })).toBeVisible()
+    await expect(page.getByRole('table').getByText('Nota #12')).toBeVisible()
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+      ),
+    ).toBe(true)
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
+
+    await page.goto('/notas-entrega/7')
+    await expect(page.getByRole('heading', { name: 'Nota de entrega #12' })).toBeVisible()
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+      ),
+    ).toBe(true)
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
+  })
