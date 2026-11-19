@@ -10,6 +10,7 @@ import NotaEntregaDetailView from '@/modules/notas-entrega/views/NotaEntregaDeta
 import NotasEntregaListView from '@/modules/notas-entrega/views/NotasEntregaListView.vue'
 import MovimientosStockListView from '@/modules/movimientos-stock/views/MovimientosStockListView.vue'
 import ReciboDetailView from '@/modules/recibos/views/ReciboDetailView.vue'
+import RecibosListView from '@/modules/recibos/views/RecibosListView.vue'
 import { pedidosService } from '@/modules/pedidos/services/pedidosService'
 import { recibosService } from '@/modules/recibos/services/recibosService'
 import { movimientosStockService } from '@/modules/movimientos-stock/services/movimientosStockService'
@@ -73,7 +74,7 @@ async function mountAt(component: unknown, path: string) {
       { path: '/ordenes-trabajo', component: { template: '<div/>' } },
       { path: '/notas-entrega', component: { template: '<div/>' } },
       { path: '/movimientos-stock', component: component as never },
-      { path: '/recibos', component: { template: '<div/>' } },
+      { path: '/recibos', component: component as never },
       { path: '/proformas/:id', component: { template: '<div/>' } },
     ],
   })
@@ -610,5 +611,43 @@ describe('FE05 operaciones', () => {
     expect(w.text()).toContain('Orig. #31')
     expect(w.text()).toContain('Carlos Méndez')
     expect(w.text()).toContain('Sistema')
+  })
+
+  it('muestra bandeja de recibos con pagador, importes y menú de acciones', async () => {
+    options()
+    server.use(
+      http.get('http://localhost:8000/api/v1/recibos/', () =>
+        HttpResponse.json([recibo('EMITIDO')]),
+      ),
+    )
+    const w = await mountAt(RecibosListView, '/recibos')
+    await flushPromises()
+    expect(w.text()).toContain('Recibo #18')
+    expect(w.text()).toContain('Ana Pérez')
+    expect(w.text()).toContain('Anticipo')
+    expect(w.text()).toContain('Pedido #9')
+    expect(w.text()).toContain('Efectivo')
+    expect(w.find('[aria-label="Acciones del recibo #18"]').exists()).toBe(true)
+  })
+
+  it('muestra detalle de recibo con KPIs financieros, monto en letras y datos de cheque', async () => {
+    options()
+    server.use(
+      http.get('http://localhost:8000/api/v1/recibos/5/', () =>
+        HttpResponse.json({
+          ...recibo('EMITIDO'),
+          numero_cheque: 'CHQ-9988',
+          banco: 'Banco Bisa',
+        }),
+      ),
+    )
+    const w = await mountAt(ReciboDetailView, '/recibos/5')
+    await flushPromises()
+    expect(w.text()).toContain('Recibo #18')
+    expect(w.text()).toContain('Cien bolivianos')
+    expect(w.text()).toContain('CHQ-9988')
+    expect(w.text()).toContain('Banco Bisa')
+    expect(w.text()).toContain('Total del pedido')
+    expect(w.text()).toContain('Saldo restante')
   })
 })
