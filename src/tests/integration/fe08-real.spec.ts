@@ -105,7 +105,7 @@ test.describe.serial('FE08 backend real', () => {
     ).toBeVisible()
 
     await page.goto('/ordenes-trabajo')
-    await expect(page.getByText('Pendiente', { exact: true }).first()).toBeVisible()
+    await expect(page.getByRole('table').getByText('Pendiente')).toBeVisible()
 
     await page.goto(`/pedidos/${pedidoId}`)
     await page.getByRole('button', { name: 'Emitir recibo' }).click()
