@@ -175,7 +175,6 @@ onMounted(load)
     </ErrorState>
 
     <template v-else-if="item">
-      <div v-if="notice" role="status" class="notice notice--success">{{ notice }}</div>
       <div v-if="error" role="alert" class="notice notice--error">{{ error }}</div>
 
       <div v-if="isAnnulled" class="annulled-banner">
