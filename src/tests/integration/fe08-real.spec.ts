@@ -146,7 +146,7 @@ test.describe.serial('FE08 backend real', () => {
     await expect(
       page
         .getByRole('table')
-        .getByRole('cell', { name: `#${pedidoId}`, exact: true })
+        .getByRole('link', { name: `Pedido #${pedidoId}` })
         .first(),
     ).toBeVisible()
 
