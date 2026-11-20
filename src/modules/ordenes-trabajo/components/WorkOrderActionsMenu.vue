@@ -7,6 +7,7 @@ const props = defineProps<{
   id: number
   numero: number
   pedidoId: number
+  canViewOrder?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -145,6 +146,7 @@ onBeforeUnmount(() => {
         </button>
 
         <RouterLink
+          v-if="props.canViewOrder !== false"
           role="menuitem"
           class="ot-actions__item ot-actions__item--info"
           :to="`/pedidos/${pedidoId}`"

@@ -66,4 +66,4 @@ vendedor_galerias.is_staff = False
 vendedor_galerias.is_superuser = False
 vendedor_galerias.set_password("gallery-integration-only")
 vendedor_galerias.save()
-vendedor_galerias.groups.add(Group.objects.get_or_create(name="VENDEDOR")[0])
+vendedor_galerias.groups.add(Group.objects.get_or_create(name="ENCARGADO_TIENDA")[0])

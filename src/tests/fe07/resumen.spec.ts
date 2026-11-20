@@ -107,6 +107,73 @@ describe('FE07 resumen operativo', () => {
     const admin = await render(['comercial.operar', 'comercial.administrar'])
     await flushPromises()
     expect(admin.findAll('nav a').map((x) => x.text())).toContain('Administrar catálogo')
+    expect(admin.text()).toContain('Supervisión global del sistema.')
+  })
+  it('presenta visión operativa de taller para JEFE_TALLER sin consultar proformas', async () => {
+    let proformaCalls = 0
+    server.use(
+      http.get('http://localhost:8000/api/v1/proformas/', () => {
+        proformaCalls += 1
+        return HttpResponse.json({ detail: 'Forbidden' }, { status: 403 })
+      }),
+      http.get('http://localhost:8000/api/v1/ordenes-trabajo/', () =>
+        HttpResponse.json([
+          {
+            id: 1,
+            pedido: 9,
+            proforma_numero: 4,
+            proforma_titulo: 'Escritorio gerencial',
+            cliente_resumen: { id: 10, nombre: 'Constructora Norte', empresa: null, celular: null },
+            jefe_taller: null,
+            numero: 40,
+            fecha: '2026-09-26',
+            fecha_inicio: null,
+            fecha_fin: null,
+            responsable_recepcion: null,
+            fecha_entrega: null,
+            lugar_entrega: null,
+            estado_saldo: null,
+            estado_saldo_info: null,
+            estado: 20,
+            estado_info: { id: 20, codigo: 'PENDIENTE', nombre: 'Pendiente' },
+            created_by: 2,
+            updated_by: 2,
+            detalles: [
+              {
+                id: 88,
+                tipo_item_info: { id: 9, codigo: 'MUEBLE_MEDIDA', nombre: 'A medida' },
+                producto: null,
+                familia_producto: null,
+                nombre: 'Escritorio a medida',
+                descripcion: 'Melamina',
+                cantidad: '1.0000',
+                unidad_info: { id: 2, codigo: 'PIEZA', nombre: 'Pieza' },
+                especificacion: {
+                  id: 1,
+                  proforma_detalle: 88,
+                  tipo_mueble: null,
+                  tipo_mueble_info: null,
+                  observaciones: null,
+                  datos_tecnicos: { componentes: [{ nombre: 'Mesón' }] },
+                },
+              },
+            ],
+          },
+        ]),
+      ),
+    )
+    const workshop = await render(['taller.operar'])
+    await flushPromises()
+    expect(proformaCalls).toBe(0)
+    expect(workshop.text()).toContain('Operación y seguimiento de taller.')
+    expect(workshop.text()).toContain('Órdenes de trabajo1')
+    expect(workshop.text()).toContain('Con fabricación a medida1')
+    expect(workshop.text()).toContain('Solo catálogo0')
+    expect(workshop.find('table').text()).toContain('Pendiente1')
+    expect(workshop.findAll('nav a').map((x) => x.text())).toEqual([
+      'Consultar órdenes de trabajo',
+      'Ver fabricación a medida',
+    ])
   })
   it('recupera un indicador fallido al actualizar y restaura el total completo', async () => {
     let failing = true

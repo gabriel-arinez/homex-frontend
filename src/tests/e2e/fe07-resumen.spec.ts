@@ -73,6 +73,53 @@ test('FE07 usa el mismo contrato para vendedor y administrador', async ({ page }
   await expect(page.getByText('Vista operativa de María HOMEX.')).toBeVisible()
   await expect(page.getByRole('link', { name: 'Administrar catálogo' })).toBeVisible()
 })
+test('FE07 presenta visión operativa de taller para JEFE_TALLER', async ({ page }) => {
+  await mock(page, { capabilities: ['taller.operar'] })
+  await page.route('**/api/v1/ordenes-trabajo/', (r) =>
+    r.fulfill({
+      json: [
+        {
+          id: 1,
+          pedido: 9,
+          proforma_numero: 4,
+          proforma_titulo: 'Escritorio gerencial',
+          cliente_resumen: { id: 10, nombre: 'Constructora Norte', empresa: null, celular: null },
+          jefe_taller: null,
+          numero: 40,
+          fecha: '2026-09-26',
+          fecha_inicio: null,
+          fecha_fin: null,
+          responsable_recepcion: null,
+          fecha_entrega: null,
+          lugar_entrega: null,
+          estado_saldo: null,
+          estado_saldo_info: null,
+          estado: 20,
+          estado_info: { id: 20, codigo: 'PENDIENTE', nombre: 'Pendiente' },
+          created_by: 2,
+          updated_by: 2,
+          detalles: [
+            {
+              id: 88,
+              tipo_item_info: { id: 9, codigo: 'MUEBLE_MEDIDA', nombre: 'A medida' },
+              producto: null,
+              familia_producto: null,
+              nombre: 'Escritorio a medida',
+              descripcion: 'Melamina',
+              cantidad: '1.0000',
+              unidad_info: { id: 2, codigo: 'PIEZA', nombre: 'Pieza' },
+              especificacion: null,
+            },
+          ],
+        },
+      ],
+    }),
+  )
+  await page.goto('/resumen')
+  await expect(page.getByText('Operación y seguimiento de taller.')).toBeVisible()
+  await expect(page.getByText('Con fabricación a medida')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Consultar órdenes de trabajo' })).toBeVisible()
+})
 test('@a11y FE07 funciona en tema oscuro y mantiene valores sin hover', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('homex.theme', 'dark'))
   await mock(page)

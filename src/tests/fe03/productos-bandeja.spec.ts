@@ -227,6 +227,8 @@ describe('Bandeja administrativa de productos', () => {
       },
     } as unknown as Producto)
     const pinia = createPinia()
+    const store = useSessionStore(pinia)
+    store.capabilities = ['comercial.operar', 'catalogo.crear_producto']
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [

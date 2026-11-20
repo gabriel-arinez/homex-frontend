@@ -54,7 +54,7 @@ const groups: Array<{
         label: 'Resumen',
         to: '/resumen',
         icon: LayoutDashboard,
-        capabilities: ['comercial.operar'],
+        capabilities: ['comercial.operar', 'taller.operar'],
       },
     ],
   },
@@ -174,6 +174,7 @@ const visibleGroups = computed(() =>
           <div class="user__info">
             <strong>{{ session.identity?.display_name ?? 'Sesión HOMEX' }}</strong>
             <small>{{ session.identity?.username ?? 'Cuenta autenticada' }}</small>
+            <span class="user__role">{{ session.roleLabel }}</span>
           </div>
           <Tooltip text="Cerrar sesión" :disabled="!preferences.sidebarCompact">
             <button
@@ -424,6 +425,15 @@ nav a.router-link-active::before {
 .user__info small {
   color: var(--color-text-secondary);
   font-size: 0.74rem;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.user__role {
+  color: var(--color-primary-accent);
+  font-size: 0.68rem;
+  font-weight: 650;
   line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;

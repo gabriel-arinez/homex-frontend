@@ -20,6 +20,7 @@ import {
   Wallet,
 } from '@lucide/vue'
 import type { DetalleOrdenTrabajo, OrdenTrabajo } from '@/generated/api'
+import { useSessionStore } from '@/app/stores/useSessionStore'
 import type {
   AtributoTecnico,
   ComponenteTecnico,
@@ -42,6 +43,8 @@ import { ordenesTrabajoService } from '../services/ordenesTrabajoService'
 const emit = defineEmits<{ openMenu: [] }>()
 const route = useRoute()
 const router = useRouter()
+const session = useSessionStore()
+const canOperateCommercial = computed(() => session.can('comercial.operar'))
 const id = Number(route.params.id)
 
 const item = ref<OrdenTrabajo | null>(null)
@@ -217,16 +220,23 @@ onMounted(load)
 const detailRows = computed(() =>
   (item.value?.detalles ?? []).map((line) => {
     const spec = parseSpecification(line)
+    const isFabrication = line.tipo_item_info.codigo === 'MUEBLE_MEDIDA' || Boolean(spec)
     return {
       ...line,
       unidadLabel: line.unidad_info.nombre,
       tipoItemLabel: line.tipo_item_info.nombre,
-      isFabrication: Boolean(line.especificacion),
-      trabajoLabel: line.especificacion ? 'Fabricación' : 'Preparación y verificación',
+      isFabrication,
+      trabajoLabel: isFabrication ? 'Fabricación' : 'Preparación y verificación',
       spec,
     }
   }),
 )
+
+const clientSummaryLabel = computed(() => {
+  const client = item.value?.cliente_resumen
+  if (!client) return ''
+  return client.empresa?.trim() || client.nombre?.trim() || ''
+})
 
 const lineCounts = computed(() => {
   const fab = detailRows.value.filter((row) => row.isFabrication).length
@@ -286,10 +296,18 @@ const lineCounts = computed(() => {
           </span>
           <div class="stat__body">
             <span>Origen comercial</span>
-            <RouterLink :to="`/pedidos/${item.pedido}`" class="stat__link">
+            <RouterLink
+              v-if="canOperateCommercial"
+              :to="`/pedidos/${item.pedido}`"
+              class="stat__link"
+            >
               Pedido #{{ item.pedido }}
             </RouterLink>
-            <small>Proforma #{{ item.proforma_numero }}</small>
+            <strong v-else class="stat__value">Pedido #{{ item.pedido }}</strong>
+            <small>
+              Proforma #{{ item.proforma_numero
+              }}<template v-if="clientSummaryLabel"> · {{ clientSummaryLabel }}</template>
+            </small>
           </div>
         </div>
 
@@ -560,6 +578,11 @@ const lineCounts = computed(() => {
                 </div>
               </div>
             </details>
+
+            <div v-else-if="line.isFabrication" class="work-line__catalog-tag">
+              <Hammer :size="15" aria-hidden="true" />
+              <span>Mueble a medida · Ficha técnica reservada a taller</span>
+            </div>
 
             <div v-else class="work-line__catalog-tag">
               <PackageCheck :size="15" aria-hidden="true" />

@@ -23,8 +23,11 @@ La vista incluye:
 - reintento general mediante “Actualizar”;
 - accesos a Proformas, Pedidos y Capturas;
 - identidad real del usuario autenticado;
-- mismo contrato de métricas para vendedor y administrador, respetando el queryset backend, con acceso contextual adicional al catálogo para `comercial.administrar`;
-- rutas y contenido protegidos por `comercial.operar`.
+- tres vistas operativas según las capacidades de los roles definitivos:
+  - `ADMIN` (`comercial.operar` + `comercial.administrar` + `taller.operar` + `catalogo.crear_producto`): visión global del sistema con acceso a administración de catálogo;
+  - `ENCARGADO_TIENDA` (`comercial.operar` + `catalogo.crear_producto`): visión comercial de tienda sobre su cartera;
+  - `JEFE_TALLER` (`taller.operar`): visión operativa de taller basada en órdenes de trabajo (totales, con fabricación a medida, sólo catálogo y distribución por estado), sin consultar endpoints comerciales de proformas;
+- rutas y contenido protegidos por `comercial.operar` o `taller.operar`.
 
 ## Definición de la métrica
 
