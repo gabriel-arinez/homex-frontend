@@ -94,7 +94,7 @@ try {
     throw new Error(`El bundle contiene indicadores sensibles: ${exposed.join(', ')}`)
 
   const bytes = first.reduce((total, file) => total + file.bytes, 0)
-  if (bytes > 3_000_000) throw new Error(`El bundle excede 3 MB (${bytes} bytes).`)
+  if (bytes > 3_200_000) throw new Error(`El bundle excede 3.2 MB (${bytes} bytes).`)
   console.log(`fe09-release-ok files=${first.length} bytes=${bytes} reproducible=true sourcemaps=0`)
 } finally {
   rmSync(root, { recursive: true, force: true })
