@@ -4,6 +4,15 @@ export type ClientOptions = {
   baseUrl: `${string}://${string}` | (string & {})
 }
 
+export type AjusteStockCrear = {
+  producto: number
+  tipo_operacion: TipoOperacionEnum
+  cantidad: string
+  motivo: MotivoEnum
+  observaciones?: string
+  clave_idempotencia?: string | null
+}
+
 export type AprobarProformaRespuesta = {
   readonly pedido_id: number
   readonly estado: string
@@ -97,6 +106,11 @@ export type CargaImagen = {
 export type CatalogoAtributosMueble = {
   limites: LimitesConfigurador
   atributos: Array<AtributoMueble>
+}
+
+export type CatalogoMotivosAjuste = {
+  ENTRADA: Array<MotivoAjusteItem>
+  SALIDA: Array<MotivoAjusteItem>
 }
 
 /**
@@ -241,6 +255,13 @@ export type CrearProforma = {
  */
 export type DecisionEnum = 'ACCEPTED' | 'REJECTED' | 'UNRESOLVED'
 
+export type DemandaPendienteDesglose = {
+  producto_id: number
+  demanda_pendiente_total: string
+  cantidad_restringida: string
+  proformas: Array<ProformaDemandaItem>
+}
+
 export type DescuentoProducto = {
   readonly id: number
   readonly vigente: boolean
@@ -346,6 +367,12 @@ export type EspecificacionMueble = {
  * * `ENTREGADO` - ENTREGADO
  */
 export type EstadoCodigoEnum = 'EN_PRODUCCION' | 'LISTO_ENTREGA' | 'ENTREGADO'
+
+export type EstadoProformaDemanda = {
+  id: number
+  codigo: string
+  nombre: string
+}
 
 export type EvidenciaCatalogo = {
   candidate_id: string
@@ -468,11 +495,55 @@ export type ModoCalculoEnum = 'PRECIO_UNITARIO'
  */
 export type MonedaCodigoEnum = 'BOB' | 'USD'
 
+export type MotivoAjusteItem = {
+  codigo: string
+  nombre: string
+  requiere_observaciones: boolean
+}
+
+/**
+ * * `REPOSICION` - REPOSICION
+ * * `REGULARIZACION_POSITIVA` - REGULARIZACION_POSITIVA
+ * * `CORRECCION_EXCEPCIONAL` - CORRECCION_EXCEPCIONAL
+ * * `MERMA` - MERMA
+ * * `DANO` - DANO
+ * * `USO_INTERNO` - USO_INTERNO
+ * * `REGULARIZACION_NEGATIVA` - REGULARIZACION_NEGATIVA
+ */
+export type MotivoEnum =
+  | 'REPOSICION'
+  | 'REGULARIZACION_POSITIVA'
+  | 'CORRECCION_EXCEPCIONAL'
+  | 'MERMA'
+  | 'DANO'
+  | 'USO_INTERNO'
+  | 'REGULARIZACION_NEGATIVA'
+
 export type MotorAsistida = {
   mode: ModeEnum
   rules_version: string
   model_version: string | null
   normalization_version: string
+}
+
+export type MovimientoReporteItem = {
+  readonly id: number
+  readonly fecha: string
+  readonly tipo_movimiento: number
+  tipo_movimiento_info: ValorCatalogoMovimiento
+  readonly cantidad: string
+  readonly producto: number
+  producto_resumen: ProductoResumenMovimiento
+  readonly pedido: number | null
+  readonly pedido_relacionado: number | null
+  readonly movimiento_referencia: number | null
+  readonly motivo: string | null
+  readonly motivo_label: string | null
+  readonly observaciones: string | null
+  readonly created_by: number | null
+  responsable: UsuarioResumenMovimiento | null
+  readonly saldo_anterior: string | null
+  readonly saldo_posterior: string | null
 }
 
 export type MovimientoStock = {
@@ -486,6 +557,8 @@ export type MovimientoStock = {
   readonly pedido: number | null
   readonly pedido_relacionado: number | null
   readonly movimiento_referencia: number | null
+  readonly motivo: string | null
+  readonly motivo_label: string | null
   readonly observaciones: string | null
   readonly created_by: number | null
   responsable: UsuarioResumenMovimiento | null
@@ -649,6 +722,8 @@ export type PatchedProducto = {
   precio_lista?: string
   readonly precio_vigente?: string
   readonly stock?: string
+  stock_minimo?: string | null
+  readonly estado_stock?: string
   readonly demanda_pendiente?: string
   readonly disponibilidad_referencial?: string
   unidad_stock?: number
@@ -685,6 +760,10 @@ export type PatchedProductoSilla = {
   marca?: number | null
   color_primario?: number | null
   color_secundario?: number | null
+}
+
+export type PatchedProductoStockMinimo = {
+  stock_minimo?: string | null
 }
 
 export type PatchedProforma = {
@@ -751,6 +830,8 @@ export type Producto = {
   precio_lista?: string
   readonly precio_vigente: string
   readonly stock: string
+  stock_minimo?: string | null
+  readonly estado_stock: string
   readonly demanda_pendiente: string
   readonly disponibilidad_referencial: string
   unidad_stock: number
@@ -830,6 +911,14 @@ export type Proforma = {
   readonly detalles: Array<DetalleProforma>
 }
 
+export type ProformaDemandaItem = {
+  proforma_id: number
+  numero: number
+  fecha: string
+  estado: EstadoProformaDemanda
+  cantidad: string
+}
+
 export type ProformaIntegral = {
   clave_idempotencia: string
   revision_esperada?: string
@@ -906,6 +995,29 @@ export type Recibo = {
   readonly tipo_pago: number
   readonly created_by: number | null
   readonly updated_by: number | null
+}
+
+export type ReporteMovimientosRespuesta = {
+  count: number
+  next: string | null
+  previous: string | null
+  saldo_reconstruible: boolean
+  limitacion_saldo: string | null
+  resumen: ReporteResumen | null
+  results: Array<MovimientoReporteItem>
+}
+
+export type ReporteResumen = {
+  producto_id: number
+  unidad_codigo: string
+  unidad_nombre: string
+  stock_actual: string
+  total_entradas: string
+  total_salidas: string
+  variacion_neta: string
+  saldo_inicial_periodo: string | null
+  saldo_final_periodo: string | null
+  cantidad_movimientos: number
 }
 
 export type ResolucionPendiente = {
@@ -999,6 +1111,12 @@ export type TipoMuebleRespuesta = {
   codigo: string
   nombre: string
 }
+
+/**
+ * * `ENTRADA` - ENTRADA
+ * * `SALIDA` - SALIDA
+ */
+export type TipoOperacionEnum = 'ENTRADA' | 'SALIDA'
 
 export type TokenObtainPair = {
   username: string
@@ -1267,6 +1385,7 @@ export type PatchedProductoWritable = {
   sku?: string
   nombre?: string
   precio_lista?: string
+  stock_minimo?: string | null
   unidad_stock?: number
   activo?: boolean
   observaciones?: string | null
@@ -1317,6 +1436,7 @@ export type ProductoWritable = {
   sku: string
   nombre: string
   precio_lista?: string
+  stock_minimo?: string | null
   unidad_stock: number
   activo?: boolean
   observaciones?: string | null
@@ -1388,6 +1508,16 @@ export type ProformaListadoWritable = {
   validez_oferta?: number | null
   porcentaje_adelanto?: string | null
   moneda: number
+}
+
+export type ReporteMovimientosRespuestaWritable = {
+  count: number
+  next: string | null
+  previous: string | null
+  saldo_reconstruible: boolean
+  limitacion_saldo: string | null
+  resumen: ReporteResumen | null
+  results: Array<unknown>
 }
 
 export type V1AuthMeRetrieveData = {
@@ -2011,6 +2141,13 @@ export type V1CatalogoProductosListData = {
     color_primario?: number
     diseno?: number
     espesor_mm?: string
+    /**
+     * * `SIN_EXISTENCIAS` - SIN_EXISTENCIAS
+     * * `STOCK_BAJO` - STOCK_BAJO
+     * * `NORMAL` - NORMAL
+     * * `SIN_MINIMO` - SIN_MINIMO
+     */
+    estado_stock?: 'SIN_EXISTENCIAS' | 'STOCK_BAJO' | 'NORMAL' | 'SIN_MINIMO'
     familia?: number
     marca?: number
     material?: number
@@ -2142,6 +2279,25 @@ export type V1CatalogoProductosUpdateResponses = {
 export type V1CatalogoProductosUpdateResponse =
   V1CatalogoProductosUpdateResponses[keyof V1CatalogoProductosUpdateResponses]
 
+export type V1CatalogoProductosDemandaPendienteRetrieveData = {
+  body?: never
+  path: {
+    /**
+     * Un valor de entero único que identifique este producto.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/catalogo/productos/{id}/demanda-pendiente/'
+}
+
+export type V1CatalogoProductosDemandaPendienteRetrieveResponses = {
+  200: DemandaPendienteDesglose
+}
+
+export type V1CatalogoProductosDemandaPendienteRetrieveResponse =
+  V1CatalogoProductosDemandaPendienteRetrieveResponses[keyof V1CatalogoProductosDemandaPendienteRetrieveResponses]
+
 export type V1CatalogoProductosImagenPrincipalDestroyData = {
   body?: never
   path: {
@@ -2239,6 +2395,25 @@ export type V1CatalogoProductosImagenesCreateResponses = {
 
 export type V1CatalogoProductosImagenesCreateResponse =
   V1CatalogoProductosImagenesCreateResponses[keyof V1CatalogoProductosImagenesCreateResponses]
+
+export type V1CatalogoProductosStockMinimoPartialUpdateData = {
+  body?: PatchedProductoStockMinimo
+  path: {
+    /**
+     * Un valor de entero único que identifique este producto.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/catalogo/productos/{id}/stock-minimo/'
+}
+
+export type V1CatalogoProductosStockMinimoPartialUpdateResponses = {
+  200: Producto
+}
+
+export type V1CatalogoProductosStockMinimoPartialUpdateResponse =
+  V1CatalogoProductosStockMinimoPartialUpdateResponses[keyof V1CatalogoProductosStockMinimoPartialUpdateResponses]
 
 export type V1CatalogoSillasListData = {
   body?: never
@@ -2605,8 +2780,30 @@ export type V1MovimientosStockListData = {
   body?: never
   path?: never
   query?: {
+    /**
+     * * `ENTRADA` - ENTRADA
+     * * `SALIDA` - SALIDA
+     */
+    direccion?: 'ENTRADA' | 'SALIDA'
     fecha_desde?: string
     fecha_hasta?: string
+    /**
+     * * `REPOSICION` - REPOSICION
+     * * `REGULARIZACION_POSITIVA` - REGULARIZACION_POSITIVA
+     * * `CORRECCION_EXCEPCIONAL` - CORRECCION_EXCEPCIONAL
+     * * `MERMA` - MERMA
+     * * `DANO` - DANO
+     * * `USO_INTERNO` - USO_INTERNO
+     * * `REGULARIZACION_NEGATIVA` - REGULARIZACION_NEGATIVA
+     */
+    motivo?:
+      | 'REPOSICION'
+      | 'REGULARIZACION_POSITIVA'
+      | 'CORRECCION_EXCEPCIONAL'
+      | 'MERMA'
+      | 'DANO'
+      | 'USO_INTERNO'
+      | 'REGULARIZACION_NEGATIVA'
     /**
      * Un número de página dentro del conjunto de resultados paginado.
      */
@@ -2648,6 +2845,124 @@ export type V1MovimientosStockRetrieveResponses = {
 
 export type V1MovimientosStockRetrieveResponse =
   V1MovimientosStockRetrieveResponses[keyof V1MovimientosStockRetrieveResponses]
+
+export type V1MovimientosStockAjustesCreateData = {
+  body: AjusteStockCrear
+  headers?: {
+    'Idempotency-Key'?: string
+  }
+  path?: never
+  query?: never
+  url: '/api/v1/movimientos-stock/ajustes/'
+}
+
+export type V1MovimientosStockAjustesCreateResponses = {
+  200: MovimientoStock
+  201: MovimientoStock
+}
+
+export type V1MovimientosStockAjustesCreateResponse =
+  V1MovimientosStockAjustesCreateResponses[keyof V1MovimientosStockAjustesCreateResponses]
+
+export type V1MovimientosStockExportarCsvRetrieveData = {
+  body?: never
+  path?: never
+  query?: {
+    /**
+     * * `ENTRADA` - ENTRADA
+     * * `SALIDA` - SALIDA
+     */
+    direccion?: 'ENTRADA' | 'SALIDA'
+    fecha_desde?: string
+    fecha_hasta?: string
+    /**
+     * * `REPOSICION` - REPOSICION
+     * * `REGULARIZACION_POSITIVA` - REGULARIZACION_POSITIVA
+     * * `CORRECCION_EXCEPCIONAL` - CORRECCION_EXCEPCIONAL
+     * * `MERMA` - MERMA
+     * * `DANO` - DANO
+     * * `USO_INTERNO` - USO_INTERNO
+     * * `REGULARIZACION_NEGATIVA` - REGULARIZACION_NEGATIVA
+     */
+    motivo?:
+      | 'REPOSICION'
+      | 'REGULARIZACION_POSITIVA'
+      | 'CORRECCION_EXCEPCIONAL'
+      | 'MERMA'
+      | 'DANO'
+      | 'USO_INTERNO'
+      | 'REGULARIZACION_NEGATIVA'
+    pedido?: number
+    producto?: number
+    search?: string
+    tipo_movimiento?: string
+  }
+  url: '/api/v1/movimientos-stock/exportar-csv/'
+}
+
+export type V1MovimientosStockExportarCsvRetrieveResponses = {
+  200: Blob | File
+}
+
+export type V1MovimientosStockExportarCsvRetrieveResponse =
+  V1MovimientosStockExportarCsvRetrieveResponses[keyof V1MovimientosStockExportarCsvRetrieveResponses]
+
+export type V1MovimientosStockMotivosAjusteRetrieveData = {
+  body?: never
+  path?: never
+  query?: never
+  url: '/api/v1/movimientos-stock/motivos-ajuste/'
+}
+
+export type V1MovimientosStockMotivosAjusteRetrieveResponses = {
+  200: CatalogoMotivosAjuste
+}
+
+export type V1MovimientosStockMotivosAjusteRetrieveResponse =
+  V1MovimientosStockMotivosAjusteRetrieveResponses[keyof V1MovimientosStockMotivosAjusteRetrieveResponses]
+
+export type V1MovimientosStockReporteRetrieveData = {
+  body?: never
+  path?: never
+  query?: {
+    /**
+     * * `ENTRADA` - ENTRADA
+     * * `SALIDA` - SALIDA
+     */
+    direccion?: 'ENTRADA' | 'SALIDA'
+    fecha_desde?: string
+    fecha_hasta?: string
+    /**
+     * * `REPOSICION` - REPOSICION
+     * * `REGULARIZACION_POSITIVA` - REGULARIZACION_POSITIVA
+     * * `CORRECCION_EXCEPCIONAL` - CORRECCION_EXCEPCIONAL
+     * * `MERMA` - MERMA
+     * * `DANO` - DANO
+     * * `USO_INTERNO` - USO_INTERNO
+     * * `REGULARIZACION_NEGATIVA` - REGULARIZACION_NEGATIVA
+     */
+    motivo?:
+      | 'REPOSICION'
+      | 'REGULARIZACION_POSITIVA'
+      | 'CORRECCION_EXCEPCIONAL'
+      | 'MERMA'
+      | 'DANO'
+      | 'USO_INTERNO'
+      | 'REGULARIZACION_NEGATIVA'
+    pedido?: number
+    producto?: number
+    search?: string
+    tipo_movimiento?: string
+  }
+  url: '/api/v1/movimientos-stock/reporte/'
+}
+
+export type V1MovimientosStockReporteRetrieveResponses = {
+  200: ReporteMovimientosRespuesta
+}
+
+export type V1MovimientosStockReporteRetrieveResponse =
+  V1MovimientosStockReporteRetrieveResponses[keyof V1MovimientosStockReporteRetrieveResponses]
 
 export type V1NotasEntregaListData = {
   body?: never
