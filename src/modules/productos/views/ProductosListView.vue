@@ -21,10 +21,11 @@ import { useSessionStore } from '@/app/stores/useSessionStore'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import { productosService } from '../services/productosService'
 import {
-  cantidadProducto,
   catalogoId,
   categoriaProducto,
   dineroProducto,
+  disponibilidadMeta,
+  estadoStockMeta,
   pageNumberProducto,
   unidadesProducto,
 } from '../utils/presentacionCatalogo'
@@ -703,15 +704,30 @@ onBeforeUnmount(() => {
             <div class="price-row">
               <strong>{{ dineroProducto(product.precio_vigente) }}</strong>
               <Badge v-if="product.promocion?.vigente" tone="info">Promoción</Badge>
+              <Badge
+                v-if="estadoStockMeta(product.estado_stock).showBadge"
+                :tone="estadoStockMeta(product.estado_stock).tone"
+              >
+                {{ estadoStockMeta(product.estado_stock).label }}
+              </Badge>
             </div>
             <div class="stock-summary">
               <div>
-                <span>Existencias</span
+                <span>Stock actual</span
                 ><strong>{{ unidadesProducto(product, product.stock) }}</strong>
               </div>
               <div>
-                <span>Cantidad pendiente</span
+                <span>Demanda pendiente</span
                 ><span>{{ unidadesProducto(product, product.demanda_pendiente) }}</span>
+              </div>
+              <div>
+                <span>Disponibilidad referencial</span>
+                <Badge
+                  :tone="disponibilidadMeta(product.disponibilidad_referencial).tone"
+                  :title="disponibilidadMeta(product.disponibilidad_referencial).hint"
+                >
+                  {{ unidadesProducto(product, product.disponibilidad_referencial) }}
+                </Badge>
               </div>
             </div>
             <RouterLink
@@ -772,23 +788,31 @@ onBeforeUnmount(() => {
                 <strong>{{ dineroProducto(product.precio_vigente) }}</strong>
                 <small v-if="product.promocion?.vigente">Promoción</small>
               </td>
-              <td class="numeric stock-cell" data-label="Existencias">
+              <td class="numeric stock-cell" data-label="Stock y disponibilidad">
                 <strong>{{ unidadesProducto(product, product.stock) }}</strong>
                 <small
                   :title="
-                    'Cantidad pendiente: ' + unidadesProducto(product, product.demanda_pendiente)
+                    'Demanda pendiente (proformas en revisión o enviadas): ' +
+                    unidadesProducto(product, product.demanda_pendiente)
                   "
                 >
-                  Pendiente: {{ cantidadProducto(product.demanda_pendiente) }}
+                  Demanda pendiente: {{ unidadesProducto(product, product.demanda_pendiente) }}
                 </small>
                 <small
-                  :title="
-                    'Saldo referencial: ' +
-                    unidadesProducto(product, product.disponibilidad_referencial)
+                  :class="
+                    'disp-tone--' + disponibilidadMeta(product.disponibilidad_referencial).tone
                   "
+                  :title="disponibilidadMeta(product.disponibilidad_referencial).hint"
                 >
-                  Saldo ref.: {{ cantidadProducto(product.disponibilidad_referencial) }}
+                  Disponibilidad ref.:
+                  {{ unidadesProducto(product, product.disponibilidad_referencial) }}
                 </small>
+                <Badge
+                  v-if="estadoStockMeta(product.estado_stock).showBadge"
+                  :tone="estadoStockMeta(product.estado_stock).tone"
+                >
+                  {{ estadoStockMeta(product.estado_stock).label }}
+                </Badge>
               </td>
               <td data-label="Estado">
                 <Badge :tone="product.activo === false ? 'neutral' : 'success'">{{
@@ -1344,6 +1368,16 @@ onBeforeUnmount(() => {
 }
 .stock-cell small {
   font-variant-numeric: tabular-nums;
+}
+.disp-tone--success {
+  color: var(--color-success-text, var(--color-text-secondary));
+}
+.disp-tone--warning {
+  color: var(--color-warning-text, #b45309);
+}
+.disp-tone--danger {
+  color: var(--color-danger-text, #b91c1c);
+  font-weight: 600;
 }
 .view-detail {
   display: inline-grid;

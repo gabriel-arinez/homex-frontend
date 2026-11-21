@@ -18,7 +18,12 @@ import {
   StickyNote,
   Tag,
 } from '@lucide/vue'
-import type { Producto, ProductoWritable, ValorCatalogoPublico } from '@/generated/api'
+import type {
+  DemandaPendienteDesglose,
+  Producto,
+  ProductoWritable,
+  ValorCatalogoPublico,
+} from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import { ApiError } from '@/shared/api'
@@ -26,13 +31,22 @@ import ImageGallery from '@/shared/media/ImageGallery.vue'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
 import ConfirmDialog from '@/shared/ui/ConfirmDialog.vue'
+import EmptyState from '@/shared/ui/EmptyState.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
+import Modal from '@/shared/ui/Modal.vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
+import TextField from '@/shared/ui/TextField.vue'
 import Toast from '@/shared/ui/Toast.vue'
 import ProductoForm from '../components/ProductoForm.vue'
 import { productosService } from '../services/productosService'
-import { categoriaProducto, dineroProducto, unidadesProducto } from '../utils/presentacionCatalogo'
+import {
+  categoriaProducto,
+  dineroProducto,
+  disponibilidadMeta,
+  estadoStockMeta,
+  unidadesProducto,
+} from '../utils/presentacionCatalogo'
 
 const emit = defineEmits<{ openMenu: [] }>()
 const route = useRoute()
@@ -236,6 +250,65 @@ onMounted(() => {
   window.addEventListener('beforeunload', beforeUnload)
   void load()
 })
+const canAdmin = computed(() => session.can('comercial.administrar'))
+
+const demandaOpen = ref(false)
+const demandaLoading = ref(false)
+const demandaError = ref('')
+const demandaData = ref<DemandaPendienteDesglose | null>(null)
+
+async function openDemandaModal() {
+  if (!product.value) return
+  demandaOpen.value = true
+  demandaLoading.value = true
+  demandaError.value = ''
+  try {
+    demandaData.value = await productosService.getDemandaPendiente(product.value.id)
+  } catch (err) {
+    demandaError.value =
+      err instanceof ApiError ? err.message : 'No pudimos cargar el origen de la demanda pendiente.'
+  } finally {
+    demandaLoading.value = false
+  }
+}
+
+const stockMinimoOpen = ref(false)
+const stockMinimoInput = ref('')
+const stockMinimoSaving = ref(false)
+const stockMinimoError = ref('')
+
+function openStockMinimoModal() {
+  if (!product.value) return
+  stockMinimoInput.value = product.value.stock_minimo ?? ''
+  stockMinimoError.value = ''
+  stockMinimoOpen.value = true
+}
+
+async function saveStockMinimo(value: string | null) {
+  if (!product.value) return
+  stockMinimoSaving.value = true
+  stockMinimoError.value = ''
+  try {
+    product.value = await productosService.updateStockMinimo(product.value.id, value)
+    stockMinimoOpen.value = false
+    toastMessage.value = value === null ? 'Stock mínimo eliminado.' : 'Stock mínimo actualizado.'
+  } catch (err) {
+    stockMinimoError.value =
+      err instanceof ApiError ? err.message : 'No pudimos guardar el stock mínimo.'
+  } finally {
+    stockMinimoSaving.value = false
+  }
+}
+
+function submitStockMinimo() {
+  const trimmed = stockMinimoInput.value.trim()
+  if (!trimmed) {
+    void saveStockMinimo(null)
+    return
+  }
+  void saveStockMinimo(trimmed)
+}
+
 onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 </script>
 
@@ -364,7 +437,27 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <div class="stat__body">
               <span>Stock actual</span>
               <strong class="stat__value">{{ unidadesProducto(product, product.stock) }}</strong>
-              <small>Existencias en almacén</small>
+              <small>Contabilizado en inventario</small>
+              <div class="stat__badges">
+                <Badge
+                  v-if="estadoStockMeta(product.estado_stock).showBadge"
+                  :tone="estadoStockMeta(product.estado_stock).tone"
+                >
+                  {{ estadoStockMeta(product.estado_stock).label }}
+                </Badge>
+                <small v-if="product.stock_minimo != null">
+                  Mínimo: {{ unidadesProducto(product, product.stock_minimo) }}
+                </small>
+                <small v-else>Sin mínimo configurado</small>
+                <button
+                  v-if="canAdmin"
+                  type="button"
+                  class="inline-action-link"
+                  @click="openStockMinimoModal"
+                >
+                  {{ product.stock_minimo != null ? 'Editar mínimo' : 'Configurar mínimo' }}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -373,11 +466,16 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <Clock3 :size="18" aria-hidden="true" />
             </span>
             <div class="stat__body">
-              <span>En proformas pendientes</span>
+              <span>Demanda pendiente</span>
               <strong class="stat__value">
                 {{ unidadesProducto(product, product.demanda_pendiente) }}
               </strong>
-              <small>Demanda sin confirmar</small>
+              <small>Proformas en revisión o enviadas (no reserva stock)</small>
+              <div class="stat__badges">
+                <button type="button" class="inline-action-link" @click="openDemandaModal">
+                  Ver origen de demanda
+                </button>
+              </div>
             </div>
           </div>
 
@@ -390,7 +488,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <strong class="stat__value">
                 {{ unidadesProducto(product, product.disponibilidad_referencial) }}
               </strong>
-              <div>
+              <small>{{ disponibilidadMeta(product.disponibilidad_referencial).hint }}</small>
+              <div class="stat__badges">
+                <Badge :tone="disponibilidadMeta(product.disponibilidad_referencial).tone">
+                  {{ disponibilidadMeta(product.disponibilidad_referencial).label }}
+                </Badge>
                 <Badge :tone="product.activo === false ? 'neutral' : 'success'">
                   {{ product.activo === false ? 'Inactivo' : 'Activo' }}
                 </Badge>
@@ -652,6 +754,102 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       @close="confirmCancel = false"
       @confirm="discardEdit"
     />
+
+    <Modal
+      :open="demandaOpen"
+      title="Origen de la demanda pendiente"
+      description="Proformas en estado En revisión o Enviada que incluyen este producto. Consultar la demanda es informativo y no reserva stock."
+      @close="demandaOpen = false"
+    >
+      <div v-if="demandaLoading" class="modal-state">
+        <LoadingSkeleton :lines="4" />
+      </div>
+      <ErrorState
+        v-else-if="demandaError"
+        :message="demandaError"
+        retry-label="Reintentar"
+        @retry="openDemandaModal"
+      />
+      <template v-else-if="demandaData && product">
+        <div class="demanda-summary">
+          <span>Total demanda pendiente:</span>
+          <strong>{{ unidadesProducto(product, demandaData.demanda_pendiente_total) }}</strong>
+        </div>
+        <p v-if="Number(demandaData.cantidad_restringida) > 0" class="demanda-restricted-note">
+          {{ unidadesProducto(product, demandaData.cantidad_restringida) }} corresponden a proformas
+          de otros vendedores que no están disponibles para tu perfil.
+        </p>
+        <EmptyState
+          v-if="demandaData.proformas.length === 0"
+          title="Sin proformas pendientes visibles"
+          description="No existen proformas pendientes visibles para este producto."
+        />
+        <ul v-else class="demanda-list">
+          <li v-for="item in demandaData.proformas" :key="item.proforma_id" class="demanda-item">
+            <div>
+              <strong>Proforma #{{ item.numero }}</strong>
+              <div class="demanda-item__meta">
+                <Badge tone="warning">{{ item.estado.nombre }}</Badge>
+                <span>{{ item.fecha }}</span>
+              </div>
+            </div>
+            <div class="demanda-item__actions">
+              <strong>{{ unidadesProducto(product, item.cantidad) }}</strong>
+              <RouterLink
+                class="inline-action-link"
+                :to="'/proformas/' + item.proforma_id"
+                @click="demandaOpen = false"
+              >
+                Abrir proforma
+              </RouterLink>
+            </div>
+          </li>
+        </ul>
+      </template>
+      <template #footer>
+        <Button variant="secondary" @click="demandaOpen = false">Cerrar</Button>
+      </template>
+    </Modal>
+
+    <Modal
+      :open="stockMinimoOpen"
+      title="Configurar stock mínimo"
+      :description="
+        product
+          ? `Define el umbral de aviso de stock bajo para ${product.nombre} (${product.unidad_stock_info?.nombre || ''}). Deja vacío para quitar el mínimo.`
+          : ''
+      "
+      @close="stockMinimoOpen = false"
+    >
+      <form id="stock-minimo-form" class="stock-minimo-form" @submit.prevent="submitStockMinimo">
+        <TextField
+          v-model="stockMinimoInput"
+          name="stock-minimo"
+          label="Stock mínimo"
+          type="number"
+          :step="product?.unidad_stock_info?.codigo === 'M2' ? '0.01' : '1'"
+          min="0"
+          placeholder="Sin mínimo configurado"
+          :error="stockMinimoError"
+        />
+      </form>
+      <template #footer>
+        <Button
+          v-if="product?.stock_minimo != null"
+          variant="warning"
+          :disabled="stockMinimoSaving"
+          @click="saveStockMinimo(null)"
+        >
+          Quitar mínimo
+        </Button>
+        <Button variant="secondary" :disabled="stockMinimoSaving" @click="stockMinimoOpen = false">
+          Cancelar
+        </Button>
+        <Button type="submit" form="stock-minimo-form" :disabled="stockMinimoSaving">
+          {{ stockMinimoSaving ? 'Guardando...' : 'Guardar mínimo' }}
+        </Button>
+      </template>
+    </Modal>
     <ConfirmDialog
       :open="confirmLeave"
       title="Salir sin guardar"
@@ -919,5 +1117,69 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   .product-fields-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+.stat__badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.25rem;
+}
+.inline-action-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--color-primary-accent);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.demanda-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-subtle, var(--color-surface-hover));
+  margin-bottom: 0.75rem;
+}
+.demanda-restricted-note {
+  margin: 0 0 0.75rem;
+  font-size: 0.84rem;
+  color: var(--color-text-secondary);
+}
+.demanda-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+.demanda-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+.demanda-item__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+.demanda-item__actions {
+  display: grid;
+  justify-items: end;
+  gap: 0.25rem;
+}
+.stock-minimo-form {
+  display: grid;
+  gap: 0.75rem;
 }
 </style>

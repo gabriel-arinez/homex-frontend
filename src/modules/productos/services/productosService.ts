@@ -1,4 +1,5 @@
 import type {
+  DemandaPendienteDesglose,
   PaginatedProductoList,
   PatchedProductoWritable,
   Producto,
@@ -16,6 +17,7 @@ type ProductoListQuery = NonNullable<V1CatalogoProductosListData['query']> & {
   acabado?: string | number
   espesor_mm?: string
   unidad_stock?: string | number
+  estado_stock?: 'SIN_EXISTENCIAS' | 'STOCK_BAJO' | 'NORMAL' | 'SIN_MINIMO'
 }
 function queryString(query: ProductoListQuery) {
   const params = new URLSearchParams()
@@ -28,6 +30,13 @@ export const productosService = {
   list: (query: ProductoListQuery = {}) =>
     apiRequest<PaginatedProductoList>(`/api/v1/catalogo/productos/${queryString(query)}`),
   get: (id: number) => apiRequest<Producto>(`/api/v1/catalogo/productos/${id}/`),
+  getDemandaPendiente: (id: number) =>
+    apiRequest<DemandaPendienteDesglose>(`/api/v1/catalogo/productos/${id}/demanda-pendiente/`),
+  updateStockMinimo: (id: number, stockMinimo: string | null) =>
+    apiRequest<Producto>(`/api/v1/catalogo/productos/${id}/stock-minimo/`, {
+      method: 'PATCH',
+      body: { stock_minimo: stockMinimo },
+    }),
   create: (body: ProductoWritable) =>
     apiRequest<Producto>('/api/v1/catalogo/productos/', { method: 'POST', body }),
   update: (id: number, body: PatchedProductoWritable, revision: string) =>
