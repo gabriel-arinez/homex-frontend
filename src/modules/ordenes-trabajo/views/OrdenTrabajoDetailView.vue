@@ -26,9 +26,11 @@ import type {
   ComponenteTecnico,
   DatosTecnicos,
 } from '@/modules/proformas/services/muebleTecnico'
+import DocumentViewerModal from '@/modules/proformas/components/DocumentViewerModal.vue'
 import { useQuoteProductImages } from '@/modules/proformas/composables/useQuoteProductImages'
 import ProductImage from '@/modules/productos/components/ProductImage.vue'
 import { downloadBlob } from '@/shared/download/downloadBlob'
+import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
 import ImageGallery from '@/shared/media/ImageGallery.vue'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
@@ -50,10 +52,19 @@ const id = Number(route.params.id)
 const item = ref<OrdenTrabajo | null>(null)
 const loading = ref(true)
 const downloading = ref(false)
+const previewModalOpen = ref(false)
 const error = ref('')
 const notice = ref('')
 
 const { images: productImages, ensure: ensureProductImages } = useQuoteProductImages()
+const {
+  blob: documentBlob,
+  url: documentUrl,
+  loading: documentLoading,
+  error: documentError,
+  load: loadDocument,
+  clear: clearDocument,
+} = usePdfDocument((orderId) => ordenesTrabajoService.documentPdf(orderId))
 
 function formatDateLabel(value: string | null | undefined): string | null {
   if (!value) return null
@@ -198,20 +209,35 @@ async function load() {
   }
 }
 
+function openPdfViewer() {
+  if (!item.value) return
+  previewModalOpen.value = true
+  void loadDocument(item.value.id)
+}
+
+function closePdfViewer() {
+  previewModalOpen.value = false
+  clearDocument()
+}
+
 async function downloadDocument() {
   if (!item.value || downloading.value) return
   downloading.value = true
   error.value = ''
+  const opened = previewModalOpen.value
   try {
-    downloadBlob(
-      await ordenesTrabajoService.document(id),
-      `orden-trabajo-${item.value.numero}.html`,
-    )
-    notice.value = 'Documento de orden de trabajo descargado.'
+    const file = (opened && documentBlob.value) || (await loadDocument(id))
+    if (!file) {
+      if (!opened) error.value = documentError.value || 'No se pudo obtener el PDF.'
+      return
+    }
+    downloadBlob(file, `orden-trabajo-${item.value.numero}.pdf`)
+    notice.value = 'Documento PDF de orden de trabajo descargado.'
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : 'No se pudo descargar la orden.'
   } finally {
     downloading.value = false
+    if (!opened) clearDocument()
   }
 }
 
@@ -275,9 +301,13 @@ const lineCounts = computed(() => {
         <Button variant="secondary" @click="router.push('/ordenes-trabajo')">
           <ArrowLeft :size="17" aria-hidden="true" /> Volver
         </Button>
+        <Button v-if="item" variant="secondary" @click="openPdfViewer">
+          <FileText :size="17" aria-hidden="true" />
+          Ver PDF
+        </Button>
         <Button v-if="item" variant="secondary" :processing="downloading" @click="downloadDocument">
           <Download :size="17" aria-hidden="true" />
-          Descargar
+          Descargar PDF
         </Button>
       </template>
     </PageHeader>
@@ -592,6 +622,21 @@ const lineCounts = computed(() => {
         </article>
       </section>
     </template>
+
+    <DocumentViewerModal
+      v-if="item"
+      :open="previewModalOpen"
+      :title="`Orden de trabajo #${item.numero}`"
+      :subtitle="`Documento PDF · Tamaño Carta (216 × 279 mm) · ${item.estado_info.nombre}`"
+      :downloading="downloading"
+      :can-download-pdf="true"
+      :pdf-url="documentUrl"
+      :loading="documentLoading"
+      :error="documentError"
+      @close="closePdfViewer"
+      @retry="loadDocument(item.id)"
+      @download="downloadDocument"
+    />
   </div>
 </template>
 

@@ -16,8 +16,10 @@ import {
 } from '@lucide/vue'
 import type { OrdenTrabajo, ProformaListado } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
+import DocumentViewerModal from '@/modules/proformas/components/DocumentViewerModal.vue'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import { downloadBlob } from '@/shared/download/downloadBlob'
+import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
 import { ordenesTrabajoService } from '../services/ordenesTrabajoService'
 import WorkOrderActionsMenu from '../components/WorkOrderActionsMenu.vue'
 import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
@@ -291,18 +293,55 @@ async function loadQuoteContext() {
   }
 }
 
-async function handleDownload(id: number) {
+const previewModalOpen = ref(false)
+const previewTarget = ref<OrdenTrabajo | null>(null)
+const downloadingPdf = ref(false)
+
+const {
+  blob: documentBlob,
+  url: documentUrl,
+  loading: documentLoading,
+  error: documentError,
+  load: loadDocument,
+  clear: clearDocument,
+} = usePdfDocument((orderId) => ordenesTrabajoService.documentPdf(orderId))
+
+function openPdfViewer(id: number) {
   const target = rows.value.find((row) => row.id === id)
   if (!target) return
+  previewTarget.value = target
+  previewModalOpen.value = true
+  void loadDocument(target.id)
+}
+
+function closePdfViewer() {
+  previewModalOpen.value = false
+  previewTarget.value = null
+  clearDocument()
+}
+
+async function handleDownload(id: number) {
+  const target = rows.value.find((row) => row.id === id) ?? previewTarget.value
+  if (!target || downloadingPdf.value) return
+  downloadingPdf.value = true
+  const opened = previewModalOpen.value && previewTarget.value?.id === target.id
   try {
-    const blob = await ordenesTrabajoService.document(id)
-    downloadBlob(blob, `orden-trabajo-${target.numero}.html`)
+    const file = (opened && documentBlob.value) || (await loadDocument(target.id))
+    if (!file) {
+      toastTone.value = 'danger'
+      toastMessage.value = documentError.value || 'No se pudo obtener el PDF.'
+      return
+    }
+    downloadBlob(file, `orden-trabajo-${target.numero}.pdf`)
     toastTone.value = 'success'
     toastMessage.value = `Orden de trabajo #${target.numero} descargada.`
   } catch (cause) {
     toastTone.value = 'danger'
     toastMessage.value =
       cause instanceof Error ? cause.message : 'No se pudo descargar la orden de trabajo.'
+  } finally {
+    downloadingPdf.value = false
+    if (!opened) clearDocument()
   }
 }
 
@@ -523,6 +562,7 @@ onMounted(load)
                   :numero="row.numero"
                   :pedido-id="row.pedido"
                   :can-view-order="canOperateCommercial"
+                  @open-pdf="openPdfViewer"
                   @download="handleDownload"
                 />
               </td>
@@ -544,6 +584,21 @@ onMounted(load)
         </div>
       </nav>
     </template>
+
+    <DocumentViewerModal
+      v-if="previewTarget"
+      :open="previewModalOpen"
+      :title="`Orden de trabajo #${previewTarget.numero}`"
+      :subtitle="`Documento PDF · Tamaño Carta (216 × 279 mm) · ${previewTarget.estado_info.nombre}`"
+      :downloading="downloadingPdf"
+      :can-download-pdf="true"
+      :pdf-url="documentUrl"
+      :loading="documentLoading"
+      :error="documentError"
+      @close="closePdfViewer"
+      @retry="loadDocument(previewTarget.id)"
+      @download="handleDownload(previewTarget.id)"
+    />
   </div>
 </template>
 

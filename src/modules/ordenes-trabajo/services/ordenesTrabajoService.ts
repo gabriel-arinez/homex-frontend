@@ -6,4 +6,9 @@ export const ordenesTrabajoService = {
   get: (id: number) => apiRequest<OrdenTrabajo>(`/api/v1/ordenes-trabajo/${id}/`),
   document: (id: number) =>
     apiRequest<Blob>(`/api/v1/ordenes-trabajo/${id}/documento/`, { responseType: 'blob' }),
+  documentPdf: (id: number) =>
+    apiRequest<Blob>(`/api/v1/ordenes-trabajo/${id}/documento-pdf/`, {
+      responseType: 'blob',
+      cache: 'no-store',
+    }),
 }

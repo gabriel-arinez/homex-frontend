@@ -5,4 +5,9 @@ export const notasEntregaService = {
   get: (id: number) => apiRequest<NotaEntrega>(`/api/v1/notas-entrega/${id}/`),
   document: (id: number) =>
     apiRequest<Blob>(`/api/v1/notas-entrega/${id}/documento/`, { responseType: 'blob' }),
+  documentPdf: (id: number) =>
+    apiRequest<Blob>(`/api/v1/notas-entrega/${id}/documento-pdf/`, {
+      responseType: 'blob',
+      cache: 'no-store',
+    }),
 }
