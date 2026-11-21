@@ -463,7 +463,12 @@ onBeforeUnmount(() => {
                     :tone="movementTone(row.tipo_movimiento_info.codigo)"
                     :title="row.tipo_movimiento_info.nombre"
                   >
-                    {{ movementLabel(row.tipo_movimiento_info.codigo, row.tipo_movimiento_info.nombre) }}
+                    {{
+                      movementLabel(
+                        row.tipo_movimiento_info.codigo,
+                        row.tipo_movimiento_info.nombre,
+                      )
+                    }}
                   </Badge>
                   <div class="variation-amount">
                     <strong
