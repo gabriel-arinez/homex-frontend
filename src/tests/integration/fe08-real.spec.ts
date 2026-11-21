@@ -97,12 +97,7 @@ test.describe.serial('FE08 backend real', () => {
 
     await page.goto('/movimientos-stock')
     await expect(page.getByText('Silla integración FE08', { exact: true }).first()).toBeVisible()
-    await expect(
-      page
-        .getByRole('table')
-        .getByText(/Salida por venta asociada/)
-        .first(),
-    ).toBeVisible()
+    await expect(page.getByRole('table').getByText('Venta confirmada').first()).toBeVisible()
 
     await page.goto('/ordenes-trabajo')
     await expect(page.getByRole('table').getByText('Pendiente')).toBeVisible()
