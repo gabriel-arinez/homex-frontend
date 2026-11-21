@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { ClipboardList, Download, Eye, MoreHorizontal } from '@lucide/vue'
+import { ClipboardList, Download, Eye, FileText, MoreHorizontal } from '@lucide/vue'
 
 const props = defineProps<{
   id: number
@@ -10,6 +10,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
+  'open-pdf': [id: number]
   download: [id: number]
 }>()
 
@@ -45,6 +46,11 @@ async function toggle() {
   open.value = true
   await nextTick()
   menu.value?.querySelector<HTMLElement>('[role="menuitem"]')?.focus({ preventScroll: true })
+}
+
+function handleOpenPdf() {
+  close(false)
+  emit('open-pdf', props.id)
 }
 
 function handleDownload() {
@@ -137,11 +143,21 @@ onBeforeUnmount(() => {
         <button
           type="button"
           role="menuitem"
+          class="dn-actions__item dn-actions__item--info"
+          @click="handleOpenPdf"
+        >
+          <FileText :size="17" aria-hidden="true" />
+          Ver PDF
+        </button>
+
+        <button
+          type="button"
+          role="menuitem"
           class="dn-actions__item dn-actions__item--success"
           @click="handleDownload"
         >
           <Download :size="17" aria-hidden="true" />
-          Descargar nota
+          Descargar PDF
         </button>
 
         <RouterLink

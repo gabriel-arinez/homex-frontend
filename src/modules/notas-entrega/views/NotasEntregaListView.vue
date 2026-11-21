@@ -11,8 +11,10 @@ import {
 } from '@lucide/vue'
 import type { NotaEntrega, Pedido, ProformaListado } from '@/generated/api'
 import { pedidosService } from '@/modules/pedidos/services/pedidosService'
+import DocumentViewerModal from '@/modules/proformas/components/DocumentViewerModal.vue'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import { downloadBlob } from '@/shared/download/downloadBlob'
+import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
 import { notasEntregaService } from '../services/notasEntregaService'
 import DeliveryNoteActionsMenu from '../components/DeliveryNoteActionsMenu.vue'
 import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
@@ -177,18 +179,55 @@ async function loadOrderContext() {
   }
 }
 
-async function handleDownload(id: number) {
+const previewModalOpen = ref(false)
+const previewTarget = ref<NotaEntrega | null>(null)
+const downloadingPdf = ref(false)
+
+const {
+  blob: documentBlob,
+  url: documentUrl,
+  loading: documentLoading,
+  error: documentError,
+  load: loadDocument,
+  clear: clearDocument,
+} = usePdfDocument((noteId) => notasEntregaService.documentPdf(noteId))
+
+function openPdfViewer(id: number) {
   const target = rows.value.find((row) => row.id === id)
   if (!target) return
+  previewTarget.value = target
+  previewModalOpen.value = true
+  void loadDocument(target.id)
+}
+
+function closePdfViewer() {
+  previewModalOpen.value = false
+  previewTarget.value = null
+  clearDocument()
+}
+
+async function handleDownload(id: number) {
+  const target = rows.value.find((row) => row.id === id) ?? previewTarget.value
+  if (!target || downloadingPdf.value) return
+  downloadingPdf.value = true
+  const opened = previewModalOpen.value && previewTarget.value?.id === target.id
   try {
-    const blob = await notasEntregaService.document(id)
-    downloadBlob(blob, `nota-entrega-${target.numero}.html`)
+    const file = (opened && documentBlob.value) || (await loadDocument(target.id))
+    if (!file) {
+      toastTone.value = 'danger'
+      toastMessage.value = documentError.value || 'No se pudo obtener el PDF.'
+      return
+    }
+    downloadBlob(file, `nota-entrega-${target.numero}.pdf`)
     toastTone.value = 'success'
     toastMessage.value = `Nota de entrega #${target.numero} descargada.`
   } catch (cause) {
     toastTone.value = 'danger'
     toastMessage.value =
       cause instanceof Error ? cause.message : 'No se pudo descargar la nota de entrega.'
+  } finally {
+    downloadingPdf.value = false
+    if (!opened) clearDocument()
   }
 }
 
@@ -358,6 +397,7 @@ onMounted(load)
                   :id="row.id"
                   :numero="row.numero"
                   :pedido-id="row.pedido"
+                  @open-pdf="openPdfViewer"
                   @download="handleDownload"
                 />
               </td>
@@ -379,6 +419,21 @@ onMounted(load)
         </div>
       </nav>
     </template>
+
+    <DocumentViewerModal
+      v-if="previewTarget"
+      :open="previewModalOpen"
+      :title="`Nota de entrega #${previewTarget.numero}`"
+      :subtitle="'Documento PDF · Tamaño Carta (216 × 279 mm) · Entrega total'"
+      :downloading="downloadingPdf"
+      :can-download-pdf="true"
+      :pdf-url="documentUrl"
+      :loading="documentLoading"
+      :error="documentError"
+      @close="closePdfViewer"
+      @retry="loadDocument(previewTarget.id)"
+      @download="handleDownload(previewTarget.id)"
+    />
   </div>
 </template>
 

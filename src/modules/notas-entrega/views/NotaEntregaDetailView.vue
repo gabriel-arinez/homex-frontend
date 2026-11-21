@@ -16,10 +16,12 @@ import {
 } from '@lucide/vue'
 import type { NotaEntrega, Pedido, Proforma } from '@/generated/api'
 import { pedidosService } from '@/modules/pedidos/services/pedidosService'
+import DocumentViewerModal from '@/modules/proformas/components/DocumentViewerModal.vue'
 import { useQuoteProductImages } from '@/modules/proformas/composables/useQuoteProductImages'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import ProductImage from '@/modules/productos/components/ProductImage.vue'
 import { downloadBlob } from '@/shared/download/downloadBlob'
+import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
@@ -39,10 +41,19 @@ const quote = ref<Proforma | null>(null)
 const contextLoading = ref(false)
 const loading = ref(true)
 const downloading = ref(false)
+const previewModalOpen = ref(false)
 const error = ref('')
 const notice = ref('')
 
 const { images: productImages, ensure: ensureProductImages } = useQuoteProductImages()
+const {
+  blob: documentBlob,
+  url: documentUrl,
+  loading: documentLoading,
+  error: documentError,
+  load: loadDocument,
+  clear: clearDocument,
+} = usePdfDocument((noteId) => notasEntregaService.documentPdf(noteId))
 
 function formatDateLabel(value: string | null | undefined): string {
   if (!value) return 'Sin fecha'
@@ -111,17 +122,35 @@ async function load() {
   }
 }
 
+function openPdfViewer() {
+  if (!item.value) return
+  previewModalOpen.value = true
+  void loadDocument(item.value.id)
+}
+
+function closePdfViewer() {
+  previewModalOpen.value = false
+  clearDocument()
+}
+
 async function downloadDocument() {
   if (!item.value || downloading.value) return
   downloading.value = true
   error.value = ''
+  const opened = previewModalOpen.value
   try {
-    downloadBlob(await notasEntregaService.document(id), `nota-entrega-${item.value.numero}.html`)
-    notice.value = 'Nota de entrega descargada correctamente.'
+    const file = (opened && documentBlob.value) || (await loadDocument(id))
+    if (!file) {
+      if (!opened) error.value = documentError.value || 'No se pudo obtener el PDF.'
+      return
+    }
+    downloadBlob(file, `nota-entrega-${item.value.numero}.pdf`)
+    notice.value = 'Nota de entrega PDF descargada correctamente.'
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : 'No se pudo descargar la nota.'
   } finally {
     downloading.value = false
+    if (!opened) clearDocument()
   }
 }
 
@@ -153,9 +182,13 @@ onMounted(load)
         <Button variant="secondary" @click="router.push('/notas-entrega')">
           <ArrowLeft :size="17" aria-hidden="true" /> Volver
         </Button>
+        <Button v-if="item" variant="secondary" @click="openPdfViewer">
+          <FileText :size="17" aria-hidden="true" />
+          Ver PDF
+        </Button>
         <Button v-if="item" variant="secondary" :processing="downloading" @click="downloadDocument">
           <Download :size="17" aria-hidden="true" />
-          Descargar
+          Descargar PDF
         </Button>
       </template>
     </PageHeader>
@@ -345,6 +378,21 @@ onMounted(load)
         </article>
       </section>
     </template>
+
+    <DocumentViewerModal
+      v-if="item"
+      :open="previewModalOpen"
+      :title="`Nota de entrega #${item.numero}`"
+      subtitle="Documento PDF · Tamaño Carta (216 × 279 mm) · Entrega total"
+      :downloading="downloading"
+      :can-download-pdf="true"
+      :pdf-url="documentUrl"
+      :loading="documentLoading"
+      :error="documentError"
+      @close="closePdfViewer"
+      @retry="loadDocument(item.id)"
+      @download="downloadDocument"
+    />
   </div>
 </template>
 

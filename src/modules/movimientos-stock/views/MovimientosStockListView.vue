@@ -103,6 +103,17 @@ function movementTone(code: string): 'danger' | 'info' | 'success' | 'warning' |
   return 'neutral'
 }
 
+const MOVEMENT_SHORT_LABELS: Record<string, string> = {
+  VENTA: 'Venta confirmada',
+  CARGA_INICIAL: 'Carga inicial',
+  AJUSTE: 'Ajuste de stock',
+  REVERSA_VENTA: 'Devolución por cancelación',
+}
+
+function movementLabel(code: string, fallback: string): string {
+  return MOVEMENT_SHORT_LABELS[code] ?? fallback
+}
+
 function movementIcon(code: string) {
   if (code === 'VENTA') return ArrowDownRight
   if (code === 'REVERSA_VENTA') return RotateCcw
@@ -448,8 +459,11 @@ onBeforeUnmount(() => {
 
               <td class="variation-cell" data-label="Tipo y variación">
                 <div class="variation-stack">
-                  <Badge :tone="movementTone(row.tipo_movimiento_info.codigo)">
-                    {{ row.tipo_movimiento_info.nombre }}
+                  <Badge
+                    :tone="movementTone(row.tipo_movimiento_info.codigo)"
+                    :title="row.tipo_movimiento_info.nombre"
+                  >
+                    {{ movementLabel(row.tipo_movimiento_info.codigo, row.tipo_movimiento_info.nombre) }}
                   </Badge>
                   <div class="variation-amount">
                     <strong

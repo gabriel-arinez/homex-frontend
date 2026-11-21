@@ -119,11 +119,11 @@ async function mock(page: Page) {
   await page.route('**/api/v1/pedidos/9/', (route) => route.fulfill({ json: pedido }))
   await page.route('**/api/v1/ordenes-trabajo/', (route) => route.fulfill({ json: [orden] }))
   await page.route('**/api/v1/ordenes-trabajo/3/', (route) => route.fulfill({ json: orden }))
-  await page.route('**/api/v1/ordenes-trabajo/3/documento/', (route) =>
+  await page.route('**/api/v1/ordenes-trabajo/3/documento-pdf/', (route) =>
     route.fulfill({
-      body: '<html><body>Orden 40</body></html>',
-      contentType: 'text/html',
-      headers: { 'Content-Disposition': 'attachment; filename="orden-trabajo-40.html"' },
+      body: '%PDF-1.4\n%Mock OT',
+      contentType: 'application/pdf',
+      headers: { 'Content-Disposition': 'attachment; filename="orden-trabajo-40.pdf"' },
     }),
   )
   await page.route(/\/api\/v1\/movimientos-stock\/(?:\?.*)?$/, (route) =>
@@ -298,9 +298,9 @@ test('FE05 OT muestra líneas reales y permite descargar su documento', async ({
   await expect(page.getByText('Pieza')).toBeVisible()
 
   const downloadPromise = page.waitForEvent('download')
-  await page.getByRole('button', { name: 'Descargar' }).click()
+  await page.getByRole('button', { name: 'Descargar PDF' }).click()
   const download = await downloadPromise
-  expect(download.suggestedFilename()).toBe('orden-trabajo-40.html')
+  expect(download.suggestedFilename()).toBe('orden-trabajo-40.pdf')
 })
 
 test('AP6.0.21 OT muestra ficha técnica autorizada', async ({ page }) => {
