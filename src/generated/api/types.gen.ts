@@ -2701,6 +2701,25 @@ export type V1NotasEntregaDocumentoRetrieveResponses = {
 export type V1NotasEntregaDocumentoRetrieveResponse =
   V1NotasEntregaDocumentoRetrieveResponses[keyof V1NotasEntregaDocumentoRetrieveResponses]
 
+export type V1NotasEntregaDocumentoPdfRetrieveData = {
+  body?: never
+  path: {
+    /**
+     * Un valor de entero único que identifique este nota entrega.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/notas-entrega/{id}/documento-pdf/'
+}
+
+export type V1NotasEntregaDocumentoPdfRetrieveResponses = {
+  200: Blob | File
+}
+
+export type V1NotasEntregaDocumentoPdfRetrieveResponse =
+  V1NotasEntregaDocumentoPdfRetrieveResponses[keyof V1NotasEntregaDocumentoPdfRetrieveResponses]
+
 export type V1OrdenesTrabajoListData = {
   body?: never
   path?: never
@@ -2752,6 +2771,25 @@ export type V1OrdenesTrabajoDocumentoRetrieveResponses = {
 
 export type V1OrdenesTrabajoDocumentoRetrieveResponse =
   V1OrdenesTrabajoDocumentoRetrieveResponses[keyof V1OrdenesTrabajoDocumentoRetrieveResponses]
+
+export type V1OrdenesTrabajoDocumentoPdfRetrieveData = {
+  body?: never
+  path: {
+    /**
+     * Un valor de entero único que identifique este orden trabajo.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/ordenes-trabajo/{id}/documento-pdf/'
+}
+
+export type V1OrdenesTrabajoDocumentoPdfRetrieveResponses = {
+  200: Blob | File
+}
+
+export type V1OrdenesTrabajoDocumentoPdfRetrieveResponse =
+  V1OrdenesTrabajoDocumentoPdfRetrieveResponses[keyof V1OrdenesTrabajoDocumentoPdfRetrieveResponses]
 
 export type V1PedidosListData = {
   body?: never

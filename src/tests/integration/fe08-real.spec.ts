@@ -152,10 +152,7 @@ test.describe.serial('FE08 backend real', () => {
     await expect(page.getByRole('status').filter({ hasText: 'Pedido cancelado' })).toBeVisible()
     await page.goto('/movimientos-stock')
     await expect(
-      page
-        .getByRole('table')
-        .getByText(/Devolución de stock por cancelación/)
-        .first(),
+      page.getByRole('table').getByText('Devolución por cancelación').first(),
     ).toBeVisible()
 
     const navigation = await page.evaluate(
