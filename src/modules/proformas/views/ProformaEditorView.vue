@@ -3479,7 +3479,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   z-index: 1;
 }
 .line-menu--open {
-  z-index: 35;
+  z-index: 50;
 }
 .menu-trigger {
   display: grid;
@@ -4303,7 +4303,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 }
 .editor-actions {
   position: sticky;
-  z-index: 40;
+  z-index: 20;
   bottom: 0;
   margin-top: var(--space-5);
   padding: var(--space-3) 0;

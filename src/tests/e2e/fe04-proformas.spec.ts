@@ -1580,12 +1580,14 @@ test('FE04 muestra creación real y alinea totales; histórico sin hora inventad
     ...makeQuote(),
     total: '7300.00',
     creado_en: new Date(Date.now() - 5 * 60_000 - 15_000).toISOString(),
+    actualizado_en: new Date(Date.now() - 5 * 60_000 - 15_000).toISOString(),
   }
   const historica = {
     ...makeQuote(),
     id: 2,
     numero: 102,
     creado_en: null,
+    actualizado_en: null,
     fecha: '2026-10-15',
     titulo: 'Proforma histórica',
   }
@@ -1602,7 +1604,7 @@ test('FE04 muestra creación real y alinea totales; histórico sin hora inventad
     }),
   )
   await page.goto('/proformas')
-  await expect(page.getByRole('columnheader', { name: 'Creación' })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: 'Última edición' })).toBeVisible()
   const primera = page.getByRole('row').filter({ hasText: '#101' })
   const segunda = page.getByRole('row').filter({ hasText: '#102' })
   await expect(primera.locator('.creation-primary')).toContainText(/Hace [56] minutos/)
