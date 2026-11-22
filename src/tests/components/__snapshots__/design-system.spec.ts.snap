@@ -42,7 +42,10 @@ exports[`design system FE01 > renderiza navegación autorizada e identidad real 
         <!--teleport end-->
       </section>
     </nav>
-    <div data-v-69f24f92="" class="sidebar__footer">
+    <div data-v-69f24f92="" class="sidebar__footer"><span data-v-bd015e50="" class="tooltip tooltip--block"><button data-v-69f24f92="" type="button" class="alerts-trigger" aria-label="Alertas operativas"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bell" aria-hidden="true"><path d="M10.268 21a2 2 0 0 0 3.464 0"></path><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"></path></svg><span data-v-69f24f92="" class="alerts-trigger__label">Alertas</span>
+      <!--v-if--></button></span>
+      <!--teleport start-->
+      <!--teleport end-->
       <div data-v-69f24f92="" class="user"><span data-v-69f24f92="" class="user__avatar" aria-hidden="true">MV</span>
         <div data-v-69f24f92="" class="user__info"><strong data-v-69f24f92="">María Vendedora</strong><small data-v-69f24f92="">vendedor</small><span data-v-69f24f92="" class="user__role">Encargado de tienda</span></div><span data-v-bd015e50="" class="tooltip"><button data-v-69f24f92="" type="button" class="user__logout" aria-label="Cerrar sesión" title="Cerrar sesión"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-log-out" aria-hidden="true"><path d="m16 17 5-5-5-5"></path><path d="M21 12H9"></path><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path></svg><span data-v-69f24f92="" class="sr-only">Cerrar sesión</span></button></span>
         <!--teleport start-->
@@ -101,7 +104,10 @@ exports[`design system FE01 > renderiza navegación autorizada e identidad real 
         <!--teleport end-->
       </section>
     </nav>
-    <div data-v-69f24f92="" class="sidebar__footer">
+    <div data-v-69f24f92="" class="sidebar__footer"><span data-v-bd015e50="" class="tooltip tooltip--block"><button data-v-69f24f92="" type="button" class="alerts-trigger" aria-label="Alertas operativas"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bell" aria-hidden="true"><path d="M10.268 21a2 2 0 0 0 3.464 0"></path><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"></path></svg><span data-v-69f24f92="" class="alerts-trigger__label">Alertas</span>
+      <!--v-if--></button></span>
+      <!--teleport start-->
+      <!--teleport end-->
       <div data-v-69f24f92="" class="user"><span data-v-69f24f92="" class="user__avatar" aria-hidden="true">MV</span>
         <div data-v-69f24f92="" class="user__info"><strong data-v-69f24f92="">María Vendedora</strong><small data-v-69f24f92="">vendedor</small><span data-v-69f24f92="" class="user__role">Encargado de tienda</span></div><span data-v-bd015e50="" class="tooltip"><button data-v-69f24f92="" type="button" class="user__logout" aria-label="Cerrar sesión" title="Cerrar sesión"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-log-out" aria-hidden="true"><path d="m16 17 5-5-5-5"></path><path d="M21 12H9"></path><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path></svg><span data-v-69f24f92="" class="sr-only">Cerrar sesión</span></button></span>
         <!--teleport start-->
@@ -160,7 +166,10 @@ exports[`design system FE01 > renderiza navegación autorizada e identidad real 
         <!--teleport end-->
       </section>
     </nav>
-    <div data-v-69f24f92="" class="sidebar__footer">
+    <div data-v-69f24f92="" class="sidebar__footer"><span data-v-bd015e50="" class="tooltip tooltip--block"><button data-v-69f24f92="" type="button" class="alerts-trigger" aria-label="Alertas operativas"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bell" aria-hidden="true"><path d="M10.268 21a2 2 0 0 0 3.464 0"></path><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"></path></svg><span data-v-69f24f92="" class="alerts-trigger__label">Alertas</span>
+      <!--v-if--></button></span>
+      <!--teleport start-->
+      <!--teleport end-->
       <div data-v-69f24f92="" class="user"><span data-v-69f24f92="" class="user__avatar" aria-hidden="true">MV</span>
         <div data-v-69f24f92="" class="user__info"><strong data-v-69f24f92="">María Vendedora</strong><small data-v-69f24f92="">vendedor</small><span data-v-69f24f92="" class="user__role">Encargado de tienda</span></div><span data-v-bd015e50="" class="tooltip"><button data-v-69f24f92="" type="button" class="user__logout" aria-label="Cerrar sesión" title="Cerrar sesión"><svg data-v-69f24f92="" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-log-out" aria-hidden="true"><path d="m16 17 5-5-5-5"></path><path d="M21 12H9"></path><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path></svg><span data-v-69f24f92="" class="sr-only">Cerrar sesión</span></button></span>
         <!--teleport start-->

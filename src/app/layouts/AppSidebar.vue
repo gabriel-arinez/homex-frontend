@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { RouterLink } from 'vue-router'
 import {
+  Bell,
   ChevronLeft,
   ChevronRight,
   FileText,
@@ -19,19 +20,26 @@ import {
   X,
   LogOut,
 } from '@lucide/vue'
+import { useAlertsStore } from '@/app/stores/useAlertsStore'
 import { usePreferencesStore } from '@/app/stores/usePreferencesStore'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import type { Capability } from '@/modules/auth/types/session'
 import { useFocusTrap } from '@/shared/composables/useFocusTrap'
 import Tooltip from '@/shared/ui/Tooltip.vue'
 const props = defineProps<{ drawerOpen: boolean }>()
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: []; 'open-alerts': [] }>()
+const alerts = useAlertsStore()
 const preferences = usePreferencesStore()
 const session = useSessionStore()
 const router = useRouter()
 function logout() {
+  alerts.reset()
   session.logout()
   void router.replace('/login')
+}
+function openAlerts() {
+  emit('open-alerts')
+  emit('close')
 }
 const panel = ref<HTMLElement | null>(null)
 useFocusTrap(
@@ -169,6 +177,27 @@ const visibleGroups = computed(() =>
         </section>
       </nav>
       <div class="sidebar__footer">
+        <Tooltip
+          :text="
+            alerts.unseenCount ? `Alertas (${alerts.unseenCount} nuevas)` : 'Alertas operativas'
+          "
+          :disabled="!preferences.sidebarCompact"
+          block
+        >
+          <button
+            type="button"
+            class="alerts-trigger"
+            :class="{ 'alerts-trigger--unseen': alerts.unseenCount > 0 }"
+            aria-label="Alertas operativas"
+            @click="openAlerts"
+          >
+            <Bell :size="18" aria-hidden="true" />
+            <span class="alerts-trigger__label">Alertas</span>
+            <span v-if="alerts.unseenCount > 0" class="alerts-trigger__badge">
+              {{ alerts.unseenCount > 99 ? '99+' : alerts.unseenCount }}
+            </span>
+          </button>
+        </Tooltip>
         <div class="user">
           <span class="user__avatar" aria-hidden="true">{{ initials }}</span>
           <div class="user__info">
@@ -384,6 +413,58 @@ nav a.router-link-active::before {
   border-top: 1px solid var(--color-border);
   background: var(--color-surface);
 }
+.alerts-trigger {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 2.5rem;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+.alerts-trigger:hover {
+  color: var(--color-text);
+  background: var(--color-surface-hover);
+}
+.alerts-trigger--unseen {
+  border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary-soft) 55%, var(--color-surface));
+  color: var(--color-text);
+}
+.alerts-trigger svg {
+  flex: 0 0 auto;
+}
+.alerts-trigger__label {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.alerts-trigger__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
 .user {
   display: flex;
   align-items: center;
@@ -515,9 +596,22 @@ nav a.router-link-active::before {
 .sidebar--compact .brand__text,
 .sidebar--compact nav h2,
 .sidebar--compact nav a span,
+.sidebar--compact .alerts-trigger__label,
 .sidebar--compact .user__info,
 .sidebar--compact .util-btn span {
   display: none;
+}
+.sidebar--compact .alerts-trigger {
+  justify-content: center;
+  padding-inline: 0;
+}
+.sidebar--compact .alerts-trigger__badge {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.3rem;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  font-size: 0.64rem;
 }
 .sidebar--compact nav section {
   margin-bottom: 0;
@@ -586,8 +680,19 @@ nav a.router-link-active::before {
     display: grid;
   }
   .sidebar--compact nav a span,
+  .sidebar--compact .alerts-trigger__label,
   .sidebar--compact .util-btn span {
     display: initial;
+  }
+  .sidebar--compact .alerts-trigger {
+    justify-content: flex-start;
+    padding-inline: 0.75rem;
+  }
+  .sidebar--compact .alerts-trigger__badge {
+    position: static;
+    min-width: 1.35rem;
+    height: 1.35rem;
+    font-size: 0.72rem;
   }
   .sidebar--compact nav section {
     margin-bottom: 1.15rem;

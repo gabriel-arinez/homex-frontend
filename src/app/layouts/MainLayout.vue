@@ -1,22 +1,65 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { RouterView } from 'vue-router'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { RouterView, useRoute } from 'vue-router'
+import AlertCenterDrawer from '@/app/components/AlertCenterDrawer.vue'
 import AppSidebar from './AppSidebar.vue'
+import { useAlertsStore } from '@/app/stores/useAlertsStore'
 import { usePreferencesStore } from '@/app/stores/usePreferencesStore'
+import { useSessionStore } from '@/app/stores/useSessionStore'
+import Toast from '@/shared/ui/Toast.vue'
 
 const drawerOpen = ref(false)
+const alertsOpen = ref(false)
 const preferences = usePreferencesStore()
+const session = useSessionStore()
+const alerts = useAlertsStore()
+const route = useRoute()
+
+onMounted(() => {
+  if (session.isAuthenticated) alerts.startPolling()
+})
+
+watch(
+  () => session.isAuthenticated,
+  (authenticated) => {
+    if (authenticated) alerts.startPolling()
+    else alerts.reset()
+  },
+)
+
+watch(
+  () => route.fullPath,
+  () => {
+    if (session.isAuthenticated) void alerts.refresh()
+  },
+)
+
+onBeforeUnmount(() => {
+  alerts.stopPolling()
+})
 </script>
 
 <template>
   <a class="skip-link" href="#main-content">Saltar al contenido principal</a>
   <div class="shell" :class="{ 'shell--compact': preferences.sidebarCompact }">
-    <AppSidebar :drawer-open="drawerOpen" @close="drawerOpen = false" />
+    <AppSidebar
+      :drawer-open="drawerOpen"
+      @close="drawerOpen = false"
+      @open-alerts="alertsOpen = true"
+    />
     <main id="main-content" tabindex="-1">
       <RouterView v-slot="{ Component }"
         ><component :is="Component" @open-menu="drawerOpen = true"
       /></RouterView>
     </main>
+    <AlertCenterDrawer :open="alertsOpen" @close="alertsOpen = false" />
+    <Toast
+      v-if="alerts.liveToast"
+      :visible="true"
+      :message="alerts.liveToast.message"
+      :tone="alerts.liveToast.tone"
+      @close="alerts.dismissLiveToast()"
+    />
   </div>
 </template>
 
