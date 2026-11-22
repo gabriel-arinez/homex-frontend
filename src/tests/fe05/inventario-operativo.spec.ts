@@ -511,7 +511,7 @@ describe('Inventario operativo (P1, P2, P4, P5, P6)', () => {
       }),
     )
 
-    // Modal sin <select name="ajuste-producto">, seleccionando directo del listado
+    // Modal sin <select name="ajuste-producto">, sin listado inicial y con búsqueda en tiempo real
     await wrapper
       .findAll('button')
       .find((b) => b.text().includes('Registrar movimiento'))!
@@ -519,6 +519,12 @@ describe('Inventario operativo (P1, P2, P4, P5, P6)', () => {
     await flushPromises()
 
     expect(wrapper.find('select[name="ajuste-producto"]').exists()).toBe(false)
+    expect(wrapper.find('.ajuste-product-results').exists()).toBe(false)
+
+    const productSearchInput = wrapper.find('.ajuste-product-picker input[type="search"]')
+    await productSearchInput.setValue('Silla')
+    await flushPromises()
+
     const optionBtn = wrapper.find('.ajuste-product-option')
     expect(optionBtn.exists()).toBe(true)
     await optionBtn.trigger('click')

@@ -319,11 +319,17 @@ async function exportExcel() {
 }
 
 function selectAjusteProducto(item: Producto) {
+  ajusteSelectedCache.value = item
   ajusteProductoId.value = String(item.id)
+  ajusteProductoSearch.value = ''
+  ajusteProductos.value = []
 }
 
 function clearAjusteProducto() {
+  ajusteSelectedCache.value = null
   ajusteProductoId.value = ''
+  ajusteProductoSearch.value = ''
+  ajusteProductos.value = []
 }
 
 // P2: Modal de registro de entrada / salida manual (solo administración comercial)
@@ -341,13 +347,22 @@ const ajusteError = ref('')
 const ajusteIdempotencyKey = ref('')
 const motivosCatalogo = ref<CatalogoMotivosAjuste | null>(null)
 
-const ajusteProductoSeleccionado = computed(
-  () =>
+const ajusteSelectedCache = ref<Producto | null>(null)
+
+const ajusteProductoSeleccionado = computed(() => {
+  if (
+    ajusteSelectedCache.value &&
+    String(ajusteSelectedCache.value.id) === ajusteProductoId.value
+  ) {
+    return ajusteSelectedCache.value
+  }
+  return (
     ajusteProductos.value.find((p) => String(p.id) === ajusteProductoId.value) ??
     (selectedProduct.value && String(selectedProduct.value.id) === ajusteProductoId.value
       ? selectedProduct.value
-      : null),
-)
+      : null)
+  )
+})
 
 const motivosDisponibles = computed(() => {
   if (!motivosCatalogo.value) return []
@@ -376,10 +391,16 @@ watch(ajusteTipo, () => {
 })
 
 async function loadAjusteProductos(term = '') {
+  const clean = term.trim()
+  if (!clean) {
+    ajusteProductos.value = []
+    ajusteProductosLoading.value = false
+    return
+  }
   ajusteProductosLoading.value = true
   try {
     const res = await productosService.list({
-      search: term.trim() || undefined,
+      search: clean,
       page_size: 25,
     })
     ajusteProductos.value = res.results
@@ -396,6 +417,9 @@ async function openAjusteModal(tipoInicial: 'ENTRADA' | 'SALIDA' = 'ENTRADA') {
   ajusteObservaciones.value = ''
   ajusteError.value = ''
   ajusteIdempotencyKey.value = generateUuidV4()
+  ajusteProductoSearch.value = ''
+  ajusteProductos.value = []
+  ajusteSelectedCache.value = selectedProduct.value ?? null
   ajusteProductoId.value = selectedProduct.value ? String(selectedProduct.value.id) : ''
   ajusteOpen.value = true
 
@@ -407,7 +431,6 @@ async function openAjusteModal(tipoInicial: 'ENTRADA' | 'SALIDA' = 'ENTRADA') {
     }
   }
   ajusteMotivo.value = motivosDisponibles.value[0]?.codigo ?? ''
-  await loadAjusteProductos(ajusteProductoSearch.value)
 }
 
 async function submitAjuste() {
@@ -956,14 +979,75 @@ onBeforeUnmount(() => {
       @close="ajusteOpen = false"
     >
       <template #title-icon>
-        <Boxes :size="18" aria-hidden="true" />
+        <span class="ajuste-modal-icon">
+          <Boxes :size="20" aria-hidden="true" />
+        </span>
       </template>
-      <form id="ajuste-stock-form" class="ajuste-form" @submit.prevent="submitAjuste">
-        <div class="ajuste-section">
-          <span class="ajuste-section__label">
-            <SlidersHorizontal :size="14" aria-hidden="true" />
-            Tipo de operación
+
+      <div
+        v-if="ajusteProductoSeleccionado"
+        class="ajuste-board"
+        aria-label="Resumen del movimiento de stock"
+      >
+        <div class="ajuste-metric ajuste-metric--highlight">
+          <span class="ajuste-metric__icon">
+            <Boxes :size="16" aria-hidden="true" />
           </span>
+          <div>
+            <span>Stock actual</span>
+            <strong>{{
+              unidadesProducto(ajusteProductoSeleccionado, ajusteProductoSeleccionado.stock)
+            }}</strong>
+          </div>
+        </div>
+        <div class="ajuste-metric ajuste-metric--highlight">
+          <span
+            class="ajuste-metric__icon"
+            :class="
+              ajusteTipo === 'ENTRADA'
+                ? 'ajuste-metric__icon--success'
+                : 'ajuste-metric__icon--danger'
+            "
+          >
+            <TrendingUp :size="16" aria-hidden="true" />
+          </span>
+          <div>
+            <span>Variación</span>
+            <strong :class="ajusteTipo === 'ENTRADA' ? 'variation-qty--in' : 'variation-qty--out'">
+              {{ ajusteTipo === 'ENTRADA' ? '+' : '-' }}{{ ajusteCantidad || '0' }}
+            </strong>
+          </div>
+        </div>
+        <div class="ajuste-metric ajuste-metric--highlight">
+          <span
+            class="ajuste-metric__icon"
+            :class="
+              stockResultanteEstimado !== null && stockResultanteEstimado < 0
+                ? 'ajuste-metric__icon--danger'
+                : 'ajuste-metric__icon--primary'
+            "
+          >
+            <PackageCheck :size="16" aria-hidden="true" />
+          </span>
+          <div>
+            <span>Stock resultante</span>
+            <strong>
+              {{
+                stockResultanteEstimado !== null
+                  ? unidadesProducto(ajusteProductoSeleccionado, stockResultanteEstimado)
+                  : '—'
+              }}
+            </strong>
+          </div>
+        </div>
+      </div>
+
+      <form id="ajuste-stock-form" class="ajuste-form" @submit.prevent="submitAjuste">
+        <div class="ajuste-section ajuste-form__full">
+          <div class="ajuste-section__header">
+            <SlidersHorizontal :size="15" aria-hidden="true" />
+            <span>Operación y producto</span>
+          </div>
           <div class="ajuste-tipo-toggle" role="group" aria-label="Tipo de operación">
             <button
               type="button"
@@ -984,13 +1068,7 @@ onBeforeUnmount(() => {
               Salida (-)
             </button>
           </div>
-        </div>
 
-        <div class="ajuste-section">
-          <span class="ajuste-section__label">
-            <Package :size="14" aria-hidden="true" />
-            Producto
-          </span>
           <div v-if="ajusteProductoSeleccionado" class="ajuste-selected-card">
             <div class="ajuste-selected-card__info">
               <PackageCheck :size="18" class="ajuste-selected-card__icon" aria-hidden="true" />
@@ -1016,7 +1094,12 @@ onBeforeUnmount(() => {
               label="Buscar producto por nombre o SKU"
               @update:model-value="loadAjusteProductos"
             />
-            <div class="ajuste-product-results" role="listbox" aria-label="Resultados de productos">
+            <div
+              v-if="ajusteProductoSearch.trim().length > 0"
+              class="ajuste-product-results"
+              role="listbox"
+              aria-label="Resultados de productos"
+            >
               <p v-if="ajusteProductosLoading" class="ajuste-product-results__state">
                 Buscando productos...
               </p>
@@ -1048,87 +1131,64 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div class="ajuste-grid">
-          <div class="ajuste-section">
-            <span class="ajuste-section__label">
-              <Hash :size="14" aria-hidden="true" />
-              Cantidad{{
-                ajusteProductoSeleccionado
-                  ? ` (${ajusteProductoSeleccionado.unidad_stock_info?.nombre || ''})`
-                  : ''
-              }}
-            </span>
-            <TextField
-              v-model="ajusteCantidad"
-              name="ajuste-cantidad"
-              label="Cantidad"
-              type="number"
-              :step="
-                ajusteProductoSeleccionado?.unidad_stock_info?.codigo === 'M2' ? '0.0001' : '1'
-              "
-              min="0"
-              placeholder="0"
-            />
+        <div class="ajuste-section ajuste-form__full">
+          <div class="ajuste-section__header">
+            <FileText :size="15" aria-hidden="true" />
+            <span>Detalle del ajuste</span>
           </div>
+          <div class="ajuste-section__grid">
+            <div class="ajuste-field-wrap">
+              <div class="ajuste-field-badge">
+                <Hash :size="13" aria-hidden="true" />
+                <span>{{
+                  ajusteProductoSeleccionado?.unidad_stock_info?.nombre || 'Unidades'
+                }}</span>
+              </div>
+              <TextField
+                v-model="ajusteCantidad"
+                name="ajuste-cantidad"
+                label="Cantidad"
+                type="number"
+                :step="
+                  ajusteProductoSeleccionado?.unidad_stock_info?.codigo === 'M2' ? '0.0001' : '1'
+                "
+                min="0"
+                placeholder="0"
+              />
+            </div>
 
-          <div class="ajuste-section">
-            <span class="ajuste-section__label">
-              <SlidersHorizontal :size="14" aria-hidden="true" />
-              Motivo del ajuste
-            </span>
-            <Select
-              v-model="ajusteMotivo"
-              name="ajuste-motivo"
-              label="Motivo"
-              :options="motivosDisponibles.map((m) => ({ label: m.nombre, value: m.codigo }))"
-            />
+            <div class="ajuste-field-wrap">
+              <div class="ajuste-field-badge">
+                <SlidersHorizontal :size="13" aria-hidden="true" />
+                <span>{{ ajusteTipo === 'ENTRADA' ? 'Ingreso manual' : 'Egreso manual' }}</span>
+              </div>
+              <Select
+                v-model="ajusteMotivo"
+                name="ajuste-motivo"
+                label="Motivo"
+                :options="motivosDisponibles.map((m) => ({ label: m.nombre, value: m.codigo }))"
+              />
+            </div>
+
+            <div class="ajuste-form__full">
+              <TextAreaField
+                v-model="ajusteObservaciones"
+                name="ajuste-observaciones"
+                :label="
+                  motivoSeleccionadoMeta?.requiere_observaciones
+                    ? 'Observaciones (obligatoria para corrección excepcional)'
+                    : 'Observaciones (opcional)'
+                "
+                placeholder="Describe el respaldo o detalle del movimiento..."
+                :rows="3"
+              />
+            </div>
           </div>
         </div>
 
-        <div class="ajuste-section">
-          <span class="ajuste-section__label">
-            <FileText :size="14" aria-hidden="true" />
-            Respaldo y observaciones
-          </span>
-          <TextAreaField
-            v-model="ajusteObservaciones"
-            name="ajuste-observaciones"
-            :label="
-              motivoSeleccionadoMeta?.requiere_observaciones
-                ? 'Observaciones (obligatoria para corrección excepcional)'
-                : 'Observaciones (opcional)'
-            "
-            placeholder="Describe el respaldo o detalle del movimiento..."
-            :rows="3"
-          />
-        </div>
-
-        <div v-if="ajusteProductoSeleccionado" class="ajuste-preview">
-          <div class="ajuste-preview__item">
-            <span><Boxes :size="13" aria-hidden="true" /> Stock actual</span>
-            <strong>{{
-              unidadesProducto(ajusteProductoSeleccionado, ajusteProductoSeleccionado.stock)
-            }}</strong>
-          </div>
-          <div class="ajuste-preview__item">
-            <span><TrendingUp :size="13" aria-hidden="true" /> Variación solicitada</span>
-            <strong :class="ajusteTipo === 'ENTRADA' ? 'variation-qty--in' : 'variation-qty--out'">
-              {{ ajusteTipo === 'ENTRADA' ? '+' : '-' }}{{ ajusteCantidad || '0' }}
-            </strong>
-          </div>
-          <div class="ajuste-preview__item">
-            <span><PackageCheck :size="13" aria-hidden="true" /> Stock resultante estimado</span>
-            <strong>
-              {{
-                stockResultanteEstimado !== null
-                  ? unidadesProducto(ajusteProductoSeleccionado, stockResultanteEstimado)
-                  : '—'
-              }}
-            </strong>
-          </div>
-        </div>
-
-        <p v-if="ajusteError" class="stock-alert" role="alert">{{ ajusteError }}</p>
+        <p v-if="ajusteError" class="stock-alert ajuste-form__full" role="alert">
+          {{ ajusteError }}
+        </p>
       </form>
       <template #footer>
         <Button variant="secondary" :disabled="ajusteSaving" @click="ajusteOpen = false">
@@ -1679,32 +1739,126 @@ onBeforeUnmount(() => {
   color: var(--color-text-secondary);
   font-size: 0.75rem;
 }
+.ajuste-modal-icon {
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: none;
+  place-items: center;
+  border-radius: 0.65rem;
+  background: var(--color-primary-soft);
+  color: var(--color-primary-accent);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 22%, transparent);
+}
+.ajuste-board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 1.1rem;
+}
+.ajuste-metric {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
+  min-width: 0;
+}
+.ajuste-metric--highlight {
+  background: var(--color-surface);
+  border-color: var(--color-border-strong);
+}
+.ajuste-metric > div {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.ajuste-metric span {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+}
+.ajuste-metric strong {
+  font-size: 0.92rem;
+  font-variant-numeric: tabular-nums;
+}
+.ajuste-metric__icon {
+  display: grid;
+  width: 1.95rem;
+  height: 1.95rem;
+  flex: none;
+  place-items: center;
+  border-radius: 0.5rem;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+.ajuste-metric__icon--primary {
+  background: var(--color-primary-soft);
+  color: var(--color-primary-accent);
+  border-color: color-mix(in srgb, var(--color-primary) 25%, transparent);
+}
+.ajuste-metric__icon--success {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+  border-color: color-mix(in srgb, var(--color-success) 30%, transparent);
+}
+.ajuste-metric__icon--danger {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 35%, transparent);
+}
 .ajuste-form {
   display: grid;
-  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4, 1rem);
+}
+.ajuste-form__full {
+  grid-column: 1 / -1;
 }
 .ajuste-section {
   display: grid;
-  gap: 0.45rem;
+  gap: 0.75rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
 }
-.ajuste-section__label {
+.ajuste-section__header {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  font-size: 0.78rem;
+  gap: 0.45rem;
+  color: var(--color-text);
+  font-size: 0.8rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--color-text-secondary);
 }
-.ajuste-grid {
+.ajuste-section__header svg {
+  color: var(--color-primary-accent);
+}
+.ajuste-section__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.85rem;
+  gap: var(--space-3, 0.75rem);
 }
-@media (max-width: 640px) {
-  .ajuste-grid {
-    grid-template-columns: minmax(0, 1fr);
+.ajuste-field-wrap {
+  display: grid;
+  gap: 0.25rem;
+  align-content: start;
+}
+.ajuste-field-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+@media (max-width: 47.99rem) {
+  .ajuste-board,
+  .ajuste-form,
+  .ajuste-section__grid {
+    grid-template-columns: 1fr;
   }
 }
 .ajuste-tipo-toggle {
@@ -1827,26 +1981,6 @@ onBeforeUnmount(() => {
 }
 .ajuste-selected-card__info small {
   font-size: 0.78rem;
-  color: var(--color-text-secondary);
-}
-.ajuste-preview {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.65rem;
-  padding: 0.75rem 0.9rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-hover);
-}
-.ajuste-preview__item {
-  display: grid;
-  gap: 0.15rem;
-}
-.ajuste-preview__item span {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.75rem;
   color: var(--color-text-secondary);
 }
 </style>
