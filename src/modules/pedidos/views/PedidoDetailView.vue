@@ -248,7 +248,7 @@ watch(
   },
 )
 
-const workflowSteps = [
+const allWorkflowSteps = [
   {
     codigo: 'CONFIRMADO',
     label: 'Confirmado',
@@ -271,6 +271,19 @@ const workflowSteps = [
   },
 ] as const
 
+const hasCustomFurniture = computed(() => {
+  if (!quote.value) return true
+  return quote.value.detalles.some(
+    (line) => line.tipo_item_info?.codigo === 'MUEBLE_MEDIDA' || Boolean(line.especificacion),
+  )
+})
+
+const workflowSteps = computed(() =>
+  hasCustomFurniture.value
+    ? allWorkflowSteps
+    : allWorkflowSteps.filter((step) => step.codigo !== 'EN_PRODUCCION'),
+)
+
 const current = computed(() => states.value.find((x) => x.id === pedido.value?.estado))
 const currentCode = computed(() => current.value?.codigo ?? '')
 const isCancelled = computed(() => currentCode.value === 'CANCELADO')
@@ -282,13 +295,13 @@ const stateName = computed(
 )
 
 const currentStepIndex = computed(() =>
-  workflowSteps.findIndex((step) => step.codigo === currentCode.value),
+  workflowSteps.value.findIndex((step) => step.codigo === currentCode.value),
 )
 
 const nextLogicalStep = computed(() => {
   if (isCancelled.value) return null
   const idx = currentStepIndex.value
-  if (idx >= 0 && idx < workflowSteps.length - 1) return workflowSteps[idx + 1] ?? null
+  if (idx >= 0 && idx < workflowSteps.value.length - 1) return workflowSteps.value[idx + 1] ?? null
   return null
 })
 
@@ -359,8 +372,10 @@ const transitionMeta = computed(() => {
 
 const alternativeTransitions = computed(() => {
   if (isCancelled.value) return []
-  const allowedCodes: EstadoCodigoEnum[] = ['EN_PRODUCCION', 'LISTO_ENTREGA', 'ENTREGADO']
-  return workflowSteps.filter(
+  const allowedCodes: EstadoCodigoEnum[] = hasCustomFurniture.value
+    ? ['EN_PRODUCCION', 'LISTO_ENTREGA', 'ENTREGADO']
+    : ['LISTO_ENTREGA', 'ENTREGADO']
+  return workflowSteps.value.filter(
     (step) =>
       allowedCodes.includes(step.codigo as EstadoCodigoEnum) &&
       step.codigo !== currentCode.value &&
@@ -371,7 +386,7 @@ const alternativeTransitions = computed(() => {
 const cancelledMessage =
   'Este pedido fue cancelado y las existencias descontadas fueron restituidas al inventario mediante reversa.'
 
-function stepLabel(step: (typeof workflowSteps)[number]) {
+function stepLabel(step: (typeof allWorkflowSteps)[number]) {
   const fromCatalog = states.value.find((s) => s.codigo === step.codigo)?.nombre
   return fromCatalog ?? step.label
 }
@@ -722,7 +737,12 @@ watch(() => route.params.id, load)
           </div>
         </div>
 
-        <ol v-else class="stepper" aria-label="Ciclo de vida del pedido">
+        <ol
+          v-else
+          class="stepper"
+          :class="{ 'stepper--three': !hasCustomFurniture }"
+          aria-label="Ciclo de vida del pedido"
+        >
           <li
             v-for="(step, idx) in workflowSteps"
             :key="step.codigo"
@@ -1411,6 +1431,9 @@ watch(() => route.params.id, load)
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0;
+}
+.stepper--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 .step {
   display: grid;

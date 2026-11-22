@@ -105,7 +105,7 @@ test.describe.serial('FE08 backend real', () => {
     await page.goto('/ordenes-trabajo')
     await otResponse
     await expect(page.getByRole('heading', { name: 'Órdenes de trabajo' })).toBeVisible()
-    await expect(page.getByText('Flujo comercial FE08')).toHaveCount(0)
+    await expect(page.getByRole('table').getByText('Pendiente').first()).toBeVisible()
 
     await page.goto(`/pedidos/${pedidoId}`)
     await page.getByRole('button', { name: 'Emitir recibo' }).click()

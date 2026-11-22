@@ -165,7 +165,7 @@ function toIsoDate(value: string): string {
 const filtered = computed(() => {
   const term = search.value.trim().toLowerCase()
   return rows.value.filter((ot) => {
-    if (!hasFabrication(ot)) return false
+    if (!canOperateCommercial.value && !hasFabrication(ot)) return false
     if (stateFilter.value && ot.estado_info?.codigo !== stateFilter.value) return false
     if (workTypeFilter.value === 'fabricacion' && !hasFabrication(ot)) return false
     if (workTypeFilter.value === 'catalogo' && hasFabrication(ot)) return false

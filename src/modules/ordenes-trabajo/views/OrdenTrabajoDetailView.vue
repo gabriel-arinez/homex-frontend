@@ -13,6 +13,7 @@ import {
   Hammer,
   Layers,
   MapPin,
+  Package,
   PackageCheck,
   Pencil,
   Ruler,
@@ -24,8 +25,15 @@ import {
   Wrench,
   X,
 } from '@lucide/vue'
-import type { DetalleOrdenTrabajo, OrdenTrabajo } from '@/generated/api'
+import type {
+  DetalleOrdenTrabajo,
+  OrdenTrabajo,
+  Producto,
+  ValorCatalogoPublico,
+} from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
+import { productosService } from '@/modules/productos/services/productosService'
+import { proformasService } from '@/modules/proformas/services/proformasService'
 import type {
   AtributoTecnico,
   ComponenteTecnico,
@@ -76,6 +84,9 @@ const planForm = ref({
   responsable_recepcion: '',
 })
 const furnitureGalleries = ref<Record<number, GalleryImage[]>>({})
+const catalogProducts = ref<Record<number, Producto>>({})
+const catalogGalleries = ref<Record<number, GalleryImage[]>>({})
+const catalogOptions = ref<Record<string, ValorCatalogoPublico[]>>({})
 const error = ref('')
 const notice = ref('')
 
@@ -287,6 +298,230 @@ function hasImages(lineId: number): boolean {
   return (furnitureGalleries.value[lineId] ?? []).length > 0
 }
 
+function catalogImages(productId: number | null | undefined): GalleryImage[] {
+  if (!productId) return []
+  return catalogGalleries.value[productId] ?? []
+}
+
+function resolveCatalogOption(
+  conceptCode: string,
+  optionId: number | null | undefined,
+): string | null {
+  if (optionId == null) return null
+  return (
+    catalogOptions.value[conceptCode]?.find((item) => item.id === optionId)?.nombre ??
+    `#${optionId}`
+  )
+}
+
+function formatCatalogAttrLabel(key: string): string {
+  const known: Record<string, string> = {
+    tapizado: 'Tapizado',
+    resistencia: 'Resistencia',
+    configuracion: 'Configuración',
+    brazos: 'Brazos',
+    altura: 'Altura',
+    base: 'Base',
+    ruedas: 'Ruedas',
+    mecanismo: 'Mecanismo',
+    material: 'Material',
+    color: 'Color',
+    acabado: 'Acabado',
+  }
+  return (
+    known[key] ??
+    key.replace(/[_-]+/g, ' ').replace(/\b\p{L}/gu, (letter) => letter.toLocaleUpperCase('es'))
+  )
+}
+
+function flattenCatalogSpecs(value: unknown, prefix = ''): Array<{ label: string; value: string }> {
+  if (value === null || value === undefined || value === '') return []
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return [{ label: prefix ? formatCatalogAttrLabel(prefix) : 'Detalle', value: String(value) }]
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap((child, index) =>
+      flattenCatalogSpecs(child, `${prefix || 'Ítem'} ${index + 1}`),
+    )
+  }
+  if (typeof value !== 'object') return []
+  return Object.entries(value as Record<string, unknown>).flatMap(([key, child]) =>
+    flattenCatalogSpecs(child, key),
+  )
+}
+
+interface CatalogParsedSpec {
+  categoryLabel: string
+  sku: string | null
+  familia: string | null
+  modelo: string | null
+  medidas: Array<{ label: string; value: string }>
+  generalSpecs: Array<{ label: string; value: string }>
+  componenteSpecs: Array<{ label: string; value: string }>
+  observaciones: string | null
+}
+
+function parseCatalogSpecification(
+  prod: Producto | undefined,
+  line: DetalleOrdenTrabajo,
+): CatalogParsedSpec {
+  if (!prod) {
+    return {
+      categoryLabel: line.tipo_item_info.nombre,
+      sku: null,
+      familia: null,
+      modelo: null,
+      medidas: [],
+      generalSpecs: [{ label: 'Categoría', value: line.tipo_item_info.nombre }],
+      componenteSpecs: [],
+      observaciones: null,
+    }
+  }
+  const catCode = prod.categoria_info?.codigo ?? ''
+  const medidas: Array<{ label: string; value: string }> = []
+  const generalSpecs: Array<{ label: string; value: string }> = []
+  if (prod.sku) generalSpecs.push({ label: 'SKU', value: prod.sku })
+  if (prod.familia_info?.nombre)
+    generalSpecs.push({ label: 'Familia', value: prod.familia_info.nombre })
+
+  let modelo: string | null = null
+  let componenteSpecs: Array<{ label: string; value: string }> = []
+
+  if (catCode === 'PISO_FLOTANTE' && prod.piso) {
+    if (prod.piso.espesor_mm)
+      medidas.push({ label: 'Espesor', value: `${prod.piso.espesor_mm} mm` })
+    if (prod.piso.ancho_mm) medidas.push({ label: 'Ancho', value: `${prod.piso.ancho_mm} mm` })
+    if (prod.piso.largo_mm) medidas.push({ label: 'Largo', value: `${prod.piso.largo_mm} mm` })
+    if (prod.piso.m2_por_caja) {
+      medidas.push({ label: 'Rendimiento por caja', value: `${prod.piso.m2_por_caja} m²` })
+    }
+    const marca = resolveCatalogOption('MARCA', prod.piso.marca)
+    const tipo = resolveCatalogOption('TIPO_PISO', prod.piso.tipo)
+    const material = resolveCatalogOption('MATERIAL_PISO', prod.piso.material)
+    const diseno = resolveCatalogOption('DISENO_PISO', prod.piso.diseno)
+    const acabado = resolveCatalogOption('ACABADO_PISO', prod.piso.acabado)
+    modelo = prod.piso.modelo?.trim() || null
+    if (marca) generalSpecs.push({ label: 'Marca', value: marca })
+    if (modelo) generalSpecs.push({ label: 'Modelo', value: modelo })
+    if (tipo) generalSpecs.push({ label: 'Tipo', value: tipo })
+    if (material) generalSpecs.push({ label: 'Material', value: material })
+    if (diseno) generalSpecs.push({ label: 'Diseño', value: diseno })
+    if (acabado) generalSpecs.push({ label: 'Acabado', value: acabado })
+  } else if (catCode === 'SILLA' && prod.silla) {
+    const marca = resolveCatalogOption('MARCA', prod.silla.marca)
+    const color1 = resolveCatalogOption('COLOR', prod.silla.color_primario)
+    const color2 = resolveCatalogOption('COLOR', prod.silla.color_secundario)
+    modelo = prod.silla.modelo?.trim() || null
+    if (marca) generalSpecs.push({ label: 'Marca', value: marca })
+    if (modelo) generalSpecs.push({ label: 'Modelo', value: modelo })
+    if (color1) generalSpecs.push({ label: 'Color primario', value: color1 })
+    if (color2) generalSpecs.push({ label: 'Color secundario', value: color2 })
+    componenteSpecs = flattenCatalogSpecs(prod.silla.especificaciones)
+  } else {
+    if (prod.categoria_info?.nombre) {
+      generalSpecs.push({ label: 'Categoría', value: prod.categoria_info.nombre })
+    }
+    if (prod.unidad_stock_info?.nombre) {
+      generalSpecs.push({ label: 'Unidad de stock', value: prod.unidad_stock_info.nombre })
+    }
+  }
+
+  return {
+    categoryLabel: prod.categoria_info?.nombre ?? line.tipo_item_info.nombre,
+    sku: prod.sku ?? null,
+    familia: prod.familia_info?.nombre ?? null,
+    modelo,
+    medidas,
+    generalSpecs,
+    componenteSpecs,
+    observaciones: prod.observaciones?.trim() || null,
+  }
+}
+
+function fallbackProductGallery(prod: Producto): GalleryImage[] {
+  if (!prod.imagen_principal?.original) return []
+  return [
+    {
+      id: prod.id,
+      nombre: prod.nombre,
+      url: prod.imagen_principal.original,
+      posicion: 0,
+      principal: true,
+      variantes: prod.imagen_principal.variantes ?? {},
+    },
+  ]
+}
+
+async function ensureCatalogDetails(lines: DetalleOrdenTrabajo[]) {
+  if (!canOperateCommercial.value) return
+  const productIds = Array.from(
+    new Set(
+      lines
+        .filter(
+          (line) =>
+            line.tipo_item_info.codigo !== 'MUEBLE_MEDIDA' &&
+            !line.especificacion &&
+            typeof line.producto === 'number',
+        )
+        .map((line) => line.producto as number),
+    ),
+  )
+  if (!productIds.length) return
+
+  type ConceptCode = Parameters<typeof proformasService.options>[0]
+  const neededConcepts: ConceptCode[] = [
+    'MARCA',
+    'COLOR',
+    'TIPO_PISO',
+    'MATERIAL_PISO',
+    'DISENO_PISO',
+    'ACABADO_PISO',
+  ]
+  const missingConcepts = neededConcepts.filter((code) => !catalogOptions.value[code])
+
+  await Promise.allSettled([
+    ...missingConcepts.map(async (code) => {
+      try {
+        const list = await proformasService.options(code)
+        catalogOptions.value = { ...catalogOptions.value, [code]: list }
+      } catch {
+        // Ignorar si no está disponible
+      }
+    }),
+    ...productIds.map(async (prodId) => {
+      if (!catalogProducts.value[prodId]) {
+        try {
+          const prod = await productosService.get(prodId)
+          catalogProducts.value = { ...catalogProducts.value, [prodId]: prod }
+          if (!catalogGalleries.value[prodId]) {
+            try {
+              const gal = await galleryService.list(
+                `/api/v1/catalogo/productos/${prodId}/imagenes/`,
+              )
+              const imgs = gal.imagenes ?? []
+              if (imgs.length > 0) {
+                catalogGalleries.value = { ...catalogGalleries.value, [prodId]: imgs }
+              } else {
+                const fallback = fallbackProductGallery(prod)
+                if (fallback.length) {
+                  catalogGalleries.value = { ...catalogGalleries.value, [prodId]: fallback }
+                }
+              }
+            } catch {
+              const fallback = fallbackProductGallery(prod)
+              if (fallback.length) {
+                catalogGalleries.value = { ...catalogGalleries.value, [prodId]: fallback }
+              }
+            }
+          }
+        } catch {
+          // Degrada limpiamente si no se puede leer el producto
+        }
+      }
+    }),
+  ])
+}
+
 function openPlanModal() {
   if (!item.value) return
   planError.value = ''
@@ -337,6 +572,7 @@ async function load() {
     const loaded = await ordenesTrabajoService.get(id)
     item.value = loaded
     void ensureFurnitureGalleries(loaded.detalles ?? [])
+    void ensureCatalogDetails(loaded.detalles ?? [])
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : 'No se pudo cargar la orden.'
   } finally {
@@ -436,6 +672,27 @@ const detailRows = computed(() =>
     }),
 )
 
+const catalogRows = computed(() =>
+  (item.value?.detalles ?? [])
+    .filter((line) => line.tipo_item_info.codigo !== 'MUEBLE_MEDIDA' && !line.especificacion)
+    .map((line) => {
+      const prod =
+        typeof line.producto === 'number' ? catalogProducts.value[line.producto] : undefined
+      return {
+        ...line,
+        unidadLabel: line.unidad_info.nombre,
+        tipoItemLabel: line.tipo_item_info.nombre,
+        catalogSpec: parseCatalogSpecification(prod, line),
+      }
+    }),
+)
+
+const totalVisibleItems = computed(() =>
+  canOperateCommercial.value
+    ? detailRows.value.length + catalogRows.value.length
+    : detailRows.value.length,
+)
+
 const clientSummaryLabel = computed(() => {
   const client = item.value?.cliente_resumen
   if (!client) return ''
@@ -447,7 +704,7 @@ const workOrderTabs = computed(() => [
     id: 'trabajo',
     label: 'Detalle de trabajo',
     icon: Hammer,
-    badge: detailRows.value.length,
+    badge: totalVisibleItems.value,
   },
   {
     id: 'planificacion',
@@ -545,8 +802,17 @@ const workOrderTabs = computed(() => [
               <StatusBadge :status="item.estado_info.codigo" :label="item.estado_info.nombre" />
             </div>
             <small>
-              {{ detailRows.length }}
-              {{ detailRows.length === 1 ? 'mueble a medida' : 'muebles a medida' }}
+              <template v-if="canOperateCommercial && catalogRows.length && detailRows.length">
+                {{ detailRows.length }} a medida · {{ catalogRows.length }} catálogo
+              </template>
+              <template v-else-if="canOperateCommercial && catalogRows.length">
+                {{ catalogRows.length }}
+                {{ catalogRows.length === 1 ? 'producto de catálogo' : 'productos de catálogo' }}
+              </template>
+              <template v-else>
+                {{ detailRows.length }}
+                {{ detailRows.length === 1 ? 'mueble a medida' : 'muebles a medida' }}
+              </template>
             </small>
           </div>
         </div>
@@ -591,15 +857,15 @@ const workOrderTabs = computed(() => [
             </div>
           </div>
           <span class="counter">
-            {{ detailRows.length }}
-            {{ detailRows.length === 1 ? 'mueble' : 'muebles' }}
+            {{ totalVisibleItems }}
+            {{ totalVisibleItems === 1 ? 'ítem' : 'ítems' }}
           </span>
         </div>
 
         <EmptyState
-          v-if="!detailRows.length"
-          title="Sin muebles a medida registrados"
-          description="Esta orden no contiene muebles a medida para fabricación en taller."
+          v-if="!detailRows.length && (!canOperateCommercial || !catalogRows.length)"
+          title="Sin ítems registrados"
+          description="Esta orden no contiene ítems para visualizar."
         />
 
         <article
@@ -733,6 +999,139 @@ const workOrderTabs = computed(() => [
             <span>Mueble a medida · Ficha técnica reservada a taller</span>
           </div>
         </article>
+
+        <!-- Productos de catálogo con ficha completa (Admin y Encargado de tienda) -->
+        <template v-if="canOperateCommercial && catalogRows.length">
+          <article
+            v-for="(cat, catIdx) in catalogRows"
+            :key="cat.id"
+            class="work-line work-line--fabrication"
+          >
+            <div class="work-line__main">
+              <div class="work-line__text">
+                <div class="work-line__badges">
+                  <span class="work-line__index">
+                    {{ String(detailRows.length + catIdx + 1).padStart(2, '0') }}
+                  </span>
+                  <Badge tone="info">
+                    <Package :size="12" aria-hidden="true" />
+                    {{ cat.catalogSpec.categoryLabel }}
+                  </Badge>
+                  <span v-if="cat.catalogSpec.sku" class="work-type-tag">
+                    <Tag :size="12" aria-hidden="true" />
+                    {{ cat.catalogSpec.sku }}
+                  </span>
+                </div>
+                <h3 class="work-line__title">{{ cat.nombre }}</h3>
+                <p v-if="cat.catalogSpec.modelo" class="work-line__desc">
+                  Modelo: {{ cat.catalogSpec.modelo }}
+                </p>
+              </div>
+
+              <div class="work-line__qty">
+                <strong>{{ formatQuantity(cat.cantidad) }}</strong>
+                <span>{{ cat.unidadLabel }}</span>
+              </div>
+            </div>
+
+            <div class="workshop-body">
+              <div
+                class="workshop-grid"
+                :class="{ 'workshop-grid--full': !catalogImages(cat.producto).length }"
+              >
+                <div class="workshop-specs">
+                  <div
+                    v-if="cat.catalogSpec.medidas.length"
+                    class="spec-section spec-section--measures"
+                  >
+                    <h4><Ruler :size="15" aria-hidden="true" /> Medidas y rendimiento</h4>
+                    <dl class="measures-grid">
+                      <div
+                        v-for="(medida, mIdx) in cat.catalogSpec.medidas"
+                        :key="mIdx"
+                        class="measure-chip"
+                      >
+                        <dt>{{ medida.label }}</dt>
+                        <dd>{{ medida.value }}</dd>
+                      </div>
+                    </dl>
+                  </div>
+
+                  <div
+                    v-if="cat.catalogSpec.generalSpecs.length"
+                    class="spec-section spec-section--general"
+                  >
+                    <h4>
+                      <SlidersHorizontal :size="15" aria-hidden="true" /> Características generales
+                    </h4>
+                    <dl class="ficha-kv-grid">
+                      <div v-for="(specItem, gIdx) in cat.catalogSpec.generalSpecs" :key="gIdx">
+                        <dt>{{ specItem.label }}</dt>
+                        <dd>{{ specItem.value }}</dd>
+                      </div>
+                    </dl>
+                  </div>
+
+                  <div
+                    v-if="cat.catalogSpec.componenteSpecs.length"
+                    class="spec-section spec-section--components"
+                  >
+                    <h4><Layers :size="15" aria-hidden="true" /> Especificaciones del producto</h4>
+                    <dl class="ficha-kv-grid">
+                      <div v-for="(compSpec, cIdx) in cat.catalogSpec.componenteSpecs" :key="cIdx">
+                        <dt>{{ compSpec.label }}</dt>
+                        <dd>{{ compSpec.value }}</dd>
+                      </div>
+                    </dl>
+                  </div>
+
+                  <div v-if="cat.catalogSpec.observaciones" class="ficha-notes">
+                    <StickyNote :size="16" aria-hidden="true" />
+                    <div>
+                      <strong>Observaciones técnicas</strong>
+                      <p>{{ cat.catalogSpec.observaciones }}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-if="catalogImages(cat.producto).length" class="workshop-media">
+                  <WorkshopImageViewer
+                    :images="catalogImages(cat.producto)"
+                    title="Imágenes del producto"
+                  />
+                </div>
+              </div>
+            </div>
+          </article>
+        </template>
+
+        <!-- Vista superficial de catálogo para Jefe de Taller en pedidos mixtos -->
+        <section
+          v-else-if="!canOperateCommercial && catalogRows.length"
+          class="catalog-ref-panel"
+          aria-label="Productos de catálogo incluidos en el pedido"
+        >
+          <div class="catalog-ref-panel__head">
+            <Package :size="16" aria-hidden="true" />
+            <div>
+              <h3>Productos de catálogo incluidos (referencia)</h3>
+              <p>
+                Ítems comerciales que acompañan este pedido; no requieren fabricación en taller.
+              </p>
+            </div>
+          </div>
+          <ul class="catalog-ref-list">
+            <li v-for="cat in catalogRows" :key="cat.id" class="catalog-ref-item">
+              <div class="catalog-ref-item__main">
+                <Badge tone="neutral">{{ cat.tipoItemLabel }}</Badge>
+                <strong>{{ cat.nombre }}</strong>
+              </div>
+              <span class="catalog-ref-item__qty">
+                {{ formatQuantity(cat.cantidad) }} {{ cat.unidadLabel }}
+              </span>
+            </li>
+          </ul>
+        </section>
       </section>
 
       <section
@@ -1671,6 +2070,61 @@ const workOrderTabs = computed(() => [
   background: var(--color-surface-muted);
   font-size: 0.88rem;
   line-height: 1.45;
+}
+.catalog-ref-panel {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-muted);
+}
+.catalog-ref-panel__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  color: var(--color-text-secondary);
+}
+.catalog-ref-panel__head h3 {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--color-text);
+}
+.catalog-ref-panel__head p {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+}
+.catalog-ref-list {
+  display: grid;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.catalog-ref-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+.catalog-ref-item__main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.catalog-ref-item__main strong {
+  font-size: 0.88rem;
+}
+.catalog-ref-item__qty {
+  font-size: 0.84rem;
+  font-weight: 650;
+  color: var(--color-text-secondary);
 }
 @media (max-width: 64rem) {
   .summary,
