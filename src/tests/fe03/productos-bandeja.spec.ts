@@ -23,6 +23,7 @@ const sample: Producto = {
   nombre: 'Silla de visita azul',
   precio_vigente: '590.00',
   stock: '27.0000',
+  estado_stock: 'SIN_MINIMO',
   demanda_pendiente: '1.0000',
   disponibilidad_referencial: '26.0000',
   unidad_stock: 3,
@@ -94,7 +95,7 @@ describe('Bandeja administrativa de productos', () => {
       expect(wrapper.get('table').attributes('class')).toContain('product-table')
       expect(wrapper.text()).toContain('1 producto encontrado')
       expect(wrapper.text()).toContain('27 piezas')
-      expect(wrapper.text()).toContain('Pendiente: 1')
+      expect(wrapper.text()).toContain('Demanda pendiente: 1 pieza')
       expect(wrapper.findAll('[aria-label="Ver producto Silla de visita azul"]')).toHaveLength(1)
       expect(wrapper.text()).not.toContain('Nuevo producto')
       await wrapper.get('[aria-label="Vista rápida de Silla de visita azul"]').trigger('click')

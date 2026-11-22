@@ -48,3 +48,51 @@ export function catalogoId(value: string): string {
     ? value
     : ''
 }
+
+export type DisponibilidadMeta = {
+  tone: 'success' | 'warning' | 'danger'
+  label: string
+  hint: string
+}
+
+export function disponibilidadMeta(valor: string | number): DisponibilidadMeta {
+  const n = Number(valor)
+  if (!Number.isFinite(n) || n > 0) {
+    return {
+      tone: 'success',
+      label: 'Disponible',
+      hint: 'Stock actual menos demanda pendiente',
+    }
+  }
+  if (n === 0) {
+    return {
+      tone: 'warning',
+      label: 'Sin margen',
+      hint: 'Demanda pendiente iguala al stock actual',
+    }
+  }
+  return {
+    tone: 'danger',
+    label: 'Déficit referencial',
+    hint: 'Demanda superior a existencias (no es stock físico negativo)',
+  }
+}
+
+export type EstadoStockMeta = {
+  tone: 'danger' | 'warning' | 'success' | 'neutral'
+  label: string
+  showBadge: boolean
+}
+
+export function estadoStockMeta(estadoStock?: string): EstadoStockMeta {
+  switch (estadoStock) {
+    case 'SIN_EXISTENCIAS':
+      return { tone: 'danger', label: 'Sin existencias', showBadge: true }
+    case 'STOCK_BAJO':
+      return { tone: 'warning', label: 'Stock bajo', showBadge: true }
+    case 'NORMAL':
+      return { tone: 'success', label: 'Por encima del mínimo', showBadge: true }
+    default:
+      return { tone: 'neutral', label: 'Sin mínimo configurado', showBadge: false }
+  }
+}

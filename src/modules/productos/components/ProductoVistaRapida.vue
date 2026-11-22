@@ -15,9 +15,15 @@ import type { DetalleProforma, Producto } from '@/generated/api'
 import type { GalleryImage } from '@/shared/media/gallery'
 import { galleryService } from '@/shared/media/gallery'
 import Modal from '@/shared/ui/Modal.vue'
+import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
 import GalleryPhoto from '@/shared/media/GalleryPhoto.vue'
 import { leerDatosTecnicos } from '@/modules/proformas/services/muebleTecnico'
+import {
+  disponibilidadMeta,
+  estadoStockMeta,
+  unidadesProducto,
+} from '../utils/presentacionCatalogo'
 
 const props = withDefaults(
   defineProps<{
@@ -485,17 +491,30 @@ const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.t
                 </dd>
               </div>
               <div>
-                <dt>Existencias</dt>
-                <dd>{{ product.stock }} {{ product.unidad_stock_info?.nombre }}</dd>
+                <dt>Stock actual</dt>
+                <dd>
+                  {{ unidadesProducto(product, product.stock) }}
+                  <Badge
+                    v-if="estadoStockMeta(product.estado_stock).showBadge"
+                    :tone="estadoStockMeta(product.estado_stock).tone"
+                  >
+                    {{ estadoStockMeta(product.estado_stock).label }}
+                  </Badge>
+                </dd>
               </div>
               <div>
                 <dt>Demanda pendiente</dt>
-                <dd>{{ product.demanda_pendiente }} {{ product.unidad_stock_info?.nombre }}</dd>
+                <dd>{{ unidadesProducto(product, product.demanda_pendiente) }}</dd>
               </div>
               <div>
                 <dt>Disponibilidad referencial</dt>
                 <dd>
-                  {{ product.disponibilidad_referencial }} {{ product.unidad_stock_info?.nombre }}
+                  <Badge
+                    :tone="disponibilidadMeta(product.disponibilidad_referencial).tone"
+                    :title="disponibilidadMeta(product.disponibilidad_referencial).hint"
+                  >
+                    {{ unidadesProducto(product, product.disponibilidad_referencial) }}
+                  </Badge>
                 </dd>
               </div>
             </dl>

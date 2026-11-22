@@ -3,18 +3,37 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
   ArrowDownRight,
+  ArrowUpRight,
   Boxes,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
   CornerDownRight,
   Cpu,
+  Download,
   PackagePlus,
+  Plus,
   RotateCcw,
   SlidersHorizontal,
   UserCheck,
 } from '@lucide/vue'
-import type { MovimientoStock, ValorCatalogoPublico } from '@/generated/api'
+import type {
+  CatalogoMotivosAjuste,
+  MovimientoReporteItem,
+  MovimientoStock,
+  Producto,
+  ReporteResumen,
+  ValorCatalogoPublico,
+} from '@/generated/api'
+import { useSessionStore } from '@/app/stores/useSessionStore'
+import { productosService } from '@/modules/productos/services/productosService'
+import {
+  disponibilidadMeta,
+  estadoStockMeta,
+  unidadesProducto,
+} from '@/modules/productos/utils/presentacionCatalogo'
+import { ApiError } from '@/shared/api'
+import { downloadBlob } from '@/shared/download/downloadBlob'
 import { movimientosStockService } from '../services/movimientosStockService'
 import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
 import Badge from '@/shared/ui/Badge.vue'
@@ -23,16 +42,21 @@ import DatePresentation from '@/shared/ui/DatePresentation.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
+import Modal from '@/shared/ui/Modal.vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
 import SearchField from '@/shared/ui/SearchField.vue'
 import Select from '@/shared/ui/Select.vue'
+import TextAreaField from '@/shared/ui/TextAreaField.vue'
 import TextField from '@/shared/ui/TextField.vue'
+import Toast from '@/shared/ui/Toast.vue'
 import { dateRangeError, isValidDate, localToday } from '@/shared/validation/dateRange'
 
 const emit = defineEmits<{ openMenu: [] }>()
 const route = useRoute()
 const router = useRouter()
+const session = useSessionStore()
 const today = localToday()
+const canAdmin = computed(() => session.can('comercial.administrar'))
 
 const queryString = (key: string) =>
   typeof route.query[key] === 'string' ? String(route.query[key]) : ''
@@ -40,16 +64,34 @@ const routeDate = (key: string) => (isValidDate(queryString(key)) ? queryString(
 const routePositiveInt = (key: string) =>
   /^\d+$/.test(queryString(key)) && Number(queryString(key)) > 0 ? queryString(key) : ''
 
-const rows = ref<MovimientoStock[]>([])
+const rows = ref<Array<MovimientoStock | MovimientoReporteItem>>([])
 const types = ref<ValorCatalogoPublico[]>([])
 const total = ref(0)
 const loading = ref(true)
 const referenceLoading = ref(true)
 const error = ref('')
 const referenceError = ref('')
+const toastMessage = ref('')
+const toastTone = ref<'success' | 'danger'>('success')
+
+// P1: Cabecera contextual cuando se filtra por un producto específico
+const selectedProduct = ref<Producto | null>(null)
+const selectedProductLoading = ref(false)
+
+// P6: Modo reporte con saldos históricos y exportación CSV
+const reportMode = ref(queryString('vista') === 'reporte')
+const saldoReconstruible = ref(false)
+const limitacionSaldo = ref<string | null>(null)
+const reporteResumen = ref<ReporteResumen | null>(null)
+const exportingCsv = ref(false)
 
 const search = ref(queryString('q'))
 const type = ref(queryString('tipo'))
+const direccion = ref<'ENTRADA' | 'SALIDA' | ''>(
+  queryString('direccion') === 'ENTRADA' || queryString('direccion') === 'SALIDA'
+    ? (queryString('direccion') as 'ENTRADA' | 'SALIDA')
+    : '',
+)
 const pedido = ref(routePositiveInt('pedido'))
 const producto = ref(routePositiveInt('producto'))
 const fechaDesde = ref(routeDate('desde'))
@@ -72,6 +114,7 @@ const hasFilters = computed(() =>
   Boolean(
     search.value.trim() ||
     type.value ||
+    direccion.value ||
     pedido.value ||
     producto.value ||
     fechaDesde.value ||
@@ -86,6 +129,14 @@ const activeFilters = computed(() => [
         {
           key: 'type',
           label: `Tipo: ${types.value.find((item) => item.codigo === type.value)?.nombre ?? type.value}`,
+        },
+      ]
+    : []),
+  ...(direccion.value
+    ? [
+        {
+          key: 'direccion',
+          label: `Dirección: ${direccion.value === 'ENTRADA' ? 'Entradas (+)' : 'Salidas (-)'}`,
         },
       ]
     : []),
@@ -125,6 +176,7 @@ function movementIcon(code: string) {
 function removeFilter(key: string) {
   if (key === 'search') search.value = ''
   if (key === 'type') type.value = ''
+  if (key === 'direccion') direccion.value = ''
   if (key === 'pedido') pedido.value = ''
   if (key === 'producto') producto.value = ''
   if (key === 'desde') fechaDesde.value = ''
@@ -134,6 +186,7 @@ function removeFilter(key: string) {
 function clearFilters() {
   search.value = ''
   type.value = ''
+  direccion.value = ''
   pedido.value = ''
   producto.value = ''
   fechaDesde.value = ''
@@ -144,10 +197,12 @@ function currentQuery() {
   return {
     q: search.value.trim() || undefined,
     tipo: type.value || undefined,
+    direccion: direccion.value || undefined,
     pedido: pedido.value || undefined,
     producto: producto.value || undefined,
     desde: fechaDesde.value || undefined,
     hasta: fechaHasta.value || undefined,
+    vista: reportMode.value ? 'reporte' : undefined,
     pagina: page.value > 1 ? String(page.value) : undefined,
   }
 }
@@ -175,30 +230,64 @@ async function loadReferences() {
   }
 }
 
+async function loadSelectedProduct() {
+  const id = Number(producto.value)
+  if (!producto.value || !Number.isInteger(id) || id <= 0) {
+    selectedProduct.value = null
+    return
+  }
+  selectedProductLoading.value = true
+  try {
+    selectedProduct.value = await productosService.get(id)
+  } catch {
+    selectedProduct.value = null
+  } finally {
+    selectedProductLoading.value = false
+  }
+}
+
 async function load() {
   const currentRequest = ++requestId
   if (dateError.value) {
     rows.value = []
     total.value = 0
+    reporteResumen.value = null
+    saldoReconstruible.value = false
+    limitacionSaldo.value = null
     loading.value = false
     return
   }
   loading.value = true
   error.value = ''
+  const params = {
+    search: search.value.trim() || undefined,
+    tipo_movimiento: type.value || undefined,
+    direccion: direccion.value || undefined,
+    pedido: pedido.value ? Number(pedido.value) : undefined,
+    producto: producto.value ? Number(producto.value) : undefined,
+    fecha_desde: fechaDesde.value || undefined,
+    fecha_hasta: fechaHasta.value || undefined,
+    page: page.value,
+    page_size: pageSize,
+  }
   try {
-    const result = await movimientosStockService.list({
-      search: search.value.trim() || undefined,
-      tipo_movimiento: type.value || undefined,
-      pedido: pedido.value ? Number(pedido.value) : undefined,
-      producto: producto.value ? Number(producto.value) : undefined,
-      fecha_desde: fechaDesde.value || undefined,
-      fecha_hasta: fechaHasta.value || undefined,
-      page: page.value,
-      page_size: pageSize,
-    })
-    if (currentRequest !== requestId) return
-    rows.value = result.results
-    total.value = result.count
+    if (reportMode.value) {
+      const result = await movimientosStockService.reporte(params)
+      if (currentRequest !== requestId) return
+      rows.value = result.results
+      total.value = result.count
+      saldoReconstruible.value = result.saldo_reconstruible
+      limitacionSaldo.value = result.limitacion_saldo
+      reporteResumen.value = result.resumen
+    } else {
+      const result = await movimientosStockService.list(params)
+      if (currentRequest !== requestId) return
+      rows.value = result.results
+      total.value = result.count
+      saldoReconstruible.value = false
+      limitacionSaldo.value = null
+      reporteResumen.value = null
+    }
     if (total.value > 0 && page.value > totalPages.value) {
       page.value = totalPages.value
       return
@@ -211,6 +300,178 @@ async function load() {
       cause instanceof Error ? cause.message : 'No se pudieron cargar los movimientos de stock.'
   } finally {
     if (currentRequest === requestId) loading.value = false
+  }
+}
+
+async function exportCsv() {
+  if (dateError.value || exportingCsv.value) return
+  exportingCsv.value = true
+  try {
+    const blob = await movimientosStockService.exportarCsv({
+      search: search.value.trim() || undefined,
+      tipo_movimiento: type.value || undefined,
+      direccion: direccion.value || undefined,
+      pedido: pedido.value ? Number(pedido.value) : undefined,
+      producto: producto.value ? Number(producto.value) : undefined,
+      fecha_desde: fechaDesde.value || undefined,
+      fecha_hasta: fechaHasta.value || undefined,
+    })
+    downloadBlob(blob, 'movimientos-stock.csv')
+    toastTone.value = 'success'
+    toastMessage.value = 'Reporte CSV exportado correctamente.'
+  } catch (err) {
+    toastTone.value = 'danger'
+    toastMessage.value = err instanceof ApiError ? err.message : 'No pudimos exportar el CSV.'
+  } finally {
+    exportingCsv.value = false
+  }
+}
+
+// P2: Modal de registro de entrada / salida manual (solo administración comercial)
+const ajusteOpen = ref(false)
+const ajusteTipo = ref<'ENTRADA' | 'SALIDA'>('ENTRADA')
+const ajusteProductoId = ref('')
+const ajusteProductoSearch = ref('')
+const ajusteProductos = ref<Producto[]>([])
+const ajusteProductosLoading = ref(false)
+const ajusteCantidad = ref('')
+const ajusteMotivo = ref('')
+const ajusteObservaciones = ref('')
+const ajusteSaving = ref(false)
+const ajusteError = ref('')
+const ajusteIdempotencyKey = ref('')
+const motivosCatalogo = ref<CatalogoMotivosAjuste | null>(null)
+
+const ajusteProductoSeleccionado = computed(
+  () =>
+    ajusteProductos.value.find((p) => String(p.id) === ajusteProductoId.value) ??
+    (selectedProduct.value && String(selectedProduct.value.id) === ajusteProductoId.value
+      ? selectedProduct.value
+      : null),
+)
+
+const motivosDisponibles = computed(() => {
+  if (!motivosCatalogo.value) return []
+  return ajusteTipo.value === 'ENTRADA'
+    ? motivosCatalogo.value.ENTRADA
+    : motivosCatalogo.value.SALIDA
+})
+
+const motivoSeleccionadoMeta = computed(
+  () => motivosDisponibles.value.find((m) => m.codigo === ajusteMotivo.value) ?? null,
+)
+
+const stockResultanteEstimado = computed(() => {
+  const prod = ajusteProductoSeleccionado.value
+  const qty = Number(ajusteCantidad.value)
+  if (!prod || !Number.isFinite(qty) || qty <= 0) return null
+  const actual = Number(prod.stock)
+  return ajusteTipo.value === 'ENTRADA' ? actual + qty : actual - qty
+})
+
+watch(ajusteTipo, () => {
+  const validCodes = new Set(motivosDisponibles.value.map((m) => m.codigo))
+  if (!validCodes.has(ajusteMotivo.value)) {
+    ajusteMotivo.value = motivosDisponibles.value[0]?.codigo ?? ''
+  }
+})
+
+async function loadAjusteProductos(term = '') {
+  ajusteProductosLoading.value = true
+  try {
+    const res = await productosService.list({
+      search: term.trim() || undefined,
+      page_size: 25,
+    })
+    ajusteProductos.value = res.results
+  } catch {
+    ajusteProductos.value = []
+  } finally {
+    ajusteProductosLoading.value = false
+  }
+}
+
+function generateUuidV4(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0'))
+  return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex.slice(6, 8).join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10, 16).join('')}`
+}
+
+async function openAjusteModal(tipoInicial: 'ENTRADA' | 'SALIDA' = 'ENTRADA') {
+  ajusteTipo.value = tipoInicial
+  ajusteCantidad.value = ''
+  ajusteObservaciones.value = ''
+  ajusteError.value = ''
+  ajusteIdempotencyKey.value = generateUuidV4()
+  ajusteProductoId.value = selectedProduct.value ? String(selectedProduct.value.id) : ''
+  ajusteOpen.value = true
+
+  if (!motivosCatalogo.value) {
+    try {
+      motivosCatalogo.value = await movimientosStockService.motivosAjuste()
+    } catch {
+      motivosCatalogo.value = null
+    }
+  }
+  ajusteMotivo.value = motivosDisponibles.value[0]?.codigo ?? ''
+  await loadAjusteProductos(ajusteProductoSearch.value)
+}
+
+async function submitAjuste() {
+  if (ajusteSaving.value) return
+  ajusteError.value = ''
+  const prodId = Number(ajusteProductoId.value)
+  if (!prodId) {
+    ajusteError.value = 'Selecciona un producto.'
+    return
+  }
+  const qty = Number(ajusteCantidad.value)
+  if (!Number.isFinite(qty) || qty <= 0) {
+    ajusteError.value = 'Ingresa una cantidad mayor a cero.'
+    return
+  }
+  if (!ajusteMotivo.value) {
+    ajusteError.value = 'Selecciona un motivo.'
+    return
+  }
+  if (motivoSeleccionadoMeta.value?.requiere_observaciones && !ajusteObservaciones.value.trim()) {
+    ajusteError.value = 'Las correcciones excepcionales requieren una observación justificativa.'
+    return
+  }
+
+  ajusteSaving.value = true
+  try {
+    await movimientosStockService.registrarAjuste(
+      {
+        producto: prodId,
+        tipo_operacion: ajusteTipo.value,
+        cantidad: ajusteCantidad.value.trim(),
+        motivo: ajusteMotivo.value as never,
+        observaciones: ajusteObservaciones.value.trim(),
+      },
+      ajusteIdempotencyKey.value,
+    )
+    ajusteOpen.value = false
+    toastTone.value = 'success'
+    toastMessage.value =
+      ajusteTipo.value === 'ENTRADA'
+        ? 'Entrada de stock registrada correctamente.'
+        : 'Salida de stock registrada correctamente.'
+    await Promise.all([load(), loadSelectedProduct()])
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 409) {
+      ajusteIdempotencyKey.value = generateUuidV4()
+    }
+    ajusteError.value =
+      err instanceof ApiError ? err.message : 'No pudimos registrar el movimiento.'
+  } finally {
+    ajusteSaving.value = false
   }
 }
 
@@ -228,18 +489,26 @@ function scheduleLoad(delay = 0) {
   }
 }
 
-watch([search, type, pedido, producto, fechaDesde, fechaHasta], (_newValues, oldValues) => {
-  if (restoringRoute || !mounted) return
-  if (page.value !== 1) page.value = 1
-  const onlySearchChanged =
-    oldValues &&
-    type.value === oldValues[1] &&
-    pedido.value === oldValues[2] &&
-    producto.value === oldValues[3] &&
-    fechaDesde.value === oldValues[4] &&
-    fechaHasta.value === oldValues[5]
-  scheduleLoad(onlySearchChanged ? 300 : 0)
-})
+watch(
+  [search, type, direccion, pedido, producto, fechaDesde, fechaHasta, reportMode],
+  (_newValues, oldValues) => {
+    if (restoringRoute || !mounted) return
+    if (page.value !== 1) page.value = 1
+    if (oldValues && producto.value !== oldValues[4]) {
+      void loadSelectedProduct()
+    }
+    const onlySearchChanged =
+      oldValues &&
+      type.value === oldValues[1] &&
+      direccion.value === oldValues[2] &&
+      pedido.value === oldValues[3] &&
+      producto.value === oldValues[4] &&
+      fechaDesde.value === oldValues[5] &&
+      fechaHasta.value === oldValues[6] &&
+      reportMode.value === oldValues[7]
+    scheduleLoad(onlySearchChanged ? 300 : 0)
+  },
+)
 
 watch(page, () => {
   if (restoringRoute || !mounted) return
@@ -250,22 +519,28 @@ watch(
   () => route.fullPath,
   async () => {
     if (synchronizing || !mounted) return
+    const incomingDir = queryString('direccion')
     const incoming = {
       search: queryString('q'),
       type: queryString('tipo'),
+      direccion: (incomingDir === 'ENTRADA' || incomingDir === 'SALIDA' ? incomingDir : '') as
+        'ENTRADA' | 'SALIDA' | '',
       pedido: routePositiveInt('pedido'),
       producto: routePositiveInt('producto'),
       fechaDesde: routeDate('desde'),
       fechaHasta: routeDate('hasta'),
+      reportMode: queryString('vista') === 'reporte',
       page: Math.max(1, Number(queryString('pagina')) || 1),
     }
     if (
       search.value === incoming.search &&
       type.value === incoming.type &&
+      direccion.value === incoming.direccion &&
       pedido.value === incoming.pedido &&
       producto.value === incoming.producto &&
       fechaDesde.value === incoming.fechaDesde &&
       fechaHasta.value === incoming.fechaHasta &&
+      reportMode.value === incoming.reportMode &&
       page.value === incoming.page
     ) {
       return
@@ -273,21 +548,25 @@ watch(
     restoringRoute = true
     search.value = incoming.search
     type.value = incoming.type
+    direccion.value = incoming.direccion
     pedido.value = incoming.pedido
     producto.value = incoming.producto
     fechaDesde.value = incoming.fechaDesde
     fechaHasta.value = incoming.fechaHasta
+    reportMode.value = incoming.reportMode
     page.value = incoming.page
     if (debounce) clearTimeout(debounce)
     await nextTick()
     restoringRoute = false
     void load()
+    void loadSelectedProduct()
   },
 )
 
 onMounted(() => {
   mounted = true
   void load()
+  void loadSelectedProduct()
   void loadReferences()
 })
 
@@ -300,17 +579,86 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="stock-movements-list">
+    <Toast
+      :visible="Boolean(toastMessage)"
+      :message="toastMessage"
+      :tone="toastTone"
+      @close="toastMessage = ''"
+    />
+
     <PageHeader
       title="Movimientos de stock"
-      description="Historial inmutable generado por las operaciones comerciales de HOMEX."
+      description="Historial inmutable generado por las operaciones comerciales y ajustes autorizados de HOMEX."
       show-menu
       @menu="emit('openMenu')"
-    />
+    >
+      <template #actions>
+        <Button
+          variant="secondary"
+          :disabled="exportingCsv || Boolean(dateError)"
+          @click="exportCsv"
+        >
+          <Download :size="16" aria-hidden="true" />
+          {{ exportingCsv ? 'Exportando...' : 'Exportar CSV' }}
+        </Button>
+        <Button v-if="canAdmin" @click="openAjusteModal('ENTRADA')">
+          <Plus :size="16" aria-hidden="true" />
+          Registrar movimiento
+        </Button>
+      </template>
+    </PageHeader>
+
+    <section
+      v-if="selectedProduct && !selectedProductLoading"
+      class="product-context-card"
+      aria-label="Resumen contextual del producto"
+    >
+      <div class="product-context-card__header">
+        <div>
+          <RouterLink :to="`/productos/${selectedProduct.id}`" class="product-context-card__title">
+            {{ selectedProduct.nombre }}
+          </RouterLink>
+          <p class="product-context-card__meta">
+            SKU: {{ selectedProduct.sku || `#${selectedProduct.id}` }} · Unidad:
+            {{ selectedProduct.unidad_stock_info?.nombre || '—' }}
+          </p>
+        </div>
+        <div class="product-context-card__actions">
+          <Badge
+            v-if="estadoStockMeta(selectedProduct.estado_stock).showBadge"
+            :tone="estadoStockMeta(selectedProduct.estado_stock).tone"
+          >
+            {{ estadoStockMeta(selectedProduct.estado_stock).label }}
+          </Badge>
+          <Button variant="secondary" @click="router.push(`/productos/${selectedProduct.id}`)">
+            Volver al producto
+          </Button>
+        </div>
+      </div>
+      <div class="product-context-card__kpis">
+        <div>
+          <span>Stock actual</span>
+          <strong>{{ unidadesProducto(selectedProduct, selectedProduct.stock) }}</strong>
+        </div>
+        <div>
+          <span>Demanda pendiente</span>
+          <strong>{{
+            unidadesProducto(selectedProduct, selectedProduct.demanda_pendiente)
+          }}</strong>
+        </div>
+        <div>
+          <span>Disponibilidad referencial</span>
+          <Badge :tone="disponibilidadMeta(selectedProduct.disponibilidad_referencial).tone">
+            {{ unidadesProducto(selectedProduct, selectedProduct.disponibilidad_referencial) }}
+          </Badge>
+        </div>
+      </div>
+    </section>
 
     <section class="stock-filters" aria-label="Buscar y filtrar movimientos de stock">
       <div class="stock-filters__main">
         <div class="stock-search">
-          <SearchField v-model="search" label="Buscar por SKU, producto u observación" />
+          <SearchField v-model="search" label="Buscar por SKU, producto, responsable o #pedido" />
         </div>
         <div class="stock-filter-select">
           <Select
@@ -324,22 +672,16 @@ onBeforeUnmount(() => {
             ]"
           />
         </div>
-        <div class="stock-filter-num">
-          <TextField
-            v-model="pedido"
-            name="pedido-movimiento"
-            label="Pedido"
-            type="number"
-            min="1"
-          />
-        </div>
-        <div class="stock-filter-num">
-          <TextField
-            v-model="producto"
-            name="producto-movimiento"
-            label="Producto"
-            type="number"
-            min="1"
+        <div class="stock-filter-select">
+          <Select
+            v-model="direccion"
+            name="direccion-movimiento"
+            label="Dirección"
+            :options="[
+              { label: 'Todas', value: '' },
+              { label: 'Entradas (+)', value: 'ENTRADA' },
+              { label: 'Salidas (-)', value: 'SALIDA' },
+            ]"
           />
         </div>
         <div class="stock-filter-date">
@@ -393,150 +735,349 @@ onBeforeUnmount(() => {
     <ErrorState v-else-if="error" :description="error">
       <button type="button" @click="load">Reintentar</button>
     </ErrorState>
-    <EmptyState
-      v-else-if="!rows.length"
-      :title="hasFilters ? 'Sin coincidencias' : 'Sin movimientos'"
-      :description="
-        hasFilters
-          ? 'No hay movimientos que coincidan con los filtros aplicados.'
-          : 'Todavía no se registraron movimientos de inventario.'
-      "
-    >
-      <Button v-if="hasFilters" variant="secondary" @click="clearFilters">Limpiar filtros</Button>
-    </EmptyState>
     <template v-else>
-      <div class="stock-results">
-        <p>{{ total }} movimiento{{ total === 1 ? '' : 's' }}</p>
-        <span>Kardex operativo HOMEX</span>
-      </div>
+      <section
+        v-if="reportMode && reporteResumen"
+        class="report-summary-bar"
+        aria-label="Resumen del período"
+      >
+        <div>
+          <span>Entradas del período</span>
+          <strong class="variation-qty--in"
+            >+{{ reporteResumen.total_entradas }} {{ reporteResumen.unidad_nombre }}</strong
+          >
+        </div>
+        <div>
+          <span>Salidas del período</span>
+          <strong class="variation-qty--out"
+            >-{{ reporteResumen.total_salidas }} {{ reporteResumen.unidad_nombre }}</strong
+          >
+        </div>
+        <div>
+          <span>Variación neta</span>
+          <strong
+            >{{ Number(reporteResumen.variacion_neta) > 0 ? '+' : ''
+            }}{{ reporteResumen.variacion_neta }} {{ reporteResumen.unidad_nombre }}</strong
+          >
+        </div>
+        <div v-if="reporteResumen.saldo_inicial_periodo != null">
+          <span>Saldo inicial del período</span>
+          <strong
+            >{{ reporteResumen.saldo_inicial_periodo }} {{ reporteResumen.unidad_nombre }}</strong
+          >
+        </div>
+        <div v-if="reporteResumen.saldo_final_periodo != null">
+          <span>Saldo final del período</span>
+          <strong
+            >{{ reporteResumen.saldo_final_periodo }} {{ reporteResumen.unidad_nombre }}</strong
+          >
+        </div>
+      </section>
 
-      <div class="stock-table">
-        <table>
-          <caption class="sr-only">
-            Historial de movimientos de stock
-          </caption>
-          <colgroup>
-            <col class="col-product" />
-            <col class="col-variation" />
-            <col class="col-trace" />
-            <col class="col-actor" />
-            <col class="col-date" />
-          </colgroup>
-          <thead>
-            <tr>
-              <th scope="col">Producto y movimiento</th>
-              <th scope="col">Tipo y variación</th>
-              <th scope="col">Trazabilidad</th>
-              <th scope="col">Responsable y observación</th>
-              <th scope="col">Fecha</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in rows" :key="row.id">
-              <td class="product-cell">
-                <div class="product-identity">
-                  <span
-                    class="movement-badge"
-                    :class="`movement-badge--${movementTone(row.tipo_movimiento_info.codigo)}`"
-                  >
-                    <component
-                      :is="movementIcon(row.tipo_movimiento_info.codigo)"
-                      :size="16"
-                      aria-hidden="true"
-                    />
-                  </span>
-                  <div class="product-identity__text">
-                    <strong :title="row.producto_resumen.nombre">
-                      {{ row.producto_resumen.nombre }}
-                    </strong>
-                    <span class="product-sku">
-                      SKU: {{ row.producto_resumen.sku || `Prod. ${row.producto}` }} · Mov.
-                      {{ row.id }}
-                    </span>
-                  </div>
-                </div>
-              </td>
+      <p v-if="reportMode && limitacionSaldo" class="report-limitation-note" role="status">
+        {{ limitacionSaldo }}
+      </p>
 
-              <td class="variation-cell" data-label="Tipo y variación">
-                <div class="variation-stack">
-                  <Badge
-                    :tone="movementTone(row.tipo_movimiento_info.codigo)"
-                    :title="row.tipo_movimiento_info.nombre"
-                  >
-                    {{
-                      movementLabel(
-                        row.tipo_movimiento_info.codigo,
-                        row.tipo_movimiento_info.nombre,
-                      )
-                    }}
-                  </Badge>
-                  <div class="variation-amount">
-                    <strong
-                      class="variation-qty"
-                      :class="Number(row.cantidad) < 0 ? 'variation-qty--out' : 'variation-qty--in'"
+      <EmptyState
+        v-if="!rows.length"
+        :title="hasFilters ? 'Sin coincidencias' : 'Sin movimientos'"
+        :description="
+          hasFilters
+            ? 'No hay movimientos que coincidan con los filtros aplicados.'
+            : 'Todavía no se registraron movimientos de inventario.'
+        "
+      >
+        <Button v-if="hasFilters" variant="secondary" @click="clearFilters">Limpiar filtros</Button>
+      </EmptyState>
+      <template v-else>
+        <div class="stock-results">
+          <p>{{ total }} movimiento{{ total === 1 ? '' : 's' }}</p>
+          <span>{{ reportMode ? 'Reporte operativo HOMEX' : 'Kardex operativo HOMEX' }}</span>
+        </div>
+
+        <div class="stock-table">
+          <table>
+            <caption class="sr-only">
+              Historial de movimientos de stock
+            </caption>
+            <colgroup>
+              <col class="col-product" />
+              <col class="col-variation" />
+              <col v-if="reportMode && saldoReconstruible" class="col-balance" />
+              <col class="col-trace" />
+              <col class="col-actor" />
+              <col class="col-date" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th scope="col">Producto y movimiento</th>
+                <th scope="col">Tipo y variación</th>
+                <th v-if="reportMode && saldoReconstruible" scope="col">Saldo</th>
+                <th scope="col">Trazabilidad</th>
+                <th scope="col">Responsable y observación</th>
+                <th scope="col">Fecha</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in rows" :key="row.id">
+                <td class="product-cell">
+                  <div class="product-identity">
+                    <span
+                      class="movement-badge"
+                      :class="`movement-badge--${movementTone(row.tipo_movimiento_info.codigo)}`"
                     >
-                      {{ Number(row.cantidad) > 0 ? '+' : '' }}{{ row.cantidad }}
-                    </strong>
-                    <span class="variation-unit">
-                      {{ row.producto_resumen.unidad_stock_info.nombre }}
+                      <component
+                        :is="movementIcon(row.tipo_movimiento_info.codigo)"
+                        :size="16"
+                        aria-hidden="true"
+                      />
+                    </span>
+                    <div class="product-identity__text">
+                      <RouterLink
+                        :to="`/productos/${row.producto}`"
+                        class="product-identity__link"
+                        :title="row.producto_resumen.nombre"
+                      >
+                        {{ row.producto_resumen.nombre }}
+                      </RouterLink>
+                      <span class="product-sku">
+                        SKU: {{ row.producto_resumen.sku || `Prod. ${row.producto}` }} · Mov.
+                        {{ row.id }}
+                      </span>
+                    </div>
+                  </div>
+                </td>
+
+                <td class="variation-cell" data-label="Tipo y variación">
+                  <div class="variation-stack">
+                    <div class="variation-badges">
+                      <Badge
+                        :tone="movementTone(row.tipo_movimiento_info.codigo)"
+                        :title="row.tipo_movimiento_info.nombre"
+                      >
+                        {{
+                          movementLabel(
+                            row.tipo_movimiento_info.codigo,
+                            row.tipo_movimiento_info.nombre,
+                          )
+                        }}
+                      </Badge>
+                      <Badge v-if="row.motivo_label" tone="neutral">
+                        {{ row.motivo_label }}
+                      </Badge>
+                    </div>
+                    <div class="variation-amount">
+                      <component
+                        :is="Number(row.cantidad) < 0 ? ArrowDownRight : ArrowUpRight"
+                        :size="14"
+                        :class="
+                          Number(row.cantidad) < 0 ? 'variation-qty--out' : 'variation-qty--in'
+                        "
+                        aria-hidden="true"
+                      />
+                      <strong
+                        class="variation-qty"
+                        :class="
+                          Number(row.cantidad) < 0 ? 'variation-qty--out' : 'variation-qty--in'
+                        "
+                      >
+                        {{ Number(row.cantidad) > 0 ? '+' : '' }}{{ row.cantidad }}
+                      </strong>
+                      <span class="variation-unit">
+                        {{ row.producto_resumen.unidad_stock_info.nombre }}
+                        ({{ Number(row.cantidad) < 0 ? 'Salida' : 'Entrada' }})
+                      </span>
+                    </div>
+                  </div>
+                </td>
+
+                <td v-if="reportMode && saldoReconstruible" class="balance-cell" data-label="Saldo">
+                  <div
+                    v-if="'saldo_posterior' in row && row.saldo_posterior != null"
+                    class="balance-stack"
+                  >
+                    <strong
+                      >{{ row.saldo_posterior }}
+                      {{ row.producto_resumen.unidad_stock_info.nombre }}</strong
+                    >
+                    <small>Ant.: {{ row.saldo_anterior }}</small>
+                  </div>
+                  <span v-else>—</span>
+                </td>
+
+                <td class="trace-cell" data-label="Trazabilidad">
+                  <div class="trace-stack">
+                    <RouterLink
+                      v-if="row.pedido_relacionado"
+                      :to="`/pedidos/${row.pedido_relacionado}`"
+                      class="trace-order-link"
+                    >
+                      <ClipboardList :size="13" aria-hidden="true" />
+                      Pedido #{{ row.pedido_relacionado }}
+                    </RouterLink>
+                    <span v-else class="trace-no-order">Sin pedido</span>
+
+                    <span v-if="row.movimiento_referencia" class="trace-ref">
+                      <CornerDownRight :size="12" aria-hidden="true" />
+                      Orig. #{{ row.movimiento_referencia }}
                     </span>
                   </div>
-                </div>
-              </td>
+                </td>
 
-              <td class="trace-cell" data-label="Trazabilidad">
-                <div class="trace-stack">
-                  <RouterLink
-                    v-if="row.pedido_relacionado"
-                    :to="`/pedidos/${row.pedido_relacionado}`"
-                    class="trace-order-link"
-                  >
-                    <ClipboardList :size="13" aria-hidden="true" />
-                    Pedido #{{ row.pedido_relacionado }}
-                  </RouterLink>
-                  <span v-else class="trace-no-order">Sin pedido</span>
+                <td class="actor-cell" data-label="Responsable y observación">
+                  <div class="actor-stack">
+                    <span class="actor-name">
+                      <UserCheck
+                        v-if="row.responsable?.display_name"
+                        :size="14"
+                        aria-hidden="true"
+                      />
+                      <Cpu v-else :size="14" aria-hidden="true" />
+                      <strong>{{ row.responsable?.display_name || 'Sistema' }}</strong>
+                    </span>
+                    <span class="actor-obs" :title="row.observaciones || 'Sin observaciones'">
+                      {{ row.observaciones || '—' }}
+                    </span>
+                  </div>
+                </td>
 
-                  <span v-if="row.movimiento_referencia" class="trace-ref">
-                    <CornerDownRight :size="12" aria-hidden="true" />
-                    Orig. #{{ row.movimiento_referencia }}
-                  </span>
-                </div>
-              </td>
+                <td class="date-cell" data-label="Fecha">
+                  <DatePresentation :timestamp="String(row.fecha)" />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-              <td class="actor-cell" data-label="Responsable y observación">
-                <div class="actor-stack">
-                  <span class="actor-name">
-                    <UserCheck v-if="row.responsable?.display_name" :size="14" aria-hidden="true" />
-                    <Cpu v-else :size="14" aria-hidden="true" />
-                    <strong>{{ row.responsable?.display_name || 'Sistema' }}</strong>
-                  </span>
-                  <span class="actor-obs" :title="row.observaciones || 'Sin observaciones'">
-                    {{ row.observaciones || '—' }}
-                  </span>
-                </div>
-              </td>
+        <nav class="stock-pagination" aria-label="Paginación de movimientos de stock">
+          <p>Mostrando {{ fromItem }}–{{ toItem }} de {{ total }} movimientos</p>
+          <div v-if="totalPages > 1" class="stock-pagination__buttons">
+            <button type="button" :disabled="page <= 1" @click="page--">
+              <ChevronLeft :size="17" aria-hidden="true" /> Anterior
+            </button>
+            <span>Página {{ page }} de {{ totalPages }}</span>
+            <button type="button" :disabled="page >= totalPages" @click="page++">
+              Siguiente <ChevronRight :size="17" aria-hidden="true" />
+            </button>
+          </div>
+        </nav>
+      </template>
+    </template>
 
-              <td class="date-cell" data-label="Fecha">
-                <DatePresentation :timestamp="String(row.fecha)" />
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <nav class="stock-pagination" aria-label="Paginación de movimientos de stock">
-        <p>Mostrando {{ fromItem }}–{{ toItem }} de {{ total }} movimientos</p>
-        <div v-if="totalPages > 1" class="stock-pagination__buttons">
-          <button type="button" :disabled="page <= 1" @click="page--">
-            <ChevronLeft :size="17" aria-hidden="true" /> Anterior
+    <Modal
+      :open="ajusteOpen"
+      title="Registrar movimiento de inventario"
+      description="Registra una entrada o salida manual de tipo Ajuste. Esta operación quedará registrada permanentemente y no podrá editarse ni eliminarse."
+      @close="ajusteOpen = false"
+    >
+      <form id="ajuste-stock-form" class="ajuste-form" @submit.prevent="submitAjuste">
+        <div class="ajuste-tipo-toggle" role="group" aria-label="Tipo de operación">
+          <button
+            type="button"
+            class="ajuste-tipo-btn"
+            :class="{ 'ajuste-tipo-btn--active-in': ajusteTipo === 'ENTRADA' }"
+            @click="ajusteTipo = 'ENTRADA'"
+          >
+            <ArrowUpRight :size="16" aria-hidden="true" />
+            Entrada (+)
           </button>
-          <span>Página {{ page }} de {{ totalPages }}</span>
-          <button type="button" :disabled="page >= totalPages" @click="page++">
-            Siguiente <ChevronRight :size="17" aria-hidden="true" />
+          <button
+            type="button"
+            class="ajuste-tipo-btn"
+            :class="{ 'ajuste-tipo-btn--active-out': ajusteTipo === 'SALIDA' }"
+            @click="ajusteTipo = 'SALIDA'"
+          >
+            <ArrowDownRight :size="16" aria-hidden="true" />
+            Salida (-)
           </button>
         </div>
-      </nav>
-    </template>
+
+        <div class="ajuste-product-picker">
+          <SearchField
+            v-model="ajusteProductoSearch"
+            label="Buscar producto por nombre o SKU"
+            @update:model-value="loadAjusteProductos"
+          />
+          <Select
+            v-model="ajusteProductoId"
+            name="ajuste-producto"
+            label="Producto"
+            :disabled="ajusteProductosLoading"
+            :options="[
+              { label: 'Selecciona un producto', value: '' },
+              ...ajusteProductos.map((p) => ({
+                label: `${p.nombre} (${p.sku || `#${p.id}`}) · Stock: ${unidadesProducto(p, p.stock)}`,
+                value: String(p.id),
+              })),
+            ]"
+          />
+        </div>
+
+        <TextField
+          v-model="ajusteCantidad"
+          name="ajuste-cantidad"
+          :label="`Cantidad${ajusteProductoSeleccionado ? ` (${ajusteProductoSeleccionado.unidad_stock_info?.nombre || ''})` : ''}`"
+          type="number"
+          :step="ajusteProductoSeleccionado?.unidad_stock_info?.codigo === 'M2' ? '0.0001' : '1'"
+          min="0"
+          placeholder="0"
+        />
+
+        <Select
+          v-model="ajusteMotivo"
+          name="ajuste-motivo"
+          label="Motivo"
+          :options="motivosDisponibles.map((m) => ({ label: m.nombre, value: m.codigo }))"
+        />
+
+        <TextAreaField
+          v-model="ajusteObservaciones"
+          name="ajuste-observaciones"
+          :label="
+            motivoSeleccionadoMeta?.requiere_observaciones
+              ? 'Observaciones (obligatoria para corrección excepcional)'
+              : 'Observaciones (opcional)'
+          "
+          placeholder="Describe el respaldo o detalle del movimiento..."
+          :rows="3"
+        />
+
+        <div v-if="ajusteProductoSeleccionado" class="ajuste-preview">
+          <div>
+            <span>Stock actual</span>
+            <strong>{{
+              unidadesProducto(ajusteProductoSeleccionado, ajusteProductoSeleccionado.stock)
+            }}</strong>
+          </div>
+          <div>
+            <span>Variación solicitada</span>
+            <strong :class="ajusteTipo === 'ENTRADA' ? 'variation-qty--in' : 'variation-qty--out'">
+              {{ ajusteTipo === 'ENTRADA' ? '+' : '-' }}{{ ajusteCantidad || '0' }}
+            </strong>
+          </div>
+          <div>
+            <span>Stock resultante estimado</span>
+            <strong>
+              {{
+                stockResultanteEstimado !== null
+                  ? unidadesProducto(ajusteProductoSeleccionado, stockResultanteEstimado)
+                  : '—'
+              }}
+            </strong>
+          </div>
+        </div>
+
+        <p v-if="ajusteError" class="stock-alert" role="alert">{{ ajusteError }}</p>
+      </form>
+      <template #footer>
+        <Button variant="secondary" :disabled="ajusteSaving" @click="ajusteOpen = false">
+          Cancelar
+        </Button>
+        <Button type="submit" form="ajuste-stock-form" :disabled="ajusteSaving">
+          {{ ajusteSaving ? 'Registrando...' : 'Confirmar movimiento' }}
+        </Button>
+      </template>
+    </Modal>
   </div>
 </template>
 
@@ -972,5 +1513,156 @@ onBeforeUnmount(() => {
   .stock-pagination {
     justify-content: center;
   }
+}
+.product-context-card {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem 1.15rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card, var(--radius-control));
+  background: var(--color-surface);
+}
+.product-context-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.product-context-card__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+.product-context-card__title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text);
+  text-decoration: none;
+}
+.product-context-card__title:hover {
+  color: var(--color-primary-accent);
+  text-decoration: underline;
+}
+.product-context-card__meta {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+}
+.product-context-card__kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+}
+.product-context-card__kpis > div {
+  display: grid;
+  gap: 0.2rem;
+  justify-items: start;
+}
+.product-context-card__kpis span {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+.report-summary-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+.report-summary-bar > div {
+  display: grid;
+  gap: 0.15rem;
+}
+.report-summary-bar span {
+  font-size: 0.76rem;
+  color: var(--color-text-secondary);
+}
+.report-limitation-note {
+  margin: 0 0 0.75rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: var(--radius-control);
+  background: var(--color-surface-hover);
+  color: var(--color-text-secondary);
+  font-size: 0.84rem;
+}
+.product-identity__link {
+  font-weight: 650;
+  color: var(--color-text);
+  text-decoration: none;
+}
+.product-identity__link:hover {
+  color: var(--color-primary-accent);
+  text-decoration: underline;
+}
+.variation-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.balance-stack {
+  display: grid;
+  gap: 0.15rem;
+  font-variant-numeric: tabular-nums;
+}
+.balance-stack small {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
+.ajuste-form {
+  display: grid;
+  gap: 0.9rem;
+}
+.ajuste-tipo-toggle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+.ajuste-tipo-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+.ajuste-tipo-btn--active-in {
+  border-color: var(--color-success, #16a34a);
+  background: color-mix(in srgb, var(--color-success, #16a34a) 12%, transparent);
+}
+.ajuste-tipo-btn--active-out {
+  border-color: var(--color-danger, #dc2626);
+  background: color-mix(in srgb, var(--color-danger, #dc2626) 12%, transparent);
+}
+.ajuste-product-picker {
+  display: grid;
+  gap: 0.65rem;
+}
+.ajuste-preview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-hover);
+}
+.ajuste-preview > div {
+  display: grid;
+  gap: 0.15rem;
+}
+.ajuste-preview span {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
 }
 </style>
