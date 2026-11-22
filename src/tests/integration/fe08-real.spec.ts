@@ -133,8 +133,7 @@ test.describe.serial('FE08 backend real', () => {
     await expect(page.getByRole('status').filter({ hasText: 'Recibo anulado' })).toBeVisible()
 
     await page.goto(`/pedidos/${pedidoId}`)
-    await page.getByRole('button', { name: 'Otras transiciones de estado' }).click()
-    await page.getByRole('menuitem', { name: /Listo para entrega/ }).click()
+    await page.getByRole('button', { name: /Listo para entrega/ }).click()
     await page
       .getByRole('dialog')
       .getByRole('button', { name: 'Confirmar listo para entrega' })
