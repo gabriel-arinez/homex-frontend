@@ -295,7 +295,7 @@ test('FE05 OT muestra líneas reales y permite descargar su documento', async ({
   await page.goto('/ordenes-trabajo/3')
   await expect(page.getByRole('heading', { name: 'Orden de trabajo #40' })).toBeVisible()
   await expect(page.getByText('Escritorio a medida')).toBeVisible()
-  await expect(page.getByText('Pieza')).toBeVisible()
+  await expect(page.getByText('Pieza', { exact: true })).toBeVisible()
 
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Descargar PDF' }).click()
@@ -347,7 +347,8 @@ test('AP6.0.21 OT muestra ficha técnica autorizada', async ({ page }) => {
     }),
   )
   await page.goto('/ordenes-trabajo/3')
-  await expect(page.getByText('Escritorio a medida')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Orden de trabajo #40' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Escritorio a medida' }).first()).toBeVisible()
   await expect(page.getByText('Piezas y componentes')).toBeVisible()
   await expect(page.getByText('Conservar pieza original')).toBeVisible()
   await expect(page.getByText(/color a elección/)).toBeVisible()
