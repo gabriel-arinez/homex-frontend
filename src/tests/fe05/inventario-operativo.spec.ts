@@ -53,6 +53,7 @@ const productoSample: Producto = {
   activo: true,
   imagen_principal: null,
   created_by: 1,
+  creado_por_resumen: null,
   updated_by: 1,
 }
 

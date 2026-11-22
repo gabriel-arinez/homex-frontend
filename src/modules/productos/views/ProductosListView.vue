@@ -3,7 +3,9 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
   Armchair,
+  ArrowDownRight,
   ArrowUpRight,
+  Boxes,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -12,9 +14,13 @@ import {
   LayoutGrid,
   Layers,
   List,
+  MoreVertical,
   Package,
+  Pencil,
+  Power,
   RotateCcw,
   SlidersHorizontal,
+  Tag,
 } from '@lucide/vue'
 import type { FamiliaProducto, Producto, ValorCatalogoPublico } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
@@ -24,39 +30,57 @@ import {
   catalogoId,
   categoriaProducto,
   dineroProducto,
-  disponibilidadMeta,
   estadoStockMeta,
   pageNumberProducto,
+  resumenFichaProducto,
   unidadesProducto,
 } from '../utils/presentacionCatalogo'
 import ProductImage from '../components/ProductImage.vue'
-import ProductoVistaRapida from '../components/ProductoVistaRapida.vue'
+import ProductoStockAjusteModal from '../components/ProductoStockAjusteModal.vue'
 import {
   readCatalogImagesVisible,
   writeCatalogImagesVisible,
 } from '@/shared/media/catalogImageVisibility'
+import {
+  readCatalogViewMode,
+  writeCatalogViewMode,
+  type CatalogViewMode,
+} from '@/shared/media/catalogViewPreference'
+import { ApiError } from '@/shared/api'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
+import ConfirmDialog from '@/shared/ui/ConfirmDialog.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
 import SearchField from '@/shared/ui/SearchField.vue'
 import Select from '@/shared/ui/Select.vue'
+import Toast from '@/shared/ui/Toast.vue'
 
 const emit = defineEmits<{ openMenu: [] }>()
 const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
+
 const canCreate = computed(() => session.can('catalogo.crear_producto'))
+const canAdmin = computed(() => session.can('comercial.administrar'))
+const canOperate = computed(() => session.can('comercial.operar'))
+
+function canEditProduct(product: Producto): boolean {
+  return canAdmin.value || (canCreate.value && product.created_by === session.identity?.id)
+}
+
 const showImages = ref(readCatalogImagesVisible())
 watch(showImages, writeCatalogImagesVisible)
+
 const products = ref<Producto[]>([])
-const quickViewProduct = ref<Producto | null>(null)
 const total = ref(0)
 const loading = ref(true)
 const error = ref('')
 const notice = ref('')
+const toastMessage = ref('')
+const toastTone = ref<'success' | 'danger'>('success')
 const categoryError = ref('')
 const categoryLoading = ref(true)
 const categories = ref<ValorCatalogoPublico[]>([])
@@ -67,17 +91,37 @@ const advancedLoaded = ref(false)
 const advancedError = ref('')
 const showAdvanced = ref(false)
 
+const openMenuId = ref<number | null>(null)
+const ajusteStockOpen = ref(false)
+const ajusteStockProduct = ref<Producto | null>(null)
+const ajusteStockType = ref<'ENTRADA' | 'SALIDA'>('ENTRADA')
+const toggleTarget = ref<Producto | null>(null)
+const togglingStatus = ref(false)
+
 const routeString = (key: string): string =>
   typeof route.query[key] === 'string' ? String(route.query[key]) : ''
 const routeStatus = (): string =>
   ['todos', 'activos', 'inactivos'].includes(routeString('estado'))
     ? routeString('estado')
     : 'activos'
-type Vista = 'grid' | 'lista'
+type StockFilter = '' | 'SIN_EXISTENCIAS' | 'STOCK_BAJO' | 'NORMAL' | 'SIN_MINIMO'
+const routeStockStatus = (): StockFilter => {
+  const val = routeString('estado_stock')
+  return ['SIN_EXISTENCIAS', 'STOCK_BAJO', 'NORMAL', 'SIN_MINIMO'].includes(val)
+    ? (val as StockFilter)
+    : ''
+}
+const routeInitialView = (): CatalogViewMode => {
+  const qView = routeString('vista')
+  if (qView === 'grid' || qView === 'lista') return qView
+  return readCatalogViewMode()
+}
+
 const search = ref(routeString('q'))
 const status = ref(routeStatus())
+const stockStatus = ref<StockFilter>(routeStockStatus())
 const category = ref(catalogoId(routeString('categoria')))
-const view = ref<Vista>(routeString('vista') === 'grid' ? 'grid' : 'lista')
+const view = ref<CatalogViewMode>(routeInitialView())
 const page = ref(pageNumberProducto(routeString('pagina')))
 const size = 12
 
@@ -124,11 +168,17 @@ const hasFilters = computed(
   () =>
     Boolean(search.value.trim()) ||
     status.value !== 'activos' ||
+    Boolean(stockStatus.value) ||
     Boolean(category.value) ||
     extraKeys.some((key) => Boolean(extras[key])),
 )
 const hasSpecificFilters = computed(() =>
-  Boolean(search.value.trim() || category.value || extraKeys.some((key) => Boolean(extras[key]))),
+  Boolean(
+    search.value.trim() ||
+    category.value ||
+    stockStatus.value ||
+    extraKeys.some((key) => Boolean(extras[key])),
+  ),
 )
 const emptyTitle = computed(() => {
   if (hasSpecificFilters.value) return 'Sin resultados'
@@ -183,6 +233,7 @@ function queryFromFilters() {
   const query: Record<string, string | undefined> = {
     q: search.value.trim() || undefined,
     estado: status.value === 'activos' ? undefined : status.value,
+    estado_stock: stockStatus.value || undefined,
     categoria: category.value || undefined,
     vista: view.value === 'lista' ? undefined : 'grid',
     pagina: page.value > 1 ? String(page.value) : undefined,
@@ -191,7 +242,7 @@ function queryFromFilters() {
   return query
 }
 function routeMatches(query: Record<string, string | undefined>) {
-  const keys = ['q', 'estado', 'categoria', 'vista', 'pagina', ...extraKeys]
+  const keys = ['q', 'estado', 'estado_stock', 'categoria', 'vista', 'pagina', ...extraKeys]
   return keys.every((key) => (routeString(key) || undefined) === query[key])
 }
 function syncRoute() {
@@ -213,6 +264,7 @@ async function load() {
     const query: NonNullable<Parameters<typeof productosService.list>[0]> = {
       search: search.value.trim() || undefined,
       activo: status.value === 'todos' ? undefined : status.value === 'activos',
+      estado_stock: stockStatus.value || undefined,
       categoria: numberId(category.value),
       page: page.value,
       page_size: size,
@@ -265,7 +317,12 @@ function changeCategory(value: string) {
 function clearFilters() {
   search.value = ''
   status.value = 'activos'
+  stockStatus.value = ''
   changeCategory('')
+}
+function setViewMode(next: CatalogViewMode) {
+  view.value = next
+  writeCatalogViewMode(next)
 }
 async function loadCategories() {
   categoryLoading.value = true
@@ -336,12 +393,80 @@ function categoryIcon(product: Producto) {
   if (code === 'PISO_FLOTANTE') return Layers
   return Package
 }
+function toggleMenu(productId: number) {
+  openMenuId.value = openMenuId.value === productId ? null : productId
+}
+function closeMenus() {
+  openMenuId.value = null
+}
+function openProductDetail(product: Producto) {
+  closeMenus()
+  void router.push(`/productos/${product.id}`)
+}
+function openProductEdit(product: Producto) {
+  closeMenus()
+  void router.push({ path: `/productos/${product.id}`, query: { editar: '1' } })
+}
+function openProductMovements(product: Producto) {
+  closeMenus()
+  void router.push({ path: '/movimientos-stock', query: { producto: String(product.id) } })
+}
+function openProductStockAjuste(product: Producto, type: 'ENTRADA' | 'SALIDA') {
+  closeMenus()
+  ajusteStockProduct.value = product
+  ajusteStockType.value = type
+  ajusteStockOpen.value = true
+}
+async function onAjusteSaved(_movimiento: unknown, tipo: 'ENTRADA' | 'SALIDA') {
+  toastTone.value = 'success'
+  toastMessage.value =
+    tipo === 'ENTRADA'
+      ? 'Entrada de stock registrada correctamente.'
+      : 'Salida de stock registrada correctamente.'
+  await load()
+}
+function askToggleProductStatus(product: Producto) {
+  closeMenus()
+  toggleTarget.value = product
+}
+async function confirmToggleProductStatus() {
+  const target = toggleTarget.value
+  if (!target || togglingStatus.value) return
+  togglingStatus.value = true
+  try {
+    const nextActive = target.activo === false
+    await productosService.update(target.id, { activo: nextActive }, target.revision)
+    toggleTarget.value = null
+    toastTone.value = 'success'
+    toastMessage.value = nextActive ? 'Producto activado.' : 'Producto desactivado.'
+    await load()
+  } catch (err) {
+    toastTone.value = 'danger'
+    toastMessage.value =
+      err instanceof ApiError ? err.message : 'No pudimos actualizar el estado del producto.'
+    toggleTarget.value = null
+  } finally {
+    togglingStatus.value = false
+  }
+}
+
+function onDocumentClick(event: MouseEvent) {
+  const target = event.target as HTMLElement | null
+  if (!target?.closest('.action-menu')) {
+    closeMenus()
+  }
+}
+function onDocumentKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') closeMenus()
+}
+
 function restoreFilters() {
   restoring = true
   search.value = routeString('q')
   status.value = routeStatus()
+  stockStatus.value = routeStockStatus()
   category.value = catalogoId(routeString('categoria'))
-  view.value = routeString('vista') === 'grid' ? 'grid' : 'lista'
+  view.value = routeInitialView()
   page.value = pageNumberProducto(routeString('pagina'))
   for (const key of extraKeys)
     extras[key] =
@@ -353,7 +478,7 @@ function restoreFilters() {
     if (mounted) scheduleLoad()
   })
 }
-watch([search, status, category], (next, previous) =>
+watch([search, status, stockStatus, category], (next, previous) =>
   filtersChanged(next[0] !== previous[0] ? 300 : 0),
 )
 watch(extras, () => filtersChanged())
@@ -362,7 +487,8 @@ watch(page, () => {
   syncRoute()
   scheduleLoad()
 })
-watch(view, () => {
+watch(view, (next) => {
+  writeCatalogViewMode(next)
   if (!restoring) syncRoute()
 })
 watch(
@@ -373,6 +499,8 @@ watch(
 )
 onMounted(() => {
   mounted = true
+  document.addEventListener('click', onDocumentClick)
+  document.addEventListener('keydown', onDocumentKeydown)
   void load()
   void loadCategories()
   if (showAdvanced.value) void loadAdvanced()
@@ -381,14 +509,23 @@ onBeforeUnmount(() => {
   mounted = false
   ++requestId
   if (debounce) clearTimeout(debounce)
+  document.removeEventListener('click', onDocumentClick)
+  document.removeEventListener('keydown', onDocumentKeydown)
 })
 </script>
 
 <template>
   <div class="productos-bandeja">
+    <Toast
+      :visible="Boolean(toastMessage)"
+      :message="toastMessage"
+      :tone="toastTone"
+      @close="toastMessage = ''"
+    />
+
     <PageHeader
       title="Productos"
-      description="Consulta y administra el catálogo comercial."
+      description="Consulta existencias, precios y fichas técnicas del catálogo comercial."
       show-menu
       @menu="emit('openMenu')"
     >
@@ -430,7 +567,7 @@ onBeforeUnmount(() => {
           type="button"
           :aria-pressed="view === 'grid'"
           :class="{ selected: view === 'grid' }"
-          @click="view = 'grid'"
+          @click="setViewMode('grid')"
         >
           <LayoutGrid :size="17" aria-hidden="true" />Cuadrícula
         </button>
@@ -438,7 +575,7 @@ onBeforeUnmount(() => {
           type="button"
           :aria-pressed="view === 'lista'"
           :class="{ selected: view === 'lista' }"
-          @click="view = 'lista'"
+          @click="setViewMode('lista')"
         >
           <List :size="17" aria-hidden="true" />Lista
         </button>
@@ -468,6 +605,19 @@ onBeforeUnmount(() => {
             { label: 'Activos', value: 'activos' },
             { label: 'Todos', value: 'todos' },
             { label: 'Inactivos', value: 'inactivos' },
+          ]"
+        />
+        <Select
+          v-model="stockStatus"
+          name="existencias-producto-filtro"
+          label="Existencias"
+          :active="Boolean(stockStatus)"
+          :options="[
+            { label: 'Todas', value: '' },
+            { label: 'Con stock normal', value: 'NORMAL' },
+            { label: 'Stock bajo', value: 'STOCK_BAJO' },
+            { label: 'Sin existencias', value: 'SIN_EXISTENCIAS' },
+            { label: 'Sin mínimo configurado', value: 'SIN_MINIMO' },
           ]"
         />
         <div class="filters-primary__actions">
@@ -611,7 +761,7 @@ onBeforeUnmount(() => {
         }}</strong
       >
       <span v-else>Catálogo de productos</span>
-      <span class="results-order">Ordenados por nombre</span>
+      <span class="results-order">Ordenados alfabéticamente</span>
     </div>
     <LoadingSkeleton v-if="loading" :lines="6" />
     <ErrorState v-else-if="error" :description="error">
@@ -626,21 +776,89 @@ onBeforeUnmount(() => {
     </EmptyState>
     <template v-else>
       <div v-if="view === 'grid'" class="product-grid">
-        <article v-for="product in products" :key="product.id" class="product-card">
+        <article
+          v-for="product in products"
+          :key="product.id"
+          class="product-card"
+          :class="{ 'product-card--menu-open': openMenuId === product.id }"
+        >
           <div class="product-visual">
-            <ProductImage :image="product.imagen_principal" :alt="product.nombre" />
-            <button
-              type="button"
-              class="quick-view-trigger"
-              :aria-label="'Vista rápida de ' + product.nombre"
-              @click="quickViewProduct = product"
-            >
-              <Eye :size="18" aria-hidden="true" />
-            </button>
+            <ProductImage
+              :image="product.imagen_principal"
+              :alt="product.nombre"
+              :category-code="product.categoria_info?.codigo"
+            />
+            <div class="card-corner-actions action-menu">
+              <button
+                type="button"
+                class="menu-trigger"
+                :aria-label="'Acciones de ' + product.nombre"
+                :aria-expanded="openMenuId === product.id"
+                aria-haspopup="menu"
+                @click.stop="toggleMenu(product.id)"
+              >
+                <MoreVertical :size="18" aria-hidden="true" />
+              </button>
+              <div
+                v-if="openMenuId === product.id"
+                class="menu-dropdown"
+                role="menu"
+                :aria-label="'Acciones disponibles para ' + product.nombre"
+              >
+                <button type="button" role="menuitem" @click="openProductDetail(product)">
+                  <Eye :size="15" aria-hidden="true" /> Ver ficha del producto
+                </button>
+                <button
+                  v-if="canEditProduct(product)"
+                  type="button"
+                  role="menuitem"
+                  @click="openProductEdit(product)"
+                >
+                  <Pencil :size="15" aria-hidden="true" /> Editar producto
+                </button>
+                <button
+                  v-if="canAdmin"
+                  type="button"
+                  role="menuitem"
+                  @click="openProductStockAjuste(product, 'ENTRADA')"
+                >
+                  <ArrowUpRight :size="15" aria-hidden="true" /> Registrar entrada
+                </button>
+                <button
+                  v-if="canAdmin"
+                  type="button"
+                  role="menuitem"
+                  @click="openProductStockAjuste(product, 'SALIDA')"
+                >
+                  <ArrowDownRight :size="15" aria-hidden="true" /> Registrar salida
+                </button>
+                <button
+                  v-if="canOperate"
+                  type="button"
+                  role="menuitem"
+                  @click="openProductMovements(product)"
+                >
+                  <Boxes :size="15" aria-hidden="true" /> Historial de stock
+                </button>
+                <button
+                  v-if="canEditProduct(product)"
+                  type="button"
+                  role="menuitem"
+                  @click="askToggleProductStatus(product)"
+                >
+                  <Power :size="15" aria-hidden="true" />
+                  {{ product.activo === false ? 'Activar producto' : 'Desactivar producto' }}
+                </button>
+              </div>
+            </div>
           </div>
+
           <div class="card-body">
             <div class="card-flags">
-              <span class="category-label">{{ categoriaProducto(product) }}</span>
+              <span class="category-label">
+                <component :is="categoryIcon(product)" :size="13" aria-hidden="true" />
+                {{ categoriaProducto(product) }}
+              </span>
               <Badge :tone="product.activo === false ? 'neutral' : 'success'">{{
                 product.activo === false ? 'Inactivo' : 'Activo'
               }}</Badge>
@@ -648,49 +866,41 @@ onBeforeUnmount(() => {
             <h2 class="product-name" :title="product.nombre">
               <RouterLink :to="'/productos/' + product.id">{{ product.nombre }}</RouterLink>
             </h2>
-            <small class="sku" :title="product.sku || undefined">{{
-              product.sku || 'Sin SKU'
-            }}</small>
-            <p v-if="product.familia_info" class="family">{{ product.familia_info.nombre }}</p>
-            <div class="price-row">
-              <strong>{{ dineroProducto(product.precio_vigente) }}</strong>
-              <Badge v-if="product.promocion?.vigente" tone="info">Promoción</Badge>
-              <Badge
-                v-if="estadoStockMeta(product.estado_stock).showBadge"
-                :tone="estadoStockMeta(product.estado_stock).tone"
-              >
-                {{ estadoStockMeta(product.estado_stock).label }}
-              </Badge>
-            </div>
-            <div class="stock-summary">
-              <div>
-                <span>Stock actual</span
-                ><strong>{{ unidadesProducto(product, product.stock) }}</strong>
+            <small class="sku" :title="product.sku || undefined">
+              <Tag :size="11" aria-hidden="true" /> {{ product.sku || 'Sin SKU' }}
+            </small>
+            <p v-if="resumenFichaProducto(product) || product.familia_info" class="family">
+              {{
+                [product.familia_info?.nombre, resumenFichaProducto(product)]
+                  .filter(Boolean)
+                  .join(' · ')
+              }}
+            </p>
+            <div class="card-metrics-footer">
+              <div class="card-price">
+                <strong>{{ dineroProducto(product.precio_vigente) }}</strong>
+                <Badge v-if="product.promocion?.vigente" tone="info">Promoción</Badge>
               </div>
-              <div>
-                <span>Demanda pendiente</span
-                ><span>{{ unidadesProducto(product, product.demanda_pendiente) }}</span>
-              </div>
-              <div>
-                <span>Disponibilidad referencial</span>
+              <div class="card-stock">
+                <span class="card-stock__label">Stock actual</span>
+                <strong class="card-stock__value">{{
+                  unidadesProducto(product, product.stock)
+                }}</strong>
                 <Badge
-                  :tone="disponibilidadMeta(product.disponibilidad_referencial).tone"
-                  :title="disponibilidadMeta(product.disponibilidad_referencial).hint"
+                  v-if="
+                    estadoStockMeta(product.estado_stock).showBadge &&
+                    product.estado_stock !== 'NORMAL'
+                  "
+                  :tone="estadoStockMeta(product.estado_stock).tone"
                 >
-                  {{ unidadesProducto(product, product.disponibilidad_referencial) }}
+                  {{ estadoStockMeta(product.estado_stock).label }}
                 </Badge>
               </div>
             </div>
-            <RouterLink
-              class="card-detail"
-              :to="'/productos/' + product.id"
-              :aria-label="'Ver producto ' + product.nombre"
-            >
-              Ver detalle <Eye :size="15" aria-hidden="true" />
-            </RouterLink>
           </div>
         </article>
       </div>
+
       <div v-else class="table-wrap">
         <table class="product-table">
           <caption class="sr-only">
@@ -698,22 +908,26 @@ onBeforeUnmount(() => {
           </caption>
           <thead>
             <tr>
-              <th scope="col">Producto</th>
-              <th scope="col">Categoría</th>
+              <th scope="col">Producto y estado</th>
+              <th scope="col">Categoría y especificaciones</th>
               <th scope="col" class="numeric">Precio vigente</th>
-              <th scope="col" class="numeric">Existencias</th>
-              <th scope="col">Estado</th>
+              <th scope="col" class="numeric">Stock actual</th>
               <th scope="col" class="actions">Acciones</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="product in products" :key="product.id">
-              <td class="identity" data-label="Producto">
+            <tr
+              v-for="(product, rowIndex) in products"
+              :key="product.id"
+              :class="{ 'row--menu-open': openMenuId === product.id }"
+            >
+              <td class="identity" data-label="Producto y estado">
                 <div class="identity-content">
                   <div v-if="showImages" class="thumbnail">
                     <ProductImage
                       :image="product.imagen_principal"
                       :alt="product.nombre"
+                      :category-code="product.categoria_info?.codigo"
                       sizes="52px"
                     />
                   </div>
@@ -727,72 +941,123 @@ onBeforeUnmount(() => {
                       :title="product.nombre"
                       >{{ product.nombre }}</RouterLink
                     >
-                    <small :title="product.sku || undefined">{{ product.sku || 'Sin SKU' }}</small>
+                    <small class="sku-line" :title="product.sku || undefined">
+                      <Tag :size="11" aria-hidden="true" /> {{ product.sku || 'Sin SKU' }}
+                    </small>
+                    <div class="identity-badges">
+                      <Badge :tone="product.activo === false ? 'neutral' : 'success'">{{
+                        product.activo === false ? 'Inactivo' : 'Activo'
+                      }}</Badge>
+                      <Badge v-if="product.promocion?.vigente" tone="info">Promoción</Badge>
+                    </div>
                   </div>
                 </div>
               </td>
-              <td class="category-cell" data-label="Categoría">
-                <span>{{ categoriaProducto(product) }}</span>
-                <small v-if="product.familia_info">{{ product.familia_info.nombre }}</small>
+              <td class="category-cell" data-label="Categoría y especificaciones">
+                <span class="category-cell__title">
+                  <component :is="categoryIcon(product)" :size="14" aria-hidden="true" />
+                  {{ categoriaProducto(product) }}
+                </span>
+                <small v-if="product.familia_info" class="category-cell__family">
+                  Familia: {{ product.familia_info.nombre }}
+                </small>
+                <small v-if="resumenFichaProducto(product)" class="category-cell__specs">
+                  {{ resumenFichaProducto(product) }}
+                </small>
               </td>
               <td class="numeric price-cell" data-label="Precio vigente">
                 <strong>{{ dineroProducto(product.precio_vigente) }}</strong>
-                <small v-if="product.promocion?.vigente">Promoción</small>
+                <small v-if="product.promocion?.vigente && product.precio_lista" class="price-old">
+                  Lista: {{ dineroProducto(product.precio_lista) }}
+                </small>
               </td>
-              <td class="numeric stock-cell" data-label="Stock y disponibilidad">
+              <td class="numeric stock-cell" data-label="Stock actual">
                 <strong>{{ unidadesProducto(product, product.stock) }}</strong>
-                <small
-                  :title="
-                    'Demanda pendiente (proformas en revisión o enviadas): ' +
-                    unidadesProducto(product, product.demanda_pendiente)
+                <div
+                  v-if="
+                    estadoStockMeta(product.estado_stock).showBadge &&
+                    product.estado_stock !== 'NORMAL'
                   "
+                  class="stock-badge-row"
                 >
-                  Demanda pendiente: {{ unidadesProducto(product, product.demanda_pendiente) }}
-                </small>
-                <small
-                  :class="
-                    'disp-tone--' + disponibilidadMeta(product.disponibilidad_referencial).tone
-                  "
-                  :title="disponibilidadMeta(product.disponibilidad_referencial).hint"
-                >
-                  Disponibilidad ref.:
-                  {{ unidadesProducto(product, product.disponibilidad_referencial) }}
-                </small>
-                <Badge
-                  v-if="estadoStockMeta(product.estado_stock).showBadge"
-                  :tone="estadoStockMeta(product.estado_stock).tone"
-                >
-                  {{ estadoStockMeta(product.estado_stock).label }}
-                </Badge>
-              </td>
-              <td data-label="Estado">
-                <Badge :tone="product.activo === false ? 'neutral' : 'success'">{{
-                  product.activo === false ? 'Inactivo' : 'Activo'
-                }}</Badge>
+                  <Badge :tone="estadoStockMeta(product.estado_stock).tone">
+                    {{ estadoStockMeta(product.estado_stock).label }}
+                  </Badge>
+                </div>
               </td>
               <td class="actions" data-label="Acciones">
-                <button
-                  type="button"
-                  class="view-detail"
-                  :aria-label="'Vista rápida de ' + product.nombre"
-                  title="Vista rápida"
-                  @click="quickViewProduct = product"
-                >
-                  <Eye :size="18" aria-hidden="true" />
-                </button>
-                <RouterLink
-                  class="view-detail"
-                  :to="'/productos/' + product.id"
-                  :aria-label="'Ver producto ' + product.nombre"
-                  title="Ver detalle"
-                >
-                  <ArrowUpRight :size="18" aria-hidden="true" />
-                </RouterLink>
+                <div class="action-menu table-action-menu">
+                  <button
+                    type="button"
+                    class="menu-trigger"
+                    :aria-label="'Acciones de ' + product.nombre"
+                    :aria-expanded="openMenuId === product.id"
+                    aria-haspopup="menu"
+                    @click.stop="toggleMenu(product.id)"
+                  >
+                    <MoreVertical :size="18" aria-hidden="true" />
+                  </button>
+                  <div
+                    v-if="openMenuId === product.id"
+                    class="menu-dropdown"
+                    :class="{
+                      'menu-dropdown--up': rowIndex >= products.length - 2 && products.length > 2,
+                    }"
+                    role="menu"
+                    :aria-label="'Acciones disponibles para ' + product.nombre"
+                  >
+                    <button type="button" role="menuitem" @click="openProductDetail(product)">
+                      <Eye :size="15" aria-hidden="true" /> Ver ficha del producto
+                    </button>
+                    <button
+                      v-if="canEditProduct(product)"
+                      type="button"
+                      role="menuitem"
+                      @click="openProductEdit(product)"
+                    >
+                      <Pencil :size="15" aria-hidden="true" /> Editar producto
+                    </button>
+                    <button
+                      v-if="canAdmin"
+                      type="button"
+                      role="menuitem"
+                      @click="openProductStockAjuste(product, 'ENTRADA')"
+                    >
+                      <ArrowUpRight :size="15" aria-hidden="true" /> Registrar entrada
+                    </button>
+                    <button
+                      v-if="canAdmin"
+                      type="button"
+                      role="menuitem"
+                      @click="openProductStockAjuste(product, 'SALIDA')"
+                    >
+                      <ArrowDownRight :size="15" aria-hidden="true" /> Registrar salida
+                    </button>
+                    <button
+                      v-if="canOperate"
+                      type="button"
+                      role="menuitem"
+                      @click="openProductMovements(product)"
+                    >
+                      <Boxes :size="15" aria-hidden="true" /> Historial de stock
+                    </button>
+                    <button
+                      v-if="canEditProduct(product)"
+                      type="button"
+                      role="menuitem"
+                      @click="askToggleProductStatus(product)"
+                    >
+                      <Power :size="15" aria-hidden="true" />
+                      {{ product.activo === false ? 'Activar producto' : 'Desactivar producto' }}
+                    </button>
+                  </div>
+                </div>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
+
       <nav class="pagination" aria-label="Paginación de productos">
         <span>Mostrando {{ pageStart }}–{{ pageEnd }} de {{ total }} productos</span>
         <div class="pagination-actions">
@@ -806,14 +1071,29 @@ onBeforeUnmount(() => {
         </div>
       </nav>
     </template>
-    <ProductoVistaRapida
-      :open="Boolean(quickViewProduct)"
-      :product="quickViewProduct"
-      :detail-to="quickViewProduct ? `/productos/${quickViewProduct.id}` : ''"
-      :gallery-endpoint="
-        quickViewProduct ? `/api/v1/catalogo/productos/${quickViewProduct.id}/imagenes/` : ''
+
+    <ProductoStockAjusteModal
+      :open="ajusteStockOpen"
+      :initial-product="ajusteStockProduct"
+      :initial-type="ajusteStockType"
+      lock-product
+      @close="ajusteStockOpen = false"
+      @saved="onAjusteSaved"
+    />
+
+    <ConfirmDialog
+      :open="Boolean(toggleTarget)"
+      :title="toggleTarget?.activo === false ? 'Activar producto' : 'Desactivar producto'"
+      :description="
+        toggleTarget
+          ? toggleTarget.activo === false
+            ? `«${toggleTarget.nombre}» volverá a mostrarse como disponible para cotizar.`
+            : `«${toggleTarget.nombre}» dejará de aparecer al crear nuevas proformas.`
+          : ''
       "
-      @close="quickViewProduct = null"
+      :confirm-label="toggleTarget?.activo === false ? 'Activar' : 'Desactivar'"
+      @close="toggleTarget = null"
+      @confirm="confirmToggleProductStatus"
     />
   </div>
 </template>
@@ -913,7 +1193,9 @@ onBeforeUnmount(() => {
 }
 .filters-primary {
   display: grid;
-  grid-template-columns: minmax(12rem, 1fr) minmax(10rem, 13rem) minmax(8rem, 11rem) auto;
+  grid-template-columns:
+    minmax(11rem, 1fr) minmax(9rem, 12rem) minmax(7.5rem, 10rem) minmax(9rem, 12rem)
+    auto;
   gap: var(--space-3);
   align-items: end;
 }
@@ -1014,16 +1296,76 @@ onBeforeUnmount(() => {
 .results-order {
   color: var(--color-text-secondary);
 }
+
+/* Action dropdown menu */
+.action-menu {
+  position: relative;
+  display: inline-flex;
+}
+.menu-trigger {
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  cursor: pointer;
+}
+.menu-trigger:hover {
+  color: var(--color-primary-accent);
+  background: var(--color-surface-hover);
+}
+.menu-dropdown {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  z-index: 60;
+  display: grid;
+  min-width: 13.5rem;
+  padding: 0.35rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised, var(--color-surface));
+  box-shadow: 0 10px 28px rgb(0 0 0 / 28%);
+}
+.menu-dropdown--up {
+  top: auto;
+  bottom: calc(100% + 0.35rem);
+}
+.menu-dropdown button {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.menu-dropdown button:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-primary-accent);
+}
+
+/* Grid view */
 .product-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-4);
 }
 .product-card {
+  position: relative;
   display: flex;
   min-width: 0;
   flex-direction: column;
-  overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
@@ -1032,40 +1374,34 @@ onBeforeUnmount(() => {
 .product-card:hover {
   border-color: var(--color-border-strong);
 }
+.product-card--menu-open {
+  z-index: 30;
+}
 .product-visual {
   position: relative;
   display: grid;
   aspect-ratio: 4 / 3;
-  overflow: hidden;
+  border-top-left-radius: calc(var(--radius-card) - 1px);
+  border-top-right-radius: calc(var(--radius-card) - 1px);
   background: var(--color-background);
-}
-.quick-view-trigger {
-  position: absolute;
-  top: var(--space-3);
-  right: var(--space-3);
-  display: grid;
-  width: 2.75rem;
-  height: 2.75rem;
-  place-items: center;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  color: var(--color-text);
-  background: var(--color-surface-raised);
-  cursor: pointer;
-}
-.quick-view-trigger:hover {
-  color: var(--color-primary-accent);
-  background: var(--color-surface-hover);
 }
 .product-visual :deep(.product-image) {
   width: 100%;
   height: 100%;
   min-height: 0;
   border-radius: 0;
+  border-top-left-radius: calc(var(--radius-card) - 1px);
+  border-top-right-radius: calc(var(--radius-card) - 1px);
   aspect-ratio: 4 / 3 !important;
 }
 .product-visual :deep(img) {
   object-fit: contain;
+}
+.card-corner-actions {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  z-index: 5;
 }
 .card-body {
   display: flex;
@@ -1083,11 +1419,14 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 .category-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   font-size: 0.75rem;
   color: var(--color-text-secondary);
 }
 .product-name {
-  margin: 0.3rem 0 0;
+  margin: 0.25rem 0 0;
   min-width: 0;
   font-size: 1rem;
   line-height: 1.4;
@@ -1106,6 +1445,9 @@ onBeforeUnmount(() => {
   text-decoration: underline;
 }
 .sku {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   color: var(--color-text-secondary);
   font-size: 0.75rem;
   overflow-wrap: anywhere;
@@ -1114,63 +1456,48 @@ onBeforeUnmount(() => {
   margin: 0;
   color: var(--color-text-secondary);
   font-size: 0.77rem;
+  line-height: 1.4;
 }
-.price-row {
+.card-metrics-footer {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0.75rem;
   margin-top: auto;
-  padding-top: 0.65rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-border);
 }
-.price-row strong {
-  font-size: 1.1rem;
+.card-price {
+  display: grid;
+  gap: 0.25rem;
+  justify-items: start;
+}
+.card-price strong {
+  font-size: 1.05rem;
   font-variant-numeric: tabular-nums;
 }
-.stock-summary {
+.card-stock {
   display: grid;
-  gap: 0.45rem;
-  padding: 0.75rem 0;
-  border-top: 1px solid var(--color-border);
-  border-bottom: 1px solid var(--color-border);
-  font-size: 0.8rem;
+  gap: 0.15rem;
+  justify-items: end;
+  text-align: right;
 }
-.stock-summary div {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.3rem;
-}
-.stock-summary div > span:first-child {
+.card-stock__label {
+  font-size: 0.7rem;
   color: var(--color-text-secondary);
 }
-.stock-summary strong,
-.stock-summary div > span:last-child {
+.card-stock__value {
+  font-size: 0.88rem;
   font-variant-numeric: tabular-nums;
 }
-.card-detail {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  align-self: start;
-  padding: 0.3rem 0;
-  color: var(--color-primary-accent);
-  font-size: 0.82rem;
-  font-weight: 600;
-  text-decoration: none;
-}
-.card-detail:hover {
-  text-decoration: underline;
-}
+
+/* List view */
 .table-wrap {
   max-width: 100%;
-  overflow-x: auto;
+  overflow: visible;
   border: 1px solid var(--color-table-border);
   border-top: 1px solid var(--color-table-header-bg);
   border-radius: var(--radius-card);
-  overflow: hidden;
   background: var(--color-table-row-odd);
 }
 .product-table {
@@ -1184,7 +1511,7 @@ onBeforeUnmount(() => {
 }
 .product-table th,
 .product-table td {
-  padding: 0.8rem 0.9rem;
+  padding: 0.85rem 0.95rem;
   text-align: left;
   vertical-align: middle;
   border-bottom: 1px solid var(--color-table-border);
@@ -1214,6 +1541,10 @@ onBeforeUnmount(() => {
 .product-table tbody tr:hover {
   background-color: var(--color-table-row-hover);
 }
+.product-table tbody tr.row--menu-open {
+  position: relative;
+  z-index: 25;
+}
 .product-table tr:last-child td {
   border-bottom: none;
 }
@@ -1224,22 +1555,19 @@ onBeforeUnmount(() => {
   border-bottom-right-radius: calc(var(--radius-card) - 1px);
 }
 .product-table th:nth-child(1) {
-  width: 34%;
+  width: 36%;
 }
 .product-table th:nth-child(2) {
-  width: 18%;
+  width: 26%;
 }
 .product-table th:nth-child(3) {
   width: 15%;
 }
 .product-table th:nth-child(4) {
-  width: 17%;
+  width: 15%;
 }
 .product-table th:nth-child(5) {
-  width: 10%;
-}
-.product-table th:nth-child(6) {
-  width: 6%;
+  width: 8%;
 }
 .product-table th.numeric,
 .product-table td.numeric {
@@ -1257,10 +1585,10 @@ onBeforeUnmount(() => {
 }
 .thumbnail {
   flex: none;
-  width: 3.2rem;
-  height: 3.2rem;
+  width: 3.3rem;
+  height: 3.3rem;
   overflow: hidden;
-  border-radius: 0.4rem;
+  border-radius: 0.45rem;
   background: var(--color-background);
 }
 .thumbnail :deep(.product-image) {
@@ -1269,18 +1597,22 @@ onBeforeUnmount(() => {
   min-height: 0;
   aspect-ratio: 1 !important;
 }
-.thumbnail :deep(.fallback) {
-  gap: 0;
-  font-size: 0;
+.thumbnail :deep(.fallback-icon-box) {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 0.5rem;
 }
-.thumbnail :deep(.fallback svg) {
-  width: 1.1rem;
-  height: 1.1rem;
+.thumbnail :deep(.fallback-icon-box svg) {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+.thumbnail :deep(.fallback-label) {
+  display: none;
 }
 .category-badge-icon {
   display: grid;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2.35rem;
+  height: 2.35rem;
   flex: none;
   place-items: center;
   border-radius: 0.65rem;
@@ -1290,7 +1622,7 @@ onBeforeUnmount(() => {
 }
 .identity-copy {
   display: grid;
-  gap: 0.3rem;
+  gap: 0.25rem;
   min-width: 0;
 }
 .table-name {
@@ -1302,59 +1634,60 @@ onBeforeUnmount(() => {
   color: var(--color-text);
   text-decoration: none;
   font-weight: 700;
-  font-size: 0.88rem;
+  font-size: 0.89rem;
 }
 .table-name:hover {
   color: var(--color-primary-accent);
   text-decoration: underline;
 }
-.identity-copy small {
+.sku-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   color: var(--color-text-secondary);
+  font-size: 0.74rem;
   overflow-wrap: anywhere;
+}
+.identity-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.1rem;
 }
 .category-cell,
 .price-cell,
 .stock-cell {
   font-size: 0.83rem;
 }
+.category-cell__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+.category-cell__title svg {
+  color: var(--color-primary-accent);
+  flex: none;
+}
 .category-cell small,
-.price-cell small,
-.stock-cell small {
+.price-cell small {
   display: block;
-  margin-top: 0.3rem;
+  margin-top: 0.25rem;
   color: var(--color-text-secondary);
-  font-size: 0.72rem;
+  font-size: 0.74rem;
+}
+.price-old {
+  text-decoration: line-through;
 }
 .price-cell strong,
 .stock-cell strong {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.stock-cell small {
-  font-variant-numeric: tabular-nums;
-}
-.disp-tone--success {
-  color: var(--color-success-text, var(--color-text-secondary));
-}
-.disp-tone--warning {
-  color: var(--color-warning-text, #b45309);
-}
-.disp-tone--danger {
-  color: var(--color-danger-text, #b91c1c);
-  font-weight: 600;
-}
-.view-detail {
-  display: inline-grid;
-  place-items: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  color: var(--color-text);
-}
-.view-detail:hover {
-  color: var(--color-primary-accent);
-  background: var(--color-surface-hover);
+.stock-badge-row {
+  margin-top: 0.3rem;
+  display: flex;
+  justify-content: flex-end;
 }
 .pagination,
 .pagination-actions {
@@ -1377,7 +1710,7 @@ onBeforeUnmount(() => {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
-@media (max-width: 68rem) {
+@media (max-width: 74rem) {
   .filters-primary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1435,11 +1768,11 @@ onBeforeUnmount(() => {
   .product-table td.actions {
     text-align: left;
   }
+  .stock-badge-row {
+    justify-content: flex-start;
+  }
   .product-table .identity-content {
     min-width: 0;
-  }
-  .product-table .view-detail {
-    justify-self: start;
   }
   .product-table .numeric strong {
     white-space: normal;

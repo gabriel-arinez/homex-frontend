@@ -436,7 +436,11 @@ onBeforeUnmount(() => {
     <div v-else-if="view === 'grid'" class="resultados-grid">
       <article v-for="producto in products" :key="producto.id" class="producto">
         <div class="product-visual">
-          <ProductImage :image="producto.imagen_principal" :alt="producto.nombre" />
+          <ProductImage
+            :image="producto.imagen_principal"
+            :alt="producto.nombre"
+            :category-code="producto.categoria_info?.codigo"
+          />
         </div>
         <div class="detalle">
           <small>{{ producto.sku || 'Sin SKU' }} · {{ producto.categoria_info?.nombre }}</small>
@@ -490,6 +494,7 @@ onBeforeUnmount(() => {
                   <ProductImage
                     :image="producto.imagen_principal"
                     :alt="producto.nombre"
+                    :category-code="producto.categoria_info?.codigo"
                     sizes="96px"
                   />
                 </div>

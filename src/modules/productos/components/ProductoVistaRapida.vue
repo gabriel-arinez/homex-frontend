@@ -2,12 +2,15 @@
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
+  Armchair,
   ArrowUpRight,
-  ImageOff,
+  Boxes,
+  ChevronLeft,
+  ChevronRight,
   Layers,
   Package,
   RotateCw,
-  Sofa,
+  Tag,
   ZoomIn,
   ZoomOut,
 } from '@lucide/vue'
@@ -84,7 +87,7 @@ const category = computed(
 )
 const headerIcon = computed(() => {
   const code = props.line?.tipo_item_info?.codigo ?? props.product?.categoria_info?.codigo
-  if (code === 'SILLA') return Sofa
+  if (code === 'SILLA') return Armchair
   if (code === 'PISO_FLOTANTE') return Layers
   return Package
 })
@@ -125,6 +128,11 @@ function selectGalleryImage(index: number) {
   activeImage.value = index
   gallerySourceIndex.value = 0
   galleryFailed.value = false
+}
+function stepGalleryImage(delta: number) {
+  const len = galleryImages.value.length
+  if (len <= 1) return
+  selectGalleryImage((activeImage.value + delta + len) % len)
 }
 async function loadGallery() {
   const requestId = ++galleryRequestId
@@ -219,32 +227,50 @@ function flatten(value: unknown, prefix = ''): DisplayField[] {
 }
 function productFields(product: Producto) {
   const fields: DisplayField[] = []
-  if (product.silla?.modelo) fields.push({ label: 'Modelo de silla', value: product.silla.modelo })
-  if (product.silla?.marca != null)
-    fields.push({ label: 'Marca (ID de catálogo)', value: String(product.silla.marca) })
-  if (product.silla?.color_primario != null)
+  if (product.silla?.marca_nombre || product.silla?.marca != null)
     fields.push({
-      label: 'Color principal (ID de catálogo)',
-      value: String(product.silla.color_primario),
+      label: 'Marca',
+      value: product.silla.marca_nombre || `#${product.silla.marca}`,
     })
-  if (product.silla?.color_secundario != null)
+  if (product.silla?.modelo) fields.push({ label: 'Modelo de silla', value: product.silla.modelo })
+  if (product.silla?.color_primario_nombre || product.silla?.color_primario != null)
     fields.push({
-      label: 'Color secundario (ID de catálogo)',
-      value: String(product.silla.color_secundario),
+      label: 'Color principal',
+      value: product.silla.color_primario_nombre || `#${product.silla.color_primario}`,
+    })
+  if (product.silla?.color_secundario_nombre || product.silla?.color_secundario != null)
+    fields.push({
+      label: 'Color secundario',
+      value: product.silla.color_secundario_nombre || `#${product.silla.color_secundario}`,
     })
   if (product.silla?.especificaciones)
     fields.push(...flatten(product.silla.especificaciones, 'Especificaciones'))
+  if (product.piso?.marca_nombre || product.piso?.marca != null)
+    fields.push({
+      label: 'Marca',
+      value: product.piso.marca_nombre || `#${product.piso.marca}`,
+    })
   if (product.piso?.modelo) fields.push({ label: 'Modelo de piso', value: product.piso.modelo })
-  if (product.piso?.marca != null)
-    fields.push({ label: 'Marca (ID de catálogo)', value: String(product.piso.marca) })
-  if (product.piso?.tipo != null)
-    fields.push({ label: 'Tipo (ID de catálogo)', value: String(product.piso.tipo) })
-  if (product.piso?.material != null)
-    fields.push({ label: 'Material (ID de catálogo)', value: String(product.piso.material) })
-  if (product.piso?.diseno != null)
-    fields.push({ label: 'Diseño (ID de catálogo)', value: String(product.piso.diseno) })
-  if (product.piso?.acabado != null)
-    fields.push({ label: 'Acabado (ID de catálogo)', value: String(product.piso.acabado) })
+  if (product.piso?.tipo_nombre || product.piso?.tipo != null)
+    fields.push({
+      label: 'Tipo',
+      value: product.piso.tipo_nombre || `#${product.piso.tipo}`,
+    })
+  if (product.piso?.material_nombre || product.piso?.material != null)
+    fields.push({
+      label: 'Material',
+      value: product.piso.material_nombre || `#${product.piso.material}`,
+    })
+  if (product.piso?.diseno_nombre || product.piso?.diseno != null)
+    fields.push({
+      label: 'Diseño',
+      value: product.piso.diseno_nombre || `#${product.piso.diseno}`,
+    })
+  if (product.piso?.acabado_nombre || product.piso?.acabado != null)
+    fields.push({
+      label: 'Acabado',
+      value: product.piso.acabado_nombre || `#${product.piso.acabado}`,
+    })
   if (product.piso?.espesor_mm)
     fields.push({ label: 'Espesor', value: `${product.piso.espesor_mm} mm` })
   if (product.piso?.ancho_mm) fields.push({ label: 'Ancho', value: `${product.piso.ancho_mm} mm` })
@@ -362,77 +388,114 @@ const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.t
           </button>
         </div>
         <section class="media-panel" aria-label="Imágenes del producto">
-          <div class="media-frame" :class="{ 'media-frame--zoomed': zoomed }">
-            <GalleryPhoto
-              v-if="gallerySource && !galleryFailed"
-              class="gallery-image"
-              :src="gallerySource"
-              :alt="primaryGalleryImage?.nombre || title"
-              @error="onGalleryImageError"
-            />
-            <GalleryPhoto
-              v-else-if="product?.imagen_principal"
-              :src="product.imagen_principal.original"
-              :alt="title"
-            />
-            <div
-              v-else
-              class="image-empty"
-              role="img"
-              :aria-label="
-                galleryFailed
-                  ? `No se pudo cargar la imagen para ${title}`
-                  : `Sin imagen para ${title}`
-              "
-            >
-              <ImageOff :size="36" aria-hidden="true" />
-              <span>{{
-                galleryFailed ? 'No se pudo cargar la imagen' : 'Sin imágenes disponibles'
-              }}</span>
+          <div class="media-panel__header">
+            <span class="media-panel__title">
+              {{
+                galleryImages.length > 1
+                  ? `Galería (${activeImage + 1}/${galleryImages.length})`
+                  : 'Imagen del producto'
+              }}
+            </span>
+            <div class="media-panel__controls">
               <button
-                v-if="galleryFailed"
+                v-if="galleryImages.length > 1"
                 type="button"
-                class="retry-link"
-                @click="retryGalleryImage"
+                class="media-ctl-btn"
+                aria-label="Imagen anterior"
+                @click="stepGalleryImage(-1)"
               >
-                Reintentar imagen
+                <ChevronLeft :size="16" aria-hidden="true" />
+              </button>
+              <button
+                v-if="galleryImages.length > 1"
+                type="button"
+                class="media-ctl-btn"
+                aria-label="Imagen siguiente"
+                @click="stepGalleryImage(1)"
+              >
+                <ChevronRight :size="16" aria-hidden="true" />
+              </button>
+              <button
+                v-if="(gallerySource && !galleryFailed) || product?.imagen_principal"
+                class="media-ctl-btn"
+                type="button"
+                :aria-label="zoomed ? 'Reducir imagen' : 'Ampliar imagen'"
+                @click="zoomed = !zoomed"
+              >
+                <ZoomOut v-if="zoomed" :size="16" aria-hidden="true" /><ZoomIn
+                  v-else
+                  :size="16"
+                  aria-hidden="true"
+                />
               </button>
             </div>
-            <button
-              v-if="(gallerySource && !galleryFailed) || product?.imagen_principal"
-              class="zoom-control"
-              type="button"
-              :aria-label="zoomed ? 'Reducir imagen' : 'Ampliar imagen'"
-              @click="zoomed = !zoomed"
+          </div>
+
+          <div
+            class="media-viewer-layout"
+            :class="{ 'media-viewer-layout--with-thumbs': galleryImages.length > 1 }"
+          >
+            <div
+              v-if="galleryImages.length > 1"
+              class="thumbnails thumbnails--vertical"
+              aria-label="Miniaturas de imágenes"
             >
-              <ZoomOut v-if="zoomed" :size="18" aria-hidden="true" /><ZoomIn
-                v-else
-                :size="18"
-                aria-hidden="true"
+              <button
+                v-for="(image, index) in galleryImages"
+                :key="image.id"
+                type="button"
+                :aria-label="`Mostrar imagen ${index + 1}`"
+                :aria-pressed="activeImage === index"
+                @click="selectGalleryImage(index)"
+              >
+                <GalleryPhoto :src="image.url" :alt="image.nombre" />
+              </button>
+            </div>
+            <div class="media-frame" :class="{ 'media-frame--zoomed': zoomed }">
+              <GalleryPhoto
+                v-if="gallerySource && !galleryFailed"
+                class="gallery-image"
+                :src="gallerySource"
+                :alt="primaryGalleryImage?.nombre || title"
+                @error="onGalleryImageError"
               />
-            </button>
+              <GalleryPhoto
+                v-else-if="product?.imagen_principal"
+                :src="product.imagen_principal.original"
+                :alt="title"
+              />
+              <div
+                v-else
+                class="image-empty"
+                role="img"
+                :aria-label="
+                  galleryFailed
+                    ? `No se pudo cargar la imagen para ${title}`
+                    : `Sin imagen para ${title}`
+                "
+              >
+                <span class="image-empty__icon" aria-hidden="true">
+                  <component :is="headerIcon" :size="32" />
+                </span>
+                <span>{{
+                  galleryFailed ? 'No se pudo cargar la imagen' : 'Sin imágenes disponibles'
+                }}</span>
+                <button
+                  v-if="galleryFailed"
+                  type="button"
+                  class="retry-link"
+                  @click="retryGalleryImage"
+                >
+                  Reintentar imagen
+                </button>
+              </div>
+            </div>
           </div>
           <div v-if="galleryLoading" class="gallery-status" role="status">Cargando imágenes…</div>
           <div v-if="galleryError" class="gallery-status gallery-status--error" role="status">
             <span>{{ galleryError }}</span>
             <button type="button" class="retry-link" @click="loadGallery">
               Reintentar imágenes
-            </button>
-          </div>
-          <div
-            v-if="galleryImages.length > 1"
-            class="thumbnails"
-            aria-label="Miniaturas de imágenes"
-          >
-            <button
-              v-for="(image, index) in galleryImages"
-              :key="image.id"
-              type="button"
-              :aria-label="`Mostrar imagen ${index + 1}`"
-              :aria-pressed="activeImage === index"
-              @click="selectGalleryImage(index)"
-            >
-              <GalleryPhoto :src="image.url" :alt="image.nombre" />
             </button>
           </div>
         </section>
@@ -471,7 +534,7 @@ const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.t
           </section>
 
           <section v-if="product && !line" class="info-card">
-            <h3>Información comercial actual</h3>
+            <h3><Tag :size="18" aria-hidden="true" />Información comercial actual</h3>
             <p class="section-note">
               Valores vigentes del catálogo; no reemplazan importes negociados de la proforma.
             </p>
@@ -521,7 +584,7 @@ const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.t
           </section>
 
           <section v-if="line" class="info-card quote-card quote-card--summary">
-            <h3>Resumen de la línea</h3>
+            <h3><Boxes :size="18" aria-hidden="true" />Resumen de la línea</h3>
             <p class="section-note">Valores guardados en esta proforma.</p>
             <div class="line-summary-meta">
               <span>{{ line.tipo_item_info?.nombre || 'Línea de proforma' }}</span>
@@ -630,12 +693,53 @@ const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.t
 .media-panel {
   position: relative;
   min-width: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.media-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.media-panel__title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+.media-panel__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.media-ctl-btn {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  cursor: pointer;
+}
+.media-ctl-btn:hover {
+  color: var(--color-primary-accent);
+  background: var(--color-surface-hover);
+}
+.media-viewer-layout {
+  display: grid;
+  gap: var(--space-3);
+  align-items: start;
+}
+.media-viewer-layout--with-thumbs {
+  grid-template-columns: 4.5rem minmax(0, 1fr);
 }
 .media-frame {
   position: relative;
   display: grid;
-  min-height: 22rem;
-  max-height: 60vh;
+  min-height: 24rem;
+  max-height: 65vh;
   overflow: hidden;
   place-items: center;
   border: 1px solid var(--color-border);
@@ -644,7 +748,7 @@ const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.t
 }
 .media-frame :deep(img.gallery-image) {
   width: 100%;
-  max-height: 60vh;
+  max-height: 65vh;
   object-fit: contain;
   transition: transform 0.2s ease;
 }
@@ -659,26 +763,28 @@ const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.t
   gap: var(--space-3);
   color: var(--color-text-secondary);
   text-align: center;
+  padding: var(--space-4);
 }
-.zoom-control {
-  position: absolute;
-  right: var(--space-3);
-  bottom: var(--space-3);
+.image-empty__icon {
   display: grid;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 3.75rem;
+  height: 3.75rem;
   place-items: center;
+  border-radius: 1rem;
   border: 1px solid var(--color-border);
-  border-radius: 50%;
-  color: var(--color-text);
-  background: var(--color-surface-raised);
-  cursor: pointer;
+  background: var(--color-surface);
+  color: var(--color-primary-accent);
 }
 .thumbnails {
   display: flex;
   gap: var(--space-2);
-  margin-top: var(--space-3);
   overflow-x: auto;
+}
+.thumbnails--vertical {
+  flex-direction: column;
+  max-height: 24rem;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 .gallery-status {
   display: flex;

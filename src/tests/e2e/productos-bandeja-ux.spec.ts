@@ -188,16 +188,17 @@ test('@a11y FE03 nueva bandeja de productos muestra lista, categorías y precios
   await mockBackend(page)
   await page.goto('/productos')
   await expect(page.getByRole('heading', { name: 'Productos' })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: 'Producto y estado' })).toBeVisible()
   await expect(page.getByRole('columnheader', { name: 'Precio vigente' })).toBeVisible()
-  await expect(page.getByRole('columnheader', { name: 'Existencias' })).toBeVisible()
-  await expect(page.getByRole('link', { name: /Ver producto Silla ejecutiva/ })).toHaveAttribute(
+  await expect(page.getByRole('columnheader', { name: 'Stock actual' })).toBeVisible()
+  await expect(page.getByRole('link', { name: /Silla ejecutiva acolchada/ })).toHaveAttribute(
     'href',
     '/productos/11',
   )
   await expect(page.getByText('27 piezas')).toBeVisible()
-  await expect(page.getByText('Demanda pendiente: 1 pieza')).toBeVisible()
+  await expect(page.getByText('Demanda pendiente')).toHaveCount(0)
   await expect(
-    page.locator('td[data-label="Stock y disponibilidad"] strong', { hasText: '16,5 m²' }),
+    page.locator('td[data-label="Stock actual"] strong', { hasText: '16,5 m²' }),
   ).toBeVisible()
   await expect(page.getByRole('button', { name: 'Nuevo producto' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Cuadrícula' }).click()
@@ -210,21 +211,17 @@ test('@a11y FE03 nueva bandeja de productos muestra lista, categorías y precios
   expect(violations).toEqual([])
 })
 
-test('@a11y vista rápida de productos conserva foco, responde en móvil y respeta tema oscuro', async ({
+test('@a11y menú de acciones de productos responde en móvil y respeta tema oscuro', async ({
   page,
 }) => {
   await mockBackend(page)
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/productos')
-  const trigger = page.getByRole('button', { name: /Vista rápida de Silla ejecutiva/ })
+  const trigger = page.getByRole('button', { name: /Acciones de Silla ejecutiva/ })
   await trigger.click()
-  const dialog = page.getByRole('dialog')
-  await expect(dialog).toBeVisible()
-  await expect(dialog.getByText('Precio vigente del catálogo')).toBeVisible()
-  await expect(dialog.getByRole('link', { name: 'Ver ficha completa' })).toHaveAttribute(
-    'href',
-    '/productos/11',
-  )
+  const menu = page.getByRole('menu', { name: /Acciones disponibles para Silla ejecutiva/ })
+  await expect(menu).toBeVisible()
+  await expect(menu.getByRole('menuitem', { name: 'Ver ficha del producto' })).toBeVisible()
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth))
     .toBeLessThanOrEqual(1)
@@ -234,8 +231,7 @@ test('@a11y vista rápida de productos conserva foco, responde en móvil y respe
   )
   expect(violations).toEqual([])
   await page.keyboard.press('Escape')
-  await expect(dialog).toBeHidden()
-  await expect(trigger).toBeFocused()
+  await expect(menu).toBeHidden()
 })
 
 test('FE03 filtros por categoría y atributos conservan búsqueda y vista en URL', async ({
@@ -281,8 +277,8 @@ for (const width of [390, 768, 1440]) {
       await page.setViewportSize({ width, height: 900 })
       await page.goto('/productos')
       if (width >= 768)
-        await expect(page.getByRole('columnheader', { name: 'Producto' })).toBeVisible()
-      else await expect(page.locator('td[data-label="Producto"]').first()).toBeVisible()
+        await expect(page.getByRole('columnheader', { name: 'Producto y estado' })).toBeVisible()
+      else await expect(page.locator('td[data-label="Producto y estado"]').first()).toBeVisible()
       await noOverflow(page)
       await page.getByRole('button', { name: 'Cuadrícula' }).click()
       await expect(page.locator('.product-card')).toHaveCount(2)

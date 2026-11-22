@@ -1,18 +1,33 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { Armchair, Layers, Package } from '@lucide/vue'
 import { mediaUrl } from '@/shared/media/gallery'
-import { ImageOff } from '@lucide/vue'
 import type { ImagenPrincipal } from '@/generated/api'
 
 const props = withDefaults(
-  defineProps<{ image: ImagenPrincipal | null; alt: string; sizes?: string; eager?: boolean }>(),
-  { sizes: '(max-width: 480px) 100vw, (max-width: 1024px) 50vw, 320px', eager: false },
+  defineProps<{
+    image: ImagenPrincipal | null
+    alt: string
+    categoryCode?: string | null
+    sizes?: string
+    eager?: boolean
+  }>(),
+  {
+    categoryCode: null,
+    sizes: '(max-width: 480px) 100vw, (max-width: 1024px) 50vw, 320px',
+    eager: false,
+  },
 )
 const failed = ref(false)
 watch(
   () => props.image,
   () => (failed.value = false),
 )
+const fallbackIcon = computed(() => {
+  if (props.categoryCode === 'SILLA') return Armchair
+  if (props.categoryCode === 'PISO_FLOTANTE') return Layers
+  return Package
+})
 const variants = computed(() =>
   Object.entries(props.image?.variantes ?? {})
     .map(([width, url]) => ({ width: Number.parseInt(width, 10), url: mediaUrl(url) }))
@@ -42,7 +57,10 @@ const srcset = computed(() => variants.value.map((item) => `${item.url} ${item.w
       @error="failed = true"
     />
     <div v-else class="fallback" role="img" :aria-label="`Sin imagen para ${alt}`">
-      <ImageOff aria-hidden="true" /><span>Sin imagen</span>
+      <span class="fallback-icon-box" aria-hidden="true">
+        <component :is="fallbackIcon" :size="26" />
+      </span>
+      <span class="fallback-label">Sin imagen</span>
     </div>
   </div>
 </template>
@@ -53,7 +71,7 @@ const srcset = computed(() => variants.value.map((item) => `${item.url} ${item.w
   overflow: hidden;
   place-items: center;
   border-radius: var(--radius-card);
-  background: var(--color-background);
+  background: var(--color-surface-soft, var(--color-background));
 }
 img {
   width: 100%;
@@ -63,8 +81,22 @@ img {
 .fallback {
   display: grid;
   justify-items: center;
-  gap: var(--space-2);
+  gap: 0.45rem;
   color: var(--color-text-secondary);
   font-weight: 600;
+}
+.fallback-icon-box {
+  display: grid;
+  width: 3.1rem;
+  height: 3.1rem;
+  place-items: center;
+  border-radius: 0.9rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-primary-accent);
+}
+.fallback-label {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
 }
 </style>

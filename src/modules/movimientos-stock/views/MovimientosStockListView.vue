@@ -5,27 +5,19 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   Boxes,
-  Check,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
   CornerDownRight,
   Cpu,
   Download,
-  FileText,
-  Hash,
-  Package,
-  PackageCheck,
   PackagePlus,
   Plus,
   RotateCcw,
   SlidersHorizontal,
-  TrendingUp,
   UserCheck,
-  X,
 } from '@lucide/vue'
 import type {
-  CatalogoMotivosAjuste,
   MovimientoReporteItem,
   MovimientoStock,
   Producto,
@@ -33,6 +25,7 @@ import type {
   ValorCatalogoPublico,
 } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
+import ProductoStockAjusteModal from '@/modules/productos/components/ProductoStockAjusteModal.vue'
 import { productosService } from '@/modules/productos/services/productosService'
 import {
   disponibilidadMeta,
@@ -42,7 +35,6 @@ import {
 import { ApiError } from '@/shared/api'
 import { downloadBlob } from '@/shared/download/downloadBlob'
 import { buildExportFilename } from '@/shared/download/exportFilename'
-import { generateUuidV4 } from '@/shared/utils/uuid'
 import { movimientosStockService } from '../services/movimientosStockService'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
@@ -50,11 +42,9 @@ import DatePresentation from '@/shared/ui/DatePresentation.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
-import Modal from '@/shared/ui/Modal.vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
 import SearchField from '@/shared/ui/SearchField.vue'
 import Select from '@/shared/ui/Select.vue'
-import TextAreaField from '@/shared/ui/TextAreaField.vue'
 import TextField from '@/shared/ui/TextField.vue'
 import Toast from '@/shared/ui/Toast.vue'
 import { dateRangeError, isValidDate, localToday } from '@/shared/validation/dateRange'
@@ -318,171 +308,22 @@ async function exportExcel() {
   }
 }
 
-function selectAjusteProducto(item: Producto) {
-  ajusteSelectedCache.value = item
-  ajusteProductoId.value = String(item.id)
-  ajusteProductoSearch.value = ''
-  ajusteProductos.value = []
-}
-
-function clearAjusteProducto() {
-  ajusteSelectedCache.value = null
-  ajusteProductoId.value = ''
-  ajusteProductoSearch.value = ''
-  ajusteProductos.value = []
-}
-
 // P2: Modal de registro de entrada / salida manual (solo administración comercial)
 const ajusteOpen = ref(false)
 const ajusteTipo = ref<'ENTRADA' | 'SALIDA'>('ENTRADA')
-const ajusteProductoId = ref('')
-const ajusteProductoSearch = ref('')
-const ajusteProductos = ref<Producto[]>([])
-const ajusteProductosLoading = ref(false)
-const ajusteCantidad = ref('')
-const ajusteMotivo = ref('')
-const ajusteObservaciones = ref('')
-const ajusteSaving = ref(false)
-const ajusteError = ref('')
-const ajusteIdempotencyKey = ref('')
-const motivosCatalogo = ref<CatalogoMotivosAjuste | null>(null)
 
-const ajusteSelectedCache = ref<Producto | null>(null)
-
-const ajusteProductoSeleccionado = computed(() => {
-  if (
-    ajusteSelectedCache.value &&
-    String(ajusteSelectedCache.value.id) === ajusteProductoId.value
-  ) {
-    return ajusteSelectedCache.value
-  }
-  return (
-    ajusteProductos.value.find((p) => String(p.id) === ajusteProductoId.value) ??
-    (selectedProduct.value && String(selectedProduct.value.id) === ajusteProductoId.value
-      ? selectedProduct.value
-      : null)
-  )
-})
-
-const motivosDisponibles = computed(() => {
-  if (!motivosCatalogo.value) return []
-  return ajusteTipo.value === 'ENTRADA'
-    ? motivosCatalogo.value.ENTRADA
-    : motivosCatalogo.value.SALIDA
-})
-
-const motivoSeleccionadoMeta = computed(
-  () => motivosDisponibles.value.find((m) => m.codigo === ajusteMotivo.value) ?? null,
-)
-
-const stockResultanteEstimado = computed(() => {
-  const prod = ajusteProductoSeleccionado.value
-  const qty = Number(ajusteCantidad.value)
-  if (!prod || !Number.isFinite(qty) || qty <= 0) return null
-  const actual = Number(prod.stock)
-  return ajusteTipo.value === 'ENTRADA' ? actual + qty : actual - qty
-})
-
-watch(ajusteTipo, () => {
-  const validCodes = new Set(motivosDisponibles.value.map((m) => m.codigo))
-  if (!validCodes.has(ajusteMotivo.value)) {
-    ajusteMotivo.value = motivosDisponibles.value[0]?.codigo ?? ''
-  }
-})
-
-async function loadAjusteProductos(term = '') {
-  const clean = term.trim()
-  if (!clean) {
-    ajusteProductos.value = []
-    ajusteProductosLoading.value = false
-    return
-  }
-  ajusteProductosLoading.value = true
-  try {
-    const res = await productosService.list({
-      search: clean,
-      page_size: 25,
-    })
-    ajusteProductos.value = res.results
-  } catch {
-    ajusteProductos.value = []
-  } finally {
-    ajusteProductosLoading.value = false
-  }
-}
-
-async function openAjusteModal(tipoInicial: 'ENTRADA' | 'SALIDA' = 'ENTRADA') {
+function openAjusteModal(tipoInicial: 'ENTRADA' | 'SALIDA' = 'ENTRADA') {
   ajusteTipo.value = tipoInicial
-  ajusteCantidad.value = ''
-  ajusteObservaciones.value = ''
-  ajusteError.value = ''
-  ajusteIdempotencyKey.value = generateUuidV4()
-  ajusteProductoSearch.value = ''
-  ajusteProductos.value = []
-  ajusteSelectedCache.value = selectedProduct.value ?? null
-  ajusteProductoId.value = selectedProduct.value ? String(selectedProduct.value.id) : ''
   ajusteOpen.value = true
-
-  if (!motivosCatalogo.value) {
-    try {
-      motivosCatalogo.value = await movimientosStockService.motivosAjuste()
-    } catch {
-      motivosCatalogo.value = null
-    }
-  }
-  ajusteMotivo.value = motivosDisponibles.value[0]?.codigo ?? ''
 }
 
-async function submitAjuste() {
-  if (ajusteSaving.value) return
-  ajusteError.value = ''
-  const prodId = Number(ajusteProductoId.value)
-  if (!prodId) {
-    ajusteError.value = 'Selecciona un producto.'
-    return
-  }
-  const qty = Number(ajusteCantidad.value)
-  if (!Number.isFinite(qty) || qty <= 0) {
-    ajusteError.value = 'Ingresa una cantidad mayor a cero.'
-    return
-  }
-  if (!ajusteMotivo.value) {
-    ajusteError.value = 'Selecciona un motivo.'
-    return
-  }
-  if (motivoSeleccionadoMeta.value?.requiere_observaciones && !ajusteObservaciones.value.trim()) {
-    ajusteError.value = 'Las correcciones excepcionales requieren una observación justificativa.'
-    return
-  }
-
-  ajusteSaving.value = true
-  try {
-    await movimientosStockService.registrarAjuste(
-      {
-        producto: prodId,
-        tipo_operacion: ajusteTipo.value,
-        cantidad: ajusteCantidad.value.trim(),
-        motivo: ajusteMotivo.value as never,
-        observaciones: ajusteObservaciones.value.trim(),
-      },
-      ajusteIdempotencyKey.value,
-    )
-    ajusteOpen.value = false
-    toastTone.value = 'success'
-    toastMessage.value =
-      ajusteTipo.value === 'ENTRADA'
-        ? 'Entrada de stock registrada correctamente.'
-        : 'Salida de stock registrada correctamente.'
-    await Promise.all([load(), loadSelectedProduct()])
-  } catch (err) {
-    if (err instanceof ApiError && err.status === 409) {
-      ajusteIdempotencyKey.value = generateUuidV4()
-    }
-    ajusteError.value =
-      err instanceof ApiError ? err.message : 'No pudimos registrar el movimiento.'
-  } finally {
-    ajusteSaving.value = false
-  }
+async function onAjusteSaved(_movimiento: MovimientoStock, tipo: 'ENTRADA' | 'SALIDA') {
+  toastTone.value = 'success'
+  toastMessage.value =
+    tipo === 'ENTRADA'
+      ? 'Entrada de stock registrada correctamente.'
+      : 'Salida de stock registrada correctamente.'
+  await Promise.all([load(), loadSelectedProduct()])
 }
 
 function scheduleLoad(delay = 0) {
@@ -971,236 +812,13 @@ onBeforeUnmount(() => {
       </template>
     </template>
 
-    <Modal
+    <ProductoStockAjusteModal
       :open="ajusteOpen"
-      wide
-      title="Registrar movimiento de inventario"
-      description="Registra una entrada o salida manual de tipo Ajuste. Esta operación quedará registrada permanentemente y no podrá editarse ni eliminarse."
+      :initial-product="selectedProduct"
+      :initial-type="ajusteTipo"
       @close="ajusteOpen = false"
-    >
-      <template #title-icon>
-        <span class="ajuste-modal-icon">
-          <Boxes :size="20" aria-hidden="true" />
-        </span>
-      </template>
-
-      <div
-        v-if="ajusteProductoSeleccionado"
-        class="ajuste-board"
-        aria-label="Resumen del movimiento de stock"
-      >
-        <div class="ajuste-metric ajuste-metric--highlight">
-          <span class="ajuste-metric__icon">
-            <Boxes :size="16" aria-hidden="true" />
-          </span>
-          <div>
-            <span>Stock actual</span>
-            <strong>{{
-              unidadesProducto(ajusteProductoSeleccionado, ajusteProductoSeleccionado.stock)
-            }}</strong>
-          </div>
-        </div>
-        <div class="ajuste-metric ajuste-metric--highlight">
-          <span
-            class="ajuste-metric__icon"
-            :class="
-              ajusteTipo === 'ENTRADA'
-                ? 'ajuste-metric__icon--success'
-                : 'ajuste-metric__icon--danger'
-            "
-          >
-            <TrendingUp :size="16" aria-hidden="true" />
-          </span>
-          <div>
-            <span>Variación</span>
-            <strong :class="ajusteTipo === 'ENTRADA' ? 'variation-qty--in' : 'variation-qty--out'">
-              {{ ajusteTipo === 'ENTRADA' ? '+' : '-' }}{{ ajusteCantidad || '0' }}
-            </strong>
-          </div>
-        </div>
-        <div class="ajuste-metric ajuste-metric--highlight">
-          <span
-            class="ajuste-metric__icon"
-            :class="
-              stockResultanteEstimado !== null && stockResultanteEstimado < 0
-                ? 'ajuste-metric__icon--danger'
-                : 'ajuste-metric__icon--primary'
-            "
-          >
-            <PackageCheck :size="16" aria-hidden="true" />
-          </span>
-          <div>
-            <span>Stock resultante</span>
-            <strong>
-              {{
-                stockResultanteEstimado !== null
-                  ? unidadesProducto(ajusteProductoSeleccionado, stockResultanteEstimado)
-                  : '—'
-              }}
-            </strong>
-          </div>
-        </div>
-      </div>
-
-      <form id="ajuste-stock-form" class="ajuste-form" @submit.prevent="submitAjuste">
-        <div class="ajuste-section ajuste-form__full">
-          <div class="ajuste-section__header">
-            <SlidersHorizontal :size="15" aria-hidden="true" />
-            <span>Operación y producto</span>
-          </div>
-          <div class="ajuste-tipo-toggle" role="group" aria-label="Tipo de operación">
-            <button
-              type="button"
-              class="ajuste-tipo-btn"
-              :class="{ 'ajuste-tipo-btn--active-in': ajusteTipo === 'ENTRADA' }"
-              @click="ajusteTipo = 'ENTRADA'"
-            >
-              <ArrowUpRight :size="16" aria-hidden="true" />
-              Entrada (+)
-            </button>
-            <button
-              type="button"
-              class="ajuste-tipo-btn"
-              :class="{ 'ajuste-tipo-btn--active-out': ajusteTipo === 'SALIDA' }"
-              @click="ajusteTipo = 'SALIDA'"
-            >
-              <ArrowDownRight :size="16" aria-hidden="true" />
-              Salida (-)
-            </button>
-          </div>
-
-          <div v-if="ajusteProductoSeleccionado" class="ajuste-selected-card">
-            <div class="ajuste-selected-card__info">
-              <PackageCheck :size="18" class="ajuste-selected-card__icon" aria-hidden="true" />
-              <div>
-                <strong>{{ ajusteProductoSeleccionado.nombre }}</strong>
-                <small>
-                  SKU: {{ ajusteProductoSeleccionado.sku || `#${ajusteProductoSeleccionado.id}` }} ·
-                  Stock actual:
-                  {{
-                    unidadesProducto(ajusteProductoSeleccionado, ajusteProductoSeleccionado.stock)
-                  }}
-                </small>
-              </div>
-            </div>
-            <Button type="button" variant="secondary" @click="clearAjusteProducto">
-              <RotateCcw :size="14" aria-hidden="true" />
-              Cambiar producto
-            </Button>
-          </div>
-          <div v-else class="ajuste-product-picker">
-            <SearchField
-              v-model="ajusteProductoSearch"
-              label="Buscar producto por nombre o SKU"
-              @update:model-value="loadAjusteProductos"
-            />
-            <div
-              v-if="ajusteProductoSearch.trim().length > 0"
-              class="ajuste-product-results"
-              role="listbox"
-              aria-label="Resultados de productos"
-            >
-              <p v-if="ajusteProductosLoading" class="ajuste-product-results__state">
-                Buscando productos...
-              </p>
-              <p v-else-if="!ajusteProductos.length" class="ajuste-product-results__state">
-                No se encontraron productos para esa búsqueda.
-              </p>
-              <button
-                v-for="item in ajusteProductos"
-                :key="item.id"
-                type="button"
-                role="option"
-                class="ajuste-product-option"
-                :aria-selected="String(item.id) === ajusteProductoId"
-                @click="selectAjusteProducto(item)"
-              >
-                <Package :size="16" class="ajuste-product-option__icon" aria-hidden="true" />
-                <div class="ajuste-product-option__body">
-                  <strong>{{ item.nombre }}</strong>
-                  <small>
-                    {{ item.sku || `#${item.id}` }} ·
-                    {{ item.unidad_stock_info?.nombre || 'Unidad' }}
-                  </small>
-                </div>
-                <span class="ajuste-product-option__stock">
-                  Stock: {{ unidadesProducto(item, item.stock) }}
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div class="ajuste-section ajuste-form__full">
-          <div class="ajuste-section__header">
-            <FileText :size="15" aria-hidden="true" />
-            <span>Detalle del ajuste</span>
-          </div>
-          <div class="ajuste-section__grid">
-            <div class="ajuste-field-wrap">
-              <div class="ajuste-field-badge">
-                <Hash :size="13" aria-hidden="true" />
-                <span>{{
-                  ajusteProductoSeleccionado?.unidad_stock_info?.nombre || 'Unidades'
-                }}</span>
-              </div>
-              <TextField
-                v-model="ajusteCantidad"
-                name="ajuste-cantidad"
-                label="Cantidad"
-                type="number"
-                :step="
-                  ajusteProductoSeleccionado?.unidad_stock_info?.codigo === 'M2' ? '0.0001' : '1'
-                "
-                min="0"
-                placeholder="0"
-              />
-            </div>
-
-            <div class="ajuste-field-wrap">
-              <div class="ajuste-field-badge">
-                <SlidersHorizontal :size="13" aria-hidden="true" />
-                <span>{{ ajusteTipo === 'ENTRADA' ? 'Ingreso manual' : 'Egreso manual' }}</span>
-              </div>
-              <Select
-                v-model="ajusteMotivo"
-                name="ajuste-motivo"
-                label="Motivo"
-                :options="motivosDisponibles.map((m) => ({ label: m.nombre, value: m.codigo }))"
-              />
-            </div>
-
-            <div class="ajuste-form__full">
-              <TextAreaField
-                v-model="ajusteObservaciones"
-                name="ajuste-observaciones"
-                :label="
-                  motivoSeleccionadoMeta?.requiere_observaciones
-                    ? 'Observaciones (obligatoria para corrección excepcional)'
-                    : 'Observaciones (opcional)'
-                "
-                placeholder="Describe el respaldo o detalle del movimiento..."
-                :rows="3"
-              />
-            </div>
-          </div>
-        </div>
-
-        <p v-if="ajusteError" class="stock-alert ajuste-form__full" role="alert">
-          {{ ajusteError }}
-        </p>
-      </form>
-      <template #footer>
-        <Button variant="secondary" :disabled="ajusteSaving" @click="ajusteOpen = false">
-          <X :size="16" aria-hidden="true" />
-          Cancelar
-        </Button>
-        <Button type="submit" form="ajuste-stock-form" :disabled="ajusteSaving">
-          <Check :size="16" aria-hidden="true" />
-          {{ ajusteSaving ? 'Registrando...' : 'Confirmar movimiento' }}
-        </Button>
-      </template>
-    </Modal>
+      @saved="onAjusteSaved"
+    />
   </div>
 </template>
 

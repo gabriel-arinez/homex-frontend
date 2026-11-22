@@ -96,3 +96,151 @@ export function estadoStockMeta(estadoStock?: string): EstadoStockMeta {
       return { tone: 'neutral', label: 'Sin mínimo configurado', showBadge: false }
   }
 }
+
+export type EspecificacionItem = {
+  label: string
+  value: string
+  group?: string
+}
+
+function formatearClaveEspecificacion(key: string): string {
+  const mapa: Record<string, string> = {
+    tapizado: 'Tapizado',
+    resistencia: 'Resistencia',
+    configuracion: 'Configuración',
+    brazos: 'Brazos',
+    altura: 'Altura',
+    base: 'Base',
+    ruedas: 'Ruedas',
+    mecanismo: 'Mecanismo',
+    material: 'Material',
+    color: 'Color',
+    acabado: 'Acabado',
+    asiento: 'Asiento',
+    respaldo: 'Respaldo',
+    suspension: 'Suspensión',
+    giro: 'Giro',
+    apoyo_lumbar: 'Apoyo lumbar',
+  }
+  return (
+    mapa[key] ??
+    key.replace(/[_-]+/g, ' ').replace(/\b\p{L}/gu, (letra) => letra.toLocaleUpperCase('es'))
+  )
+}
+
+function aplanarEspecificaciones(valor: unknown, prefijo = ''): EspecificacionItem[] {
+  if (valor === null || valor === undefined || valor === '') return []
+  if (typeof valor === 'string' || typeof valor === 'number' || typeof valor === 'boolean') {
+    return [
+      {
+        label: prefijo ? formatearClaveEspecificacion(prefijo) : 'Detalle',
+        value: typeof valor === 'boolean' ? (valor ? 'Sí' : 'No') : String(valor),
+        group: 'Características adicionales',
+      },
+    ]
+  }
+  if (Array.isArray(valor)) {
+    return valor.flatMap((item, idx) =>
+      aplanarEspecificaciones(item, `${prefijo || 'Elemento'} ${idx + 1}`),
+    )
+  }
+  if (typeof valor !== 'object') return []
+  const registro = valor as Record<string, unknown>
+  if ('valor' in registro) {
+    const monto = String(registro.valor ?? '')
+    const unidad = typeof registro.unidad === 'string' ? registro.unidad : ''
+    return monto
+      ? [
+          {
+            label: formatearClaveEspecificacion(prefijo || 'Valor'),
+            value: `${monto}${unidad ? ` ${unidad}` : ''}`,
+            group: 'Características adicionales',
+          },
+        ]
+      : []
+  }
+  return Object.entries(registro).flatMap(([clave, hijo]) => {
+    if (clave === 'uid') return []
+    return aplanarEspecificaciones(hijo, clave)
+  })
+}
+
+export function resumenFichaProducto(producto: Producto): string {
+  const partes: string[] = []
+  if (producto.silla) {
+    if (producto.silla.marca_nombre) partes.push(producto.silla.marca_nombre)
+    if (producto.silla.modelo) partes.push(producto.silla.modelo)
+    if (producto.silla.color_primario_nombre) partes.push(producto.silla.color_primario_nombre)
+  } else if (producto.piso) {
+    if (producto.piso.marca_nombre) partes.push(producto.piso.marca_nombre)
+    if (producto.piso.modelo) partes.push(producto.piso.modelo)
+    if (producto.piso.espesor_mm) partes.push(`${cantidadProducto(producto.piso.espesor_mm)} mm`)
+  }
+  return partes.join(' · ')
+}
+
+export function especificacionesLegiblesProducto(producto: Producto): EspecificacionItem[] {
+  const items: EspecificacionItem[] = []
+  if (producto.silla) {
+    if (producto.silla.marca_nombre)
+      items.push({ label: 'Marca', value: producto.silla.marca_nombre, group: 'Ficha de silla' })
+    if (producto.silla.modelo)
+      items.push({ label: 'Modelo', value: producto.silla.modelo, group: 'Ficha de silla' })
+    if (producto.silla.color_primario_nombre)
+      items.push({
+        label: 'Color principal',
+        value: producto.silla.color_primario_nombre,
+        group: 'Ficha de silla',
+      })
+    if (producto.silla.color_secundario_nombre)
+      items.push({
+        label: 'Color secundario',
+        value: producto.silla.color_secundario_nombre,
+        group: 'Ficha de silla',
+      })
+    items.push(...aplanarEspecificaciones(producto.silla.especificaciones))
+  }
+  if (producto.piso) {
+    if (producto.piso.marca_nombre)
+      items.push({ label: 'Marca', value: producto.piso.marca_nombre, group: 'Ficha de piso' })
+    if (producto.piso.modelo)
+      items.push({ label: 'Modelo', value: producto.piso.modelo, group: 'Ficha de piso' })
+    if (producto.piso.tipo_nombre)
+      items.push({ label: 'Tipo', value: producto.piso.tipo_nombre, group: 'Ficha de piso' })
+    if (producto.piso.material_nombre)
+      items.push({
+        label: 'Material',
+        value: producto.piso.material_nombre,
+        group: 'Ficha de piso',
+      })
+    if (producto.piso.diseno_nombre)
+      items.push({ label: 'Diseño', value: producto.piso.diseno_nombre, group: 'Ficha de piso' })
+    if (producto.piso.acabado_nombre)
+      items.push({ label: 'Acabado', value: producto.piso.acabado_nombre, group: 'Ficha de piso' })
+    if (producto.piso.espesor_mm)
+      items.push({
+        label: 'Espesor',
+        value: `${cantidadProducto(producto.piso.espesor_mm)} mm`,
+        group: 'Dimensiones y empaque',
+      })
+    if (producto.piso.ancho_mm)
+      items.push({
+        label: 'Ancho',
+        value: `${cantidadProducto(producto.piso.ancho_mm)} mm`,
+        group: 'Dimensiones y empaque',
+      })
+    if (producto.piso.largo_mm)
+      items.push({
+        label: 'Largo',
+        value: `${cantidadProducto(producto.piso.largo_mm)} mm`,
+        group: 'Dimensiones y empaque',
+      })
+    if (producto.piso.m2_por_caja)
+      items.push({
+        label: 'm² por caja',
+        value: cantidadProducto(producto.piso.m2_por_caja),
+        group: 'Dimensiones y empaque',
+      })
+  }
+  return items
+}

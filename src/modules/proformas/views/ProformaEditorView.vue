@@ -2953,7 +2953,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         @action="editReadLine"
       />
       <Modal
-        wide
+        extra-wide
+        sticky-frame
         :open="lineModal"
         :title="editingLine === null ? 'Agregar producto' : 'Editar producto'"
         @close="closeLineModal"

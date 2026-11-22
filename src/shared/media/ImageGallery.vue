@@ -25,8 +25,9 @@ const props = withDefaults(
     preservePending?: boolean
     streamlined?: boolean
     title?: string
+    subjectLabel?: string
   }>(),
-  { editable: true, title: 'Galería de imágenes' },
+  { editable: true, title: 'Galería de imágenes', subjectLabel: 'este mueble en la proforma' },
 )
 const emit = defineEmits<{
   'update:modelValue': [images: LocalImage[]]
@@ -471,10 +472,11 @@ defineExpose({ flush: upload, count: computed(() => all.value.length) })
         <ImagePlus :size="24" />
       </span>
       <strong>Sin imágenes cargadas todavía</strong>
-      <span>
-        Este paso es opcional. Arrastra o selecciona fotos desde el panel derecho si deseas ilustrar
-        el mueble en la proforma.
+      <span v-if="editable">
+        Este paso es opcional. Arrastra o selecciona fotos aquí si deseas ilustrar
+        {{ subjectLabel }}.
       </span>
+      <span v-else>Este registro aún no cuenta con fotografías en galería.</span>
     </div>
     <p v-else class="empty">Sin imágenes. Puedes guardar sin adjuntar fotografías.</p>
     <div class="thumbs">
@@ -537,11 +539,11 @@ defineExpose({ flush: upload, count: computed(() => all.value.length) })
       >
       <p v-if="streamlined" class="actions-guide">
         <template v-if="all.length">
-          La portada ilustrará este mueble en la proforma. Haz clic en cualquier miniatura para
+          La portada ilustrará {{ subjectLabel }}. Haz clic en cualquier miniatura para
           <strong>cambiar portada, ordenar o quitar</strong>.
         </template>
         <template v-else>
-          La primera imagen subida quedará como portada principal en la proforma (máximo
+          La primera imagen subida quedará como portada principal para {{ subjectLabel }} (máximo
           {{ limit }} fotos).
         </template>
       </p>

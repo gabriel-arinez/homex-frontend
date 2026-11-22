@@ -3,7 +3,9 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import {
   Armchair,
+  ArrowDownRight,
   ArrowLeft,
+  ArrowUpRight,
   Boxes,
   CheckCircle2,
   CircleAlert,
@@ -31,6 +33,7 @@ import ImageGallery from '@/shared/media/ImageGallery.vue'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
 import ConfirmDialog from '@/shared/ui/ConfirmDialog.vue'
+import CreatorTag from '@/shared/ui/CreatorTag.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
@@ -39,6 +42,7 @@ import PageHeader from '@/shared/ui/PageHeader.vue'
 import TextField from '@/shared/ui/TextField.vue'
 import Toast from '@/shared/ui/Toast.vue'
 import ProductoForm from '../components/ProductoForm.vue'
+import ProductoStockAjusteModal from '../components/ProductoStockAjusteModal.vue'
 import { productosService } from '../services/productosService'
 import {
   categoriaProducto,
@@ -93,7 +97,12 @@ function returnToProforma() {
   void router.push(contextualDestination.value)
 }
 
-function resolveCatalogOption(conceptCode: string, id: number | null | undefined): string {
+function resolveCatalogOption(
+  conceptCode: string,
+  id: number | null | undefined,
+  preloadedName?: string | null,
+): string {
+  if (preloadedName) return preloadedName
   if (id == null) return 'No informado'
   const found = catalogOptions[conceptCode]?.find((item) => item.id === id)
   return found?.nombre ?? `#${id}`
@@ -309,6 +318,23 @@ function submitStockMinimo() {
   void saveStockMinimo(trimmed)
 }
 
+const ajusteStockOpen = ref(false)
+const ajusteStockType = ref<'ENTRADA' | 'SALIDA'>('ENTRADA')
+
+function openAjusteStock(type: 'ENTRADA' | 'SALIDA') {
+  ajusteStockType.value = type
+  ajusteStockOpen.value = true
+}
+
+async function onAjusteStockSaved(_movimiento: unknown, tipo: 'ENTRADA' | 'SALIDA') {
+  const updatedMessage =
+    tipo === 'ENTRADA'
+      ? 'Entrada de stock registrada correctamente.'
+      : 'Salida de stock registrada correctamente.'
+  await load()
+  toastMessage.value = updatedMessage
+}
+
 onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 </script>
 
@@ -367,6 +393,20 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           <ArrowLeft :size="17" aria-hidden="true" /> Volver a productos
         </Button>
         <Button
+          v-if="product && !editing && canAdmin"
+          variant="secondary"
+          @click="openAjusteStock('ENTRADA')"
+        >
+          <ArrowUpRight :size="17" aria-hidden="true" /> Entrada stock
+        </Button>
+        <Button
+          v-if="product && !editing && canAdmin"
+          variant="secondary"
+          @click="openAjusteStock('SALIDA')"
+        >
+          <ArrowDownRight :size="17" aria-hidden="true" /> Salida stock
+        </Button>
+        <Button
           v-if="product && !editing && session.can('comercial.operar')"
           variant="secondary"
           @click="
@@ -376,7 +416,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           <Boxes :size="17" aria-hidden="true" /> Ver movimientos
         </Button>
         <Button v-if="product && canEdit && !editing" variant="warning" @click="editing = true">
-          <Pencil :size="16" aria-hidden="true" /> Editar datos comerciales
+          <Pencil :size="16" aria-hidden="true" /> Editar producto
         </Button>
       </template>
     </PageHeader>
@@ -397,7 +437,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <div>
               <p class="section-kicker">EDICIÓN DE CATÁLOGO</p>
               <h2 id="edit-product-title">Editar datos comerciales</h2>
-              <p>Actualiza nombre, precios, atributos técnicos o estado comercial.</p>
+              <p>Actualiza nombre, precios, imágenes, atributos técnicos o estado comercial.</p>
             </div>
           </div>
         </div>
@@ -405,6 +445,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           :key="product.id"
           :initial="product"
           :processing="saving"
+          :can-upload-image="canEdit"
           @save="save"
           @change="dirty = true"
           @cancel="confirmCancel = true"
@@ -531,10 +572,12 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <ImageGallery
               :endpoint="`/api/v1/catalogo/productos/${product.id}/imagenes/`"
               :editable="canEdit"
+              :streamlined="true"
+              subject-label="este producto en el catálogo"
             />
             <p v-if="canEdit" class="gallery-note">
-              Las imágenes se guardan al instante. Para modificar los datos comerciales utiliza
-              «Editar datos comerciales».
+              Las imágenes se guardan al instante. Puedes establecer portada, ordenar o eliminar
+              haciendo clic en cualquier foto.
             </p>
           </section>
 
@@ -600,6 +643,13 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   </div>
                 </div>
 
+                <div v-if="product.creado_por_resumen" class="product-field-card">
+                  <span class="product-field-card__label">Registrado por</span>
+                  <div class="product-field-card__creator">
+                    <CreatorTag :name="product.creado_por_resumen.display_name" />
+                  </div>
+                </div>
+
                 <div
                   v-if="product.observaciones"
                   class="product-field-card product-field-card--full"
@@ -639,21 +689,35 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 <div class="product-field-card">
                   <span class="product-field-card__label">Marca</span>
                   <strong class="product-field-card__value">
-                    {{ resolveCatalogOption('MARCA', product.silla.marca) }}
+                    {{
+                      resolveCatalogOption('MARCA', product.silla.marca, product.silla.marca_nombre)
+                    }}
                   </strong>
                 </div>
 
                 <div class="product-field-card">
                   <span class="product-field-card__label">Color principal</span>
                   <strong class="product-field-card__value">
-                    {{ resolveCatalogOption('COLOR', product.silla.color_primario) }}
+                    {{
+                      resolveCatalogOption(
+                        'COLOR',
+                        product.silla.color_primario,
+                        product.silla.color_primario_nombre,
+                      )
+                    }}
                   </strong>
                 </div>
 
                 <div class="product-field-card">
                   <span class="product-field-card__label">Color secundario</span>
                   <strong class="product-field-card__value">
-                    {{ resolveCatalogOption('COLOR', product.silla.color_secundario) }}
+                    {{
+                      resolveCatalogOption(
+                        'COLOR',
+                        product.silla.color_secundario,
+                        product.silla.color_secundario_nombre,
+                      )
+                    }}
                   </strong>
                 </div>
 
@@ -695,35 +759,57 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 <div class="product-field-card">
                   <span class="product-field-card__label">Marca</span>
                   <strong class="product-field-card__value">
-                    {{ resolveCatalogOption('MARCA', product.piso.marca) }}
+                    {{
+                      resolveCatalogOption('MARCA', product.piso.marca, product.piso.marca_nombre)
+                    }}
                   </strong>
                 </div>
 
                 <div class="product-field-card">
                   <span class="product-field-card__label">Tipo</span>
                   <strong class="product-field-card__value">
-                    {{ resolveCatalogOption('TIPO_PISO', product.piso.tipo) }}
+                    {{
+                      resolveCatalogOption('TIPO_PISO', product.piso.tipo, product.piso.tipo_nombre)
+                    }}
                   </strong>
                 </div>
 
                 <div class="product-field-card">
                   <span class="product-field-card__label">Material</span>
                   <strong class="product-field-card__value">
-                    {{ resolveCatalogOption('MATERIAL_PISO', product.piso.material) }}
+                    {{
+                      resolveCatalogOption(
+                        'MATERIAL_PISO',
+                        product.piso.material,
+                        product.piso.material_nombre,
+                      )
+                    }}
                   </strong>
                 </div>
 
                 <div class="product-field-card">
                   <span class="product-field-card__label">Diseño</span>
                   <strong class="product-field-card__value">
-                    {{ resolveCatalogOption('DISENO_PISO', product.piso.diseno) }}
+                    {{
+                      resolveCatalogOption(
+                        'DISENO_PISO',
+                        product.piso.diseno,
+                        product.piso.diseno_nombre,
+                      )
+                    }}
                   </strong>
                 </div>
 
                 <div class="product-field-card">
                   <span class="product-field-card__label">Acabado</span>
                   <strong class="product-field-card__value">
-                    {{ resolveCatalogOption('ACABADO_PISO', product.piso.acabado) }}
+                    {{
+                      resolveCatalogOption(
+                        'ACABADO_PISO',
+                        product.piso.acabado,
+                        product.piso.acabado_nombre,
+                      )
+                    }}
                   </strong>
                 </div>
 
@@ -745,15 +831,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                     class="product-field-card__value"
                     :class="{ 'product-field-card__value--muted': !product.piso.m2_por_caja }"
                   >
-                    {{ product.piso.m2_por_caja || 'No informado (dato descriptivo)' }}
+                    {{ product.piso.m2_por_caja || 'No informado' }}
                   </strong>
                 </div>
               </div>
             </section>
-
-            <p class="stock-note">
-              El stock, la demanda, la disponibilidad y el precio vigente provienen del backend.
-            </p>
           </div>
         </div>
       </template>
@@ -870,6 +952,14 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       confirm-label="Salir sin guardar"
       @close="answerLeave(false)"
       @confirm="answerLeave(true)"
+    />
+    <ProductoStockAjusteModal
+      :open="ajusteStockOpen"
+      :initial-product="product"
+      :initial-type="ajusteStockType"
+      lock-product
+      @close="ajusteStockOpen = false"
+      @saved="onAjusteStockSaved"
     />
   </div>
 </template>

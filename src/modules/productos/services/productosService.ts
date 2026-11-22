@@ -3,6 +3,7 @@ import type {
   PaginatedProductoList,
   PatchedProductoWritable,
   Producto,
+  ProductoSimilaresRespuesta,
   ProductoWritable,
   V1CatalogoProductosListData,
 } from '@/generated/api'
@@ -52,5 +53,26 @@ export const productosService = {
       method: 'POST',
       body,
     })
+  },
+  verificarSimilares: (params: {
+    exclude_id?: number
+    sku?: string
+    nombre?: string
+    categoria?: number
+    marca?: number
+    modelo?: string
+    color_primario?: number
+    espesor_mm?: string
+  }) => {
+    const search = new URLSearchParams()
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && String(value).trim() !== '') {
+        search.set(key, String(value).trim())
+      }
+    }
+    const qs = search.toString()
+    return apiRequest<ProductoSimilaresRespuesta>(
+      `/api/v1/catalogo/productos/verificar-similares/${qs ? `?${qs}` : ''}`,
+    )
   },
 }

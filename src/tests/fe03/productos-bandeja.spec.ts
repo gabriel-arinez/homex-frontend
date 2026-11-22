@@ -31,6 +31,7 @@ const sample: Producto = {
   activo: true,
   imagen_principal: null,
   created_by: 7,
+  creado_por_resumen: null,
   updated_by: 7,
 }
 
@@ -88,36 +89,39 @@ afterEach(() => {
 })
 
 describe('Bandeja administrativa de productos', () => {
-  it('presenta tabla y tarjetas con vista rápida y navegación a la ficha completa', async () => {
+  it('presenta tabla y tarjetas con estado integrado, stock actual y menú de acciones', async () => {
     mockServices()
+    localStorage.removeItem('homex.catalogo.vista-preferida.v1')
     const { wrapper } = await makeMounted()
     try {
       expect(wrapper.get('table').attributes('class')).toContain('product-table')
+      expect(wrapper.text()).toContain('Producto y estado')
+      expect(wrapper.text()).toContain('Stock actual')
       expect(wrapper.text()).toContain('1 producto encontrado')
       expect(wrapper.text()).toContain('27 piezas')
-      expect(wrapper.text()).toContain('Demanda pendiente: 1 pieza')
-      expect(wrapper.findAll('[aria-label="Ver producto Silla de visita azul"]')).toHaveLength(1)
+      expect(wrapper.text()).not.toContain('Demanda pendiente')
+      expect(wrapper.findAll('[aria-label="Acciones de Silla de visita azul"]')).toHaveLength(1)
       expect(wrapper.text()).not.toContain('Nuevo producto')
-      await wrapper.get('[aria-label="Vista rápida de Silla de visita azul"]').trigger('click')
+
+      await wrapper.get('[aria-label="Acciones de Silla de visita azul"]').trigger('click')
       await flushPromises()
-      expect(document.body.textContent).toContain('Información comercial actual')
-      expect(document.body.querySelector('.full-detail')?.getAttribute('href')).toBe(
-        '/productos/13',
-      )
-      await document.body.querySelector<HTMLButtonElement>('.viewer-footer button')?.click()
+      expect(wrapper.text()).toContain('Ver ficha del producto')
+
       await wrapper.get('[aria-label="Vista del catálogo"] button:first-child').trigger('click')
       await flushPromises()
+      expect(localStorage.getItem('homex.catalogo.vista-preferida.v1')).toBe('grid')
       expect(wrapper.findAll('.product-card')).toHaveLength(1)
       expect(wrapper.get('.product-name').text()).toContain('Silla de visita azul')
       expect(wrapper.get('.product-visual').text()).toContain('Sin imagen')
-      await wrapper.get('[aria-label="Vista rápida de Silla de visita azul"]').trigger('click')
+      expect(wrapper.get('.product-card').text()).not.toContain('Demanda pendiente')
+      await wrapper.get('[aria-label="Acciones de Silla de visita azul"]').trigger('click')
       await flushPromises()
-      expect(document.body.textContent).toContain('Silla de visita azul')
-      expect(document.body.querySelector('.full-detail')?.getAttribute('href')).toBe(
-        '/productos/13',
+      expect(wrapper.find('.product-card .menu-dropdown').text()).toContain(
+        'Ver ficha del producto',
       )
     } finally {
       wrapper.unmount()
+      localStorage.removeItem('homex.catalogo.vista-preferida.v1')
     }
   })
 

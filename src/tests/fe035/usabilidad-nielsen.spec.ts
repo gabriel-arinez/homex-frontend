@@ -230,7 +230,7 @@ describe('FE03.5 baseline de usabilidad Nielsen', () => {
     })
     await flushPromises()
 
-    await buttonByText(wrapper, 'Editar datos comerciales').trigger('click')
+    await buttonByText(wrapper, 'Editar producto').trigger('click')
     const nombre = wrapper.get<HTMLInputElement>('input[name="nombre"]')
     await nombre.setValue('Silla temporal')
     await wrapper.get('form').trigger('submit')
@@ -251,7 +251,7 @@ describe('FE03.5 baseline de usabilidad Nielsen', () => {
     await flushPromises()
     expect(wrapper.find('form').exists()).toBe(false)
 
-    await buttonByText(wrapper, 'Editar datos comerciales').trigger('click')
+    await buttonByText(wrapper, 'Editar producto').trigger('click')
     expect(wrapper.get<HTMLInputElement>('input[name="nombre"]').element.value).toBe(
       'Silla ejecutiva',
     )

@@ -8,18 +8,33 @@ import {
 } from '@/modules/capturas/fieldVoiceReview'
 import type { VoiceEvidence } from '@/modules/capturas/voiceEvidence'
 import { dateRangeError } from '@/shared/validation/dateRange'
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import type {
   CamposCatalogo,
   CategoriaEnum,
   FamiliaProducto,
   Producto,
+  ProductoSimilarItem,
   ProductoWritable,
   ValorCatalogoPublico,
 } from '@/generated/api'
 import { proformasService } from '@/modules/proformas/services/proformasService'
+import { productosService } from '../services/productosService'
+import { dineroProducto, cantidadProducto } from '../utils/presentacionCatalogo'
 import CapturaCatalogo from './CapturaCatalogo.vue'
-import { Armchair, Check, FileText, Layers, Mic, Package, Save, Tag, Trash2 } from '@lucide/vue'
+import {
+  AlertTriangle,
+  Armchair,
+  ArrowUpRight,
+  Check,
+  FileText,
+  Layers,
+  Mic,
+  Package,
+  Save,
+  Tag,
+  Trash2,
+} from '@lucide/vue'
 import VoiceDrawer from '@/modules/capturas/components/VoiceDrawer.vue'
 import ImageGallery from '@/shared/media/ImageGallery.vue'
 import type { LocalImage } from '@/shared/media/gallery'
@@ -129,9 +144,52 @@ function updateRecording(active: boolean, paused: boolean, elapsed: number) {
   recordingElapsed.value = elapsed
 }
 
-const fieldError = (name: string) => fields.value[name]?.[0] ?? props.serverErrors?.[name]?.[0]
+const fieldError = (name: string) =>
+  fields.value[name]?.[0] ??
+  props.serverErrors?.[name]?.[0] ??
+  (name === 'sku' && skuDuplicado.value
+    ? `El código SKU ya pertenece a «${skuDuplicado.value.nombre}».`
+    : undefined)
 const money = (value: string | number) =>
   new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(Number(value) || 0)
+
+const skuDuplicado = ref<ProductoSimilarItem | null>(null)
+const productosSimilares = ref<ProductoSimilarItem[]>([])
+let similarityTimer: ReturnType<typeof setTimeout> | undefined
+let similaritySeq = 0
+
+function scheduleSimilarityCheck() {
+  if (similarityTimer) clearTimeout(similarityTimer)
+  const sku = form.sku.trim()
+  const nombre = form.nombre.trim()
+  const modelo = form.modelo.trim()
+  const marca = form.marca ? Number(form.marca) : undefined
+  if (!sku && nombre.length < 3 && !marca && modelo.length < 2) {
+    skuDuplicado.value = null
+    productosSimilares.value = []
+    return
+  }
+  similarityTimer = setTimeout(async () => {
+    const seq = ++similaritySeq
+    try {
+      const res = await productosService.verificarSimilares({
+        exclude_id: props.initial?.id,
+        sku: sku || undefined,
+        nombre: nombre || undefined,
+        categoria: form.categoria ? Number(form.categoria) : undefined,
+        marca,
+        modelo: modelo || undefined,
+        color_primario: form.color_primario ? Number(form.color_primario) : undefined,
+        espesor_mm: form.espesor_mm || undefined,
+      })
+      if (seq !== similaritySeq) return
+      skuDuplicado.value = res.sku_duplicado ?? null
+      productosSimilares.value = res.similares ?? []
+    } catch {
+      // Validación informativa; no interrumpe la captura si la red falla.
+    }
+  }, 350)
+}
 
 const discountPercent = computed(() => {
   const before = Number(form.precio_lista)
@@ -487,6 +545,8 @@ function submit(): boolean {
   if (!form.categoria) fields.value.categoria = ['Selecciona una categoría.']
   if (!form.nombre.trim()) fields.value.nombre = ['El nombre comercial es obligatorio.']
   if (!form.sku.trim()) fields.value.sku = ['Ingresa un SKU.']
+  else if (skuDuplicado.value)
+    fields.value.sku = [`Ya existe «${skuDuplicado.value.nombre}» con ese SKU.`]
   if (!form.unidad_stock) fields.value.unidad_stock = ['Selecciona una unidad comercial.']
   if (
     form.precio_lista === '' ||
@@ -607,7 +667,24 @@ function submit(): boolean {
 }
 
 defineExpose({ submit, hasRecording: () => recordingActive.value })
+watch(
+  [
+    () => form.sku,
+    () => form.nombre,
+    () => form.categoria,
+    () => form.marca,
+    () => form.modelo,
+    () => form.color_primario,
+    () => form.espesor_mm,
+  ],
+  () => {
+    if (!loading.value) scheduleSimilarityCheck()
+  },
+)
 onMounted(load)
+onBeforeUnmount(() => {
+  if (similarityTimer) clearTimeout(similarityTimer)
+})
 </script>
 
 <template>
@@ -671,11 +748,42 @@ onMounted(load)
         <!-- 1. Información General -->
         <section class="catalog-section" aria-labelledby="general-title">
           <div class="section-heading">
-            <Package :size="20" aria-hidden="true" />
+            <span class="section-icon"><Package :size="19" aria-hidden="true" /></span>
             <div>
               <h3 id="general-title">Información general</h3>
               <p>Identificación del producto dentro del catálogo HOMEX.</p>
             </div>
+          </div>
+          <div v-if="productosSimilares.length" class="similarity-warning" role="status">
+            <div class="similarity-warning__head">
+              <AlertTriangle :size="18" aria-hidden="true" />
+              <div>
+                <strong>Posible producto duplicado o similar encontrado</strong>
+                <p>
+                  Verifica antes de guardar que no estés registrando el mismo artículo dos veces.
+                </p>
+              </div>
+            </div>
+            <ul class="similarity-warning__list">
+              <li v-for="sim in productosSimilares" :key="sim.id">
+                <div class="similarity-warning__item">
+                  <strong>{{ sim.nombre }}</strong>
+                  <small>
+                    SKU: {{ sim.sku || `#${sim.id}` }} · {{ sim.categoria_nombre }} ·
+                    {{ dineroProducto(sim.precio_vigente) }} · Stock:
+                    {{ cantidadProducto(sim.stock) }} {{ sim.unidad_nombre }} · {{ sim.motivo }}
+                  </small>
+                </div>
+                <a
+                  :href="`/productos/${sim.id}`"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="similarity-warning__link"
+                >
+                  Ver ficha <ArrowUpRight :size="14" aria-hidden="true" />
+                </a>
+              </li>
+            </ul>
           </div>
           <div class="fields-grid">
             <div :class="{ 'full-field': !preselectCategory && !initial }">
@@ -1122,13 +1230,15 @@ onMounted(load)
           </p>
           <ImageGallery
             v-model="images"
+            :streamlined="true"
             :endpoint="initial ? `/api/v1/catalogo/productos/${initial.id}/imagenes/` : undefined"
-            :editable="!initial && canUploadImage !== false"
+            :editable="canUploadImage !== false"
+            title="Imágenes del producto"
+            subject-label="este producto en el catálogo"
             @changed="emit('change')"
           />
           <p v-if="initial && canUploadImage !== false" class="muted tiny">
-            Gestiona las imágenes desde la ficha del producto. Los cambios de la galería se guardan
-            al instante, independientemente de los datos comerciales.
+            Los cambios en la galería (subir, portada, orden o eliminar) se guardan al instante.
           </p>
         </section>
 
@@ -1297,6 +1407,100 @@ onMounted(load)
   flex: 0 0 auto;
   color: var(--color-primary);
   margin-top: 0.15rem;
+}
+
+.section-icon {
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: none;
+  place-items: center;
+  border-radius: 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 18%, transparent);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-accent);
+}
+
+.similarity-warning {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: var(--space-4);
+  padding: 0.85rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 45%, var(--color-border));
+  border-radius: var(--radius-control);
+  background: var(--color-warning-soft, rgba(234, 179, 8, 0.1));
+}
+
+.similarity-warning__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+}
+
+.similarity-warning__head svg {
+  flex: none;
+  color: var(--color-warning);
+  margin-top: 0.1rem;
+}
+
+.similarity-warning__head strong {
+  display: block;
+  font-size: 0.88rem;
+}
+
+.similarity-warning__head p {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+
+.similarity-warning__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.similarity-warning__list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+
+.similarity-warning__item {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.similarity-warning__item strong {
+  font-size: 0.85rem;
+}
+
+.similarity-warning__item small {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.similarity-warning__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-primary-accent);
+  text-decoration: none;
+}
+
+.similarity-warning__link:hover {
+  text-decoration: underline;
 }
 
 .heading-split {

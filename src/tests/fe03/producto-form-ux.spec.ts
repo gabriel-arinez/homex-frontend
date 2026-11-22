@@ -182,8 +182,8 @@ describe('Formulario comercial de productos', () => {
       },
     })
     await flushPromises()
-    expect(w.findComponent({ name: 'ImageGallery' }).props('editable')).toBe(false)
-    expect(w.text()).toContain('Gestiona las imágenes desde la ficha del producto')
+    expect(w.findComponent({ name: 'ImageGallery' }).props('editable')).toBe(true)
+    expect(w.text()).toContain('Los cambios en la galería')
     w.unmount()
   })
   it('oculta la carga de imágenes cuando no existe permiso comercial', async () => {

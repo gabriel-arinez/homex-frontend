@@ -160,6 +160,14 @@ export type ClienteResumenProforma = {
   celular: string | null
 }
 
+/**
+ * * `SKU_EXACTO` - SKU_EXACTO
+ * * `NOMBRE_EXACTO` - NOMBRE_EXACTO
+ * * `ATRIBUTOS_IGUALES` - ATRIBUTOS_IGUALES
+ * * `SIMILAR` - SIMILAR
+ */
+export type CoincidenciaEnum = 'SKU_EXACTO' | 'NOMBRE_EXACTO' | 'ATRIBUTOS_IGUALES' | 'SIMILAR'
+
 export type ComercialAsistida = {
   nombre: string
   cantidad: number | null
@@ -764,11 +772,17 @@ export type PatchedProducto = {
   piso?: ProductoPiso | null
   promocion?: DescuentoProducto | null
   readonly created_by?: number | null
+  creado_por_resumen?: UsuarioResumen | null
   readonly updated_by?: number | null
 }
 
 export type PatchedProductoPiso = {
   readonly producto?: number
+  readonly marca_nombre?: string | null
+  readonly tipo_nombre?: string | null
+  readonly material_nombre?: string | null
+  readonly diseno_nombre?: string | null
+  readonly acabado_nombre?: string | null
   modelo?: string | null
   espesor_mm?: string | null
   largo_mm?: string | null
@@ -783,6 +797,9 @@ export type PatchedProductoPiso = {
 
 export type PatchedProductoSilla = {
   readonly producto?: number
+  readonly marca_nombre?: string | null
+  readonly color_primario_nombre?: string | null
+  readonly color_secundario_nombre?: string | null
   modelo?: string | null
   especificaciones?: unknown
   marca?: number | null
@@ -879,11 +896,17 @@ export type Producto = {
   piso?: ProductoPiso | null
   promocion?: DescuentoProducto | null
   readonly created_by: number | null
+  creado_por_resumen: UsuarioResumen | null
   readonly updated_by: number | null
 }
 
 export type ProductoPiso = {
   readonly producto: number
+  readonly marca_nombre: string | null
+  readonly tipo_nombre: string | null
+  readonly material_nombre: string | null
+  readonly diseno_nombre: string | null
+  readonly acabado_nombre: string | null
   modelo?: string | null
   espesor_mm?: string | null
   largo_mm?: string | null
@@ -905,11 +928,32 @@ export type ProductoResumenMovimiento = {
 
 export type ProductoSilla = {
   readonly producto: number
+  readonly marca_nombre: string | null
+  readonly color_primario_nombre: string | null
+  readonly color_secundario_nombre: string | null
   modelo?: string | null
   especificaciones?: unknown
   marca?: number | null
   color_primario?: number | null
   color_secundario?: number | null
+}
+
+export type ProductoSimilarItem = {
+  id: number
+  sku: string | null
+  nombre: string
+  categoria_nombre: string
+  precio_vigente: string
+  stock: string
+  unidad_nombre: string
+  activo: boolean
+  coincidencia: CoincidenciaEnum
+  motivo: string
+}
+
+export type ProductoSimilaresRespuesta = {
+  sku_duplicado: ProductoSimilarItem | null
+  similares: Array<ProductoSimilarItem>
 }
 
 export type Proforma = {
@@ -2472,6 +2516,29 @@ export type V1CatalogoProductosStockMinimoPartialUpdateResponses = {
 
 export type V1CatalogoProductosStockMinimoPartialUpdateResponse =
   V1CatalogoProductosStockMinimoPartialUpdateResponses[keyof V1CatalogoProductosStockMinimoPartialUpdateResponses]
+
+export type V1CatalogoProductosVerificarSimilaresRetrieveData = {
+  body?: never
+  path?: never
+  query?: {
+    categoria?: number
+    color_primario?: number
+    espesor_mm?: string
+    exclude_id?: number
+    marca?: number
+    modelo?: string
+    nombre?: string
+    sku?: string
+  }
+  url: '/api/v1/catalogo/productos/verificar-similares/'
+}
+
+export type V1CatalogoProductosVerificarSimilaresRetrieveResponses = {
+  200: ProductoSimilaresRespuesta
+}
+
+export type V1CatalogoProductosVerificarSimilaresRetrieveResponse =
+  V1CatalogoProductosVerificarSimilaresRetrieveResponses[keyof V1CatalogoProductosVerificarSimilaresRetrieveResponses]
 
 export type V1CatalogoSillasListData = {
   body?: never
