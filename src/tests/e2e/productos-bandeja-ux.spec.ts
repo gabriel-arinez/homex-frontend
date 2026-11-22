@@ -195,8 +195,10 @@ test('@a11y FE03 nueva bandeja de productos muestra lista, categorías y precios
     '/productos/11',
   )
   await expect(page.getByText('27 piezas')).toBeVisible()
-  await expect(page.getByText('Pendiente: 1')).toBeVisible()
-  await expect(page.getByText('16,5 m²')).toBeVisible()
+  await expect(page.getByText('Demanda pendiente: 1 pieza')).toBeVisible()
+  await expect(
+    page.locator('td[data-label="Stock y disponibilidad"] strong', { hasText: '16,5 m²' }),
+  ).toBeVisible()
   await expect(page.getByRole('button', { name: 'Nuevo producto' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Cuadrícula' }).click()
   await expect(page.locator('.product-card')).toHaveCount(2)

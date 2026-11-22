@@ -307,6 +307,99 @@ describe('Inventario operativo (P1, P2, P4, P5, P6)', () => {
       cantidad: '3',
       motivo: 'REPOSICION',
     })
-    expect(ajusteSpy.mock.calls[0]?.[1]).toBeTruthy()
+    const firstKey = ajusteSpy.mock.calls[0]?.[1]
+    expect(firstKey).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    )
+  })
+
+  it('P2 & P5: conserva UUID en reintentos, genera uno nuevo por operación y admite 4 decimales en M2', async () => {
+    const session = useSessionStore()
+    session.capabilities = ['comercial.operar', 'comercial.administrar']
+
+    const pisoM2: Producto = {
+      ...productoSample,
+      id: 20,
+      sku: 'PISO-20',
+      nombre: 'Piso Flotante Roble',
+      stock: '16.5000',
+      stock_minimo: '2.2500',
+      estado_stock: 'NORMAL',
+      unidad_stock: 2,
+      unidad_stock_info: { id: 2, concepto_codigo: 'UNIDAD_MEDIDA', codigo: 'M2', nombre: 'm²' },
+    }
+
+    vi.spyOn(movimientosStockService, 'types').mockResolvedValue([])
+    vi.spyOn(movimientosStockService, 'list').mockResolvedValue({
+      count: 0,
+      next: null,
+      previous: null,
+      results: [],
+    })
+    vi.spyOn(movimientosStockService, 'motivosAjuste').mockResolvedValue({
+      ENTRADA: [{ codigo: 'REPOSICION', nombre: 'Reposición', requiere_observaciones: false }],
+      SALIDA: [{ codigo: 'MERMA', nombre: 'Merma', requiere_observaciones: false }],
+    })
+    vi.spyOn(productosService, 'get').mockResolvedValue(pisoM2)
+    vi.spyOn(productosService, 'list').mockResolvedValue({
+      count: 1,
+      next: null,
+      previous: null,
+      results: [pisoM2],
+    })
+
+    const ajusteSpy = vi
+      .spyOn(movimientosStockService, 'registrarAjuste')
+      .mockRejectedValueOnce(new Error('Timeout de red'))
+      .mockResolvedValueOnce({} as never)
+      .mockResolvedValueOnce({} as never)
+
+    const router = buildRouter()
+    await router.push('/movimientos-stock?producto=20')
+    await router.isReady()
+
+    const wrapper = mount(MovimientosStockListView, {
+      global: { plugins: [router], stubs: { Teleport: true } },
+    })
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text().includes('Registrar movimiento'))!
+      .trigger('click')
+    await flushPromises()
+
+    const qtyInput = wrapper.find('input[name="ajuste-cantidad"]')
+    expect(qtyInput.attributes('step')).toBe('0.0001')
+
+    await qtyInput.setValue('1.2345')
+    await wrapper.find('#ajuste-stock-form').trigger('submit')
+    await flushPromises()
+
+    // Reintento tras error incierto: conserva la misma clave UUID
+    await wrapper.find('#ajuste-stock-form').trigger('submit')
+    await flushPromises()
+
+    const keyTry1 = ajusteSpy.mock.calls[0]?.[1]
+    const keyTry2 = ajusteSpy.mock.calls[1]?.[1]
+    expect(keyTry1).toBeTruthy()
+    expect(keyTry2).toBe(keyTry1)
+    expect(ajusteSpy.mock.calls[1]?.[0].cantidad).toBe('1.2345')
+
+    // Nueva operación al reabrir el modal: genera un UUID distinto
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text().includes('Registrar movimiento'))!
+      .trigger('click')
+    await flushPromises()
+    await wrapper.find('input[name="ajuste-cantidad"]').setValue('0.5000')
+    await wrapper.find('#ajuste-stock-form').trigger('submit')
+    await flushPromises()
+
+    const keyNewOp = ajusteSpy.mock.calls[2]?.[1]
+    expect(keyNewOp).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    )
+    expect(keyNewOp).not.toBe(keyTry1)
   })
 })
