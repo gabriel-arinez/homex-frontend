@@ -172,6 +172,13 @@ function restoreAutoMontoEnLetras() {
   montoEnLetrasManual.value = false
   form.value.monto_en_letras = montoEnLetras(form.value.pago_actual, orderCurrency.value)
 }
+function handleMontoEnLetrasInput(value: string) {
+  if (!value.trim()) {
+    montoEnLetrasManual.value = false
+    return
+  }
+  montoEnLetrasManual.value = true
+}
 const currentPayAmount = computed(() => {
   const n = Number(String(form.value.pago_actual).replace(',', '.'))
   return Number.isFinite(n) ? n : Number.NaN
@@ -980,9 +987,9 @@ watch(() => route.params.id, load)
                 v-model="form.pago_actual"
                 :label="`Pago actual (${orderCurrency})`"
                 name="pago"
-                type="number"
-                min="0.01"
-                step="0.01"
+                type="text"
+                input-mode="decimal"
+                input-rule="decimal"
                 :error="receiptAmountError"
                 required
               />
@@ -1040,12 +1047,8 @@ watch(() => route.params.id, load)
           </div>
           <div class="receipt-section__grid">
             <div class="receipt-form__full receipt-field-wrap">
-              <div class="receipt-letras-bar">
-                <span class="receipt-letras-tag">
-                  {{ montoEnLetrasManual ? 'Editado manualmente' : 'Autogenerado' }}
-                </span>
+              <div v-if="montoEnLetrasManual" class="receipt-letras-bar">
                 <button
-                  v-if="montoEnLetrasManual"
                   type="button"
                   class="receipt-letras-reset"
                   @click="restoreAutoMontoEnLetras"
@@ -1059,7 +1062,7 @@ watch(() => route.params.id, load)
                 label="Monto en letras"
                 name="letras"
                 required
-                @update:model-value="montoEnLetrasManual = true"
+                @update:model-value="handleMontoEnLetrasInput"
               />
             </div>
             <div class="receipt-form__full">
