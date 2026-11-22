@@ -16,6 +16,7 @@ import {
 import type { DetalleProforma, Proforma } from '@/generated/api'
 import { ApiError } from '@/shared/api'
 import { downloadBlob } from '@/shared/download/downloadBlob'
+import { buildExportFilename } from '@/shared/download/exportFilename'
 import Button from '@/shared/ui/Button.vue'
 import Badge from '@/shared/ui/Badge.vue'
 import ConfirmDialog from '@/shared/ui/ConfirmDialog.vue'
@@ -204,7 +205,18 @@ async function downloadDocument() {
       return
     }
     const prefix = stateCode.value === 'BORRADOR' ? 'proforma-borrador' : 'proforma'
-    downloadBlob(file, `${prefix}-${quote.value.numero}.pdf`)
+    downloadBlob(
+      file,
+      buildExportFilename(
+        prefix,
+        [
+          quote.value.numero,
+          quote.value.cliente_resumen?.nombre || quote.value.cliente_resumen?.empresa,
+          quote.value.titulo,
+        ],
+        'pdf',
+      ),
+    )
     downloadNotice.value = 'Documento descargado correctamente.'
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : 'No se pudo descargar el documento.'

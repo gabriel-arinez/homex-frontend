@@ -300,7 +300,7 @@ test('FE05 OT muestra líneas reales y permite descargar su documento', async ({
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Descargar PDF' }).click()
   const download = await downloadPromise
-  expect(download.suggestedFilename()).toBe('orden-trabajo-40.pdf')
+  expect(download.suggestedFilename()).toBe('orden-trabajo_40_pedido-9.pdf')
 })
 
 test('AP6.0.21 OT muestra ficha técnica autorizada', async ({ page }) => {

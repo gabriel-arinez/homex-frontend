@@ -20,6 +20,7 @@ import {
 import type { Recibo, ValorCatalogoPublico } from '@/generated/api'
 import DocumentViewerModal from '@/modules/proformas/components/DocumentViewerModal.vue'
 import { downloadBlob } from '@/shared/download/downloadBlob'
+import { buildExportFilename } from '@/shared/download/exportFilename'
 import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
@@ -128,7 +129,14 @@ async function downloadDocument() {
   try {
     const file = previewOpen.value && pdfBlob.value ? pdfBlob.value : await loadPdf(id)
     if (!file) throw new Error(pdfError.value || 'No se pudo descargar el recibo.')
-    downloadBlob(file, `recibo-${item.value.numero}.pdf`)
+    downloadBlob(
+      file,
+      buildExportFilename(
+        'recibo',
+        [item.value.numero, item.value.nombre_completo, item.value.fecha],
+        'pdf',
+      ),
+    )
     if (!previewOpen.value) clearPdf()
     notice.value = 'Recibo PDF descargado correctamente.'
   } catch (e) {

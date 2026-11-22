@@ -1648,7 +1648,7 @@ test('approved PDF renders, downloads identical bytes and prints the original do
   const downloadEvent = page.waitForEvent('download')
   await viewer.getByRole('button', { name: 'Descargar' }).click()
   const download = await downloadEvent
-  expect(download.suggestedFilename()).toBe('proforma-borrador-101.pdf')
+  expect(download.suggestedFilename()).toBe('proforma-borrador_101_ana-perez_oficina-nueva.pdf')
   const file = await download.path()
   expect(file).not.toBeNull()
   expect(readFileSync(file!)).toEqual(fixture)

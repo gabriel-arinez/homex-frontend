@@ -47,6 +47,7 @@ import { tipoPagoIcon } from '@/modules/recibos/utils/tipoPagoIcon'
 import { ApiError } from '@/shared/api'
 import { fechaComercial, formatearFechaHora } from '@/shared/date/presentacionFecha'
 import { downloadBlob } from '@/shared/download/downloadBlob'
+import { buildExportFilename } from '@/shared/download/exportFilename'
 import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
 import { generateUuidV4 } from '@/shared/utils/uuid'
 import { pedidosService } from '../services/pedidosService'
@@ -132,7 +133,18 @@ async function downloadReceiptPdf() {
   try {
     const file = receiptPdfBlob.value ?? (await loadReceiptPdf(pdfPreviewRecibo.value.id))
     if (!file) throw new Error(receiptPdfError.value || 'No se pudo descargar el recibo.')
-    downloadBlob(file, `recibo-${pdfPreviewRecibo.value.numero}.pdf`)
+    downloadBlob(
+      file,
+      buildExportFilename(
+        'recibo',
+        [
+          pdfPreviewRecibo.value.numero,
+          pdfPreviewRecibo.value.nombre_completo,
+          pdfPreviewRecibo.value.fecha,
+        ],
+        'pdf',
+      ),
+    )
     notice.value = `Recibo #${pdfPreviewRecibo.value.numero} descargado en PDF.`
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'No se pudo descargar el recibo.'

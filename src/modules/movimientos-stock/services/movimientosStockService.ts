@@ -31,6 +31,10 @@ export const movimientosStockService = {
     apiRequest<Blob>(`/api/v1/movimientos-stock/exportar-csv/${qs(query)}`, {
       responseType: 'blob',
     }),
+  exportarExcel: (query: Omit<Query, 'pagina' | 'page_size'> = {}) =>
+    apiRequest<Blob>(`/api/v1/movimientos-stock/exportar-excel/${qs(query)}`, {
+      responseType: 'blob',
+    }),
   motivosAjuste: () =>
     apiRequest<CatalogoMotivosAjuste>('/api/v1/movimientos-stock/motivos-ajuste/'),
   registrarAjuste: (body: AjusteStockCrear, idempotencyKey?: string) =>

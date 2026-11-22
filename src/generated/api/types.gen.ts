@@ -2911,6 +2911,49 @@ export type V1MovimientosStockExportarCsvRetrieveResponses = {
 export type V1MovimientosStockExportarCsvRetrieveResponse =
   V1MovimientosStockExportarCsvRetrieveResponses[keyof V1MovimientosStockExportarCsvRetrieveResponses]
 
+export type V1MovimientosStockExportarExcelRetrieveData = {
+  body?: never
+  path?: never
+  query?: {
+    /**
+     * * `ENTRADA` - ENTRADA
+     * * `SALIDA` - SALIDA
+     */
+    direccion?: 'ENTRADA' | 'SALIDA'
+    fecha_desde?: string
+    fecha_hasta?: string
+    /**
+     * * `REPOSICION` - REPOSICION
+     * * `REGULARIZACION_POSITIVA` - REGULARIZACION_POSITIVA
+     * * `CORRECCION_EXCEPCIONAL` - CORRECCION_EXCEPCIONAL
+     * * `MERMA` - MERMA
+     * * `DANO` - DANO
+     * * `USO_INTERNO` - USO_INTERNO
+     * * `REGULARIZACION_NEGATIVA` - REGULARIZACION_NEGATIVA
+     */
+    motivo?:
+      | 'REPOSICION'
+      | 'REGULARIZACION_POSITIVA'
+      | 'CORRECCION_EXCEPCIONAL'
+      | 'MERMA'
+      | 'DANO'
+      | 'USO_INTERNO'
+      | 'REGULARIZACION_NEGATIVA'
+    pedido?: number
+    producto?: number
+    search?: string
+    tipo_movimiento?: string
+  }
+  url: '/api/v1/movimientos-stock/exportar-excel/'
+}
+
+export type V1MovimientosStockExportarExcelRetrieveResponses = {
+  200: Blob | File
+}
+
+export type V1MovimientosStockExportarExcelRetrieveResponse =
+  V1MovimientosStockExportarExcelRetrieveResponses[keyof V1MovimientosStockExportarExcelRetrieveResponses]
+
 export type V1MovimientosStockMotivosAjusteRetrieveData = {
   body?: never
   path?: never

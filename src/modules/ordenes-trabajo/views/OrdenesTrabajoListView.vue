@@ -19,6 +19,7 @@ import { useSessionStore } from '@/app/stores/useSessionStore'
 import DocumentViewerModal from '@/modules/proformas/components/DocumentViewerModal.vue'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import { downloadBlob } from '@/shared/download/downloadBlob'
+import { buildExportFilename } from '@/shared/download/exportFilename'
 import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
 import { ordenesTrabajoService } from '../services/ordenesTrabajoService'
 import WorkOrderActionsMenu from '../components/WorkOrderActionsMenu.vue'
@@ -299,7 +300,18 @@ async function handleDownload(id: number) {
       toastMessage.value = documentError.value || 'No se pudo obtener el PDF.'
       return
     }
-    downloadBlob(file, `orden-trabajo-${target.numero}.pdf`)
+    downloadBlob(
+      file,
+      buildExportFilename(
+        'orden-trabajo',
+        [
+          target.numero,
+          `pedido-${target.pedido}`,
+          target.cliente_resumen?.nombre || target.cliente_resumen?.empresa,
+        ],
+        'pdf',
+      ),
+    )
     toastTone.value = 'success'
     toastMessage.value = `Orden de trabajo #${target.numero} descargada.`
   } catch (cause) {
@@ -769,9 +781,9 @@ onMounted(load)
 .ot-subtitle {
   color: var(--color-text-secondary);
   font-size: 0.76rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .origin-content {
   display: flex;
@@ -788,9 +800,9 @@ onMounted(load)
   color: var(--color-text);
   font-size: 0.87rem;
   font-weight: 650;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.3;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .origin-links {
   display: flex;
@@ -826,13 +838,13 @@ onMounted(load)
 }
 .schedule-meta {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.3rem;
   color: var(--color-text-secondary);
   font-size: 0.74rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .schedule-meta svg {
   flex: none;

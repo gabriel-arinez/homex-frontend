@@ -565,9 +565,9 @@ onMounted(load)
 .order-subtitle {
   color: var(--color-text-secondary);
   font-size: 0.76rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .client-content {
   display: flex;
@@ -584,9 +584,9 @@ onMounted(load)
   color: var(--color-text);
   font-size: 0.87rem;
   font-weight: 650;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.3;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .proforma-chip {
   display: inline-flex;

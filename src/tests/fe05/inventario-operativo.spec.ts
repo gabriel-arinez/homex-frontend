@@ -457,4 +457,72 @@ describe('Inventario operativo (P1, P2, P4, P5, P6)', () => {
     expect(wrapper.text()).toContain('Saldo final del período')
     expect(wrapper.text()).toContain('5.0000 Pieza')
   })
+
+  it('selecciona producto desde el buscador del modal y exige rango de fechas al exportar Excel', async () => {
+    const session = useSessionStore()
+    session.capabilities = ['comercial.operar', 'comercial.administrar']
+
+    vi.spyOn(movimientosStockService, 'types').mockResolvedValue([])
+    vi.spyOn(movimientosStockService, 'list').mockResolvedValue({
+      count: 0,
+      next: null,
+      previous: null,
+      results: [],
+    })
+    vi.spyOn(movimientosStockService, 'motivosAjuste').mockResolvedValue({
+      ENTRADA: [{ codigo: 'REPOSICION', nombre: 'Reposición', requiere_observaciones: false }],
+      SALIDA: [{ codigo: 'MERMA', nombre: 'Merma', requiere_observaciones: false }],
+    })
+    vi.spyOn(productosService, 'list').mockResolvedValue({
+      count: 1,
+      next: null,
+      previous: null,
+      results: [productoSample],
+    })
+    const excelSpy = vi
+      .spyOn(movimientosStockService, 'exportarExcel')
+      .mockResolvedValue(new Blob(['xlsx-bytes']))
+
+    const router = buildRouter()
+    await router.push('/movimientos-stock')
+    await router.isReady()
+
+    const wrapper = mount(MovimientosStockListView, {
+      global: { plugins: [router], stubs: { Teleport: true } },
+    })
+    await flushPromises()
+
+    // Sin rango de fechas no debe llamar a exportarExcel y debe avisar
+    const exportBtn = wrapper.findAll('button').find((b) => b.text().includes('Exportar Excel'))!
+    await exportBtn.trigger('click')
+    await flushPromises()
+    expect(excelSpy).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Debes seleccionar un rango de fechas')
+
+    // Con rango de fechas en ruta sí llama a exportarExcel
+    await router.push('/movimientos-stock?desde=2026-11-01&hasta=2026-11-22')
+    await flushPromises()
+    await exportBtn.trigger('click')
+    await flushPromises()
+    expect(excelSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fecha_desde: '2026-11-01',
+        fecha_hasta: '2026-11-22',
+      }),
+    )
+
+    // Modal sin <select name="ajuste-producto">, seleccionando directo del listado
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text().includes('Registrar movimiento'))!
+      .trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('select[name="ajuste-producto"]').exists()).toBe(false)
+    const optionBtn = wrapper.find('.ajuste-product-option')
+    expect(optionBtn.exists()).toBe(true)
+    await optionBtn.trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.ajuste-selected-card').text()).toContain('Silla Ergonómica')
+  })
 })

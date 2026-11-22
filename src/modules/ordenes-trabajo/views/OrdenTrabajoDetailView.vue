@@ -30,6 +30,7 @@ import DocumentViewerModal from '@/modules/proformas/components/DocumentViewerMo
 import { useQuoteProductImages } from '@/modules/proformas/composables/useQuoteProductImages'
 import ProductImage from '@/modules/productos/components/ProductImage.vue'
 import { downloadBlob } from '@/shared/download/downloadBlob'
+import { buildExportFilename } from '@/shared/download/exportFilename'
 import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
 import ImageGallery from '@/shared/media/ImageGallery.vue'
 import Badge from '@/shared/ui/Badge.vue'
@@ -231,7 +232,18 @@ async function downloadDocument() {
       if (!opened) error.value = documentError.value || 'No se pudo obtener el PDF.'
       return
     }
-    downloadBlob(file, `orden-trabajo-${item.value.numero}.pdf`)
+    downloadBlob(
+      file,
+      buildExportFilename(
+        'orden-trabajo',
+        [
+          item.value.numero,
+          `pedido-${item.value.pedido}`,
+          item.value.cliente_resumen?.nombre || item.value.cliente_resumen?.empresa,
+        ],
+        'pdf',
+      ),
+    )
     notice.value = 'Documento PDF de orden de trabajo descargado.'
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : 'No se pudo descargar la orden.'

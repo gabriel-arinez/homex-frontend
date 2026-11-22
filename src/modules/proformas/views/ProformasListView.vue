@@ -21,6 +21,7 @@ import ProformaActionsMenu from '../components/ProformaActionsMenu.vue'
 import DocumentViewerModal from '../components/DocumentViewerModal.vue'
 import { useProformaPdf } from '../composables/useProformaPdf'
 import { downloadBlob } from '@/shared/download/downloadBlob'
+import { buildExportFilename } from '@/shared/download/exportFilename'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
 import ClientAvatar from '@/shared/ui/ClientAvatar.vue'
@@ -111,7 +112,7 @@ async function downloadDocumentPdf() {
       (previewModalOpen.value && documentBlob.value) || (await loadDocument(previewQuote.value.id))
     if (!file) return
     const prefix = previewQuote.value.estado === 'BORRADOR' ? 'proforma-borrador' : 'proforma'
-    downloadBlob(file, `${prefix}-${previewQuote.value.numero}.pdf`)
+    downloadBlob(file, buildExportFilename(prefix, [previewQuote.value.numero], 'pdf'))
   } catch {
     // Error handled in modal or catch
   } finally {
@@ -808,17 +809,14 @@ onBeforeUnmount(() => {
   display: block;
   font-weight: 700;
   font-size: 0.89rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.3;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .quote-identity__text span {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
   line-height: 1.35;
-  word-break: break-word;
+  white-space: normal;
+  overflow-wrap: anywhere;
   color: var(--color-text-secondary);
   font-size: 0.78rem;
 }
@@ -827,9 +825,9 @@ onBeforeUnmount(() => {
   color: var(--color-text-secondary);
   font-size: 0.75rem;
   margin-top: 0.25rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .date-cell {
   font-size: 0.84rem;

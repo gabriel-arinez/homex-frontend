@@ -21,6 +21,7 @@ import { useQuoteProductImages } from '@/modules/proformas/composables/useQuoteP
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import ProductImage from '@/modules/productos/components/ProductImage.vue'
 import { downloadBlob } from '@/shared/download/downloadBlob'
+import { buildExportFilename } from '@/shared/download/exportFilename'
 import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
@@ -144,7 +145,14 @@ async function downloadDocument() {
       if (!opened) error.value = documentError.value || 'No se pudo obtener el PDF.'
       return
     }
-    downloadBlob(file, `nota-entrega-${item.value.numero}.pdf`)
+    downloadBlob(
+      file,
+      buildExportFilename(
+        'nota-entrega',
+        [item.value.numero, `pedido-${item.value.pedido}`, item.value.fecha],
+        'pdf',
+      ),
+    )
     notice.value = 'Nota de entrega PDF descargada correctamente.'
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : 'No se pudo descargar la nota.'

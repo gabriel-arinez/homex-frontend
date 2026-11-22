@@ -576,18 +576,18 @@ onBeforeUnmount(() => {
   display: block;
   font-weight: 700;
   font-size: 0.89rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.3;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .client-cell span {
   display: block;
   color: var(--color-text-secondary);
   font-size: 0.75rem;
   margin-top: 0.2rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .type-chip {
   display: inline-flex;
@@ -630,9 +630,9 @@ onBeforeUnmount(() => {
 }
 .contact-phone span,
 .contact-address span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .client-table td.actions-cell,
 .client-table th.actions-heading {

@@ -14,6 +14,7 @@ import type { Recibo, ValorCatalogoPublico } from '@/generated/api'
 import DocumentViewerModal from '@/modules/proformas/components/DocumentViewerModal.vue'
 import { fechaComercial } from '@/shared/date/presentacionFecha'
 import { downloadBlob } from '@/shared/download/downloadBlob'
+import { buildExportFilename } from '@/shared/download/exportFilename'
 import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
 import { recibosService } from '../services/recibosService'
 import { tipoPagoIcon } from '../utils/tipoPagoIcon'
@@ -205,7 +206,10 @@ async function handleDownload(id: number) {
         ? pdfBlob.value
         : await loadPdf(id)
     if (!file) throw new Error(pdfError.value || 'No se pudo descargar el recibo.')
-    downloadBlob(file, `recibo-${target.numero}.pdf`)
+    downloadBlob(
+      file,
+      buildExportFilename('recibo', [target.numero, target.nombre_completo, target.fecha], 'pdf'),
+    )
     if (!previewOpen.value) clearPdf()
     toastTone.value = 'success'
     toastMessage.value = `Recibo #${target.numero} descargado en PDF.`

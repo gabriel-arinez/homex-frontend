@@ -5,17 +5,24 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   Boxes,
+  Check,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
   CornerDownRight,
   Cpu,
   Download,
+  FileText,
+  Hash,
+  Package,
+  PackageCheck,
   PackagePlus,
   Plus,
   RotateCcw,
   SlidersHorizontal,
+  TrendingUp,
   UserCheck,
+  X,
 } from '@lucide/vue'
 import type {
   CatalogoMotivosAjuste,
@@ -34,6 +41,7 @@ import {
 } from '@/modules/productos/utils/presentacionCatalogo'
 import { ApiError } from '@/shared/api'
 import { downloadBlob } from '@/shared/download/downloadBlob'
+import { buildExportFilename } from '@/shared/download/exportFilename'
 import { generateUuidV4 } from '@/shared/utils/uuid'
 import { movimientosStockService } from '../services/movimientosStockService'
 import Badge from '@/shared/ui/Badge.vue'
@@ -269,28 +277,53 @@ async function load() {
   }
 }
 
-async function exportCsv() {
+async function exportExcel() {
   if (dateError.value || exportingCsv.value) return
+  if (!fechaDesde.value || !fechaHasta.value) {
+    toastTone.value = 'danger'
+    toastMessage.value = 'Debes seleccionar un rango de fechas (Desde y Hasta) para exportar.'
+    return
+  }
   exportingCsv.value = true
   try {
-    const blob = await movimientosStockService.exportarCsv({
+    const blob = await movimientosStockService.exportarExcel({
       search: search.value.trim() || undefined,
       tipo_movimiento: type.value || undefined,
       direccion: direccion.value || undefined,
       pedido: pedido.value ? Number(pedido.value) : undefined,
       producto: producto.value ? Number(producto.value) : undefined,
-      fecha_desde: fechaDesde.value || undefined,
-      fecha_hasta: fechaHasta.value || undefined,
+      fecha_desde: fechaDesde.value,
+      fecha_hasta: fechaHasta.value,
     })
-    downloadBlob(blob, 'movimientos-stock.csv')
+    const filename = buildExportFilename(
+      'reporte-stock',
+      [
+        selectedProduct.value?.sku || (producto.value ? `prod-${producto.value}` : ''),
+        pedido.value ? `pedido-${pedido.value}` : '',
+        type.value,
+        direccion.value,
+        search.value.trim(),
+        `${fechaDesde.value}_a_${fechaHasta.value}`,
+      ],
+      'xlsx',
+    )
+    downloadBlob(blob, filename)
     toastTone.value = 'success'
-    toastMessage.value = 'Reporte CSV exportado correctamente.'
+    toastMessage.value = 'Reporte Excel exportado correctamente.'
   } catch (err) {
     toastTone.value = 'danger'
-    toastMessage.value = err instanceof ApiError ? err.message : 'No pudimos exportar el CSV.'
+    toastMessage.value = err instanceof ApiError ? err.message : 'No pudimos exportar el Excel.'
   } finally {
     exportingCsv.value = false
   }
+}
+
+function selectAjusteProducto(item: Producto) {
+  ajusteProductoId.value = String(item.id)
+}
+
+function clearAjusteProducto() {
+  ajusteProductoId.value = ''
 }
 
 // P2: Modal de registro de entrada / salida manual (solo administración comercial)
@@ -550,10 +583,10 @@ onBeforeUnmount(() => {
         <Button
           variant="secondary"
           :disabled="exportingCsv || Boolean(dateError)"
-          @click="exportCsv"
+          @click="exportExcel"
         >
           <Download :size="16" aria-hidden="true" />
-          {{ exportingCsv ? 'Exportando...' : 'Exportar CSV' }}
+          {{ exportingCsv ? 'Exportando...' : 'Exportar Excel' }}
         </Button>
         <Button v-if="canAdmin" @click="openAjusteModal('ENTRADA')">
           <Plus :size="16" aria-hidden="true" />
@@ -917,97 +950,174 @@ onBeforeUnmount(() => {
 
     <Modal
       :open="ajusteOpen"
+      wide
       title="Registrar movimiento de inventario"
       description="Registra una entrada o salida manual de tipo Ajuste. Esta operación quedará registrada permanentemente y no podrá editarse ni eliminarse."
       @close="ajusteOpen = false"
     >
+      <template #title-icon>
+        <Boxes :size="18" aria-hidden="true" />
+      </template>
       <form id="ajuste-stock-form" class="ajuste-form" @submit.prevent="submitAjuste">
-        <div class="ajuste-tipo-toggle" role="group" aria-label="Tipo de operación">
-          <button
-            type="button"
-            class="ajuste-tipo-btn"
-            :class="{ 'ajuste-tipo-btn--active-in': ajusteTipo === 'ENTRADA' }"
-            @click="ajusteTipo = 'ENTRADA'"
-          >
-            <ArrowUpRight :size="16" aria-hidden="true" />
-            Entrada (+)
-          </button>
-          <button
-            type="button"
-            class="ajuste-tipo-btn"
-            :class="{ 'ajuste-tipo-btn--active-out': ajusteTipo === 'SALIDA' }"
-            @click="ajusteTipo = 'SALIDA'"
-          >
-            <ArrowDownRight :size="16" aria-hidden="true" />
-            Salida (-)
-          </button>
+        <div class="ajuste-section">
+          <span class="ajuste-section__label">
+            <SlidersHorizontal :size="14" aria-hidden="true" />
+            Tipo de operación
+          </span>
+          <div class="ajuste-tipo-toggle" role="group" aria-label="Tipo de operación">
+            <button
+              type="button"
+              class="ajuste-tipo-btn"
+              :class="{ 'ajuste-tipo-btn--active-in': ajusteTipo === 'ENTRADA' }"
+              @click="ajusteTipo = 'ENTRADA'"
+            >
+              <ArrowUpRight :size="16" aria-hidden="true" />
+              Entrada (+)
+            </button>
+            <button
+              type="button"
+              class="ajuste-tipo-btn"
+              :class="{ 'ajuste-tipo-btn--active-out': ajusteTipo === 'SALIDA' }"
+              @click="ajusteTipo = 'SALIDA'"
+            >
+              <ArrowDownRight :size="16" aria-hidden="true" />
+              Salida (-)
+            </button>
+          </div>
         </div>
 
-        <div class="ajuste-product-picker">
-          <SearchField
-            v-model="ajusteProductoSearch"
-            label="Buscar producto por nombre o SKU"
-            @update:model-value="loadAjusteProductos"
-          />
-          <Select
-            v-model="ajusteProductoId"
-            name="ajuste-producto"
-            label="Producto"
-            :disabled="ajusteProductosLoading"
-            :options="[
-              { label: 'Selecciona un producto', value: '' },
-              ...ajusteProductos.map((p) => ({
-                label: `${p.nombre} (${p.sku || `#${p.id}`}) · Stock: ${unidadesProducto(p, p.stock)}`,
-                value: String(p.id),
-              })),
-            ]"
-          />
+        <div class="ajuste-section">
+          <span class="ajuste-section__label">
+            <Package :size="14" aria-hidden="true" />
+            Producto
+          </span>
+          <div v-if="ajusteProductoSeleccionado" class="ajuste-selected-card">
+            <div class="ajuste-selected-card__info">
+              <PackageCheck :size="18" class="ajuste-selected-card__icon" aria-hidden="true" />
+              <div>
+                <strong>{{ ajusteProductoSeleccionado.nombre }}</strong>
+                <small>
+                  SKU: {{ ajusteProductoSeleccionado.sku || `#${ajusteProductoSeleccionado.id}` }} ·
+                  Stock actual:
+                  {{
+                    unidadesProducto(ajusteProductoSeleccionado, ajusteProductoSeleccionado.stock)
+                  }}
+                </small>
+              </div>
+            </div>
+            <Button type="button" variant="secondary" @click="clearAjusteProducto">
+              <RotateCcw :size="14" aria-hidden="true" />
+              Cambiar producto
+            </Button>
+          </div>
+          <div v-else class="ajuste-product-picker">
+            <SearchField
+              v-model="ajusteProductoSearch"
+              label="Buscar producto por nombre o SKU"
+              @update:model-value="loadAjusteProductos"
+            />
+            <div class="ajuste-product-results" role="listbox" aria-label="Resultados de productos">
+              <p v-if="ajusteProductosLoading" class="ajuste-product-results__state">
+                Buscando productos...
+              </p>
+              <p v-else-if="!ajusteProductos.length" class="ajuste-product-results__state">
+                No se encontraron productos para esa búsqueda.
+              </p>
+              <button
+                v-for="item in ajusteProductos"
+                :key="item.id"
+                type="button"
+                role="option"
+                class="ajuste-product-option"
+                :aria-selected="String(item.id) === ajusteProductoId"
+                @click="selectAjusteProducto(item)"
+              >
+                <Package :size="16" class="ajuste-product-option__icon" aria-hidden="true" />
+                <div class="ajuste-product-option__body">
+                  <strong>{{ item.nombre }}</strong>
+                  <small>
+                    {{ item.sku || `#${item.id}` }} ·
+                    {{ item.unidad_stock_info?.nombre || 'Unidad' }}
+                  </small>
+                </div>
+                <span class="ajuste-product-option__stock">
+                  Stock: {{ unidadesProducto(item, item.stock) }}
+                </span>
+              </button>
+            </div>
+          </div>
         </div>
 
-        <TextField
-          v-model="ajusteCantidad"
-          name="ajuste-cantidad"
-          :label="`Cantidad${ajusteProductoSeleccionado ? ` (${ajusteProductoSeleccionado.unidad_stock_info?.nombre || ''})` : ''}`"
-          type="number"
-          :step="ajusteProductoSeleccionado?.unidad_stock_info?.codigo === 'M2' ? '0.0001' : '1'"
-          min="0"
-          placeholder="0"
-        />
+        <div class="ajuste-grid">
+          <div class="ajuste-section">
+            <span class="ajuste-section__label">
+              <Hash :size="14" aria-hidden="true" />
+              Cantidad{{
+                ajusteProductoSeleccionado
+                  ? ` (${ajusteProductoSeleccionado.unidad_stock_info?.nombre || ''})`
+                  : ''
+              }}
+            </span>
+            <TextField
+              v-model="ajusteCantidad"
+              name="ajuste-cantidad"
+              label="Cantidad"
+              type="number"
+              :step="
+                ajusteProductoSeleccionado?.unidad_stock_info?.codigo === 'M2' ? '0.0001' : '1'
+              "
+              min="0"
+              placeholder="0"
+            />
+          </div>
 
-        <Select
-          v-model="ajusteMotivo"
-          name="ajuste-motivo"
-          label="Motivo"
-          :options="motivosDisponibles.map((m) => ({ label: m.nombre, value: m.codigo }))"
-        />
+          <div class="ajuste-section">
+            <span class="ajuste-section__label">
+              <SlidersHorizontal :size="14" aria-hidden="true" />
+              Motivo del ajuste
+            </span>
+            <Select
+              v-model="ajusteMotivo"
+              name="ajuste-motivo"
+              label="Motivo"
+              :options="motivosDisponibles.map((m) => ({ label: m.nombre, value: m.codigo }))"
+            />
+          </div>
+        </div>
 
-        <TextAreaField
-          v-model="ajusteObservaciones"
-          name="ajuste-observaciones"
-          :label="
-            motivoSeleccionadoMeta?.requiere_observaciones
-              ? 'Observaciones (obligatoria para corrección excepcional)'
-              : 'Observaciones (opcional)'
-          "
-          placeholder="Describe el respaldo o detalle del movimiento..."
-          :rows="3"
-        />
+        <div class="ajuste-section">
+          <span class="ajuste-section__label">
+            <FileText :size="14" aria-hidden="true" />
+            Respaldo y observaciones
+          </span>
+          <TextAreaField
+            v-model="ajusteObservaciones"
+            name="ajuste-observaciones"
+            :label="
+              motivoSeleccionadoMeta?.requiere_observaciones
+                ? 'Observaciones (obligatoria para corrección excepcional)'
+                : 'Observaciones (opcional)'
+            "
+            placeholder="Describe el respaldo o detalle del movimiento..."
+            :rows="3"
+          />
+        </div>
 
         <div v-if="ajusteProductoSeleccionado" class="ajuste-preview">
-          <div>
-            <span>Stock actual</span>
+          <div class="ajuste-preview__item">
+            <span><Boxes :size="13" aria-hidden="true" /> Stock actual</span>
             <strong>{{
               unidadesProducto(ajusteProductoSeleccionado, ajusteProductoSeleccionado.stock)
             }}</strong>
           </div>
-          <div>
-            <span>Variación solicitada</span>
+          <div class="ajuste-preview__item">
+            <span><TrendingUp :size="13" aria-hidden="true" /> Variación solicitada</span>
             <strong :class="ajusteTipo === 'ENTRADA' ? 'variation-qty--in' : 'variation-qty--out'">
               {{ ajusteTipo === 'ENTRADA' ? '+' : '-' }}{{ ajusteCantidad || '0' }}
             </strong>
           </div>
-          <div>
-            <span>Stock resultante estimado</span>
+          <div class="ajuste-preview__item">
+            <span><PackageCheck :size="13" aria-hidden="true" /> Stock resultante estimado</span>
             <strong>
               {{
                 stockResultanteEstimado !== null
@@ -1022,9 +1132,11 @@ onBeforeUnmount(() => {
       </form>
       <template #footer>
         <Button variant="secondary" :disabled="ajusteSaving" @click="ajusteOpen = false">
+          <X :size="16" aria-hidden="true" />
           Cancelar
         </Button>
         <Button type="submit" form="ajuste-stock-form" :disabled="ajusteSaving">
+          <Check :size="16" aria-hidden="true" />
           {{ ajusteSaving ? 'Registrando...' : 'Confirmar movimiento' }}
         </Button>
       </template>
@@ -1241,17 +1353,16 @@ onBeforeUnmount(() => {
   color: var(--color-text);
   font-size: 0.89rem;
   font-weight: 700;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.3;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .product-sku {
   color: var(--color-text-secondary);
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .variation-stack {
   display: grid;
@@ -1331,16 +1442,16 @@ onBeforeUnmount(() => {
 }
 .actor-name strong {
   font-weight: 650;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.3;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .actor-obs {
   color: var(--color-text-secondary);
   font-size: 0.75rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .stock-pagination {
   display: flex;
@@ -1570,7 +1681,31 @@ onBeforeUnmount(() => {
 }
 .ajuste-form {
   display: grid;
-  gap: 0.9rem;
+  gap: 1rem;
+}
+.ajuste-section {
+  display: grid;
+  gap: 0.45rem;
+}
+.ajuste-section__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+.ajuste-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+@media (max-width: 640px) {
+  .ajuste-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .ajuste-tipo-toggle {
   display: grid;
@@ -1600,7 +1735,99 @@ onBeforeUnmount(() => {
 }
 .ajuste-product-picker {
   display: grid;
+  gap: 0.55rem;
+}
+.ajuste-product-results {
+  display: grid;
+  gap: 0.35rem;
+  max-height: 13.5rem;
+  overflow-y: auto;
+  padding: 0.35rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+.ajuste-product-results__state {
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.84rem;
+  color: var(--color-text-secondary);
+}
+.ajuste-product-option {
+  display: flex;
+  align-items: center;
   gap: 0.65rem;
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+}
+.ajuste-product-option:hover {
+  border-color: var(--color-border);
+  background: var(--color-surface-hover);
+}
+.ajuste-product-option__icon {
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+}
+.ajuste-product-option__body {
+  display: grid;
+  gap: 0.1rem;
+  flex: 1;
+  min-width: 0;
+}
+.ajuste-product-option__body strong {
+  font-size: 0.88rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.ajuste-product-option__body small {
+  font-size: 0.76rem;
+  color: var(--color-text-secondary);
+}
+.ajuste-product-option__stock {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+.ajuste-selected-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--color-primary-accent, #b91c1c);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--color-primary-accent, #b91c1c) 6%, var(--color-surface));
+}
+.ajuste-selected-card__info {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+.ajuste-selected-card__icon {
+  flex-shrink: 0;
+  color: var(--color-primary-accent, #b91c1c);
+}
+.ajuste-selected-card__info > div {
+  display: grid;
+  gap: 0.12rem;
+}
+.ajuste-selected-card__info strong {
+  font-size: 0.92rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.ajuste-selected-card__info small {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
 }
 .ajuste-preview {
   display: grid;
@@ -1611,11 +1838,14 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-control);
   background: var(--color-surface-hover);
 }
-.ajuste-preview > div {
+.ajuste-preview__item {
   display: grid;
   gap: 0.15rem;
 }
-.ajuste-preview span {
+.ajuste-preview__item span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   font-size: 0.75rem;
   color: var(--color-text-secondary);
 }

@@ -94,6 +94,7 @@ import {
 } from '../services/editorLocal'
 import { totalEstimadoCompleto, totalEstimadoLinea } from '../services/presentacionComercial'
 import { downloadBlob } from '@/shared/download/downloadBlob'
+import { buildExportFilename } from '@/shared/download/exportFilename'
 import DocumentViewerModal from '../components/DocumentViewerModal.vue'
 import { useProformaPdf } from '../composables/useProformaPdf'
 
@@ -948,7 +949,18 @@ async function downloadDocumentPdf() {
       : persisted.value.estado_info.codigo === 'BORRADOR'
         ? 'proforma-borrador'
         : 'proforma'
-    downloadBlob(file, `${prefix}-${persisted.value.numero}.pdf`)
+    downloadBlob(
+      file,
+      buildExportFilename(
+        prefix,
+        [
+          persisted.value.numero,
+          persisted.value.cliente_resumen?.nombre || persisted.value.cliente_resumen?.empresa,
+          persisted.value.titulo,
+        ],
+        'pdf',
+      ),
+    )
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : 'No se pudo descargar el PDF.'
   } finally {
