@@ -104,7 +104,7 @@ test.describe.serial('FE08 backend real', () => {
 
     await page.goto(`/pedidos/${pedidoId}`)
     await page.getByRole('button', { name: 'Emitir recibo' }).click()
-    await page.getByLabel('Nombre completo').fill('Cliente Integración FE08')
+    await page.getByLabel('Recibido de').fill('Cliente Integración FE08')
     await page.getByLabel('Monto en letras').fill('Cincuenta bolivianos')
     await page.getByLabel('Concepto').fill('Anticipo FE08')
     await page.getByLabel('Tipo de pago').selectOption({ label: 'Efectivo' })
