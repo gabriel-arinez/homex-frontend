@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { RouterView, useRoute } from 'vue-router'
+import { RouterView } from 'vue-router'
 import AlertCenterDrawer from '@/app/components/AlertCenterDrawer.vue'
 import AppSidebar from './AppSidebar.vue'
 import { useAlertsStore } from '@/app/stores/useAlertsStore'
@@ -13,7 +13,6 @@ const alertsOpen = ref(false)
 const preferences = usePreferencesStore()
 const session = useSessionStore()
 const alerts = useAlertsStore()
-const route = useRoute()
 
 onMounted(() => {
   if (session.isAuthenticated) alerts.startPolling()
@@ -24,13 +23,6 @@ watch(
   (authenticated) => {
     if (authenticated) alerts.startPolling()
     else alerts.reset()
-  },
-)
-
-watch(
-  () => route.fullPath,
-  () => {
-    if (session.isAuthenticated) void alerts.refresh()
   },
 )
 

@@ -93,6 +93,7 @@ export const useAlertsStore = defineStore('alerts', () => {
   const initializedBaseline = ref(false)
   const liveToast = ref<{ message: string; tone: 'success' | 'danger' | 'info' } | null>(null)
 
+  let initialTimer: ReturnType<typeof setTimeout> | null = null
   let pollTimer: ReturnType<typeof setInterval> | null = null
   let visibilityBound = false
   let activeRefresh: Promise<void> | null = null
@@ -486,8 +487,11 @@ export const useAlertsStore = defineStore('alerts', () => {
   }
 
   function startPolling() {
-    if (pollTimer) return
-    void refresh()
+    if (pollTimer || initialTimer) return
+    initialTimer = setTimeout(() => {
+      initialTimer = null
+      if (session.isAuthenticated) void refresh()
+    }, 1500)
     pollTimer = setInterval(() => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
       if (session.isAuthenticated) void refresh()
@@ -499,6 +503,10 @@ export const useAlertsStore = defineStore('alerts', () => {
   }
 
   function stopPolling() {
+    if (initialTimer) {
+      clearTimeout(initialTimer)
+      initialTimer = null
+    }
     if (pollTimer) {
       clearInterval(pollTimer)
       pollTimer = null
