@@ -130,12 +130,12 @@ test.describe.serial('FE08 backend real', () => {
     await page.goto(`/pedidos/${pedidoId}`)
     await page.getByRole('button', { name: 'Otras transiciones de estado' }).click()
     await page.getByRole('menuitem', { name: /Listo para entrega/ }).click()
-    await expect(page.getByRole('status').filter({ hasText: 'Estado actualizado' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Emitir nota de entrega' })).toBeVisible()
-    await page.getByRole('button', { name: 'Emitir nota de entrega' }).click()
-    await page.getByRole('dialog').getByRole('button', { name: 'Emitir nota' }).click()
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Confirmar listo para entrega' })
+      .click()
     await expect(
-      page.getByRole('status').filter({ hasText: 'Nota de entrega emitida' }),
+      page.getByRole('status').filter({ hasText: /Nota de entrega emitida automáticamente/ }),
     ).toBeVisible()
     await page.goto('/notas-entrega')
     await expect(
