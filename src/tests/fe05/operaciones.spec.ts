@@ -131,15 +131,16 @@ describe('FE05 operaciones', () => {
     expect(w.text()).toContain('No puede cancelar mientras existan recibos EMITIDOS.')
     expect(reads).toBeGreaterThan(1)
   })
-  it('ofrece nota únicamente cuando backend reporta LISTO_ENTREGA', async () => {
+  it('no ofrece botón manual de nota de entrega en LISTO_ENTREGA porque se emite automáticamente', async () => {
     options()
     server.use(
       http.get('http://localhost:8000/api/v1/pedidos/9/', () => HttpResponse.json(pedido(2))),
     )
     const w = await mountAt(PedidoDetailView, '/pedidos/9')
     await flushPromises()
-    expect(w.text()).toContain('Emitir nota de entrega')
+    expect(w.text()).not.toContain('Emitir nota de entrega')
     expect(w.text()).not.toContain('Emitir recibo')
+    expect(w.text()).toContain('Entregado')
   })
   it('anula recibo sin DELETE y actualiza evidencia a ANULADO', async () => {
     options()
@@ -288,7 +289,7 @@ describe('FE05 operaciones', () => {
     expect(w.text()).toContain('Anticipo')
   })
 
-  it('muestra stepper interactivo sin tecnicismos y avanza al siguiente estado en un clic', async () => {
+  it('muestra stepper interactivo sin tecnicismos y abre modal informativo antes de avanzar de estado', async () => {
     options()
     let postedBody: unknown = null
     server.use(
@@ -305,6 +306,10 @@ describe('FE05 operaciones', () => {
     expect(mainAdvanceBtn.exists()).toBe(true)
     expect(mainAdvanceBtn.text()).toContain('En producción')
     await mainAdvanceBtn.trigger('click')
+    await flushPromises()
+    expect(w.text()).toContain('Enviar pedido a producción')
+    const confirmBtn = w.findAll('button').find((b) => b.text().includes('Enviar a producción'))!
+    await confirmBtn.trigger('click')
     await flushPromises()
     expect(postedBody).toEqual({ estado_codigo: 'EN_PRODUCCION' })
   })
@@ -430,9 +435,11 @@ describe('FE05 operaciones', () => {
     const w = await mountAt(OrdenTrabajoDetailView, '/ordenes-trabajo/3')
     await flushPromises()
     expect(w.text()).toContain('Orden de trabajo #40')
+    expect(w.text()).toContain('Detalle de trabajo')
+    expect(w.text()).toContain('Planificación y logística')
     expect(w.text()).toContain('Carlos Méndez')
     expect(w.text()).toContain('Av. Banzer Km 6')
-    expect(w.text()).toContain('2 componentes')
+    expect(w.text()).toContain('Componentes de fabricación')
     expect(w.text()).toContain('Mesón')
     expect(w.text()).toContain('Nogal')
     expect(w.text()).toContain('Conservar pieza original')

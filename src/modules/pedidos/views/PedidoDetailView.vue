@@ -81,7 +81,7 @@ const error = ref('')
 const notice = ref('')
 const receiptOpen = ref(false)
 const cancelOpen = ref(false)
-const noteOpen = ref(false)
+const pendingTransition = ref<EstadoCodigoEnum | null>(null)
 const stateMenuOpen = ref(false)
 const stateMenuContainer = ref<HTMLElement | null>(null)
 let loadRequestId = 0
@@ -292,6 +292,71 @@ const nextLogicalStep = computed(() => {
   return null
 })
 
+const transitionMeta = computed(() => {
+  const code = pendingTransition.value
+  const clientName = quote.value?.cliente_resumen?.nombre || 'Cliente registrado'
+  const totalItems = quote.value?.detalles.length ?? 0
+  if (code === 'EN_PRODUCCION') {
+    return {
+      title: 'Enviar pedido a producción',
+      description: `El Pedido #${pedidoId.value} pasará a fabricación y se habilitará para el Jefe de Taller.`,
+      icon: Hammer,
+      tone: 'warning' as const,
+      confirmLabel: 'Enviar a producción',
+      banner:
+        'La orden de trabajo, las especificaciones técnicas de muebles a medida y las imágenes de referencia quedarán disponibles para el Jefe de Taller.',
+      cards: [
+        { label: 'Pedido', value: `#${pedidoId.value}`, icon: FileText },
+        { label: 'Destino operativo', value: 'Jefe de Taller', icon: Hammer },
+        {
+          label: 'Ítems en orden',
+          value: totalItems
+            ? `${totalItems} ${totalItems === 1 ? 'línea' : 'líneas'}`
+            : 'Asociados',
+          icon: ClipboardCheck,
+        },
+      ],
+    }
+  }
+  if (code === 'LISTO_ENTREGA') {
+    return {
+      title: 'Marcar pedido listo para entrega',
+      description: `Se finalizará la etapa de producción del Pedido #${pedidoId.value}.`,
+      icon: PackageCheck,
+      tone: 'info' as const,
+      confirmLabel: 'Confirmar listo para entrega',
+      banner:
+        'Al confirmar esta acción, se emitirá automáticamente la Nota de Entrega oficial (entrega total 1:1) con la fecha actual y quedará disponible en Documentos operativos vinculados.',
+      cards: [
+        { label: 'Pedido', value: `#${pedidoId.value}`, icon: FileText },
+        { label: 'Cliente', value: clientName, icon: UserCheck },
+        { label: 'Nota de entrega', value: 'Emisión automática', icon: PackageCheck },
+      ],
+    }
+  }
+  return {
+    title: 'Confirmar entrega y finalizar pedido',
+    description: `Se registrará la entrega física total del Pedido #${pedidoId.value}.`,
+    icon: Truck,
+    tone: 'success' as const,
+    confirmLabel: 'Confirmar entrega final',
+    banner: 'Esta acción marca el pedido como Entregado y cierra su ciclo operativo en tienda.',
+    cards: [
+      {
+        label: 'Nota de entrega',
+        value: deliveryNotes.value[0] ? `#${deliveryNotes.value[0].numero}` : 'Emitida',
+        icon: FileCheck2,
+      },
+      { label: 'Cobrado', value: money(orderPaid.value, orderCurrency.value), icon: Wallet },
+      {
+        label: 'Saldo pendiente',
+        value: money(orderRemaining.value, orderCurrency.value),
+        icon: Clock3,
+      },
+    ],
+  }
+})
+
 const alternativeTransitions = computed(() => {
   if (isCancelled.value) return []
   const allowedCodes: EstadoCodigoEnum[] = ['EN_PRODUCCION', 'LISTO_ENTREGA', 'ENTREGADO']
@@ -365,7 +430,6 @@ function applyActionQuery() {
   const accion = typeof route.query.accion === 'string' ? route.query.accion : ''
   if (!accion || !pedido.value) return
   if (accion === 'recibo' && currentCode.value === 'CONFIRMADO') openReceiptModal()
-  if (accion === 'nota' && currentCode.value === 'LISTO_ENTREGA') noteOpen.value = true
   if (accion === 'cancelar' && !['CANCELADO', 'ENTREGADO'].includes(currentCode.value)) {
     cancelOpen.value = true
   }
@@ -417,12 +481,32 @@ async function action(fn: () => Promise<unknown>, message: string) {
   }
 }
 
+function openTransitionModal(codigo: EstadoCodigoEnum) {
+  stateMenuOpen.value = false
+  pendingTransition.value = codigo
+}
+
 function advanceTo(codigo: EstadoCodigoEnum) {
   stateMenuOpen.value = false
+  const successMessage =
+    codigo === 'LISTO_ENTREGA'
+      ? 'Pedido listo para entrega. Nota de entrega emitida automáticamente.'
+      : codigo === 'EN_PRODUCCION'
+        ? 'Pedido enviado a producción y asignado a taller.'
+        : codigo === 'ENTREGADO'
+          ? 'Pedido entregado y finalizado.'
+          : 'Estado actualizado.'
   return action(
     () => pedidosService.changeState(pedidoId.value, { estado_codigo: codigo }),
-    'Estado actualizado.',
+    successMessage,
   )
+}
+
+async function confirmTransition() {
+  const codigo = pendingTransition.value
+  if (!codigo || processing.value) return
+  pendingTransition.value = null
+  await advanceTo(codigo)
 }
 
 const cancel = () =>
@@ -430,11 +514,6 @@ const cancel = () =>
     () => pedidosService.cancel(pedidoId.value),
     'Pedido cancelado y stock devuelto al inventario.',
   ).finally(() => (cancelOpen.value = false))
-
-const note = () =>
-  action(() => pedidosService.emitDeliveryNote(pedidoId.value), 'Nota de entrega emitida.').finally(
-    () => (noteOpen.value = false),
-  )
 
 async function receipt() {
   if (processing.value) return
@@ -602,7 +681,7 @@ watch(() => route.params.id, load)
               variant="primary"
               class="split-action__main"
               :disabled="processing"
-              @click="advanceTo(nextLogicalStep.codigo as EstadoCodigoEnum)"
+              @click="openTransitionModal(nextLogicalStep.codigo as EstadoCodigoEnum)"
             >
               <ArrowRight :size="16" aria-hidden="true" />
               "{{ stepLabel(nextLogicalStep) }}"
@@ -626,7 +705,7 @@ watch(() => route.params.id, load)
                 :key="alt.codigo"
                 type="button"
                 role="menuitem"
-                @click="advanceTo(alt.codigo as EstadoCodigoEnum)"
+                @click="openTransitionModal(alt.codigo as EstadoCodigoEnum)"
               >
                 <ArrowRight :size="14" aria-hidden="true" />
                 "{{ stepLabel(alt) }}"
@@ -715,15 +794,6 @@ watch(() => route.params.id, load)
             >
               <Receipt :size="16" aria-hidden="true" />
               Emitir recibo
-            </Button>
-            <Button
-              v-if="currentCode === 'LISTO_ENTREGA'"
-              variant="info"
-              :disabled="processing"
-              @click="noteOpen = true"
-            >
-              <Send :size="16" aria-hidden="true" />
-              Emitir nota de entrega
             </Button>
           </div>
         </div>
@@ -1111,15 +1181,58 @@ watch(() => route.params.id, load)
       @confirm="cancel"
     />
 
-    <ConfirmDialog
-      :open="noteOpen"
-      variant="info"
-      title="Emitir nota de entrega"
-      description="Se creará la única nota del pedido con la fecha actual de emisión."
-      confirm-label="Emitir nota"
-      @close="noteOpen = false"
-      @confirm="note"
-    />
+    <Modal
+      :open="Boolean(pendingTransition)"
+      wide
+      :title="transitionMeta.title"
+      :description="transitionMeta.description"
+      @close="pendingTransition = null"
+    >
+      <template #title-icon>
+        <span class="receipt-modal-icon">
+          <component :is="transitionMeta.icon" :size="20" aria-hidden="true" />
+        </span>
+      </template>
+
+      <div class="transition-board">
+        <div
+          v-for="card in transitionMeta.cards"
+          :key="card.label"
+          class="receipt-metric receipt-metric--highlight"
+        >
+          <span
+            class="receipt-metric__icon"
+            :class="`receipt-metric__icon--${transitionMeta.tone}`"
+          >
+            <component :is="card.icon" :size="16" aria-hidden="true" />
+          </span>
+          <div>
+            <span>{{ card.label }}</span>
+            <strong>{{ card.value }}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="transition-note" role="note">
+        <component :is="transitionMeta.icon" :size="18" aria-hidden="true" />
+        <p>{{ transitionMeta.banner }}</p>
+      </div>
+
+      <template #footer>
+        <Button variant="secondary" :disabled="processing" @click="pendingTransition = null">
+          <X :size="16" aria-hidden="true" />
+          Cancelar
+        </Button>
+        <Button
+          :variant="transitionMeta.tone === 'success' ? 'success' : 'primary'"
+          :disabled="processing"
+          @click="confirmTransition"
+        >
+          <Check :size="16" aria-hidden="true" />
+          {{ processing ? 'Procesando...' : transitionMeta.confirmLabel }}
+        </Button>
+      </template>
+    </Modal>
 
     <DocumentViewerModal
       :open="pdfPreviewOpen"
@@ -1914,5 +2027,36 @@ watch(() => route.params.id, load)
   color: var(--color-danger, #dc2626);
   font-size: 0.85rem;
   font-weight: 600;
+}
+.transition-board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+.transition-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.transition-note svg {
+  flex: none;
+  margin-top: 0.1rem;
+  color: var(--color-primary-accent);
+}
+.transition-note p {
+  margin: 0;
+}
+@media (max-width: 47.99rem) {
+  .transition-board {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

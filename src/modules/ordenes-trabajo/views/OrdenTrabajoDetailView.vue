@@ -5,21 +5,25 @@ import {
   AlertTriangle,
   ArrowLeft,
   Calendar,
-  ChevronDown,
+  Check,
   ClipboardCheck,
   Clock3,
   Download,
+  Eye,
   FileText,
   Hammer,
   Layers,
   MapPin,
   PackageCheck,
+  Ruler,
   StickyNote,
   Truck,
   UserCheck,
   Wallet,
+  Wrench,
+  X,
 } from '@lucide/vue'
-import type { DetalleOrdenTrabajo, OrdenTrabajo } from '@/generated/api'
+import type { DetalleOrdenTrabajo, OrdenTrabajo, Producto } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import type {
   AtributoTecnico,
@@ -29,15 +33,21 @@ import type {
 import DocumentViewerModal from '@/modules/proformas/components/DocumentViewerModal.vue'
 import { useQuoteProductImages } from '@/modules/proformas/composables/useQuoteProductImages'
 import ProductImage from '@/modules/productos/components/ProductImage.vue'
+import ProductoVistaRapida from '@/modules/productos/components/ProductoVistaRapida.vue'
+import { productosService } from '@/modules/productos/services/productosService'
 import { downloadBlob } from '@/shared/download/downloadBlob'
 import { buildExportFilename } from '@/shared/download/exportFilename'
+import { galleryService, type GalleryImage } from '@/shared/media/gallery'
+import GalleryPhoto from '@/shared/media/GalleryPhoto.vue'
 import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
 import ImageGallery from '@/shared/media/ImageGallery.vue'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
+import DetailTabs from '@/shared/ui/DetailTabs.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
+import Modal from '@/shared/ui/Modal.vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
 import StatusBadge from '@/shared/ui/StatusBadge.vue'
 import Toast from '@/shared/ui/Toast.vue'
@@ -54,6 +64,15 @@ const item = ref<OrdenTrabajo | null>(null)
 const loading = ref(true)
 const downloading = ref(false)
 const previewModalOpen = ref(false)
+const activeTab = ref<'trabajo' | 'planificacion'>('trabajo')
+const workFilter = ref<'all' | 'fabrication' | 'catalog'>('all')
+const readyModalOpen = ref(false)
+const markingReady = ref(false)
+const furnitureGalleries = ref<Record<number, GalleryImage[]>>({})
+const viewerLine = ref<DetalleOrdenTrabajo | null>(null)
+const viewerProduct = ref<Producto | null>(null)
+const viewerProductLoading = ref(false)
+const viewerProductError = ref('')
 const error = ref('')
 const notice = ref('')
 
@@ -191,6 +210,81 @@ function componentAttributes(comp: ComponenteTecnico): Array<{ label: string; va
   return attrs
 }
 
+async function ensureFurnitureGalleries(lines: DetalleOrdenTrabajo[]) {
+  const customLines = lines.filter(
+    (line) => line.tipo_item_info.codigo === 'MUEBLE_MEDIDA' && !furnitureGalleries.value[line.id],
+  )
+  await Promise.allSettled(
+    customLines.map(async (line) => {
+      try {
+        const res = await galleryService.list(`/api/v1/imagenes-privadas/?detalle=${line.id}`)
+        furnitureGalleries.value = {
+          ...furnitureGalleries.value,
+          [line.id]: res.imagenes ?? [],
+        }
+      } catch {
+        // Sin permisos o sin imágenes registradas
+      }
+    }),
+  )
+}
+
+function furnitureCover(lineId: number): GalleryImage | null {
+  const pics = furnitureGalleries.value[lineId] ?? []
+  return pics.find((p) => p.principal) ?? pics[0] ?? null
+}
+
+function furnitureCoverSrc(lineId: number): string {
+  const cover = furnitureCover(lineId)
+  if (!cover) return ''
+  return cover.variantes?.['320'] ?? cover.url ?? ''
+}
+
+async function openItemViewer(line: DetalleOrdenTrabajo) {
+  viewerLine.value = line
+  viewerProduct.value = null
+  viewerProductError.value = ''
+  if (line.producto && canOperateCommercial.value) {
+    viewerProductLoading.value = true
+    try {
+      viewerProduct.value = await productosService.get(line.producto)
+    } catch (cause) {
+      viewerProductError.value =
+        cause instanceof Error ? cause.message : 'No se pudo cargar el detalle del producto.'
+    } finally {
+      viewerProductLoading.value = false
+    }
+  }
+}
+
+function closeItemViewer() {
+  viewerLine.value = null
+  viewerProduct.value = null
+  viewerProductError.value = ''
+}
+
+const viewerGallery = computed<GalleryImage[]>(() => {
+  if (!viewerLine.value) return []
+  const custom = furnitureGalleries.value[viewerLine.value.id]
+  if (custom?.length) return custom
+  if (viewerLine.value.producto) {
+    const img = productImages.value[viewerLine.value.producto]
+    if (img) {
+      return [
+        {
+          id: viewerLine.value.producto,
+          url: img.original,
+          variantes: img.variantes,
+          nombre: viewerLine.value.nombre,
+          principal: true,
+          posicion: 0,
+        },
+      ]
+    }
+  }
+  return []
+})
+
 async function load() {
   loading.value = true
   error.value = ''
@@ -203,10 +297,40 @@ async function load() {
     if (productIds.length) {
       void ensureProductImages(productIds)
     }
+    void ensureFurnitureGalleries(loaded.detalles ?? [])
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : 'No se pudo cargar la orden.'
   } finally {
     loading.value = false
+  }
+}
+
+const canMarkReady = computed(() => {
+  if (!item.value) return false
+  const otCode = item.value.estado_info.codigo.toUpperCase()
+  const pedCode = (item.value.pedido_estado_codigo ?? '').toUpperCase()
+  if (['CANCELADA', 'TERMINADA'].includes(otCode)) return false
+  if (['LISTO_ENTREGA', 'ENTREGADO', 'CANCELADO'].includes(pedCode)) return false
+  return true
+})
+
+async function confirmMarkReady() {
+  if (!item.value || markingReady.value) return
+  markingReady.value = true
+  error.value = ''
+  try {
+    item.value = await ordenesTrabajoService.marcarListoEntrega(item.value.id)
+    readyModalOpen.value = false
+    notice.value =
+      'Pedido marcado como listo para entrega. Nota de entrega emitida automáticamente.'
+  } catch (cause) {
+    error.value =
+      cause instanceof Error
+        ? cause.message
+        : 'No se pudo marcar el pedido como listo para entrega.'
+    readyModalOpen.value = false
+  } finally {
+    markingReady.value = false
   }
 }
 
@@ -281,6 +405,26 @@ const lineCounts = computed(() => {
   const cat = detailRows.value.length - fab
   return { fab, cat }
 })
+
+const filteredDetailRows = computed(() => {
+  if (workFilter.value === 'fabrication') return detailRows.value.filter((r) => r.isFabrication)
+  if (workFilter.value === 'catalog') return detailRows.value.filter((r) => !r.isFabrication)
+  return detailRows.value
+})
+
+const workOrderTabs = computed(() => [
+  {
+    id: 'trabajo',
+    label: 'Detalle de trabajo',
+    icon: Hammer,
+    badge: detailRows.value.length,
+  },
+  {
+    id: 'planificacion',
+    label: 'Planificación y logística',
+    icon: Calendar,
+  },
+])
 </script>
 
 <template>
@@ -320,6 +464,15 @@ const lineCounts = computed(() => {
         <Button v-if="item" variant="secondary" :processing="downloading" @click="downloadDocument">
           <Download :size="17" aria-hidden="true" />
           Descargar PDF
+        </Button>
+        <Button
+          v-if="canMarkReady"
+          variant="primary"
+          :disabled="markingReady"
+          @click="readyModalOpen = true"
+        >
+          <PackageCheck :size="17" aria-hidden="true" />
+          Listo para entrega
         </Button>
       </template>
     </PageHeader>
@@ -394,7 +547,231 @@ const lineCounts = computed(() => {
         </div>
       </section>
 
-      <section class="panel" aria-labelledby="ot-logistics-title">
+      <DetailTabs
+        :model-value="activeTab"
+        :tabs="workOrderTabs"
+        aria-label="Apartados de la orden de trabajo"
+        @update:model-value="activeTab = $event as 'trabajo' | 'planificacion'"
+      />
+
+      <section
+        v-show="activeTab === 'trabajo'"
+        class="work-lines"
+        role="tabpanel"
+        aria-labelledby="ot-details-title"
+      >
+        <div class="section-heading">
+          <div class="section-heading__identity">
+            <span class="section-icon">
+              <ClipboardCheck :size="18" aria-hidden="true" />
+            </span>
+            <div>
+              <h2 id="ot-details-title">Detalle de trabajo</h2>
+              <p>Especificaciones técnicas, advertencias y referencias visuales para taller.</p>
+            </div>
+          </div>
+          <div
+            v-if="detailRows.length"
+            class="work-filters"
+            role="group"
+            aria-label="Filtrar líneas"
+          >
+            <button
+              type="button"
+              class="work-filter-pill"
+              :class="{ active: workFilter === 'all' }"
+              @click="workFilter = 'all'"
+            >
+              Todos ({{ detailRows.length }})
+            </button>
+            <button
+              v-if="lineCounts.fab > 0"
+              type="button"
+              class="work-filter-pill"
+              :class="{ active: workFilter === 'fabrication' }"
+              @click="workFilter = 'fabrication'"
+            >
+              <Hammer :size="13" aria-hidden="true" />
+              Fabricación ({{ lineCounts.fab }})
+            </button>
+            <button
+              v-if="lineCounts.cat > 0"
+              type="button"
+              class="work-filter-pill"
+              :class="{ active: workFilter === 'catalog' }"
+              @click="workFilter = 'catalog'"
+            >
+              <PackageCheck :size="13" aria-hidden="true" />
+              Catálogo ({{ lineCounts.cat }})
+            </button>
+          </div>
+        </div>
+
+        <EmptyState
+          v-if="!filteredDetailRows.length"
+          title="Sin ítems en esta vista"
+          description="No hay líneas registradas para el filtro seleccionado."
+        />
+
+        <article
+          v-for="(line, index) in filteredDetailRows"
+          :key="line.id"
+          class="work-line"
+          :class="{ 'work-line--fabrication': line.isFabrication }"
+        >
+          <div class="work-line__main">
+            <div class="work-line__identity">
+              <button
+                v-if="line.producto"
+                type="button"
+                class="work-line__thumb work-line__thumb--btn"
+                :aria-label="`Ampliar imagen de ${line.nombre}`"
+                @click="openItemViewer(line)"
+              >
+                <ProductImage
+                  :image="productImages[line.producto] ?? null"
+                  :alt="line.nombre"
+                  sizes="64px"
+                />
+              </button>
+              <button
+                v-else-if="furnitureCoverSrc(line.id)"
+                type="button"
+                class="work-line__thumb work-line__thumb--btn"
+                :aria-label="`Ampliar imagen de ${line.nombre}`"
+                @click="openItemViewer(line)"
+              >
+                <GalleryPhoto
+                  :src="furnitureCoverSrc(line.id)"
+                  :alt="`Referencia principal de ${line.nombre}`"
+                />
+              </button>
+              <div v-else class="work-line__thumb work-line__thumb--icon">
+                <Hammer v-if="line.isFabrication" :size="22" aria-hidden="true" />
+                <PackageCheck v-else :size="22" aria-hidden="true" />
+              </div>
+
+              <div class="work-line__text">
+                <div class="work-line__meta">
+                  <small>
+                    {{ String(index + 1).padStart(2, '0') }} · {{ line.tipoItemLabel }}
+                  </small>
+                  <Badge :tone="line.isFabrication ? 'warning' : 'info'">
+                    {{ line.trabajoLabel }}
+                  </Badge>
+                </div>
+                <h3>{{ line.nombre }}</h3>
+                <p v-if="line.descripcion" class="work-line__desc">{{ line.descripcion }}</p>
+              </div>
+            </div>
+
+            <div class="work-line__aside">
+              <Button
+                v-if="line.producto || furnitureCoverSrc(line.id) || line.spec"
+                type="button"
+                variant="secondary"
+                @click="openItemViewer(line)"
+              >
+                <Eye :size="15" aria-hidden="true" />
+                Ver ficha
+              </Button>
+              <div class="work-line__qty">
+                <strong>{{ formatQuantity(line.cantidad) }}</strong>
+                <span>{{ line.unidadLabel }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="line.spec" class="workshop-body">
+            <div v-if="line.spec.advertencias.length" class="ficha-alerts" role="note">
+              <AlertTriangle :size="16" aria-hidden="true" />
+              <div>
+                <strong>Advertencias de taller</strong>
+                <ul>
+                  <li v-for="(adv, i) in line.spec.advertencias" :key="i">{{ adv }}</li>
+                </ul>
+              </div>
+            </div>
+
+            <div v-if="line.spec.observaciones" class="ficha-notes">
+              <StickyNote :size="16" aria-hidden="true" />
+              <div>
+                <strong>Observaciones técnicas</strong>
+                <p>{{ line.spec.observaciones }}</p>
+              </div>
+            </div>
+
+            <div class="workshop-grid">
+              <div class="workshop-col">
+                <div v-if="line.spec.generalSpecs.length" class="ficha-block">
+                  <h4><Ruler :size="14" aria-hidden="true" /> Características generales</h4>
+                  <dl class="ficha-kv-grid">
+                    <div v-for="(specItem, idx) in line.spec.generalSpecs" :key="idx">
+                      <dt>{{ specItem.label }}</dt>
+                      <dd>{{ specItem.value }}</dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <div v-if="line.spec.componentes.length" class="ficha-block">
+                  <h4><Layers :size="14" aria-hidden="true" /> Componentes de fabricación</h4>
+                  <div class="components-grid">
+                    <div
+                      v-for="(comp, idx) in line.spec.componentes"
+                      :key="comp.uid || idx"
+                      class="component-card"
+                    >
+                      <div class="component-card__head">
+                        <strong>{{ comp.nombre }}</strong>
+                        <span v-if="comp.cantidad_interna" class="component-card__qty">
+                          × {{ comp.cantidad_interna }}
+                        </span>
+                      </div>
+                      <dl v-if="componentAttributes(comp).length" class="component-card__attrs">
+                        <div v-for="(attr, aIdx) in componentAttributes(comp)" :key="aIdx">
+                          <dt>{{ attr.label }}</dt>
+                          <dd>{{ attr.value }}</dd>
+                        </div>
+                      </dl>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="workshop-col">
+                <div v-if="line.spec.accesorios.length" class="ficha-block">
+                  <h4><Wrench :size="14" aria-hidden="true" /> Accesorios</h4>
+                  <div class="accessories-list">
+                    <span v-for="(acc, aIdx) in line.spec.accesorios" :key="aIdx" class="acc-chip">
+                      {{ acc }}
+                    </span>
+                  </div>
+                </div>
+
+                <div class="ficha-gallery">
+                  <ImageGallery
+                    :endpoint="`/api/v1/imagenes-privadas/?detalle=${line.id}`"
+                    :editable="false"
+                    title="Referencias visuales"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-else-if="line.isFabrication" class="work-line__catalog-tag">
+            <Hammer :size="15" aria-hidden="true" />
+            <span>Mueble a medida · Ficha técnica reservada a taller</span>
+          </div>
+        </article>
+      </section>
+
+      <section
+        v-show="activeTab === 'planificacion'"
+        class="panel"
+        role="tabpanel"
+        aria-labelledby="ot-logistics-title"
+      >
         <div class="section-heading">
           <div class="section-heading__identity">
             <span class="section-icon">
@@ -481,159 +858,76 @@ const lineCounts = computed(() => {
           </div>
         </div>
       </section>
-
-      <section class="work-lines" aria-labelledby="ot-details-title">
-        <div class="section-heading">
-          <div class="section-heading__identity">
-            <span class="section-icon">
-              <ClipboardCheck :size="18" aria-hidden="true" />
-            </span>
-            <div>
-              <h2 id="ot-details-title">Detalle de trabajo</h2>
-              <p>Estas líneas provienen de la proforma aprobada que originó el pedido.</p>
-            </div>
-          </div>
-          <span class="counter">
-            {{ detailRows.length }} {{ detailRows.length === 1 ? 'ítem' : 'ítems' }}
-          </span>
-        </div>
-
-        <EmptyState
-          v-if="!detailRows.length"
-          title="Sin ítems registrados"
-          description="Esta orden de trabajo no contiene líneas de detalle."
-        />
-
-        <article v-for="(line, index) in detailRows" :key="line.id" class="work-line">
-          <div class="work-line__main">
-            <div class="work-line__identity">
-              <div v-if="line.producto" class="work-line__thumb">
-                <ProductImage
-                  :image="productImages[line.producto] ?? null"
-                  :alt="line.nombre"
-                  sizes="64px"
-                />
-              </div>
-              <div v-else class="work-line__thumb work-line__thumb--icon">
-                <Hammer v-if="line.isFabrication" :size="22" aria-hidden="true" />
-                <PackageCheck v-else :size="22" aria-hidden="true" />
-              </div>
-
-              <div class="work-line__text">
-                <div class="work-line__meta">
-                  <small>
-                    {{ String(index + 1).padStart(2, '0') }} · {{ line.tipoItemLabel }}
-                  </small>
-                  <Badge :tone="line.isFabrication ? 'warning' : 'info'">
-                    {{ line.trabajoLabel }}
-                  </Badge>
-                </div>
-                <h3>{{ line.nombre }}</h3>
-                <p v-if="line.descripcion" class="work-line__desc">{{ line.descripcion }}</p>
-              </div>
-            </div>
-
-            <div class="work-line__qty">
-              <strong>{{ formatQuantity(line.cantidad) }}</strong>
-              <span>{{ line.unidadLabel }}</span>
-            </div>
-          </div>
-
-          <div class="work-line__spec">
-            <details v-if="line.spec" class="ficha-ot">
-              <summary class="ficha-ot__summary">
-                <span class="ficha-ot__summary-label">
-                  <Layers :size="16" aria-hidden="true" />
-                  {{ line.spec.detalleLabel }}
-                </span>
-                <ChevronDown :size="16" class="ficha-ot__chevron" aria-hidden="true" />
-              </summary>
-
-              <div class="ficha-ot__body">
-                <div v-if="line.spec.advertencias.length" class="ficha-alerts" role="note">
-                  <AlertTriangle :size="16" aria-hidden="true" />
-                  <div>
-                    <strong>Advertencias de taller</strong>
-                    <ul>
-                      <li v-for="(adv, i) in line.spec.advertencias" :key="i">{{ adv }}</li>
-                    </ul>
-                  </div>
-                </div>
-
-                <div v-if="line.spec.observaciones" class="ficha-notes">
-                  <StickyNote :size="16" aria-hidden="true" />
-                  <div>
-                    <strong>Observaciones técnicas</strong>
-                    <p>{{ line.spec.observaciones }}</p>
-                  </div>
-                </div>
-
-                <div v-if="line.spec.generalSpecs.length" class="ficha-block">
-                  <h4>Características generales</h4>
-                  <dl class="ficha-kv-grid">
-                    <div v-for="(specItem, idx) in line.spec.generalSpecs" :key="idx">
-                      <dt>{{ specItem.label }}</dt>
-                      <dd>{{ specItem.value }}</dd>
-                    </div>
-                  </dl>
-                </div>
-
-                <div v-if="line.spec.componentes.length" class="ficha-block">
-                  <h4>Componentes de fabricación</h4>
-                  <div class="components-grid">
-                    <div
-                      v-for="(comp, idx) in line.spec.componentes"
-                      :key="comp.uid || idx"
-                      class="component-card"
-                    >
-                      <div class="component-card__head">
-                        <strong>{{ comp.nombre }}</strong>
-                        <span v-if="comp.cantidad_interna" class="component-card__qty">
-                          × {{ comp.cantidad_interna }}
-                        </span>
-                      </div>
-                      <dl v-if="componentAttributes(comp).length" class="component-card__attrs">
-                        <div v-for="(attr, aIdx) in componentAttributes(comp)" :key="aIdx">
-                          <dt>{{ attr.label }}</dt>
-                          <dd>{{ attr.value }}</dd>
-                        </div>
-                      </dl>
-                    </div>
-                  </div>
-                </div>
-
-                <div v-if="line.spec.accesorios.length" class="ficha-block">
-                  <h4>Accesorios</h4>
-                  <div class="accessories-list">
-                    <span v-for="(acc, aIdx) in line.spec.accesorios" :key="aIdx" class="acc-chip">
-                      {{ acc }}
-                    </span>
-                  </div>
-                </div>
-
-                <div class="ficha-gallery">
-                  <ImageGallery
-                    :endpoint="`/api/v1/imagenes-privadas/?detalle=${line.id}`"
-                    :editable="false"
-                    title="Referencias de fabricación"
-                  />
-                </div>
-              </div>
-            </details>
-
-            <div v-else-if="line.isFabrication" class="work-line__catalog-tag">
-              <Hammer :size="15" aria-hidden="true" />
-              <span>Mueble a medida · Ficha técnica reservada a taller</span>
-            </div>
-
-            <div v-else class="work-line__catalog-tag">
-              <PackageCheck :size="15" aria-hidden="true" />
-              <span>Ítem de catálogo</span>
-            </div>
-          </div>
-        </article>
-      </section>
     </template>
+
+    <Modal
+      v-if="item"
+      :open="readyModalOpen"
+      wide
+      title="Marcar pedido listo para entrega"
+      :description="`El Pedido #${item.pedido} pasará a estado Listo para entrega.`"
+      @close="readyModalOpen = false"
+    >
+      <template #title-icon>
+        <span class="ot-modal-icon">
+          <PackageCheck :size="20" aria-hidden="true" />
+        </span>
+      </template>
+      <div class="ot-ready-board">
+        <div class="ot-ready-metric">
+          <span class="ot-ready-metric__icon"><Hammer :size="16" aria-hidden="true" /></span>
+          <div>
+            <span>Orden de trabajo</span>
+            <strong>OT #{{ item.numero }}</strong>
+          </div>
+        </div>
+        <div class="ot-ready-metric">
+          <span class="ot-ready-metric__icon"><FileText :size="16" aria-hidden="true" /></span>
+          <div>
+            <span>Pedido vinculado</span>
+            <strong>Pedido #{{ item.pedido }}</strong>
+          </div>
+        </div>
+        <div class="ot-ready-metric">
+          <span class="ot-ready-metric__icon ot-ready-metric__icon--info">
+            <PackageCheck :size="16" aria-hidden="true" />
+          </span>
+          <div>
+            <span>Nota de entrega</span>
+            <strong>Emisión automática</strong>
+          </div>
+        </div>
+      </div>
+      <p class="ot-ready-note">
+        Al confirmar que el trabajo de taller concluyó, la orden quedará marcada como terminada y se
+        emitirá automáticamente la Nota de Entrega oficial del pedido para tienda.
+      </p>
+      <template #footer>
+        <Button variant="secondary" :disabled="markingReady" @click="readyModalOpen = false">
+          <X :size="16" aria-hidden="true" />
+          Cancelar
+        </Button>
+        <Button variant="primary" :disabled="markingReady" @click="confirmMarkReady">
+          <Check :size="16" aria-hidden="true" />
+          {{ markingReady ? 'Confirmando...' : 'Confirmar listo para entrega' }}
+        </Button>
+      </template>
+    </Modal>
+
+    <ProductoVistaRapida
+      :open="Boolean(viewerLine)"
+      :line="viewerLine as any"
+      :product="viewerProduct"
+      :gallery="viewerGallery"
+      :gallery-endpoint="
+        viewerLine && viewerLine.tipo_item_info.codigo === 'MUEBLE_MEDIDA'
+          ? `/api/v1/imagenes-privadas/?detalle=${viewerLine.id}`
+          : ''
+      "
+      :product-loading="viewerProductLoading"
+      :product-error="viewerProductError"
+      @close="closeItemViewer"
+    />
 
     <DocumentViewerModal
       v-if="item"
@@ -1150,9 +1444,136 @@ const lineCounts = computed(() => {
   padding-top: var(--space-2);
   border-top: 1px solid var(--color-border);
 }
+.work-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.work-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.38rem 0.78rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.work-filter-pill.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-accent);
+}
+.work-line--fabrication {
+  border-left: 3px solid var(--color-warning, #d97706);
+}
+.work-line__thumb--btn {
+  padding: 0;
+  cursor: pointer;
+}
+.work-line__aside {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex: none;
+}
+.workshop-body {
+  display: grid;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+.workshop-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+.workshop-col {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.ficha-block h4 {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.ot-modal-icon {
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: none;
+  place-items: center;
+  border-radius: 0.65rem;
+  background: var(--color-primary-soft);
+  color: var(--color-primary-accent);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 22%, transparent);
+}
+.ot-ready-board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+.ot-ready-metric {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+.ot-ready-metric > div {
+  display: grid;
+  gap: 0.1rem;
+}
+.ot-ready-metric span {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+}
+.ot-ready-metric strong {
+  font-size: 0.92rem;
+}
+.ot-ready-metric__icon {
+  display: grid;
+  width: 1.95rem;
+  height: 1.95rem;
+  flex: none;
+  place-items: center;
+  border-radius: 0.5rem;
+  background: var(--color-surface-soft);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+.ot-ready-metric__icon--info {
+  background: var(--color-primary-soft);
+  color: var(--color-primary-accent);
+}
+.ot-ready-note {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
 @media (max-width: 64rem) {
-  .summary {
+  .summary,
+  .workshop-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 47.99rem) {
+  .workshop-grid,
+  .ot-ready-board {
+    grid-template-columns: 1fr;
   }
 }
 @media (max-width: 38rem) {

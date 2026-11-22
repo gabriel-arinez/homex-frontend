@@ -25,6 +25,7 @@ import { buildExportFilename } from '@/shared/download/exportFilename'
 import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
+import DetailTabs from '@/shared/ui/DetailTabs.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
@@ -43,6 +44,7 @@ const contextLoading = ref(false)
 const loading = ref(true)
 const downloading = ref(false)
 const previewModalOpen = ref(false)
+const activeTab = ref<'trazabilidad' | 'items'>('trazabilidad')
 const error = ref('')
 const notice = ref('')
 
@@ -87,6 +89,19 @@ const clientDisplay = computed(() => {
 })
 
 const deliveryLines = computed(() => quote.value?.detalles ?? [])
+const deliveryTabs = computed(() => [
+  {
+    id: 'trazabilidad',
+    label: 'Trazabilidad y condiciones',
+    icon: FileText,
+  },
+  {
+    id: 'items',
+    label: 'Ítems incluidos',
+    icon: PackageCheck,
+    badge: deliveryLines.value.length || undefined,
+  },
+])
 
 async function loadRelatedContext(pedidoId: number) {
   contextLoading.value = true
@@ -257,7 +272,19 @@ onMounted(load)
         </div>
       </section>
 
-      <section class="panel" aria-labelledby="delivery-traceability-title">
+      <DetailTabs
+        :model-value="activeTab"
+        :tabs="deliveryTabs"
+        aria-label="Apartados de la nota de entrega"
+        @update:model-value="activeTab = $event as 'trazabilidad' | 'items'"
+      />
+
+      <section
+        v-show="activeTab === 'trazabilidad'"
+        class="panel"
+        role="tabpanel"
+        aria-labelledby="delivery-traceability-title"
+      >
         <div class="section-heading">
           <div class="section-heading__identity">
             <span class="section-icon">
@@ -321,7 +348,12 @@ onMounted(load)
         </div>
       </section>
 
-      <section class="delivery-lines" aria-labelledby="delivery-items-title">
+      <section
+        v-show="activeTab === 'items'"
+        class="delivery-lines"
+        role="tabpanel"
+        aria-labelledby="delivery-items-title"
+      >
         <div class="section-heading">
           <div class="section-heading__identity">
             <span class="section-icon">

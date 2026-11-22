@@ -348,7 +348,7 @@ test('AP6.0.21 OT muestra ficha técnica autorizada', async ({ page }) => {
   )
   await page.goto('/ordenes-trabajo/3')
   await expect(page.getByText('Escritorio a medida')).toBeVisible()
-  await page.getByText('2 componentes').click()
+  await expect(page.getByText('Componentes de fabricación')).toBeVisible()
   await expect(page.getByText('Conservar pieza original')).toBeVisible()
   await expect(page.getByText(/color a elección/)).toBeVisible()
   await expect(page.getByText('Silla ejecutiva')).toBeVisible()

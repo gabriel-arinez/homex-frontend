@@ -580,6 +580,8 @@ export type NullEnum = never
 export type OrdenTrabajo = {
   readonly id: number
   readonly pedido: number
+  readonly pedido_estado_codigo: string
+  readonly pedido_estado_nombre: string
   readonly proforma_numero: number
   readonly proforma_titulo: string | null
   cliente_resumen: ClienteResumenProforma | null
@@ -3152,6 +3154,25 @@ export type V1OrdenesTrabajoDocumentoPdfRetrieveResponses = {
 
 export type V1OrdenesTrabajoDocumentoPdfRetrieveResponse =
   V1OrdenesTrabajoDocumentoPdfRetrieveResponses[keyof V1OrdenesTrabajoDocumentoPdfRetrieveResponses]
+
+export type V1OrdenesTrabajoMarcarListoEntregaCreateData = {
+  body?: never
+  path: {
+    /**
+     * Un valor de entero único que identifique este orden trabajo.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/ordenes-trabajo/{id}/marcar-listo-entrega/'
+}
+
+export type V1OrdenesTrabajoMarcarListoEntregaCreateResponses = {
+  200: OrdenTrabajo
+}
+
+export type V1OrdenesTrabajoMarcarListoEntregaCreateResponse =
+  V1OrdenesTrabajoMarcarListoEntregaCreateResponses[keyof V1OrdenesTrabajoMarcarListoEntregaCreateResponses]
 
 export type V1PedidosListData = {
   body?: never

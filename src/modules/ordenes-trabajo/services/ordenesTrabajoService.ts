@@ -11,4 +11,8 @@ export const ordenesTrabajoService = {
       responseType: 'blob',
       cache: 'no-store',
     }),
+  marcarListoEntrega: (id: number) =>
+    apiRequest<OrdenTrabajo>(`/api/v1/ordenes-trabajo/${id}/marcar-listo-entrega/`, {
+      method: 'POST',
+    }),
 }
