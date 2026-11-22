@@ -19,6 +19,7 @@ import { pedidosService } from '../services/pedidosService'
 import OrderActionsMenu from '../components/OrderActionsMenu.vue'
 import Button from '@/shared/ui/Button.vue'
 import ClientAvatar from '@/shared/ui/ClientAvatar.vue'
+import CreatorTag from '@/shared/ui/CreatorTag.vue'
 import DatePresentation from '@/shared/ui/DatePresentation.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
@@ -78,11 +79,21 @@ function proformaOf(pedido: Pedido): ProformaListado | undefined {
 }
 
 function clientName(pedido: Pedido): string {
-  return proformaOf(pedido)?.cliente_resumen?.nombre?.trim() || ''
+  return (
+    pedido.cliente_resumen?.empresa?.trim() ||
+    pedido.cliente_resumen?.nombre?.trim() ||
+    proformaOf(pedido)?.cliente_resumen?.empresa?.trim() ||
+    proformaOf(pedido)?.cliente_resumen?.nombre?.trim() ||
+    ''
+  )
 }
 
 function quoteTitle(pedido: Pedido): string {
-  return proformaOf(pedido)?.titulo?.trim() || 'Orden de venta confirmada'
+  return (
+    pedido.proforma_titulo?.trim() ||
+    proformaOf(pedido)?.titulo?.trim() ||
+    'Orden de venta confirmada'
+  )
 }
 
 function toIsoDate(iso: string): string {
@@ -329,6 +340,10 @@ onMounted(load)
                       <FileText :size="13" aria-hidden="true" />
                       Proforma #{{ row.proforma }}
                     </RouterLink>
+                    <CreatorTag
+                      v-if="row.vendedor_resumen?.display_name"
+                      :name="row.vendedor_resumen.display_name"
+                    />
                   </div>
                 </div>
               </td>

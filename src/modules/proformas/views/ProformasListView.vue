@@ -15,6 +15,7 @@ import {
   Send,
 } from '@lucide/vue'
 import type { ProformaListado, ValorCatalogoPublico } from '@/generated/api'
+import { useSessionStore } from '@/app/stores/useSessionStore'
 import { proformasService } from '../services/proformasService'
 import { presentarCreacion } from '../utils/fechaCreacion'
 import ProformaActionsMenu from '../components/ProformaActionsMenu.vue'
@@ -25,6 +26,7 @@ import { buildExportFilename } from '@/shared/download/exportFilename'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
 import ClientAvatar from '@/shared/ui/ClientAvatar.vue'
+import CreatorTag from '@/shared/ui/CreatorTag.vue'
 import DatePresentation from '@/shared/ui/DatePresentation.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
@@ -46,14 +48,15 @@ const routePage = () => {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 1
 }
 const rows = ref<ProformaListado[]>([])
+const session = useSessionStore()
 const ahora = ref(Date.now())
 const filasConCreacion = computed(() =>
   rows.value.map((row) => {
-    const creadoEn = (row as ProformaListado & { creado_en?: string | null }).creado_en
+    const editedAt = row.actualizado_en ?? row.creado_en
     return {
       ...row,
-      creado_en: creadoEn,
-      creacion: presentarCreacion(creadoEn, row.fecha, ahora.value),
+      creado_en: editedAt,
+      creacion: presentarCreacion(editedAt, row.fecha, ahora.value),
     }
   }),
 )
@@ -153,6 +156,13 @@ function quoteIcon(code: string) {
 }
 function editable(row: ProformaListado) {
   return ['BORRADOR', 'EN_REVISION'].includes(row.estado_info.codigo)
+}
+function canManageQuote(row: ProformaListado) {
+  return (
+    session.can('comercial.administrar') ||
+    !session.identity?.id ||
+    row.vendedor === session.identity.id
+  )
 }
 function customerLabel(row: ProformaListado) {
   return row.cliente_resumen?.empresa?.trim() || row.cliente_resumen?.nombre?.trim() || 'Prospecto'
@@ -416,7 +426,7 @@ onBeforeUnmount(() => {
             <tr>
               <th scope="col">Proforma</th>
               <th scope="col">Cliente</th>
-              <th scope="col">Creación</th>
+              <th scope="col">Última edición</th>
               <th scope="col">Estado</th>
               <th scope="col" class="numeric">Total</th>
               <th scope="col" class="actions-heading">Acciones</th>
@@ -447,10 +457,14 @@ onBeforeUnmount(() => {
                   <div class="client-info">
                     <strong :title="customerLabel(row)">{{ customerLabel(row) }}</strong>
                     <span>{{ row.cliente_resumen ? 'Cliente registrado' : 'Prospecto' }}</span>
+                    <CreatorTag
+                      v-if="row.vendedor_resumen?.display_name"
+                      :name="row.vendedor_resumen.display_name"
+                    />
                   </div>
                 </div>
               </td>
-              <td class="date-cell" data-label="Creación">
+              <td class="date-cell" data-label="Última edición">
                 <DatePresentation :presentation="row.creacion" :timestamp="row.creado_en" />
               </td>
               <td class="status-cell" data-label="Estado">
@@ -461,7 +475,10 @@ onBeforeUnmount(() => {
               </td>
               <td class="actions-cell">
                 <ProformaActionsMenu
-                  v-if="editable(row) || row.estado_info.codigo === 'NO_CONCRETADA'"
+                  v-if="
+                    canManageQuote(row) &&
+                    (editable(row) || row.estado_info.codigo === 'NO_CONCRETADA')
+                  "
                   :estado="row.estado_info.codigo"
                   :id="row.id"
                   :numero="row.numero"

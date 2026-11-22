@@ -996,11 +996,21 @@ const transitioning = ref(false)
 
 const stateCode = computed(() => persisted.value?.estado_info.codigo ?? '')
 const inReview = computed(() => ['EN_REVISION', 'ENVIADA'].includes(stateCode.value))
+const isOwnerOrAdmin = computed(
+  () =>
+    !persisted.value ||
+    session.can('comercial.administrar') ||
+    !session.identity?.id ||
+    persisted.value.vendedor === session.identity.id,
+)
 const isEditable = computed(
-  () => !persisted.value || ['BORRADOR', 'EN_REVISION'].includes(stateCode.value),
+  () =>
+    isOwnerOrAdmin.value &&
+    (!persisted.value || ['BORRADOR', 'EN_REVISION'].includes(stateCode.value)),
 )
 const canApprove = computed(
   () =>
+    isOwnerOrAdmin.value &&
     inReview.value &&
     Boolean(persisted.value?.cliente) &&
     Boolean(lineas.value.length) &&
@@ -2097,7 +2107,12 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               </strong>
               <strong v-else class="pending-value">Pendiente</strong>
             </div>
-            <div class="line-menu" @click.stop @keydown.esc="menuLineId = null">
+            <div
+              class="line-menu"
+              :class="{ 'line-menu--open': menuLineId === line.localId }"
+              @click.stop
+              @keydown.esc="menuLineId = null"
+            >
               <button
                 type="button"
                 class="menu-trigger"
@@ -3344,12 +3359,17 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   gap: var(--space-3);
   margin-top: var(--space-2);
 }
+.products-panel {
+  padding-bottom: var(--space-4);
+}
 .line-card {
   display: grid;
   position: relative;
   min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
   align-items: center;
-  grid-template-columns: auto minmax(14rem, 0.9fr) minmax(24rem, 1.5fr) auto auto;
+  grid-template-columns: auto minmax(0, 1.15fr) minmax(0, 1.45fr) auto auto;
   gap: var(--space-4);
   padding: 0.85rem 1rem;
   cursor: pointer;
@@ -3456,7 +3476,10 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 }
 .line-menu {
   position: relative;
-  z-index: 30;
+  z-index: 1;
+}
+.line-menu--open {
+  z-index: 35;
 }
 .menu-trigger {
   display: grid;
@@ -4280,7 +4303,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 }
 .editor-actions {
   position: sticky;
-  z-index: 5;
+  z-index: 40;
   bottom: 0;
   margin-top: var(--space-5);
   padding: var(--space-3) 0;
@@ -4309,7 +4332,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   white-space: normal;
   text-align: center;
 }
-@media (max-width: 64rem) {
+@media (max-width: 78rem) {
   .line-card {
     grid-template-columns: auto minmax(0, 1fr) auto auto;
   }
@@ -4330,6 +4353,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     grid-column: 4;
     grid-row: 1 / 3;
   }
+}
+@media (max-width: 64rem) {
   .steps button {
     padding: 0.65rem;
     gap: 0.5rem;

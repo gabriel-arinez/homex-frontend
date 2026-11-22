@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import type { ProformaListado } from '@/generated/api'
@@ -12,12 +13,14 @@ function quote(id: number, status: string): ProformaListado {
     cliente: 1,
     cliente_resumen: { id: 1, nombre: 'Ana Pérez', empresa: null, celular: '70000000' },
     vendedor: 7,
+    vendedor_resumen: { id: 7, username: 'vendedor7', display_name: 'Carlos Ventas' },
     estado: 1,
     estado_info: { id: 1, codigo: status, nombre: status === 'BORRADOR' ? 'Borrador' : 'Enviada' },
     titulo: id === 1 ? 'Oficina ejecutiva' : 'Cocina',
     fecha: '2026-10-25',
     fecha_vencimiento: null,
     creado_en: null,
+    actualizado_en: null,
     plazo_entrega: null,
     validez_oferta: null,
     porcentaje_adelanto: null,
@@ -41,6 +44,7 @@ function makeRouter(path = '/proformas') {
   return router.push(path).then(() => router)
 }
 function mockList() {
+  setActivePinia(createPinia())
   const list = vi.spyOn(proformasService, 'list').mockResolvedValue({
     count: 2,
     next: null,

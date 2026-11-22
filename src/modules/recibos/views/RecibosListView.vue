@@ -22,6 +22,7 @@ import ReceiptActionsMenu from '../components/ReceiptActionsMenu.vue'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
 import ClientAvatar from '@/shared/ui/ClientAvatar.vue'
+import CreatorTag from '@/shared/ui/CreatorTag.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
@@ -406,6 +407,10 @@ onMounted(load)
                       <component :is="paymentTypeIcon(row)" :size="13" aria-hidden="true" />
                       {{ paymentTypeName(row) }}
                     </span>
+                    <CreatorTag
+                      v-if="row.vendedor_resumen?.display_name"
+                      :name="row.vendedor_resumen.display_name"
+                    />
                   </div>
                 </div>
               </td>

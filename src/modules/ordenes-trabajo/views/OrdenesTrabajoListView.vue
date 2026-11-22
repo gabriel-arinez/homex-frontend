@@ -25,6 +25,7 @@ import { ordenesTrabajoService } from '../services/ordenesTrabajoService'
 import WorkOrderActionsMenu from '../components/WorkOrderActionsMenu.vue'
 import Button from '@/shared/ui/Button.vue'
 import ClientAvatar from '@/shared/ui/ClientAvatar.vue'
+import CreatorTag from '@/shared/ui/CreatorTag.vue'
 import DatePresentation from '@/shared/ui/DatePresentation.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
@@ -513,6 +514,10 @@ onMounted(load)
                         Prof. #{{ row.proforma_numero }}
                       </span>
                     </div>
+                    <CreatorTag
+                      v-if="row.vendedor_resumen?.display_name"
+                      :name="row.vendedor_resumen.display_name"
+                    />
                   </div>
                 </div>
               </td>

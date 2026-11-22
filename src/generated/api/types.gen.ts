@@ -587,6 +587,7 @@ export type NotaEntrega = {
   readonly proforma_numero: number
   readonly proforma_titulo: string | null
   cliente_resumen: ClienteResumenProforma | null
+  vendedor_resumen: UsuarioResumen | null
   readonly detalles: Array<DetalleNotaEntrega>
 }
 
@@ -600,6 +601,7 @@ export type OrdenTrabajo = {
   readonly proforma_numero: number
   readonly proforma_titulo: string | null
   cliente_resumen: ClienteResumenProforma | null
+  vendedor_resumen: UsuarioResumen | null
   readonly jefe_taller: number | null
   readonly numero: number
   readonly fecha: string
@@ -799,10 +801,13 @@ export type PatchedProforma = {
   cliente?: number | null
   cliente_resumen?: ClienteResumenProforma | null
   readonly vendedor?: number
+  vendedor_resumen?: UsuarioResumen | null
   readonly estado?: number
   estado_info?: ValorCatalogoResumen
   titulo?: string | null
   readonly fecha?: string
+  readonly creado_en?: string | null
+  readonly actualizado_en?: string | null
   plazo_entrega?: string | null
   validez_oferta?: number | null
   readonly fecha_vencimiento?: string | null
@@ -828,6 +833,10 @@ export type PatchedProforma = {
 
 export type Pedido = {
   readonly id: number
+  readonly proforma_numero: number
+  readonly proforma_titulo: string | null
+  cliente_resumen: ClienteResumenProforma | null
+  vendedor_resumen: UsuarioResumen | null
   readonly fecha_confirmacion: string
   readonly proforma: number
   readonly estado: number
@@ -910,10 +919,13 @@ export type Proforma = {
   cliente?: number | null
   cliente_resumen: ClienteResumenProforma | null
   readonly vendedor: number
+  vendedor_resumen: UsuarioResumen | null
   readonly estado: number
   estado_info: ValorCatalogoResumen
   titulo?: string | null
   readonly fecha: string
+  readonly creado_en: string | null
+  readonly actualizado_en: string | null
   plazo_entrega?: string | null
   validez_oferta?: number | null
   readonly fecha_vencimiento: string | null
@@ -970,11 +982,13 @@ export type ProformaListado = {
   cliente?: number | null
   cliente_resumen: ClienteResumenProforma | null
   readonly vendedor: number
+  vendedor_resumen: UsuarioResumen | null
   readonly estado: number
   estado_info: ValorCatalogoResumen
   titulo?: string | null
   readonly fecha: string
   readonly creado_en: string | null
+  readonly actualizado_en: string | null
   plazo_entrega?: string | null
   validez_oferta?: number | null
   readonly fecha_vencimiento: string | null
@@ -1007,6 +1021,7 @@ export type Recibo = {
   readonly id: number
   readonly moneda_codigo: string
   readonly tipo_pago_nombre: string
+  vendedor_resumen: UsuarioResumen | null
   readonly numero: number
   readonly nombre_completo: string
   readonly monto_en_letras: string
@@ -1164,6 +1179,12 @@ export type TokenRefresh = {
  * * `JUEGO` - JUEGO
  */
 export type UnidadCodigoEnum = 'PIEZA' | 'JUEGO'
+
+export type UsuarioResumen = {
+  readonly id: number
+  readonly username: string
+  readonly display_name: string
+}
 
 export type UsuarioResumenMovimiento = {
   readonly id: number
@@ -1461,6 +1482,10 @@ export type PatchedProformaWritable = {
   prospecto_empresa?: string | null
   prospecto_celular?: string | null
   prospecto_direccion?: string | null
+}
+
+export type PedidoWritable = {
+  [key: string]: unknown
 }
 
 export type ProductoWritable = {
