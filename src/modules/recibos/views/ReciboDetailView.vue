@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   ClipboardList,
   Clock3,
-  CreditCard,
   Download,
   FileText,
   Hash,
@@ -30,6 +29,7 @@ import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
 import Toast from '@/shared/ui/Toast.vue'
 import { recibosService } from '../services/recibosService'
+import { tipoPagoIcon } from '../utils/tipoPagoIcon'
 
 const emit = defineEmits<{ openMenu: [] }>()
 const route = useRoute()
@@ -46,13 +46,18 @@ const confirm = ref(false)
 const notice = ref('')
 
 const isAnnulled = computed(() => item.value?.estado === 'ANULADO')
+const paymentTypeObj = computed(() =>
+  item.value ? types.value.find((x) => x.id === item.value?.tipo_pago) : undefined,
+)
 const paymentTypeLabel = computed(() => {
   if (!item.value) return ''
   return (
-    types.value.find((x) => x.id === item.value?.tipo_pago)?.nombre ??
-    `Tipo ${item.value.tipo_pago}`
+    item.value.tipo_pago_nombre || paymentTypeObj.value?.nombre || `Tipo ${item.value.tipo_pago}`
   )
 })
+const paymentTypeIconComp = computed(() =>
+  tipoPagoIcon(paymentTypeObj.value?.codigo, paymentTypeLabel.value),
+)
 
 const money = (v: string | number) => {
   const amount = Number(v)
@@ -318,7 +323,7 @@ onMounted(load)
 
           <div class="receipt-field-card">
             <span class="receipt-field-card__icon">
-              <CreditCard :size="17" aria-hidden="true" />
+              <component :is="paymentTypeIconComp" :size="17" aria-hidden="true" />
             </span>
             <div class="receipt-field-card__body">
               <span class="receipt-field-card__label">Tipo de pago</span>

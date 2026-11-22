@@ -17,6 +17,7 @@ import {
   Send,
   SlidersHorizontal,
   Truck,
+  UserCheck,
 } from '@lucide/vue'
 import type {
   EstadoCodigoEnum,
@@ -27,11 +28,15 @@ import type {
   ValorCatalogoPublico,
 } from '@/generated/api'
 import { notasEntregaService } from '@/modules/notas-entrega/services/notasEntregaService'
+import DocumentViewerModal from '@/modules/proformas/components/DocumentViewerModal.vue'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import { recibosService } from '@/modules/recibos/services/recibosService'
 import { montoEnLetras } from '@/modules/recibos/utils/montoEnLetras'
+import { tipoPagoIcon } from '@/modules/recibos/utils/tipoPagoIcon'
 import { ApiError } from '@/shared/api'
-import { formatearFechaHora } from '@/shared/date/presentacionFecha'
+import { fechaComercial, formatearFechaHora } from '@/shared/date/presentacionFecha'
+import { downloadBlob } from '@/shared/download/downloadBlob'
+import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
 import { generateUuidV4 } from '@/shared/utils/uuid'
 import { pedidosService } from '../services/pedidosService'
 import Badge from '@/shared/ui/Badge.vue'
@@ -72,6 +77,58 @@ let loadRequestId = 0
 const receiptError = ref('')
 const receiptIdempotencyKey = ref('')
 const montoEnLetrasManual = ref(false)
+
+const pdfPreviewOpen = ref(false)
+const pdfPreviewRecibo = ref<Recibo | null>(null)
+const downloadingReceiptPdf = ref(false)
+const {
+  blob: receiptPdfBlob,
+  url: receiptPdfUrl,
+  loading: receiptPdfLoading,
+  error: receiptPdfError,
+  load: loadReceiptPdf,
+  clear: clearReceiptPdf,
+} = usePdfDocument(recibosService.documentPdf)
+
+function paymentInfo(id: number): ValorCatalogoPublico | undefined {
+  return payments.value.find((item) => item.id === id)
+}
+
+function receiptPaymentName(rec: Recibo): string {
+  return rec.tipo_pago_nombre || paymentInfo(rec.tipo_pago)?.nombre || `Tipo #${rec.tipo_pago}`
+}
+
+function receiptPaymentIcon(rec: Recibo) {
+  const info = paymentInfo(rec.tipo_pago)
+  return tipoPagoIcon(info?.codigo, rec.tipo_pago_nombre || info?.nombre)
+}
+
+async function openReceiptPdfPreview(rec: Recibo) {
+  pdfPreviewRecibo.value = rec
+  pdfPreviewOpen.value = true
+  await loadReceiptPdf(rec.id)
+}
+
+function closeReceiptPdfPreview() {
+  pdfPreviewOpen.value = false
+  pdfPreviewRecibo.value = null
+  clearReceiptPdf()
+}
+
+async function downloadReceiptPdf() {
+  if (!pdfPreviewRecibo.value || downloadingReceiptPdf.value) return
+  downloadingReceiptPdf.value = true
+  try {
+    const file = receiptPdfBlob.value ?? (await loadReceiptPdf(pdfPreviewRecibo.value.id))
+    if (!file) throw new Error(receiptPdfError.value || 'No se pudo descargar el recibo.')
+    downloadBlob(file, `recibo-${pdfPreviewRecibo.value.numero}.pdf`)
+    notice.value = `Recibo #${pdfPreviewRecibo.value.numero} descargado en PDF.`
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'No se pudo descargar el recibo.'
+  } finally {
+    downloadingReceiptPdf.value = false
+  }
+}
 
 const form = ref({
   nombre_completo: '',
@@ -628,6 +685,28 @@ watch(() => route.params.id, load)
           </div>
         </div>
 
+        <div
+          v-if="quote && !docsLoading"
+          class="docs-finance-strip"
+          aria-label="Resumen de cobros del pedido"
+        >
+          <span class="docs-finance-pill">
+            <span>Total pedido</span>
+            <strong>{{ money(orderTotal, orderCurrency) }}</strong>
+          </span>
+          <span class="docs-finance-pill">
+            <span>Cobrado</span>
+            <strong>{{ money(orderPaid, orderCurrency) }}</strong>
+          </span>
+          <span
+            class="docs-finance-pill"
+            :class="{ 'docs-finance-pill--pending': orderRemaining > 0.0001 }"
+          >
+            <span>Saldo pendiente</span>
+            <strong>{{ money(orderRemaining, orderCurrency) }}</strong>
+          </span>
+        </div>
+
         <div v-if="docsLoading" class="docs-skeleton" aria-hidden="true">
           <span />
           <span />
@@ -639,42 +718,94 @@ watch(() => route.params.id, load)
           description="Todavía no se emitieron recibos ni notas de entrega para este pedido."
         />
         <div v-else class="docs-list">
-          <RouterLink
+          <article
             v-for="rec in receipts"
             :key="`rec-${rec.id}`"
-            :to="`/recibos/${rec.id}`"
-            class="doc-row"
+            class="doc-row doc-row--receipt"
+            :class="{ 'doc-row--annulled': rec.estado === 'ANULADO' }"
           >
             <div class="doc-row__identity">
-              <span class="doc-row__icon">
-                <Receipt :size="16" aria-hidden="true" />
+              <span
+                class="doc-row__icon"
+                :class="
+                  rec.estado === 'ANULADO' ? 'doc-row__icon--danger' : 'doc-row__icon--success'
+                "
+              >
+                <Ban v-if="rec.estado === 'ANULADO'" :size="16" aria-hidden="true" />
+                <Receipt v-else :size="16" aria-hidden="true" />
               </span>
-              <div>
-                <strong>Recibo #{{ rec.numero }}</strong>
-                <span>{{ rec.concepto }} · {{ rec.fecha }}</span>
+              <div class="doc-row__body">
+                <div class="doc-row__title-line">
+                  <RouterLink :to="`/recibos/${rec.id}`" class="doc-row__title-link">
+                    Recibo #{{ rec.numero }}
+                  </RouterLink>
+                  <Badge :tone="rec.estado === 'ANULADO' ? 'danger' : 'success'">
+                    {{ rec.estado }}
+                  </Badge>
+                  <span class="doc-row__date">
+                    <Calendar :size="13" aria-hidden="true" />
+                    {{ fechaComercial(String(rec.fecha)) }}
+                  </span>
+                </div>
+                <p class="doc-row__concept">{{ rec.concepto }}</p>
+                <div class="doc-row__details">
+                  <span class="doc-row__detail">
+                    <UserCheck :size="13" aria-hidden="true" />
+                    {{ rec.nombre_completo }}
+                  </span>
+                  <span class="doc-row__detail">
+                    <component :is="receiptPaymentIcon(rec)" :size="13" aria-hidden="true" />
+                    {{ receiptPaymentName(rec) }}
+                  </span>
+                  <span v-if="rec.banco || rec.numero_cheque" class="doc-row__detail">
+                    {{
+                      [rec.banco, rec.numero_cheque ? `N.º ${rec.numero_cheque}` : '']
+                        .filter(Boolean)
+                        .join(' · ')
+                    }}
+                  </span>
+                </div>
               </div>
             </div>
-            <div class="doc-row__meta">
-              <Badge :tone="rec.estado === 'ANULADO' ? 'danger' : 'success'">
-                {{ rec.estado }}
-              </Badge>
-              <strong class="doc-row__amount">{{ money(rec.pago_actual) }}</strong>
+
+            <div class="doc-row__aside">
+              <div class="doc-row__amounts">
+                <strong class="doc-row__amount">
+                  {{ money(rec.pago_actual, rec.moneda_codigo || orderCurrency) }}
+                </strong>
+                <span class="doc-row__amounts-sub">
+                  A cuenta: {{ money(rec.a_cuenta, rec.moneda_codigo || orderCurrency) }} · Saldo:
+                  {{ money(rec.saldo, rec.moneda_codigo || orderCurrency) }}
+                </span>
+              </div>
+              <button
+                type="button"
+                class="doc-row__pdf-btn"
+                :aria-label="`Ver PDF del Recibo #${rec.numero}`"
+                :title="`Ver PDF del Recibo #${rec.numero}`"
+                @click="openReceiptPdfPreview(rec)"
+              >
+                <FileText :size="17" aria-hidden="true" />
+              </button>
             </div>
-          </RouterLink>
+          </article>
 
           <RouterLink
             v-for="nota in deliveryNotes"
             :key="`nota-${nota.id}`"
             :to="`/notas-entrega/${nota.id}`"
-            class="doc-row"
+            class="doc-row doc-row--link"
           >
             <div class="doc-row__identity">
               <span class="doc-row__icon">
                 <PackageCheck :size="16" aria-hidden="true" />
               </span>
-              <div>
+              <div class="doc-row__body">
                 <strong>Nota de entrega #{{ nota.id }}</strong>
-                <span>Emitida el {{ formatearFechaHora(nota.fecha) }}</span>
+                <span class="doc-row__date">
+                  <Calendar :size="13" aria-hidden="true" />
+                  Emitida el {{ formatearFechaHora(nota.fecha) }}
+                </span>
               </div>
             </div>
             <div class="doc-row__meta">
@@ -795,6 +926,20 @@ watch(() => route.params.id, load)
       confirm-label="Emitir nota"
       @close="noteOpen = false"
       @confirm="note"
+    />
+
+    <DocumentViewerModal
+      :open="pdfPreviewOpen"
+      :title="pdfPreviewRecibo ? `Recibo #${pdfPreviewRecibo.numero}` : 'Comprobante de recibo'"
+      subtitle="Hoja carta con Copia Cliente y Copia HOMEX listas para impresión."
+      :pdf-url="receiptPdfUrl"
+      :loading="receiptPdfLoading"
+      :error="receiptPdfError"
+      :downloading="downloadingReceiptPdf"
+      :can-download-pdf="Boolean(pdfPreviewRecibo)"
+      @close="closeReceiptPdfPreview"
+      @download="downloadReceiptPdf"
+      @retry="pdfPreviewRecibo && loadReceiptPdf(pdfPreviewRecibo.id)"
     />
   </div>
 </template>
@@ -1099,16 +1244,39 @@ watch(() => route.params.id, load)
   background: var(--color-surface-hover);
   color: var(--color-primary-accent);
 }
+.docs-finance-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-bottom: var(--space-4);
+}
+.docs-finance-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-muted);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+.docs-finance-pill span {
+  color: var(--color-text-secondary);
+}
+.docs-finance-pill--pending {
+  border-color: color-mix(in srgb, var(--color-warning, #d97706) 35%, var(--color-border));
+}
 .docs-list {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 .doc-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  padding: 0.85rem 1rem;
+  padding: 0.95rem 1.05rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-surface-muted);
@@ -1118,20 +1286,25 @@ watch(() => route.params.id, load)
     border-color var(--transition-fast),
     background var(--transition-fast);
 }
-.doc-row:hover {
+.doc-row--link:hover,
+.doc-row--receipt:hover {
   border-color: var(--color-border-strong);
   background: var(--color-surface-hover);
 }
+.doc-row--annulled {
+  opacity: 0.85;
+}
 .doc-row__identity {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-3);
   min-width: 0;
+  flex: 1;
 }
 .doc-row__icon {
   display: grid;
-  width: 2.1rem;
-  height: 2.1rem;
+  width: 2.25rem;
+  height: 2.25rem;
   flex: none;
   place-items: center;
   border: 1px solid var(--color-border);
@@ -1139,20 +1312,104 @@ watch(() => route.params.id, load)
   color: var(--color-primary-accent);
   background: var(--color-surface);
 }
-.doc-row__identity > div {
+.doc-row__icon--success {
+  color: var(--color-success);
+  background: var(--color-success-soft);
+  border-color: color-mix(in srgb, var(--color-success) 35%, transparent);
+}
+.doc-row__icon--danger {
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+  border-color: color-mix(in srgb, var(--color-danger) 35%, transparent);
+}
+.doc-row__body {
   display: grid;
-  gap: 0.15rem;
+  gap: 0.25rem;
   min-width: 0;
 }
-.doc-row__identity strong {
-  font-size: 0.9rem;
+.doc-row__title-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.6rem;
 }
-.doc-row__identity span {
+.doc-row__title-link {
+  color: var(--color-text);
+  font-size: 0.93rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+.doc-row__title-link:hover {
+  color: var(--color-primary-accent);
+  text-decoration: underline;
+}
+.doc-row__date {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
   color: var(--color-text-secondary);
-  font-size: 0.8rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 0.77rem;
+  font-weight: 550;
+}
+.doc-row__concept {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.83rem;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.doc-row__details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.85rem;
+}
+.doc-row__detail {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  color: var(--color-text-secondary);
+  font-size: 0.76rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.doc-row__aside {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: none;
+}
+.doc-row__amounts {
+  display: grid;
+  gap: 0.12rem;
+  justify-items: end;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.doc-row__amounts-sub {
+  color: var(--color-text-secondary);
+  font-size: 0.74rem;
+}
+.doc-row__pdf-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: none;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-primary-accent);
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+.doc-row__pdf-btn:hover,
+.doc-row__pdf-btn:focus-visible {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
 }
 .doc-row__meta {
   display: flex;
@@ -1161,7 +1418,8 @@ watch(() => route.params.id, load)
   flex: none;
 }
 .doc-row__amount {
-  font-size: 0.9rem;
+  font-size: 0.96rem;
+  font-weight: 750;
   font-variant-numeric: tabular-nums;
 }
 .receipt-form {
@@ -1236,6 +1494,16 @@ watch(() => route.params.id, load)
   .doc-row {
     flex-direction: column;
     align-items: flex-start;
+  }
+  .doc-row__aside {
+    width: 100%;
+    justify-content: space-between;
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--color-border);
+  }
+  .doc-row__amounts {
+    justify-items: start;
+    text-align: left;
   }
 }
 .receipt-summary {

@@ -3,10 +3,10 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
   Ban,
+  Calendar,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
-  CreditCard,
   Receipt,
   RotateCcw,
 } from '@lucide/vue'
@@ -16,6 +16,7 @@ import { fechaComercial } from '@/shared/date/presentacionFecha'
 import { downloadBlob } from '@/shared/download/downloadBlob'
 import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
 import { recibosService } from '../services/recibosService'
+import { tipoPagoIcon } from '../utils/tipoPagoIcon'
 import ReceiptActionsMenu from '../components/ReceiptActionsMenu.vue'
 import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
 import Badge from '@/shared/ui/Badge.vue'
@@ -56,14 +57,35 @@ const page = ref(Math.max(1, Number(route.query.pagina) || 1))
 const pageSize = 10
 const dateError = computed(() => dateRangeError(dateFrom.value, dateTo.value, today))
 
-const money = (v: string | number) => {
+const money = (v: string | number, currency = 'BOB') => {
   const amount = Number(v)
   if (!Number.isFinite(amount)) return '—'
-  return new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(amount)
+  const code = currency || 'BOB'
+  try {
+    return new Intl.NumberFormat('es-BO', { style: 'currency', currency: code }).format(amount)
+  } catch {
+    return `${code} ${amount.toFixed(2)}`
+  }
 }
 
-function paymentTypeName(id: number): string {
-  return paymentTypes.value.find((item) => item.id === id)?.nombre ?? `Tipo #${id}`
+function paymentTypeInfo(id: number): ValorCatalogoPublico | undefined {
+  return paymentTypes.value.find((item) => item.id === id)
+}
+
+function paymentTypeName(rowOrId: Recibo | number): string {
+  if (typeof rowOrId === 'number') {
+    return paymentTypeInfo(rowOrId)?.nombre ?? `Tipo #${rowOrId}`
+  }
+  return (
+    rowOrId.tipo_pago_nombre ||
+    paymentTypeInfo(rowOrId.tipo_pago)?.nombre ||
+    `Tipo #${rowOrId.tipo_pago}`
+  )
+}
+
+function paymentTypeIcon(row: Recibo) {
+  const info = paymentTypeInfo(row.tipo_pago)
+  return tipoPagoIcon(info?.codigo, row.tipo_pago_nombre || info?.nombre)
 }
 
 function toIsoDate(value: string): string {
@@ -402,31 +424,44 @@ onMounted(load)
                 <div class="payer-content">
                   <ClientAvatar :name="row.nombre_completo" :size="34" />
                   <div class="payer-info">
-                    <strong :title="row.nombre_completo">{{ row.nombre_completo }}</strong>
-                    <div class="payer-meta">
-                      <RouterLink :to="`/pedidos/${row.pedido}`" class="order-chip">
-                        <ClipboardList :size="13" aria-hidden="true" />
-                        Pedido #{{ row.pedido }}
-                      </RouterLink>
-                      <span class="payment-chip">
-                        <CreditCard :size="12" aria-hidden="true" />
-                        {{ paymentTypeName(row.tipo_pago) }}
-                      </span>
-                    </div>
+                    <strong class="payer-name">{{ row.nombre_completo }}</strong>
+                    <RouterLink :to="`/pedidos/${row.pedido}`" class="order-chip">
+                      <ClipboardList :size="13" aria-hidden="true" />
+                      Pedido #{{ row.pedido }}
+                    </RouterLink>
+                    <span class="payment-chip">
+                      <component :is="paymentTypeIcon(row)" :size="13" aria-hidden="true" />
+                      {{ paymentTypeName(row) }}
+                    </span>
                   </div>
                 </div>
               </td>
 
               <td class="date-cell" data-label="Emisión">
-                <span class="date-label">{{ fechaComercial(String(row.fecha)) }}</span>
+                <div class="date-pres">
+                  <div class="date-pres__primary">
+                    <Calendar :size="15" aria-hidden="true" />
+                    <strong>{{ fechaComercial(String(row.fecha)) }}</strong>
+                  </div>
+                </div>
               </td>
 
               <td class="amounts-cell numeric" data-label="Importes">
                 <div class="amounts-stack">
-                  <strong class="amount-paid">{{ money(row.pago_actual) }}</strong>
-                  <span class="amount-sub">
-                    A cuenta: {{ money(row.a_cuenta) }} · Saldo: {{ money(row.saldo) }}
-                  </span>
+                  <div class="amount-row amount-row--main">
+                    <span class="amount-label">Cobrado</span>
+                    <strong class="amount-paid">{{
+                      money(row.pago_actual, row.moneda_codigo)
+                    }}</strong>
+                  </div>
+                  <div class="amount-row">
+                    <span class="amount-label">A cuenta</span>
+                    <span class="amount-sub">{{ money(row.a_cuenta, row.moneda_codigo) }}</span>
+                  </div>
+                  <div class="amount-row">
+                    <span class="amount-label">Saldo</span>
+                    <span class="amount-sub">{{ money(row.saldo, row.moneda_codigo) }}</span>
+                  </div>
                 </div>
               </td>
 
@@ -588,7 +623,7 @@ onMounted(load)
   border-bottom: 1px solid var(--color-table-border);
   border-left: 0;
   border-right: 0;
-  vertical-align: middle;
+  vertical-align: top;
 }
 .receipt-table th {
   background: var(--color-table-header-bg);
@@ -667,35 +702,47 @@ onMounted(load)
 }
 .receipt-concept {
   color: var(--color-text-secondary);
-  font-size: 0.76rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .payer-content {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.65rem;
   min-width: 0;
 }
 .payer-info {
   display: grid;
-  gap: 0.2rem;
+  gap: 0.24rem;
   min-width: 0;
+  justify-items: start;
 }
-.payer-info strong {
+.payer-name {
   color: var(--color-text);
   font-size: 0.87rem;
   font-weight: 650;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.3;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
-.payer-meta {
-  display: flex;
+.date-pres {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+}
+.date-pres__primary {
+  display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 0.55rem;
+  gap: 0.35rem;
+  color: var(--color-text);
+  font-size: 0.86rem;
+  white-space: normal;
+}
+.date-pres__primary svg {
+  flex: none;
+  color: var(--color-text-secondary);
 }
 .order-chip {
   display: inline-flex;
@@ -713,23 +760,47 @@ onMounted(load)
 .payment-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.3rem;
   color: var(--color-text-secondary);
-  font-size: 0.74rem;
+  font-size: 0.76rem;
+  font-weight: 550;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.payment-chip svg {
+  flex: none;
+  color: var(--color-text-secondary);
 }
 .amounts-stack {
   display: grid;
-  gap: 0.18rem;
+  gap: 0.22rem;
   justify-items: end;
 }
+.amount-row {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  font-variant-numeric: tabular-nums;
+}
+.amount-label {
+  color: var(--color-text-secondary);
+  font-size: 0.73rem;
+}
+.amount-row--main .amount-label {
+  font-size: 0.76rem;
+  font-weight: 600;
+}
 .amount-paid {
-  font-size: 0.92rem;
-  font-weight: 750;
+  color: var(--color-text);
+  font-size: 0.98rem;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 .amount-sub {
   color: var(--color-text-secondary);
-  font-size: 0.73rem;
+  font-size: 0.76rem;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 .status-actions-wrap {
