@@ -344,6 +344,7 @@ export type EmitirRecibo = {
   numero_cheque?: string | null
   banco?: string | null
   pago_actual: string
+  clave_idempotencia?: string | null
 }
 
 export type EspecificacionAsistida = {
@@ -979,6 +980,8 @@ export type PropuestaConfigurador = {
 
 export type Recibo = {
   readonly id: number
+  readonly moneda_codigo: string
+  readonly tipo_pago_nombre: string
   readonly numero: number
   readonly nombre_completo: string
   readonly monto_en_letras: string
@@ -991,6 +994,7 @@ export type Recibo = {
   readonly saldo: string
   readonly estado: string
   readonly fecha: string
+  readonly clave_idempotencia: string | null
   readonly pedido: number
   readonly tipo_pago: number
   readonly created_by: number | null
@@ -3196,6 +3200,9 @@ export type V1PedidosEmitirNotaEntregaCreateResponse =
 
 export type V1PedidosEmitirReciboCreateData = {
   body: EmitirRecibo
+  headers?: {
+    'Idempotency-Key'?: string
+  }
   path: {
     /**
      * Un valor de entero único que identifique este pedido.
@@ -3207,6 +3214,7 @@ export type V1PedidosEmitirReciboCreateData = {
 }
 
 export type V1PedidosEmitirReciboCreateResponses = {
+  200: Recibo
   201: Recibo
 }
 
@@ -3842,3 +3850,22 @@ export type V1RecibosDocumentoRetrieveResponses = {
 
 export type V1RecibosDocumentoRetrieveResponse =
   V1RecibosDocumentoRetrieveResponses[keyof V1RecibosDocumentoRetrieveResponses]
+
+export type V1RecibosDocumentoPdfRetrieveData = {
+  body?: never
+  path: {
+    /**
+     * Un valor de entero único que identifique este recibo.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/recibos/{id}/documento-pdf/'
+}
+
+export type V1RecibosDocumentoPdfRetrieveResponses = {
+  200: Blob | File
+}
+
+export type V1RecibosDocumentoPdfRetrieveResponse =
+  V1RecibosDocumentoPdfRetrieveResponses[keyof V1RecibosDocumentoPdfRetrieveResponses]
