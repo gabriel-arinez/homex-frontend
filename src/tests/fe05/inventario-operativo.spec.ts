@@ -167,6 +167,7 @@ describe('Inventario operativo (P1, P2, P4, P5, P6)', () => {
     expect(wrapper.text()).toContain('Stock bajo')
     expect(wrapper.text()).toContain('Déficit referencial')
     expect(wrapper.text()).toContain('Editar mínimo')
+    expect(wrapper.text()).toContain('Ver reporte de stock')
 
     await wrapper
       .findAll('button')
@@ -277,17 +278,21 @@ describe('Inventario operativo (P1, P2, P4, P5, P6)', () => {
       .spyOn(movimientosStockService, 'registrarAjuste')
       .mockResolvedValue({} as never)
 
+    const routerReport = buildRouter()
+    await routerReport.push('/movimientos-stock?producto=10&vista=reporte')
+    await routerReport.isReady()
+
     const wrapperAdmin = mount(MovimientosStockListView, {
-      global: { plugins: [router], stubs: { Teleport: true } },
+      global: { plugins: [routerReport], stubs: { Teleport: true } },
     })
     await flushPromises()
 
     expect(wrapperAdmin.text()).toContain('Registrar movimiento')
-    await wrapperAdmin
-      .findAll('button')
-      .find((b) => b.text().includes('Reporte y saldos'))!
-      .trigger('click')
-    await flushPromises()
+    expect(wrapperAdmin.text()).not.toContain('Reporte y saldos')
+    expect(wrapperAdmin.text()).not.toContain('Vista historial')
+    expect(wrapperAdmin.find('input[name="pedido-movimiento"]').exists()).toBe(false)
+    expect(wrapperAdmin.find('input[name="producto-movimiento"]').exists()).toBe(false)
+    expect(wrapperAdmin.text()).toContain('Volver al producto')
     expect(reporteSpy).toHaveBeenCalled()
     expect(wrapperAdmin.text()).toContain('Entradas del período')
     expect(wrapperAdmin.text()).toContain('5.0000 Pieza')
