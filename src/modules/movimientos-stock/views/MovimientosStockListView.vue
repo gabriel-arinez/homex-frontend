@@ -1051,12 +1051,11 @@ onBeforeUnmount(() => {
 .stock-filters__main {
   display: grid;
   grid-template-columns:
-    minmax(13rem, 2fr)
-    minmax(10rem, 1.2fr)
-    minmax(6.5rem, 0.7fr)
-    minmax(6.5rem, 0.7fr)
-    minmax(8rem, 0.85fr)
-    minmax(8rem, 0.85fr)
+    minmax(13rem, 2.2fr)
+    minmax(10rem, 1.15fr)
+    minmax(8.5rem, 0.9fr)
+    minmax(8.5rem, 0.85fr)
+    minmax(8.5rem, 0.85fr)
     auto;
   align-items: end;
   gap: 0.8rem;
