@@ -827,7 +827,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           name="stock-minimo"
           label="Stock mínimo"
           type="number"
-          :step="product?.unidad_stock_info?.codigo === 'M2' ? '0.01' : '1'"
+          :step="product?.unidad_stock_info?.codigo === 'M2' ? '0.0001' : '1'"
           min="0"
           placeholder="Sin mínimo configurado"
           :error="stockMinimoError"

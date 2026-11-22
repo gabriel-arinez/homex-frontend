@@ -392,15 +392,24 @@ async function loadAjusteProductos(term = '') {
   }
 }
 
+function generateUuidV4(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0'))
+  return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex.slice(6, 8).join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10, 16).join('')}`
+}
+
 async function openAjusteModal(tipoInicial: 'ENTRADA' | 'SALIDA' = 'ENTRADA') {
   ajusteTipo.value = tipoInicial
   ajusteCantidad.value = ''
   ajusteObservaciones.value = ''
   ajusteError.value = ''
-  ajusteIdempotencyKey.value =
-    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  ajusteIdempotencyKey.value = generateUuidV4()
   ajusteProductoId.value = selectedProduct.value ? String(selectedProduct.value.id) : ''
   ajusteOpen.value = true
 
@@ -457,6 +466,9 @@ async function submitAjuste() {
         : 'Salida de stock registrada correctamente.'
     await Promise.all([load(), loadSelectedProduct()])
   } catch (err) {
+    if (err instanceof ApiError && err.status === 409) {
+      ajusteIdempotencyKey.value = generateUuidV4()
+    }
     ajusteError.value =
       err instanceof ApiError ? err.message : 'No pudimos registrar el movimiento.'
   } finally {
@@ -1014,7 +1026,7 @@ onBeforeUnmount(() => {
           name="ajuste-cantidad"
           :label="`Cantidad${ajusteProductoSeleccionado ? ` (${ajusteProductoSeleccionado.unidad_stock_info?.nombre || ''})` : ''}`"
           type="number"
-          :step="ajusteProductoSeleccionado?.unidad_stock_info?.codigo === 'M2' ? '0.01' : '1'"
+          :step="ajusteProductoSeleccionado?.unidad_stock_info?.codigo === 'M2' ? '0.0001' : '1'"
           min="0"
           placeholder="0"
         />
