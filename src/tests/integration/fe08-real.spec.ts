@@ -99,8 +99,13 @@ test.describe.serial('FE08 backend real', () => {
     await expect(page.getByText('Silla integración FE08', { exact: true }).first()).toBeVisible()
     await expect(page.getByRole('table').getByText('Venta confirmada').first()).toBeVisible()
 
+    const otResponse = page.waitForResponse(
+      (res) => res.url().includes('/api/v1/ordenes-trabajo') && res.status() === 200,
+    )
     await page.goto('/ordenes-trabajo')
-    await expect(page.getByRole('table').getByText('Pendiente')).toBeVisible()
+    await otResponse
+    await expect(page.getByRole('heading', { name: 'Órdenes de trabajo' })).toBeVisible()
+    await expect(page.getByText('Flujo comercial FE08')).toHaveCount(0)
 
     await page.goto(`/pedidos/${pedidoId}`)
     await page.getByRole('button', { name: 'Emitir recibo' }).click()
