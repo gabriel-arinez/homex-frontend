@@ -6,11 +6,12 @@ import { describe, expect, it, vi } from 'vitest'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import ClienteDetailView from '@/modules/clientes/views/ClienteDetailView.vue'
 import ProductoDetailView from '@/modules/productos/views/ProductoDetailView.vue'
-import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
 import Button from '@/shared/ui/Button.vue'
 import ConfirmDialog from '@/shared/ui/ConfirmDialog.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
+import SearchField from '@/shared/ui/SearchField.vue'
+import Select from '@/shared/ui/Select.vue'
 import TextField from '@/shared/ui/TextField.vue'
 import { server } from '@/tests/msw/server'
 
@@ -60,15 +61,36 @@ describe('FE03.5 baseline de usabilidad Nielsen', () => {
     expect(wrapper.get('input').attributes('aria-describedby')).toBe('nombre-error')
   })
 
-  it('hace reconocibles y removibles los filtros activos', async () => {
-    const wrapper = mount(ActiveFilters, {
-      props: { filters: [{ key: 'search', label: 'Búsqueda: silla' }] },
+  it('subraya los controles de filtro activos y ofrece una sola X en búsqueda', async () => {
+    const search = mount(SearchField, {
+      props: { modelValue: 'silla', label: 'Buscar producto' },
     })
-    const button = wrapper.get('button')
-    expect(button.attributes('aria-label')).toBe('Quitar filtro: Búsqueda: silla')
-    await button.trigger('click')
-    expect(wrapper.emitted('remove')).toEqual([['search']])
-    expect(wrapper.text()).toContain('Filtros activos')
+    expect(search.get('.search').classes()).toContain('search--active')
+    expect(search.findAll('button')).toHaveLength(1)
+    await search.get('button').trigger('click')
+    expect(search.emitted('update:modelValue')).toEqual([['']])
+
+    const select = mount(Select, {
+      props: {
+        modelValue: 'EMITIDO',
+        label: 'Estado',
+        name: 'estado',
+        active: true,
+        options: [{ label: 'Emitido', value: 'EMITIDO' }],
+      },
+    })
+    expect(select.get('.select').classes()).toContain('select--active')
+
+    const dateField = mount(TextField, {
+      props: {
+        modelValue: '2026-11-22',
+        label: 'Desde',
+        name: 'desde',
+        type: 'date',
+        active: true,
+      },
+    })
+    expect(dateField.get('.field').classes()).toContain('field--active')
   })
 
   it('no ejecuta una acción destructiva antes de confirmarla', async () => {

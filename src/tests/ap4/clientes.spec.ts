@@ -223,7 +223,8 @@ describe('AP4 clientes consolidados', () => {
       tipo_cliente: '2',
       page: '2',
     })
-    expect(wrapper.text()).toContain('Flores')
+    expect((wrapper.get('input[type="search"]').element as HTMLInputElement).value).toBe('Flores')
+    expect(wrapper.get('.search').classes()).toContain('search--active')
   })
 
   it('conserva campos locales ante 409 por otro editor', async () => {

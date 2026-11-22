@@ -134,7 +134,7 @@ describe('Bandeja de proformas HOMEX', () => {
       await flushPromises()
       expect(wrapper.text()).toContain('La fecha inicial no puede ser posterior')
       expect(list).not.toHaveBeenCalled()
-      await wrapper.get('button.clear').trigger('click')
+      await wrapper.get('button[aria-label="Limpiar filtros"]').trigger('click')
       await new Promise((resolve) => setTimeout(resolve, 30))
       await flushPromises()
       expect(list).toHaveBeenCalledTimes(1)

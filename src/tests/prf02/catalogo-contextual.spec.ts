@@ -114,7 +114,7 @@ describe('PRF-02 catálogo contextual', () => {
     expect(consultas.some((url) => url.searchParams.get('categoria') === '1')).toBe(true)
     const filtro = wrapper
       .findAll('button')
-      .find((button) => button.attributes('aria-label')?.includes('Quitar Categoría: Sillas'))
+      .find((button) => button.attributes('aria-label') === 'Limpiar filtros')
     expect(filtro).toBeDefined()
     await filtro!.trigger('click')
     await flushPromises()
