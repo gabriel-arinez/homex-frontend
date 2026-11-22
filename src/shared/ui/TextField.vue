@@ -17,6 +17,7 @@ const props = defineProps<{
   maxLength?: number
   inputMode?: 'numeric' | 'decimal' | 'tel' | 'text' | 'search'
   inputRule?: InputRule
+  active?: boolean
 }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string]; blur: [] }>()
 function update(event: Event) {
@@ -29,7 +30,7 @@ function update(event: Event) {
 }
 </script>
 <template>
-  <label class="field"
+  <label class="field" :class="{ 'field--active': active && !error }"
     ><span>{{ label }}</span
     ><input
       :id="name"
@@ -82,5 +83,14 @@ function update(event: Event) {
 .field input:disabled {
   cursor: not-allowed;
   opacity: 0.65;
+}
+.field--active span {
+  color: var(--color-primary-accent);
+  text-decoration: underline;
+  text-underline-offset: 0.22rem;
+  text-decoration-thickness: 2px;
+}
+.field--active input {
+  border-bottom: 2.5px solid var(--color-primary-accent);
 }
 </style>

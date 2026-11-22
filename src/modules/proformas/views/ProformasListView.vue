@@ -21,7 +21,6 @@ import ProformaActionsMenu from '../components/ProformaActionsMenu.vue'
 import DocumentViewerModal from '../components/DocumentViewerModal.vue'
 import { useProformaPdf } from '../composables/useProformaPdf'
 import { downloadBlob } from '@/shared/download/downloadBlob'
-import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
 import ClientAvatar from '@/shared/ui/ClientAvatar.vue'
@@ -80,22 +79,6 @@ const dateError = computed(() => dateRangeError(dateFrom.value, dateTo.value, lo
 const hasFilters = computed(() =>
   Boolean(search.value.trim() || state.value || customer.value || dateFrom.value || dateTo.value),
 )
-const filters = computed(() => [
-  ...(search.value.trim() ? [{ key: 'q', label: `Búsqueda: ${search.value.trim()}` }] : []),
-  ...(state.value
-    ? [
-        {
-          key: 'state',
-          label: `Estado: ${states.value.find((x) => x.codigo === state.value)?.nombre ?? state.value}`,
-        },
-      ]
-    : []),
-  ...(customer.value
-    ? [{ key: 'customer', label: `Cliente: ${customerName.value || '#' + customer.value}` }]
-    : []),
-  ...(dateFrom.value ? [{ key: 'from', label: `Desde: ${dateFrom.value}` }] : []),
-  ...(dateTo.value ? [{ key: 'to', label: `Hasta: ${dateTo.value}` }] : []),
-])
 
 const previewModalOpen = ref(false)
 const previewQuote = ref<{ id: number; numero: number; estado: string } | null>(null)
@@ -287,16 +270,6 @@ watch(
     void load()
   },
 )
-function removeFilter(key: string) {
-  if (key === 'q') search.value = ''
-  if (key === 'state') state.value = ''
-  if (key === 'customer') {
-    customer.value = ''
-    customerName.value = ''
-  }
-  if (key === 'from') dateFrom.value = ''
-  if (key === 'to') dateTo.value = ''
-}
 function clearFilters() {
   search.value = ''
   state.value = ''
@@ -361,6 +334,7 @@ onBeforeUnmount(() => {
             v-model="state"
             name="estado-proforma"
             label="Estado"
+            :active="Boolean(state)"
             :options="[
               { label: 'Todos los estados', value: '' },
               ...states.map((x) => ({ label: x.nombre, value: x.codigo })),
@@ -370,16 +344,16 @@ onBeforeUnmount(() => {
             ]"
           />
         </div>
-        <label class="proforma-date"
-          >Desde
+        <label class="proforma-date" :class="{ 'proforma-date--active': Boolean(dateFrom) }"
+          ><span>Desde</span>
           <input
             v-model="dateFrom"
             type="date"
             name="fecha-desde-proforma"
             :max="dateTo && dateTo < today ? dateTo : today"
         /></label>
-        <label class="proforma-date"
-          >Hasta
+        <label class="proforma-date" :class="{ 'proforma-date--active': Boolean(dateTo) }"
+          ><span>Hasta</span>
           <input
             v-model="dateTo"
             type="date"
@@ -388,19 +362,18 @@ onBeforeUnmount(() => {
             :max="today"
         /></label>
         <Button
-          variant="secondary"
+          v-if="hasFilters"
+          variant="danger"
+          class="filter-clear-btn"
           aria-label="Limpiar filtros"
           title="Limpiar filtros"
-          :disabled="!hasFilters"
           @click="clearFilters"
         >
-          <RotateCcw :size="18" aria-hidden="true" />
+          <RotateCcw :size="16" aria-hidden="true" />
         </Button>
       </div>
       <p v-if="dateError" class="proforma-date-error" role="alert">{{ dateError }}</p>
     </section>
-
-    <ActiveFilters :filters="filters" @remove="removeFilter" @clear="clearFilters" />
 
     <LoadingSkeleton v-if="loading" :lines="6" />
     <ErrorState v-else-if="error" :description="error">
@@ -651,6 +624,23 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-control);
   background: var(--color-surface);
   font: inherit;
+}
+.proforma-date--active span {
+  color: var(--color-primary-accent);
+  text-decoration: underline;
+  text-underline-offset: 0.22rem;
+  text-decoration-thickness: 2px;
+}
+.proforma-date--active input {
+  border-bottom: 2.5px solid var(--color-primary-accent);
+}
+.filter-clear-btn {
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+  flex: none;
 }
 .proforma-date-error {
   color: var(--color-danger);

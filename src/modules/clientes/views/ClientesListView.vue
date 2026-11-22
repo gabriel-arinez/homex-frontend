@@ -16,7 +16,6 @@ import { useSessionStore } from '@/app/stores/useSessionStore'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import { clientesService, nombreCliente } from '../services/clientesService'
 import ClientActionsMenu from '../components/ClientActionsMenu.vue'
-import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
 import ClientAvatar from '@/shared/ui/ClientAvatar.vue'
@@ -52,31 +51,12 @@ let debounce: ReturnType<typeof setTimeout> | undefined
 let restoringRoute = false
 let mounted = false
 
-const statusLabels: Record<string, string> = {
-  todos: 'Todos',
-  activos: 'Activos',
-  inactivos: 'Inactivos',
-}
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
 const fromItem = computed(() => (page.value - 1) * pageSize + 1)
 const toItem = computed(() => Math.min(total.value, page.value * pageSize))
 const hasFilters = computed(
   () => Boolean(search.value.trim()) || status.value !== 'todos' || type.value !== 'todos',
 )
-const activeFilters = computed(() => [
-  ...(search.value.trim() ? [{ key: 'search', label: `Búsqueda: ${search.value.trim()}` }] : []),
-  ...(status.value !== 'todos'
-    ? [{ key: 'status', label: `Estado: ${statusLabels[status.value] ?? status.value}` }]
-    : []),
-  ...(type.value !== 'todos'
-    ? [
-        {
-          key: 'type',
-          label: `Tipo: ${types.value.find((item) => String(item.id) === type.value)?.nombre ?? type.value}`,
-        },
-      ]
-    : []),
-])
 
 function isCompany(client: Cliente) {
   return client.tipo_cliente_info?.codigo === 'EMPRESA' || Boolean(client.empresa?.trim())
@@ -93,11 +73,6 @@ function clientSubtitle(client: Cliente) {
   return `Persona natural · Cliente #${client.id}`
 }
 
-function removeFilter(key: string) {
-  if (key === 'search') search.value = ''
-  if (key === 'status') status.value = 'todos'
-  if (key === 'type') type.value = 'todos'
-}
 function clearFilters() {
   search.value = ''
   status.value = 'todos'
@@ -270,6 +245,7 @@ onBeforeUnmount(() => {
             v-model="status"
             name="estado-cliente"
             label="Estado"
+            :active="status !== 'todos'"
             :options="[
               { label: 'Todos', value: 'todos' },
               { label: 'Activos', value: 'activos' },
@@ -282,6 +258,7 @@ onBeforeUnmount(() => {
             v-model="type"
             name="tipo-cliente"
             label="Tipo de cliente"
+            :active="type !== 'todos'"
             :options="[
               { label: 'Todos', value: 'todos' },
               ...types.map((item) => ({ label: item.nombre, value: String(item.id) })),
@@ -289,18 +266,17 @@ onBeforeUnmount(() => {
           />
         </div>
         <Button
-          variant="secondary"
+          v-if="hasFilters"
+          variant="danger"
+          class="filter-clear-btn"
           aria-label="Limpiar filtros"
           title="Limpiar filtros"
-          :disabled="!hasFilters"
           @click="clearFilters"
         >
-          <RotateCcw :size="18" aria-hidden="true" />
+          <RotateCcw :size="16" aria-hidden="true" />
         </Button>
       </div>
     </section>
-
-    <ActiveFilters :filters="activeFilters" @remove="removeFilter" @clear="clearFilters" />
 
     <LoadingSkeleton v-if="loading" :lines="6" />
     <ErrorState v-else-if="error" :description="error">
@@ -482,6 +458,14 @@ onBeforeUnmount(() => {
 }
 .client-filter-select :deep(.select select) {
   width: 100%;
+}
+.filter-clear-btn {
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+  flex: none;
 }
 .client-results {
   display: flex;

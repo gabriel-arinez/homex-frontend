@@ -5,11 +5,12 @@ defineProps<{
   name: string
   options: Array<{ label: string; value: string }>
   disabled?: boolean
+  active?: boolean
 }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 </script>
 <template>
-  <label class="select"
+  <label class="select" :class="{ 'select--active': active }"
     ><span>{{ label }}</span
     ><select
       :id="name"
@@ -41,5 +42,14 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 .select select:disabled {
   cursor: not-allowed;
   opacity: 0.65;
+}
+.select--active span {
+  color: var(--color-primary-accent);
+  text-decoration: underline;
+  text-underline-offset: 0.22rem;
+  text-decoration-thickness: 2px;
+}
+.select--active select {
+  border-bottom: 2.5px solid var(--color-primary-accent);
 }
 </style>

@@ -36,7 +36,6 @@ import { ApiError } from '@/shared/api'
 import { downloadBlob } from '@/shared/download/downloadBlob'
 import { generateUuidV4 } from '@/shared/utils/uuid'
 import { movimientosStockService } from '../services/movimientosStockService'
-import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
 import DatePresentation from '@/shared/ui/DatePresentation.vue'
@@ -123,30 +122,6 @@ const hasFilters = computed(() =>
   ),
 )
 
-const activeFilters = computed(() => [
-  ...(search.value.trim() ? [{ key: 'search', label: `Búsqueda: ${search.value.trim()}` }] : []),
-  ...(type.value
-    ? [
-        {
-          key: 'type',
-          label: `Tipo: ${types.value.find((item) => item.codigo === type.value)?.nombre ?? type.value}`,
-        },
-      ]
-    : []),
-  ...(direccion.value
-    ? [
-        {
-          key: 'direccion',
-          label: `Dirección: ${direccion.value === 'ENTRADA' ? 'Entradas (+)' : 'Salidas (-)'}`,
-        },
-      ]
-    : []),
-  ...(pedido.value ? [{ key: 'pedido', label: `Pedido #${pedido.value}` }] : []),
-  ...(producto.value ? [{ key: 'producto', label: `Producto #${producto.value}` }] : []),
-  ...(fechaDesde.value ? [{ key: 'desde', label: `Desde: ${fechaDesde.value}` }] : []),
-  ...(fechaHasta.value ? [{ key: 'hasta', label: `Hasta: ${fechaHasta.value}` }] : []),
-])
-
 function movementTone(code: string): 'danger' | 'info' | 'success' | 'warning' | 'neutral' {
   if (code === 'VENTA') return 'danger'
   if (code === 'REVERSA_VENTA') return 'info'
@@ -172,16 +147,6 @@ function movementIcon(code: string) {
   if (code === 'CARGA_INICIAL') return PackagePlus
   if (code === 'AJUSTE') return SlidersHorizontal
   return Boxes
-}
-
-function removeFilter(key: string) {
-  if (key === 'search') search.value = ''
-  if (key === 'type') type.value = ''
-  if (key === 'direccion') direccion.value = ''
-  if (key === 'pedido') pedido.value = ''
-  if (key === 'producto') producto.value = ''
-  if (key === 'desde') fechaDesde.value = ''
-  if (key === 'hasta') fechaHasta.value = ''
 }
 
 function clearFilters() {
@@ -647,13 +612,14 @@ onBeforeUnmount(() => {
     <section class="stock-filters" aria-label="Buscar y filtrar movimientos de stock">
       <div class="stock-filters__main">
         <div class="stock-search">
-          <SearchField v-model="search" label="Buscar por SKU, producto, responsable o #pedido" />
+          <SearchField v-model="search" label="Buscar por SKU, producto, responsable o pedido" />
         </div>
         <div class="stock-filter-select">
           <Select
             v-model="type"
             name="tipo-movimiento"
             label="Tipo"
+            :active="Boolean(type)"
             :disabled="referenceLoading || Boolean(referenceError)"
             :options="[
               { label: 'Todos', value: '' },
@@ -666,6 +632,7 @@ onBeforeUnmount(() => {
             v-model="direccion"
             name="direccion-movimiento"
             label="Dirección"
+            :active="Boolean(direccion)"
             :options="[
               { label: 'Todas', value: '' },
               { label: 'Entradas (+)', value: 'ENTRADA' },
@@ -679,6 +646,7 @@ onBeforeUnmount(() => {
             name="fecha-desde"
             label="Desde"
             type="date"
+            :active="Boolean(fechaDesde)"
             :max="fechaHasta && fechaHasta < today ? fechaHasta : today"
           />
         </div>
@@ -688,13 +656,14 @@ onBeforeUnmount(() => {
             name="fecha-hasta"
             label="Hasta"
             type="date"
+            :active="Boolean(fechaHasta)"
             :min="fechaDesde || undefined"
             :max="today"
           />
         </div>
         <Button
           v-if="hasFilters"
-          variant="secondary"
+          variant="danger"
           class="stock-clear-btn"
           aria-label="Limpiar filtros"
           title="Limpiar filtros"
@@ -711,13 +680,6 @@ onBeforeUnmount(() => {
           Reintentar tipos
         </button>
       </p>
-
-      <ActiveFilters
-        v-if="activeFilters.length"
-        :filters="activeFilters"
-        @remove="removeFilter"
-        @clear="clearFilters"
-      />
     </section>
 
     <LoadingSkeleton v-if="loading" :lines="7" />
@@ -1116,8 +1078,12 @@ onBeforeUnmount(() => {
   font-size: 0.89rem;
 }
 .stock-clear-btn {
-  min-height: 2.6rem;
-  padding: 0 0.75rem;
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+  flex: none;
 }
 .stock-alert {
   display: flex;

@@ -17,7 +17,6 @@ import { downloadBlob } from '@/shared/download/downloadBlob'
 import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
 import { notasEntregaService } from '../services/notasEntregaService'
 import DeliveryNoteActionsMenu from '../components/DeliveryNoteActionsMenu.vue'
-import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
 import ClientAvatar from '@/shared/ui/ClientAvatar.vue'
@@ -118,14 +117,6 @@ const toItem = computed(() => Math.min(page.value * pageSize, total.value))
 
 const hasFilters = computed(() => Boolean(search.value.trim() || dateFrom.value || dateTo.value))
 
-const activeFilterChips = computed(() => {
-  const items: { key: string; label: string }[] = []
-  if (search.value.trim()) items.push({ key: 'search', label: `Búsqueda: ${search.value.trim()}` })
-  if (dateFrom.value) items.push({ key: 'from', label: `Desde: ${dateFrom.value}` })
-  if (dateTo.value) items.push({ key: 'to', label: `Hasta: ${dateTo.value}` })
-  return items
-})
-
 function syncRoute() {
   const query: Record<string, string> = {}
   if (search.value.trim()) query.q = search.value.trim()
@@ -140,12 +131,6 @@ function clearFilters() {
   dateFrom.value = ''
   dateTo.value = ''
   page.value = 1
-}
-
-function removeFilter(key: string) {
-  if (key === 'search') search.value = ''
-  if (key === 'from') dateFrom.value = ''
-  if (key === 'to') dateTo.value = ''
 }
 
 watch([search, dateFrom, dateTo], () => {
@@ -267,7 +252,7 @@ onMounted(load)
     <section class="delivery-filters" aria-label="Buscar y filtrar notas de entrega">
       <div class="delivery-filters__main">
         <div class="delivery-search">
-          <SearchField v-model="search" label="Buscar por # nota, pedido, proforma o cliente" />
+          <SearchField v-model="search" label="Buscar por nota, pedido, proforma o cliente" />
         </div>
         <div class="delivery-filter-date">
           <TextField
@@ -275,6 +260,7 @@ onMounted(load)
             name="fecha-desde-nota"
             label="Desde"
             type="date"
+            :active="Boolean(dateFrom)"
             :max="dateTo && dateTo < today ? dateTo : today"
           />
         </div>
@@ -284,13 +270,14 @@ onMounted(load)
             name="fecha-hasta-nota"
             label="Hasta"
             type="date"
+            :active="Boolean(dateTo)"
             :min="dateFrom || undefined"
             :max="today"
           />
         </div>
         <Button
           v-if="hasFilters"
-          variant="secondary"
+          variant="danger"
           class="delivery-clear-btn"
           aria-label="Limpiar filtros"
           title="Limpiar filtros"
@@ -300,12 +287,6 @@ onMounted(load)
         </Button>
       </div>
       <p v-if="dateError" class="delivery-date-error" role="alert">{{ dateError }}</p>
-      <ActiveFilters
-        v-if="activeFilterChips.length"
-        :filters="activeFilterChips"
-        @remove="removeFilter"
-        @clear="clearFilters"
-      />
     </section>
 
     <LoadingSkeleton v-if="loading" :lines="5" />
@@ -473,8 +454,12 @@ onMounted(load)
   font-size: 0.89rem;
 }
 .delivery-clear-btn {
-  min-height: 2.6rem;
-  padding: 0 0.75rem;
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+  flex: none;
 }
 .delivery-date-error {
   margin: 0;

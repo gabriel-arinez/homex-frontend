@@ -22,7 +22,6 @@ import { downloadBlob } from '@/shared/download/downloadBlob'
 import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
 import { ordenesTrabajoService } from '../services/ordenesTrabajoService'
 import WorkOrderActionsMenu from '../components/WorkOrderActionsMenu.vue'
-import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
 import Button from '@/shared/ui/Button.vue'
 import ClientAvatar from '@/shared/ui/ClientAvatar.vue'
 import DatePresentation from '@/shared/ui/DatePresentation.vue'
@@ -208,30 +207,6 @@ const hasFilters = computed(() =>
   ),
 )
 
-const workTypeLabels: Record<string, string> = {
-  fabricacion: 'Con fabricación a medida',
-  catalogo: 'Solo catálogo',
-}
-
-const activeFilterChips = computed(() => {
-  const items: { key: string; label: string }[] = []
-  if (search.value.trim()) items.push({ key: 'search', label: `Búsqueda: ${search.value.trim()}` })
-  if (stateFilter.value) {
-    const label =
-      availableStates.value.find((s) => s.codigo === stateFilter.value)?.nombre ?? stateFilter.value
-    items.push({ key: 'state', label: `Estado: ${label}` })
-  }
-  if (workTypeFilter.value) {
-    items.push({
-      key: 'type',
-      label: `Trabajo: ${workTypeLabels[workTypeFilter.value] ?? workTypeFilter.value}`,
-    })
-  }
-  if (dateFrom.value) items.push({ key: 'from', label: `Desde: ${dateFrom.value}` })
-  if (dateTo.value) items.push({ key: 'to', label: `Hasta: ${dateTo.value}` })
-  return items
-})
-
 function syncRoute() {
   const query: Record<string, string> = {}
   if (search.value.trim()) query.q = search.value.trim()
@@ -250,14 +225,6 @@ function clearFilters() {
   dateFrom.value = ''
   dateTo.value = ''
   page.value = 1
-}
-
-function removeFilter(key: string) {
-  if (key === 'search') search.value = ''
-  if (key === 'state') stateFilter.value = ''
-  if (key === 'type') workTypeFilter.value = ''
-  if (key === 'from') dateFrom.value = ''
-  if (key === 'to') dateTo.value = ''
 }
 
 watch([search, stateFilter, workTypeFilter, dateFrom, dateTo], () => {
@@ -381,13 +348,14 @@ onMounted(load)
     <section class="ot-filters" aria-label="Buscar y filtrar órdenes de trabajo">
       <div class="ot-filters__main">
         <div class="ot-search">
-          <SearchField v-model="search" label="Buscar por # OT, pedido, proforma o cliente" />
+          <SearchField v-model="search" label="Buscar por OT, pedido, proforma o cliente" />
         </div>
         <div class="ot-filter-select">
           <Select
             v-model="stateFilter"
             name="estado-ot"
             label="Estado"
+            :active="Boolean(stateFilter)"
             :options="[
               { label: 'Todos', value: '' },
               ...availableStates.map((s) => ({ label: s.nombre, value: s.codigo })),
@@ -399,6 +367,7 @@ onMounted(load)
             v-model="workTypeFilter"
             name="tipo-trabajo-ot"
             label="Trabajo"
+            :active="Boolean(workTypeFilter)"
             :options="[
               { label: 'Todos', value: '' },
               { label: 'Con fabricación a medida', value: 'fabricacion' },
@@ -412,6 +381,7 @@ onMounted(load)
             name="fecha-desde-ot"
             label="Desde"
             type="date"
+            :active="Boolean(dateFrom)"
             :max="dateTo && dateTo < today ? dateTo : today"
           />
         </div>
@@ -421,13 +391,14 @@ onMounted(load)
             name="fecha-hasta-ot"
             label="Hasta"
             type="date"
+            :active="Boolean(dateTo)"
             :min="dateFrom || undefined"
             :max="today"
           />
         </div>
         <Button
           v-if="hasFilters"
-          variant="secondary"
+          variant="danger"
           class="ot-clear-btn"
           aria-label="Limpiar filtros"
           title="Limpiar filtros"
@@ -437,12 +408,6 @@ onMounted(load)
         </Button>
       </div>
       <p v-if="dateError" class="ot-date-error" role="alert">{{ dateError }}</p>
-      <ActiveFilters
-        v-if="activeFilterChips.length"
-        :filters="activeFilterChips"
-        @remove="removeFilter"
-        @clear="clearFilters"
-      />
     </section>
 
     <LoadingSkeleton v-if="loading" :lines="6" />
@@ -645,8 +610,12 @@ onMounted(load)
   font-size: 0.89rem;
 }
 .ot-clear-btn {
-  min-height: 2.6rem;
-  padding: 0 0.75rem;
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+  flex: none;
 }
 .ot-date-error {
   margin: 0;

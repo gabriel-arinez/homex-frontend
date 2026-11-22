@@ -18,7 +18,6 @@ import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
 import { recibosService } from '../services/recibosService'
 import { tipoPagoIcon } from '../utils/tipoPagoIcon'
 import ReceiptActionsMenu from '../components/ReceiptActionsMenu.vue'
-import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
 import ClientAvatar from '@/shared/ui/ClientAvatar.vue'
@@ -140,26 +139,6 @@ const hasFilters = computed(() =>
   ),
 )
 
-const activeFilterChips = computed(() => {
-  const items: { key: string; label: string }[] = []
-  if (search.value.trim()) items.push({ key: 'search', label: `Búsqueda: ${search.value.trim()}` })
-  if (stateFilter.value) {
-    items.push({
-      key: 'state',
-      label: `Estado: ${stateFilter.value === 'EMITIDO' ? 'Emitidos' : 'Anulados'}`,
-    })
-  }
-  if (paymentFilter.value) {
-    items.push({
-      key: 'payment',
-      label: `Pago: ${paymentTypeName(Number(paymentFilter.value))}`,
-    })
-  }
-  if (dateFrom.value) items.push({ key: 'from', label: `Desde: ${dateFrom.value}` })
-  if (dateTo.value) items.push({ key: 'to', label: `Hasta: ${dateTo.value}` })
-  return items
-})
-
 function syncRoute() {
   const query: Record<string, string> = {}
   if (search.value.trim()) query.q = search.value.trim()
@@ -178,14 +157,6 @@ function clearFilters() {
   dateFrom.value = ''
   dateTo.value = ''
   page.value = 1
-}
-
-function removeFilter(key: string) {
-  if (key === 'search') search.value = ''
-  if (key === 'state') stateFilter.value = ''
-  if (key === 'payment') paymentFilter.value = ''
-  if (key === 'from') dateFrom.value = ''
-  if (key === 'to') dateTo.value = ''
 }
 
 watch([search, stateFilter, paymentFilter, dateFrom, dateTo], () => {
@@ -290,13 +261,14 @@ onMounted(load)
     <section class="receipt-filters" aria-label="Buscar y filtrar recibos">
       <div class="receipt-filters__main">
         <div class="receipt-search">
-          <SearchField v-model="search" label="Buscar por # recibo, pedido, cliente o concepto" />
+          <SearchField v-model="search" label="Buscar por recibo, pedido, cliente o concepto" />
         </div>
         <div class="receipt-filter-select">
           <Select
             v-model="stateFilter"
             name="estado-recibo"
             label="Estado"
+            :active="Boolean(stateFilter)"
             :options="[
               { label: 'Todos', value: '' },
               { label: 'Emitidos', value: 'EMITIDO' },
@@ -309,6 +281,7 @@ onMounted(load)
             v-model="paymentFilter"
             name="tipo-pago-recibo"
             label="Tipo de pago"
+            :active="Boolean(paymentFilter)"
             :options="[
               { label: 'Todos', value: '' },
               ...paymentTypes.map((t) => ({ label: t.nombre, value: String(t.id) })),
@@ -321,6 +294,7 @@ onMounted(load)
             name="fecha-desde-recibo"
             label="Desde"
             type="date"
+            :active="Boolean(dateFrom)"
             :max="dateTo && dateTo < today ? dateTo : today"
           />
         </div>
@@ -330,13 +304,14 @@ onMounted(load)
             name="fecha-hasta-recibo"
             label="Hasta"
             type="date"
+            :active="Boolean(dateTo)"
             :min="dateFrom || undefined"
             :max="today"
           />
         </div>
         <Button
           v-if="hasFilters"
-          variant="secondary"
+          variant="danger"
           class="receipt-clear-btn"
           aria-label="Limpiar filtros"
           title="Limpiar filtros"
@@ -346,12 +321,6 @@ onMounted(load)
         </Button>
       </div>
       <p v-if="dateError" class="receipt-date-error" role="alert">{{ dateError }}</p>
-      <ActiveFilters
-        v-if="activeFilterChips.length"
-        :filters="activeFilterChips"
-        @remove="removeFilter"
-        @clear="clearFilters"
-      />
     </section>
 
     <LoadingSkeleton v-if="loading" :lines="6" />
@@ -559,8 +528,12 @@ onMounted(load)
   font-size: 0.89rem;
 }
 .receipt-clear-btn {
-  min-height: 2.6rem;
-  padding: 0 0.75rem;
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+  flex: none;
 }
 .receipt-date-error {
   margin: 0;

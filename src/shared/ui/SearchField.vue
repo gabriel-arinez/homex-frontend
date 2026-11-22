@@ -8,7 +8,7 @@ const inputId = useId()
 </script>
 
 <template>
-  <div class="search">
+  <div class="search" :class="{ 'search--active': Boolean(modelValue?.trim()) }">
     <label class="sr-only" :for="inputId">{{ label ?? 'Buscar' }}</label>
     <Search :size="18" aria-hidden="true" />
     <input
@@ -44,6 +44,9 @@ const inputId = useId()
 .search:focus-within {
   box-shadow: var(--focus-ring);
 }
+.search--active {
+  border-bottom: 2.5px solid var(--color-primary-accent);
+}
 .search input {
   min-width: 0;
   flex: 1;
@@ -51,6 +54,14 @@ const inputId = useId()
   border: 0;
   background: transparent;
   outline: 0;
+}
+.search input::-webkit-search-cancel-button,
+.search input::-webkit-search-decoration,
+.search input::-webkit-search-results-button,
+.search input::-webkit-search-results-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
 }
 .search button {
   display: grid;

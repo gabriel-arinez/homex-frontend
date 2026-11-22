@@ -35,7 +35,6 @@ import {
   readCatalogImagesVisible,
   writeCatalogImagesVisible,
 } from '@/shared/media/catalogImageVisibility'
-import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
@@ -158,61 +157,6 @@ const filterError = computed(() => {
     return 'Introduce un espesor válido, mayor que cero y con hasta dos decimales.'
   return ''
 })
-const filterLabel = (key: ExtraKey, value: string) => {
-  if (key === 'familia')
-    return families.value.find((x) => String(x.id) === value)?.nombre || '#' + value
-  if (key === 'modelo' || key === 'espesor_mm') return value
-  const code: Record<string, string> = {
-    marca: 'MARCA',
-    color_primario: 'COLOR',
-    tipo: 'TIPO_PISO',
-    material: 'MATERIAL_PISO',
-    diseno: 'DISENO_PISO',
-    acabado: 'ACABADO_PISO',
-    unidad_stock: 'UNIDAD_MEDIDA',
-  }
-  return options[code[key] || '']?.find((x) => String(x.id) === value)?.nombre || '#' + value
-}
-const extraNames: Record<ExtraKey, string> = {
-  familia: 'Familia',
-  marca: 'Marca',
-  modelo: 'Modelo',
-  color_primario: 'Color',
-  tipo: 'Tipo de piso',
-  material: 'Material',
-  diseno: 'Diseño',
-  acabado: 'Acabado',
-  espesor_mm: 'Espesor (mm)',
-  unidad_stock: 'Unidad',
-}
-const activeFilters = computed(() => [
-  ...(search.value.trim() ? [{ key: 'q', label: 'Búsqueda: ' + search.value.trim() }] : []),
-  ...(category.value
-    ? [
-        {
-          key: 'categoria',
-          label:
-            'Categoría: ' +
-            (categories.value.find((x) => String(x.id) === category.value)?.nombre ||
-              '#' + category.value),
-        },
-      ]
-    : []),
-  ...(status.value !== 'activos'
-    ? [
-        {
-          key: 'estado',
-          label: 'Estado: ' + (status.value === 'todos' ? 'Todos' : 'Inactivos'),
-        },
-      ]
-    : []),
-  ...availableExtra.value
-    .filter((key) => Boolean(extras[key]))
-    .map((key) => ({
-      key,
-      label: extraNames[key] + ': ' + filterLabel(key, extras[key]),
-    })),
-])
 let requestId = 0
 let debounce: ReturnType<typeof setTimeout> | undefined
 let restoring = false
@@ -317,12 +261,6 @@ function changeCategory(value: string) {
   category.value = catalogoId(value)
   for (const key of extraKeys) extras[key] = ''
   notice.value = ''
-}
-function removeFilter(key: string) {
-  if (key === 'q') search.value = ''
-  else if (key === 'estado') status.value = 'activos'
-  else if (key === 'categoria') changeCategory('')
-  else if (extraKeys.includes(key as ExtraKey)) extras[key as ExtraKey] = ''
 }
 function clearFilters() {
   search.value = ''
@@ -516,6 +454,7 @@ onBeforeUnmount(() => {
           :model-value="category"
           name="categoria-producto-filtro"
           label="Categoría"
+          :active="Boolean(category)"
           :options="categoryOptions"
           :disabled="categoryLoading || Boolean(categoryError)"
           @update:model-value="changeCategory"
@@ -524,6 +463,7 @@ onBeforeUnmount(() => {
           v-model="status"
           name="estado-producto"
           label="Estado"
+          :active="status !== 'activos'"
           :options="[
             { label: 'Activos', value: 'activos' },
             { label: 'Todos', value: 'todos' },
@@ -545,7 +485,7 @@ onBeforeUnmount(() => {
           </button>
           <Button
             v-if="hasFilters"
-            variant="secondary"
+            variant="danger"
             class="clear-filters-btn"
             aria-label="Limpiar filtros"
             title="Limpiar filtros"
@@ -569,6 +509,7 @@ onBeforeUnmount(() => {
             v-model="extras.familia"
             name="familia-producto-filtro"
             label="Familia"
+            :active="Boolean(extras.familia)"
             :options="familyOptions"
             :disabled="!advancedLoaded"
           />
@@ -577,19 +518,23 @@ onBeforeUnmount(() => {
               v-model="extras.marca"
               name="marca-producto-filtro"
               label="Marca"
+              :active="Boolean(extras.marca)"
               :options="optionList('MARCA', 'Todas las marcas')"
               :disabled="!advancedLoaded"
             />
           </template>
           <template v-if="categoryCode === 'SILLA'">
-            <label class="advanced-input"
-              >Modelo
+            <label
+              class="advanced-input"
+              :class="{ 'advanced-input--active': Boolean(extras.modelo) }"
+              ><span>Modelo</span>
               <input v-model.trim="extras.modelo" maxlength="150" placeholder="Buscar modelo…" />
             </label>
             <Select
               v-model="extras.color_primario"
               name="color-producto-filtro"
               label="Color"
+              :active="Boolean(extras.color_primario)"
               :options="optionList('COLOR', 'Todos los colores')"
               :disabled="!advancedLoaded"
             />
@@ -599,6 +544,7 @@ onBeforeUnmount(() => {
               v-model="extras.tipo"
               name="tipo-producto-filtro"
               label="Tipo de piso"
+              :active="Boolean(extras.tipo)"
               :options="optionList('TIPO_PISO', 'Todos los tipos')"
               :disabled="!advancedLoaded"
             />
@@ -606,6 +552,7 @@ onBeforeUnmount(() => {
               v-model="extras.material"
               name="material-producto-filtro"
               label="Material"
+              :active="Boolean(extras.material)"
               :options="optionList('MATERIAL_PISO', 'Todos los materiales')"
               :disabled="!advancedLoaded"
             />
@@ -613,6 +560,7 @@ onBeforeUnmount(() => {
               v-model="extras.diseno"
               name="diseno-producto-filtro"
               label="Diseño"
+              :active="Boolean(extras.diseno)"
               :options="optionList('DISENO_PISO', 'Todos los diseños')"
               :disabled="!advancedLoaded"
             />
@@ -620,11 +568,14 @@ onBeforeUnmount(() => {
               v-model="extras.acabado"
               name="acabado-producto-filtro"
               label="Acabado"
+              :active="Boolean(extras.acabado)"
               :options="optionList('ACABADO_PISO', 'Todos los acabados')"
               :disabled="!advancedLoaded"
             />
-            <label class="advanced-input"
-              >Espesor (mm)
+            <label
+              class="advanced-input"
+              :class="{ 'advanced-input--active': Boolean(extras.espesor_mm) }"
+              ><span>Espesor (mm)</span>
               <input
                 v-model="extras.espesor_mm"
                 type="number"
@@ -640,6 +591,7 @@ onBeforeUnmount(() => {
             v-model="extras.unidad_stock"
             name="unidad-producto-filtro"
             label="Unidad comercial"
+            :active="Boolean(extras.unidad_stock)"
             :options="optionList('UNIDAD_MEDIDA', 'Todas las unidades')"
             :disabled="!advancedLoaded"
           />
@@ -651,7 +603,6 @@ onBeforeUnmount(() => {
       {{ categoryError }} <button type="button" @click="loadCategories">Reintentar</button>
     </p>
     <p v-if="notice" role="status" class="options-warning">{{ notice }}</p>
-    <ActiveFilters :filters="activeFilters" @remove="removeFilter" @clear="clearFilters" />
 
     <div class="results-header">
       <strong v-if="!loading && !error"
@@ -978,8 +929,12 @@ onBeforeUnmount(() => {
   gap: var(--space-2);
 }
 .clear-filters-btn {
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
   min-height: 2.75rem;
-  padding: 0 0.75rem;
+  padding: 0;
+  flex: none;
 }
 .more-filters {
   display: inline-flex;
@@ -1013,6 +968,15 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-4);
+}
+.advanced-input--active span {
+  color: var(--color-primary-accent);
+  text-decoration: underline;
+  text-underline-offset: 0.22rem;
+  text-decoration-thickness: 2px;
+}
+.advanced-input--active input {
+  border-bottom: 2.5px solid var(--color-primary-accent);
 }
 .advanced-input {
   display: grid;

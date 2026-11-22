@@ -28,6 +28,7 @@ import {
   Package,
   PackageOpen,
   Plus,
+  RotateCcw,
   SearchX,
   SlidersHorizontal,
   Sofa,
@@ -155,12 +156,7 @@ const activeChips = computed(() => {
   }
   return chips
 })
-function clearFilter(key: string) {
-  if (key === 'search') search.value = ''
-  else if (key === 'category') category.value = ''
-  else if (key === 'family') family.value = ''
-  else if (key in filters) filters[key as Field] = ''
-}
+const hasFilters = computed(() => activeChips.value.length > 0)
 function clearAllFilters() {
   notification.value = 'Filtros eliminados. Se muestra el catálogo disponible.'
   search.value = ''
@@ -315,6 +311,7 @@ onBeforeUnmount(() => {
         v-model="family"
         name="familia-catalogo"
         label="Familia"
+        :active="Boolean(family)"
         :options="[
           { label: 'Todas las familias', value: '' },
           ...familias
@@ -322,6 +319,16 @@ onBeforeUnmount(() => {
             .map((x) => ({ label: x.nombre, value: String(x.id) })),
         ]"
       />
+      <Button
+        v-if="hasFilters"
+        variant="danger"
+        class="catalog-clear-btn"
+        aria-label="Limpiar filtros"
+        title="Limpiar filtros"
+        @click="clearAllFilters"
+      >
+        <RotateCcw :size="16" aria-hidden="true" />
+      </Button>
     </div>
     <details
       v-if="activeFields.length"
@@ -340,6 +347,7 @@ onBeforeUnmount(() => {
             v-model="filters[item.field]"
             :name="'filtro-' + item.field"
             :label="item.label"
+            :active="Boolean(filters[item.field])"
             :options="[
               { label: 'Todos', value: '' },
               ...(options[item.concepto] ?? []).map((x) => ({
@@ -348,7 +356,11 @@ onBeforeUnmount(() => {
               })),
             ]"
           />
-          <label v-else class="filtro-texto">
+          <label
+            v-else
+            class="filtro-texto"
+            :class="{ 'filtro-texto--active': Boolean(filters[item.field]) }"
+          >
             <span>{{ item.label }}</span>
             <input
               v-model="filters[item.field]"
@@ -360,19 +372,6 @@ onBeforeUnmount(() => {
         </template>
       </div>
     </details>
-    <div v-if="activeChips.length" class="chips-filtros" aria-label="Filtros activos">
-      <span>Filtros activos:</span>
-      <button
-        v-for="chip in activeChips"
-        :key="chip.key"
-        type="button"
-        :aria-label="'Quitar ' + chip.label"
-        @click="clearFilter(chip.key)"
-      >
-        {{ chip.label }} <span aria-hidden="true">×</span>
-      </button>
-      <Button variant="secondary" @click="clearAllFilters">Limpiar filtros</Button>
-    </div>
     <div class="toolbar results-toolbar">
       <p role="status">
         {{ total }} {{ total === 1 ? 'producto encontrado' : 'productos encontrados' }}
@@ -636,28 +635,32 @@ onBeforeUnmount(() => {
 .filtros-panel[open] > summary > svg:last-child {
   transform: rotate(180deg);
 }
-.chips-filtros {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-.chips-filtros button:not(.button) {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  padding: var(--space-2);
-  background: var(--color-surface);
-  color: var(--color-text);
-  cursor: pointer;
-}
 .filters-primary {
   display: grid;
-  grid-template-columns: minmax(14rem, 2fr) minmax(12rem, 1fr);
+  grid-template-columns: minmax(14rem, 2fr) minmax(12rem, 1fr) auto;
+  align-items: end;
   gap: var(--space-3);
   padding: var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
+}
+.catalog-clear-btn {
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
+  flex: none;
+}
+.filtro-texto--active span {
+  color: var(--color-primary-accent);
+  text-decoration: underline;
+  text-underline-offset: 0.22rem;
+  text-decoration-thickness: 2px;
+}
+.filtro-texto--active input {
+  border-bottom: 2.5px solid var(--color-primary-accent);
 }
 .filtros {
   display: grid;
