@@ -212,6 +212,11 @@ describe('Rediseño de recibos y PDF', () => {
     })
     await flushPromises()
     expect(wList.text()).not.toContain('Hora no registrada')
+    expect(wList.text()).toContain('22 de nov de 2026')
+    expect(wList.text()).toContain('Cobrado')
+    expect(wList.text()).toContain('A cuenta')
+    expect(wList.text()).toContain('Saldo')
+    expect(wList.text()).toContain('Efectivo')
 
     const routerDetail = buildRouter()
     await routerDetail.push('/recibos/18')
@@ -232,5 +237,85 @@ describe('Rediseño de recibos y PDF', () => {
       .trigger('click')
     await flushPromises()
     expect(pdfSpy).toHaveBeenCalledWith(18)
+  })
+
+  it('PedidoDetailView abre el visor PDF al presionar el icono PDF de un recibo vinculado', async () => {
+    vi.spyOn(pedidosService, 'options').mockImplementation(async (concepto) => {
+      if (concepto === 'ESTADO_PEDIDO') {
+        return [
+          { id: 1, concepto_codigo: 'ESTADO_PEDIDO', codigo: 'CONFIRMADO', nombre: 'Confirmado' },
+        ]
+      }
+      return [{ id: 12, concepto_codigo: 'TIPO_PAGO', codigo: 'QR', nombre: 'QR' }]
+    })
+    vi.spyOn(pedidosService, 'get').mockResolvedValue({
+      id: 77,
+      proforma: 30,
+      proforma_numero: 5030,
+      estado: 1,
+      estado_info: {
+        id: 1,
+        concepto_codigo: 'ESTADO_PEDIDO',
+        codigo: 'CONFIRMADO',
+        nombre: 'Confirmado',
+      },
+      transiciones_permitidas: [],
+      fecha_confirmacion: '2026-11-22T10:00:00Z',
+      observaciones: '',
+      created_by: 1,
+      updated_by: 1,
+    } as never)
+    vi.spyOn(proformasService, 'get').mockResolvedValue({
+      id: 30,
+      numero: 5030,
+      total: '500.00',
+      moneda_info: { id: 1, codigo: 'BOB', nombre: 'Bolivianos' },
+      cliente_resumen: { id: 5, nombre: 'María Gutiérrez', tipo_cliente_codigo: 'PERSONA' },
+      detalles: [],
+    } as never)
+    vi.spyOn(recibosService, 'list').mockResolvedValue([
+      {
+        id: 25,
+        numero: 1025,
+        pedido: 77,
+        nombre_completo: 'María Gutiérrez',
+        monto_en_letras: 'Cien 00/100 Bolivianos',
+        concepto: 'Pago QR inicial',
+        tipo_pago: 12,
+        tipo_pago_nombre: 'QR',
+        moneda_codigo: 'BOB',
+        numero_cheque: null,
+        banco: null,
+        total: '500.00',
+        pago_actual: '100.00',
+        a_cuenta: '100.00',
+        saldo: '400.00',
+        estado: 'EMITIDO',
+        fecha: '2026-11-22',
+        created_by: 1,
+        updated_by: 1,
+        clave_idempotencia: null,
+      },
+    ])
+    vi.spyOn(notasEntregaService, 'list').mockResolvedValue([])
+    const pdfSpy = vi
+      .spyOn(recibosService, 'documentPdf')
+      .mockResolvedValue(new Blob(['%PDF-1.4'], { type: 'application/pdf' }))
+
+    const router = buildRouter()
+    await router.push('/pedidos/77')
+    await router.isReady()
+    const wrapper = mount(PedidoDetailView, {
+      global: { plugins: [router, createPinia()], stubs: { Teleport: true } },
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('22 de nov de 2026')
+    expect(wrapper.text()).toContain('QR')
+    const pdfBtn = wrapper.find('button[aria-label="Ver PDF del Recibo #1025"]')
+    expect(pdfBtn.exists()).toBe(true)
+    await pdfBtn.trigger('click')
+    await flushPromises()
+    expect(pdfSpy).toHaveBeenCalledWith(25)
   })
 })

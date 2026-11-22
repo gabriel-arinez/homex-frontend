@@ -180,7 +180,7 @@ test('FE05 navegación expone OT, notas, recibos y stock como módulos reales', 
   await expect(page.getByRole('table').getByText('Pendiente')).toBeVisible()
 
   await page.goto('/recibos')
-  await expect(page.getByText('Bs\u00a0100,00', { exact: true })).toBeVisible()
+  await expect(page.locator('.amount-paid', { hasText: 'Bs\u00a0100,00' })).toBeVisible()
 
   await page.goto('/notas-entrega')
   await expect(page.getByText('Sin notas de entrega')).toBeVisible()
