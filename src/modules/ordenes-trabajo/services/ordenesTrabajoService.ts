@@ -1,4 +1,4 @@
-import type { OrdenTrabajo } from '@/generated/api'
+import type { OrdenTrabajo, PatchedPlanificacionOrdenTrabajo } from '@/generated/api'
 import { apiRequest } from '@/shared/api'
 
 export const ordenesTrabajoService = {
@@ -14,5 +14,10 @@ export const ordenesTrabajoService = {
   marcarListoEntrega: (id: number) =>
     apiRequest<OrdenTrabajo>(`/api/v1/ordenes-trabajo/${id}/marcar-listo-entrega/`, {
       method: 'POST',
+    }),
+  updatePlanificacion: (id: number, body: PatchedPlanificacionOrdenTrabajo) =>
+    apiRequest<OrdenTrabajo>(`/api/v1/ordenes-trabajo/${id}/planificacion/`, {
+      method: 'PATCH',
+      body,
     }),
 }

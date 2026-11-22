@@ -298,6 +298,17 @@ export type DetalleIntegral = {
   especificacion?: EspecificacionMueble | null
 }
 
+export type DetalleNotaEntrega = {
+  readonly id: number
+  tipo_item_info: ValorCatalogoResumen
+  readonly producto: number | null
+  readonly nombre: string
+  readonly descripcion: string | null
+  readonly cantidad: string
+  unidad_info: ValorCatalogoResumen
+  readonly tipo_mueble_nombre: string | null
+}
+
 export type DetalleOrdenTrabajo = {
   readonly id: number
   tipo_item_info: ValorCatalogoResumen
@@ -567,12 +578,16 @@ export type MovimientoStock = {
 
 export type NotaEntrega = {
   readonly id: number
-  readonly numero: number
-  readonly fecha: string
   readonly pedido: number
   readonly vendedor: number
+  readonly numero: number
+  readonly fecha: string
   readonly created_by: number | null
   readonly updated_by: number | null
+  readonly proforma_numero: number
+  readonly proforma_titulo: string | null
+  cliente_resumen: ClienteResumenProforma | null
+  readonly detalles: Array<DetalleNotaEntrega>
 }
 
 export type NullEnum = never
@@ -711,6 +726,14 @@ export type PatchedModificarGaleria = {
   orden?: Array<number>
   principal?: number
   eliminar?: number
+}
+
+export type PatchedPlanificacionOrdenTrabajo = {
+  fecha_inicio?: string | null
+  fecha_fin?: string | null
+  fecha_entrega?: string | null
+  lugar_entrega?: string | null
+  responsable_recepcion?: string | null
 }
 
 export type PatchedProducto = {
@@ -1295,6 +1318,10 @@ export type FamiliaProductoWritable = {
   nombre: string
   descripcion?: string | null
   activo?: boolean
+}
+
+export type NotaEntregaWritable = {
+  [key: string]: unknown
 }
 
 export type OrdenTrabajoWritable = {
@@ -3173,6 +3200,25 @@ export type V1OrdenesTrabajoMarcarListoEntregaCreateResponses = {
 
 export type V1OrdenesTrabajoMarcarListoEntregaCreateResponse =
   V1OrdenesTrabajoMarcarListoEntregaCreateResponses[keyof V1OrdenesTrabajoMarcarListoEntregaCreateResponses]
+
+export type V1OrdenesTrabajoPlanificacionPartialUpdateData = {
+  body?: PatchedPlanificacionOrdenTrabajo
+  path: {
+    /**
+     * Un valor de entero único que identifique este orden trabajo.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/ordenes-trabajo/{id}/planificacion/'
+}
+
+export type V1OrdenesTrabajoPlanificacionPartialUpdateResponses = {
+  200: OrdenTrabajo
+}
+
+export type V1OrdenesTrabajoPlanificacionPartialUpdateResponse =
+  V1OrdenesTrabajoPlanificacionPartialUpdateResponses[keyof V1OrdenesTrabajoPlanificacionPartialUpdateResponses]
 
 export type V1PedidosListData = {
   body?: never

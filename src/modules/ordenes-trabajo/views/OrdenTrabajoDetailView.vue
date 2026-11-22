@@ -9,38 +9,34 @@ import {
   ClipboardCheck,
   Clock3,
   Download,
-  Eye,
   FileText,
   Hammer,
   Layers,
   MapPin,
   PackageCheck,
+  Pencil,
   Ruler,
+  SlidersHorizontal,
   StickyNote,
+  Tag,
   Truck,
   UserCheck,
-  Wallet,
   Wrench,
   X,
 } from '@lucide/vue'
-import type { DetalleOrdenTrabajo, OrdenTrabajo, Producto } from '@/generated/api'
+import type { DetalleOrdenTrabajo, OrdenTrabajo } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import type {
   AtributoTecnico,
   ComponenteTecnico,
+  ConjuntoTecnico,
   DatosTecnicos,
 } from '@/modules/proformas/services/muebleTecnico'
 import DocumentViewerModal from '@/modules/proformas/components/DocumentViewerModal.vue'
-import { useQuoteProductImages } from '@/modules/proformas/composables/useQuoteProductImages'
-import ProductImage from '@/modules/productos/components/ProductImage.vue'
-import ProductoVistaRapida from '@/modules/productos/components/ProductoVistaRapida.vue'
-import { productosService } from '@/modules/productos/services/productosService'
 import { downloadBlob } from '@/shared/download/downloadBlob'
 import { buildExportFilename } from '@/shared/download/exportFilename'
 import { galleryService, type GalleryImage } from '@/shared/media/gallery'
-import GalleryPhoto from '@/shared/media/GalleryPhoto.vue'
 import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
-import ImageGallery from '@/shared/media/ImageGallery.vue'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
 import DetailTabs from '@/shared/ui/DetailTabs.vue'
@@ -50,7 +46,9 @@ import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
 import Modal from '@/shared/ui/Modal.vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
 import StatusBadge from '@/shared/ui/StatusBadge.vue'
+import TextField from '@/shared/ui/TextField.vue'
 import Toast from '@/shared/ui/Toast.vue'
+import WorkshopImageViewer from '../components/WorkshopImageViewer.vue'
 import { ordenesTrabajoService } from '../services/ordenesTrabajoService'
 
 const emit = defineEmits<{ openMenu: [] }>()
@@ -65,18 +63,22 @@ const loading = ref(true)
 const downloading = ref(false)
 const previewModalOpen = ref(false)
 const activeTab = ref<'trabajo' | 'planificacion'>('trabajo')
-const workFilter = ref<'all' | 'fabrication' | 'catalog'>('all')
 const readyModalOpen = ref(false)
 const markingReady = ref(false)
+const planModalOpen = ref(false)
+const savingPlan = ref(false)
+const planError = ref('')
+const planForm = ref({
+  fecha_inicio: '',
+  fecha_fin: '',
+  fecha_entrega: '',
+  lugar_entrega: '',
+  responsable_recepcion: '',
+})
 const furnitureGalleries = ref<Record<number, GalleryImage[]>>({})
-const viewerLine = ref<DetalleOrdenTrabajo | null>(null)
-const viewerProduct = ref<Producto | null>(null)
-const viewerProductLoading = ref(false)
-const viewerProductError = ref('')
 const error = ref('')
 const notice = ref('')
 
-const { images: productImages, ensure: ensureProductImages } = useQuoteProductImages()
 const {
   blob: documentBlob,
   url: documentUrl,
@@ -129,19 +131,31 @@ function workOrderTone(code: string): 'info' | 'warning' | 'success' | 'danger' 
   return 'neutral'
 }
 
+interface PieceGroup {
+  id: string
+  nombre: string | null
+  piezas: ComponenteTecnico[]
+}
+
 interface ParsedSpec {
-  componentes: ComponenteTecnico[]
+  medidas: Array<{ label: string; value: string }>
+  gruposPiezas: PieceGroup[]
   advertencias: string[]
   accesorios: string[]
   generalSpecs: Array<{ label: string; value: string }>
   observaciones: string | null
-  detalleLabel: string
+}
+
+function formatMeasureLabel(key: string): string {
+  const clean = key.replace(/_/g, ' ').trim()
+  return clean ? clean.charAt(0).toUpperCase() + clean.slice(1) : key
 }
 
 function parseSpecification(line: DetalleOrdenTrabajo): ParsedSpec | null {
   if (!line.especificacion) return null
   const datos = (line.especificacion.datos_tecnicos ?? {}) as DatosTecnicos
   const componentes = Array.isArray(datos.componentes) ? datos.componentes : []
+  const conjuntos = Array.isArray(datos.conjuntos) ? (datos.conjuntos as ConjuntoTecnico[]) : []
   const advertencias = Array.isArray(datos.advertencias)
     ? datos.advertencias.filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
     : []
@@ -149,10 +163,36 @@ function parseSpecification(line: DetalleOrdenTrabajo): ParsedSpec | null {
     ? datos.accesorios.filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
     : []
 
+  const medidas: Array<{ label: string; value: string }> = []
   const generalSpecs: Array<{ label: string; value: string }> = []
   const gen = datos.caracteristicas_generales
   if (gen && typeof gen === 'object' && !Array.isArray(gen)) {
+    const dims = gen.dimensiones
+    if (dims && typeof dims === 'object' && !Array.isArray(dims)) {
+      for (const [dimKey, dimVal] of Object.entries(dims as Record<string, unknown>)) {
+        if (dimVal && typeof dimVal === 'object' && !Array.isArray(dimVal)) {
+          const obj = dimVal as Record<string, unknown>
+          const valor =
+            obj.valor !== undefined && obj.valor !== null ? String(obj.valor).trim() : ''
+          const unidad =
+            obj.unidad !== undefined && obj.unidad !== null ? String(obj.unidad).trim() : ''
+          if (valor) {
+            medidas.push({
+              label: formatMeasureLabel(dimKey),
+              value: unidad ? `${valor} ${unidad}` : valor,
+            })
+          }
+        } else if (dimVal !== null && dimVal !== undefined && String(dimVal).trim() !== '') {
+          medidas.push({
+            label: formatMeasureLabel(dimKey),
+            value: String(dimVal).trim(),
+          })
+        }
+      }
+    }
+
     for (const [key, val] of Object.entries(gen)) {
+      if (key === 'dimensiones') continue
       if (key === 'atributos' && Array.isArray(val)) {
         for (const attr of val as AtributoTecnico[]) {
           if (attr?.nombre && attr?.valor) {
@@ -169,24 +209,38 @@ function parseSpecification(line: DetalleOrdenTrabajo): ParsedSpec | null {
         typeof val !== 'object'
       ) {
         generalSpecs.push({
-          label: key.replace(/_/g, ' '),
+          label: formatMeasureLabel(key),
           value: String(val),
         })
       }
     }
   }
 
-  const detalleLabel = componentes.length
-    ? `${componentes.length} componente${componentes.length === 1 ? '' : 's'}`
-    : 'Ficha técnica registrada'
+  const gruposPiezas: PieceGroup[] = []
+  if (conjuntos.length) {
+    for (const conj of conjuntos) {
+      const piezas = componentes.filter((c) => c.conjunto_uid === conj.uid)
+      if (piezas.length) {
+        gruposPiezas.push({ id: conj.uid, nombre: conj.nombre, piezas })
+      }
+    }
+    const sinGrupo = componentes.filter(
+      (c) => !c.conjunto_uid || !conjuntos.some((conj) => conj.uid === c.conjunto_uid),
+    )
+    if (sinGrupo.length) {
+      gruposPiezas.push({ id: 'otros', nombre: 'Otros componentes', piezas: sinGrupo })
+    }
+  } else if (componentes.length) {
+    gruposPiezas.push({ id: 'all', nombre: null, piezas: componentes })
+  }
 
   return {
-    componentes,
+    medidas,
+    gruposPiezas,
     advertencias,
     accesorios,
     generalSpecs,
     observaciones: line.especificacion.observaciones ?? null,
-    detalleLabel,
   }
 }
 
@@ -229,61 +283,52 @@ async function ensureFurnitureGalleries(lines: DetalleOrdenTrabajo[]) {
   )
 }
 
-function furnitureCover(lineId: number): GalleryImage | null {
-  const pics = furnitureGalleries.value[lineId] ?? []
-  return pics.find((p) => p.principal) ?? pics[0] ?? null
+function hasImages(lineId: number): boolean {
+  return (furnitureGalleries.value[lineId] ?? []).length > 0
 }
 
-function furnitureCoverSrc(lineId: number): string {
-  const cover = furnitureCover(lineId)
-  if (!cover) return ''
-  return cover.variantes?.['320'] ?? cover.url ?? ''
+function openPlanModal() {
+  if (!item.value) return
+  planError.value = ''
+  planForm.value = {
+    fecha_inicio: item.value.fecha_inicio ?? '',
+    fecha_fin: item.value.fecha_fin ?? '',
+    fecha_entrega: item.value.fecha_entrega ?? '',
+    lugar_entrega: item.value.lugar_entrega ?? '',
+    responsable_recepcion: item.value.responsable_recepcion ?? '',
+  }
+  planModalOpen.value = true
 }
 
-async function openItemViewer(line: DetalleOrdenTrabajo) {
-  viewerLine.value = line
-  viewerProduct.value = null
-  viewerProductError.value = ''
-  if (line.producto && canOperateCommercial.value) {
-    viewerProductLoading.value = true
-    try {
-      viewerProduct.value = await productosService.get(line.producto)
-    } catch (cause) {
-      viewerProductError.value =
-        cause instanceof Error ? cause.message : 'No se pudo cargar el detalle del producto.'
-    } finally {
-      viewerProductLoading.value = false
-    }
+async function savePlanificacion() {
+  if (!item.value || savingPlan.value) return
+  planError.value = ''
+  if (
+    planForm.value.fecha_inicio &&
+    planForm.value.fecha_fin &&
+    planForm.value.fecha_fin < planForm.value.fecha_inicio
+  ) {
+    planError.value = 'La fecha de fin de fabricación no puede ser anterior al inicio.'
+    return
+  }
+  savingPlan.value = true
+  try {
+    item.value = await ordenesTrabajoService.updatePlanificacion(item.value.id, {
+      fecha_inicio: planForm.value.fecha_inicio || null,
+      fecha_fin: planForm.value.fecha_fin || null,
+      fecha_entrega: planForm.value.fecha_entrega || null,
+      lugar_entrega: planForm.value.lugar_entrega.trim() || null,
+      responsable_recepcion: planForm.value.responsable_recepcion.trim() || null,
+    })
+    planModalOpen.value = false
+    notice.value = 'Planificación y logística actualizada.'
+  } catch (cause) {
+    planError.value =
+      cause instanceof Error ? cause.message : 'No se pudo actualizar la planificación.'
+  } finally {
+    savingPlan.value = false
   }
 }
-
-function closeItemViewer() {
-  viewerLine.value = null
-  viewerProduct.value = null
-  viewerProductError.value = ''
-}
-
-const viewerGallery = computed<GalleryImage[]>(() => {
-  if (!viewerLine.value) return []
-  const custom = furnitureGalleries.value[viewerLine.value.id]
-  if (custom?.length) return custom
-  if (viewerLine.value.producto) {
-    const img = productImages.value[viewerLine.value.producto]
-    if (img) {
-      return [
-        {
-          id: viewerLine.value.producto,
-          url: img.original,
-          variantes: img.variantes,
-          nombre: viewerLine.value.nombre,
-          principal: true,
-          posicion: 0,
-        },
-      ]
-    }
-  }
-  return []
-})
 
 async function load() {
   loading.value = true
@@ -291,12 +336,6 @@ async function load() {
   try {
     const loaded = await ordenesTrabajoService.get(id)
     item.value = loaded
-    const productIds = (loaded.detalles ?? [])
-      .map((line) => line.producto)
-      .filter((prodId): prodId is number => typeof prodId === 'number' && prodId > 0)
-    if (productIds.length) {
-      void ensureProductImages(productIds)
-    }
     void ensureFurnitureGalleries(loaded.detalles ?? [])
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : 'No se pudo cargar la orden.'
@@ -380,36 +419,27 @@ async function downloadDocument() {
 onMounted(load)
 
 const detailRows = computed(() =>
-  (item.value?.detalles ?? []).map((line) => {
-    const spec = parseSpecification(line)
-    const isFabrication = line.tipo_item_info.codigo === 'MUEBLE_MEDIDA' || Boolean(spec)
-    return {
-      ...line,
-      unidadLabel: line.unidad_info.nombre,
-      tipoItemLabel: line.tipo_item_info.nombre,
-      isFabrication,
-      trabajoLabel: isFabrication ? 'Fabricación' : 'Preparación y verificación',
-      spec,
-    }
-  }),
+  (item.value?.detalles ?? [])
+    .filter(
+      (line) => line.tipo_item_info.codigo === 'MUEBLE_MEDIDA' || Boolean(line.especificacion),
+    )
+    .map((line) => {
+      const spec = parseSpecification(line)
+      return {
+        ...line,
+        unidadLabel: line.unidad_info.nombre,
+        tipoItemLabel: line.tipo_item_info.nombre,
+        tipoMuebleLabel: line.especificacion?.tipo_mueble_info?.nombre ?? null,
+        isFabrication: true,
+        spec,
+      }
+    }),
 )
 
 const clientSummaryLabel = computed(() => {
   const client = item.value?.cliente_resumen
   if (!client) return ''
   return client.empresa?.trim() || client.nombre?.trim() || ''
-})
-
-const lineCounts = computed(() => {
-  const fab = detailRows.value.filter((row) => row.isFabrication).length
-  const cat = detailRows.value.length - fab
-  return { fab, cat }
-})
-
-const filteredDetailRows = computed(() => {
-  if (workFilter.value === 'fabrication') return detailRows.value.filter((r) => r.isFabrication)
-  if (workFilter.value === 'catalog') return detailRows.value.filter((r) => !r.isFabrication)
-  return detailRows.value
 })
 
 const workOrderTabs = computed(() => [
@@ -441,8 +471,7 @@ const workOrderTabs = computed(() => [
         class="ot-status-pill"
         :class="`ot-status-pill--${workOrderTone(item.estado_info.codigo)}`"
       >
-        <Hammer v-if="lineCounts.fab > 0" :size="14" aria-hidden="true" />
-        <PackageCheck v-else :size="14" aria-hidden="true" />
+        <Hammer :size="14" aria-hidden="true" />
         <span>{{ item.estado_info.nombre }}</span>
       </div>
     </div>
@@ -484,7 +513,7 @@ const workOrderTabs = computed(() => [
     <template v-else-if="item">
       <div v-if="error" class="notice notice--error" role="alert">{{ error }}</div>
 
-      <section class="summary" aria-label="Resumen de la orden de trabajo">
+      <section class="summary summary--taller" aria-label="Resumen de la orden de trabajo">
         <div class="stat">
           <span class="stat__icon">
             <FileText :size="18" aria-hidden="true" />
@@ -515,19 +544,10 @@ const workOrderTabs = computed(() => [
             <div>
               <StatusBadge :status="item.estado_info.codigo" :label="item.estado_info.nombre" />
             </div>
-            <small> {{ lineCounts.fab }} fabricación · {{ lineCounts.cat }} catálogo </small>
-          </div>
-        </div>
-
-        <div class="stat">
-          <span class="stat__icon">
-            <Wallet :size="18" aria-hidden="true" />
-          </span>
-          <div class="stat__body">
-            <span>Estado de saldo</span>
-            <strong class="stat__value">
-              {{ item.estado_saldo_info?.nombre ?? 'Sin asignar' }}
-            </strong>
+            <small>
+              {{ detailRows.length }}
+              {{ detailRows.length === 1 ? 'mueble a medida' : 'muebles a medida' }}
+            </small>
           </div>
         </div>
 
@@ -567,144 +587,79 @@ const workOrderTabs = computed(() => [
             </span>
             <div>
               <h2 id="ot-details-title">Detalle de trabajo</h2>
-              <p>Especificaciones técnicas, advertencias y referencias visuales para taller.</p>
+              <p>Especificaciones técnicas, medidas, piezas y referencias de fabricación.</p>
             </div>
           </div>
-          <div
-            v-if="detailRows.length"
-            class="work-filters"
-            role="group"
-            aria-label="Filtrar líneas"
-          >
-            <button
-              type="button"
-              class="work-filter-pill"
-              :class="{ active: workFilter === 'all' }"
-              @click="workFilter = 'all'"
-            >
-              Todos ({{ detailRows.length }})
-            </button>
-            <button
-              v-if="lineCounts.fab > 0"
-              type="button"
-              class="work-filter-pill"
-              :class="{ active: workFilter === 'fabrication' }"
-              @click="workFilter = 'fabrication'"
-            >
-              <Hammer :size="13" aria-hidden="true" />
-              Fabricación ({{ lineCounts.fab }})
-            </button>
-            <button
-              v-if="lineCounts.cat > 0"
-              type="button"
-              class="work-filter-pill"
-              :class="{ active: workFilter === 'catalog' }"
-              @click="workFilter = 'catalog'"
-            >
-              <PackageCheck :size="13" aria-hidden="true" />
-              Catálogo ({{ lineCounts.cat }})
-            </button>
-          </div>
+          <span class="counter">
+            {{ detailRows.length }}
+            {{ detailRows.length === 1 ? 'mueble' : 'muebles' }}
+          </span>
         </div>
 
         <EmptyState
-          v-if="!filteredDetailRows.length"
-          title="Sin ítems en esta vista"
-          description="No hay líneas registradas para el filtro seleccionado."
+          v-if="!detailRows.length"
+          title="Sin muebles a medida registrados"
+          description="Esta orden no contiene muebles a medida para fabricación en taller."
         />
 
         <article
-          v-for="(line, index) in filteredDetailRows"
+          v-for="(line, index) in detailRows"
           :key="line.id"
-          class="work-line"
-          :class="{ 'work-line--fabrication': line.isFabrication }"
+          class="work-line work-line--fabrication"
         >
           <div class="work-line__main">
-            <div class="work-line__identity">
-              <button
-                v-if="line.producto"
-                type="button"
-                class="work-line__thumb work-line__thumb--btn"
-                :aria-label="`Ampliar imagen de ${line.nombre}`"
-                @click="openItemViewer(line)"
-              >
-                <ProductImage
-                  :image="productImages[line.producto] ?? null"
-                  :alt="line.nombre"
-                  sizes="64px"
-                />
-              </button>
-              <button
-                v-else-if="furnitureCoverSrc(line.id)"
-                type="button"
-                class="work-line__thumb work-line__thumb--btn"
-                :aria-label="`Ampliar imagen de ${line.nombre}`"
-                @click="openItemViewer(line)"
-              >
-                <GalleryPhoto
-                  :src="furnitureCoverSrc(line.id)"
-                  :alt="`Referencia principal de ${line.nombre}`"
-                />
-              </button>
-              <div v-else class="work-line__thumb work-line__thumb--icon">
-                <Hammer v-if="line.isFabrication" :size="22" aria-hidden="true" />
-                <PackageCheck v-else :size="22" aria-hidden="true" />
+            <div class="work-line__text">
+              <div class="work-line__badges">
+                <span class="work-line__index">{{ String(index + 1).padStart(2, '0') }}</span>
+                <Badge tone="warning">
+                  <Hammer :size="12" aria-hidden="true" />
+                  Mueble a medida
+                </Badge>
+                <span v-if="line.tipoMuebleLabel" class="work-type-tag">
+                  <Tag :size="12" aria-hidden="true" />
+                  {{ line.tipoMuebleLabel }}
+                </span>
               </div>
-
-              <div class="work-line__text">
-                <div class="work-line__meta">
-                  <small>
-                    {{ String(index + 1).padStart(2, '0') }} · {{ line.tipoItemLabel }}
-                  </small>
-                  <Badge :tone="line.isFabrication ? 'warning' : 'info'">
-                    {{ line.trabajoLabel }}
-                  </Badge>
-                </div>
-                <h3>{{ line.nombre }}</h3>
-                <p v-if="line.descripcion" class="work-line__desc">{{ line.descripcion }}</p>
-              </div>
+              <h3 class="work-line__title">{{ line.nombre }}</h3>
+              <p v-if="line.descripcion" class="work-line__desc">{{ line.descripcion }}</p>
             </div>
 
-            <div class="work-line__aside">
-              <Button
-                v-if="line.producto || furnitureCoverSrc(line.id) || line.spec"
-                type="button"
-                variant="secondary"
-                @click="openItemViewer(line)"
-              >
-                <Eye :size="15" aria-hidden="true" />
-                Ver ficha
-              </Button>
-              <div class="work-line__qty">
-                <strong>{{ formatQuantity(line.cantidad) }}</strong>
-                <span>{{ line.unidadLabel }}</span>
-              </div>
+            <div class="work-line__qty">
+              <strong>{{ formatQuantity(line.cantidad) }}</strong>
+              <span>{{ line.unidadLabel }}</span>
             </div>
           </div>
 
           <div v-if="line.spec" class="workshop-body">
-            <div v-if="line.spec.advertencias.length" class="ficha-alerts" role="note">
-              <AlertTriangle :size="16" aria-hidden="true" />
-              <div>
-                <strong>Advertencias de taller</strong>
-                <ul>
-                  <li v-for="(adv, i) in line.spec.advertencias" :key="i">{{ adv }}</li>
-                </ul>
-              </div>
-            </div>
+            <div class="workshop-grid" :class="{ 'workshop-grid--full': !hasImages(line.id) }">
+              <div class="workshop-specs">
+                <div v-if="line.spec.advertencias.length" class="ficha-alerts" role="note">
+                  <AlertTriangle :size="16" aria-hidden="true" />
+                  <div>
+                    <strong>Advertencias de taller</strong>
+                    <ul>
+                      <li v-for="(adv, i) in line.spec.advertencias" :key="i">{{ adv }}</li>
+                    </ul>
+                  </div>
+                </div>
 
-            <div v-if="line.spec.observaciones" class="ficha-notes">
-              <StickyNote :size="16" aria-hidden="true" />
-              <div>
-                <strong>Observaciones técnicas</strong>
-                <p>{{ line.spec.observaciones }}</p>
-              </div>
-            </div>
+                <div v-if="line.spec.medidas.length" class="spec-section spec-section--measures">
+                  <h4><Ruler :size="15" aria-hidden="true" /> Medidas generales</h4>
+                  <dl class="measures-grid">
+                    <div v-for="(medida, idx) in line.spec.medidas" :key="idx" class="measure-chip">
+                      <dt>{{ medida.label }}</dt>
+                      <dd>{{ medida.value }}</dd>
+                    </div>
+                  </dl>
+                </div>
 
-            <div class="workshop-grid">
-              <div class="workshop-col">
-                <div v-if="line.spec.generalSpecs.length" class="ficha-block">
-                  <h4><Ruler :size="14" aria-hidden="true" /> Características generales</h4>
+                <div
+                  v-if="line.spec.generalSpecs.length"
+                  class="spec-section spec-section--general"
+                >
+                  <h4>
+                    <SlidersHorizontal :size="15" aria-hidden="true" /> Características generales
+                  </h4>
                   <dl class="ficha-kv-grid">
                     <div v-for="(specItem, idx) in line.spec.generalSpecs" :key="idx">
                       <dt>{{ specItem.label }}</dt>
@@ -713,34 +668,41 @@ const workOrderTabs = computed(() => [
                   </dl>
                 </div>
 
-                <div v-if="line.spec.componentes.length" class="ficha-block">
-                  <h4><Layers :size="14" aria-hidden="true" /> Componentes de fabricación</h4>
-                  <div class="components-grid">
-                    <div
-                      v-for="(comp, idx) in line.spec.componentes"
-                      :key="comp.uid || idx"
-                      class="component-card"
-                    >
-                      <div class="component-card__head">
-                        <strong>{{ comp.nombre }}</strong>
-                        <span v-if="comp.cantidad_interna" class="component-card__qty">
-                          × {{ comp.cantidad_interna }}
-                        </span>
-                      </div>
-                      <dl v-if="componentAttributes(comp).length" class="component-card__attrs">
-                        <div v-for="(attr, aIdx) in componentAttributes(comp)" :key="aIdx">
-                          <dt>{{ attr.label }}</dt>
-                          <dd>{{ attr.value }}</dd>
+                <div
+                  v-if="line.spec.gruposPiezas.length"
+                  class="spec-section spec-section--components"
+                >
+                  <h4><Layers :size="15" aria-hidden="true" /> Piezas y componentes</h4>
+                  <div v-for="grupo in line.spec.gruposPiezas" :key="grupo.id" class="piece-group">
+                    <p v-if="grupo.nombre" class="piece-group__title">{{ grupo.nombre }}</p>
+                    <div class="components-grid">
+                      <div
+                        v-for="(comp, idx) in grupo.piezas"
+                        :key="comp.uid || idx"
+                        class="component-card"
+                      >
+                        <div class="component-card__head">
+                          <strong>{{ comp.nombre }}</strong>
+                          <span v-if="comp.cantidad_interna" class="component-card__qty">
+                            × {{ comp.cantidad_interna }}
+                          </span>
                         </div>
-                      </dl>
+                        <dl v-if="componentAttributes(comp).length" class="component-card__attrs">
+                          <div v-for="(attr, aIdx) in componentAttributes(comp)" :key="aIdx">
+                            <dt>{{ attr.label }}</dt>
+                            <dd>{{ attr.value }}</dd>
+                          </div>
+                        </dl>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <div class="workshop-col">
-                <div v-if="line.spec.accesorios.length" class="ficha-block">
-                  <h4><Wrench :size="14" aria-hidden="true" /> Accesorios</h4>
+                <div
+                  v-if="line.spec.accesorios.length"
+                  class="spec-section spec-section--accessories"
+                >
+                  <h4><Wrench :size="15" aria-hidden="true" /> Accesorios y herrajes</h4>
                   <div class="accessories-list">
                     <span v-for="(acc, aIdx) in line.spec.accesorios" :key="aIdx" class="acc-chip">
                       {{ acc }}
@@ -748,18 +710,25 @@ const workOrderTabs = computed(() => [
                   </div>
                 </div>
 
-                <div class="ficha-gallery">
-                  <ImageGallery
-                    :endpoint="`/api/v1/imagenes-privadas/?detalle=${line.id}`"
-                    :editable="false"
-                    title="Referencias visuales"
-                  />
+                <div v-if="line.spec.observaciones" class="ficha-notes">
+                  <StickyNote :size="16" aria-hidden="true" />
+                  <div>
+                    <strong>Observaciones técnicas</strong>
+                    <p>{{ line.spec.observaciones }}</p>
+                  </div>
                 </div>
+              </div>
+
+              <div v-if="hasImages(line.id)" class="workshop-media">
+                <WorkshopImageViewer
+                  :images="furnitureGalleries[line.id]!"
+                  title="Referencias visuales"
+                />
               </div>
             </div>
           </div>
 
-          <div v-else-if="line.isFabrication" class="work-line__catalog-tag">
+          <div v-else class="work-line__catalog-tag">
             <Hammer :size="15" aria-hidden="true" />
             <span>Mueble a medida · Ficha técnica reservada a taller</span>
           </div>
@@ -782,6 +751,10 @@ const workOrderTabs = computed(() => [
               <p>Fechas operativas de taller y datos de recepción del pedido.</p>
             </div>
           </div>
+          <Button variant="secondary" @click="openPlanModal">
+            <Pencil :size="15" aria-hidden="true" />
+            Editar planificación
+          </Button>
         </div>
 
         <div class="ot-fields-grid">
@@ -914,20 +887,67 @@ const workOrderTabs = computed(() => [
       </template>
     </Modal>
 
-    <ProductoVistaRapida
-      :open="Boolean(viewerLine)"
-      :line="viewerLine as any"
-      :product="viewerProduct"
-      :gallery="viewerGallery"
-      :gallery-endpoint="
-        viewerLine && viewerLine.tipo_item_info.codigo === 'MUEBLE_MEDIDA'
-          ? `/api/v1/imagenes-privadas/?detalle=${viewerLine.id}`
-          : ''
-      "
-      :product-loading="viewerProductLoading"
-      :product-error="viewerProductError"
-      @close="closeItemViewer"
-    />
+    <Modal
+      v-if="item"
+      :open="planModalOpen"
+      wide
+      title="Editar planificación de taller"
+      :description="`Actualiza las fechas de fabricación y datos de entrega para la OT #${item.numero}.`"
+      @close="planModalOpen = false"
+    >
+      <template #title-icon>
+        <span class="ot-modal-icon">
+          <Calendar :size="20" aria-hidden="true" />
+        </span>
+      </template>
+      <form id="ot-plan-form" class="ot-plan-form" @submit.prevent="savePlanificacion">
+        <div class="ot-plan-grid">
+          <TextField
+            v-model="planForm.fecha_inicio"
+            name="plan-fecha-inicio"
+            label="Inicio de fabricación"
+            type="date"
+          />
+          <TextField
+            v-model="planForm.fecha_fin"
+            name="plan-fecha-fin"
+            label="Fin de fabricación"
+            type="date"
+          />
+          <TextField
+            v-model="planForm.fecha_entrega"
+            name="plan-fecha-entrega"
+            label="Entrega prevista"
+            type="date"
+          />
+          <TextField
+            v-model="planForm.responsable_recepcion"
+            name="plan-responsable"
+            label="Responsable de recepción"
+            placeholder="Nombre de quien recibe"
+          />
+          <div class="ot-plan-grid__full">
+            <TextField
+              v-model="planForm.lugar_entrega"
+              name="plan-lugar"
+              label="Lugar de entrega"
+              placeholder="Dirección o referencia de entrega"
+            />
+          </div>
+        </div>
+        <p v-if="planError" class="notice notice--error" role="alert">{{ planError }}</p>
+      </form>
+      <template #footer>
+        <Button variant="secondary" :disabled="savingPlan" @click="planModalOpen = false">
+          <X :size="16" aria-hidden="true" />
+          Cancelar
+        </Button>
+        <Button type="submit" form="ot-plan-form" :disabled="savingPlan">
+          <Check :size="16" aria-hidden="true" />
+          {{ savingPlan ? 'Guardando...' : 'Guardar planificación' }}
+        </Button>
+      </template>
+    </Modal>
 
     <DocumentViewerModal
       v-if="item"
@@ -1444,48 +1464,43 @@ const workOrderTabs = computed(() => [
   padding-top: var(--space-2);
   border-top: 1px solid var(--color-border);
 }
-.work-filters {
+.summary--taller {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.work-line__badges {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: 0.45rem;
 }
-.work-filter-pill {
+.work-line__index {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.7rem;
+  height: 1.5rem;
+  padding: 0 0.4rem;
+  border-radius: 0.4rem;
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+.work-type-tag {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.38rem 0.78rem;
+  gap: 0.3rem;
+  padding: 0.2rem 0.6rem;
   border-radius: var(--radius-pill);
   border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  font: inherit;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
+  background: var(--color-surface-soft);
+  color: var(--color-text);
+  font-size: 0.76rem;
+  font-weight: 650;
 }
-.work-filter-pill.active {
-  border-color: var(--color-primary);
-  background: var(--color-primary-soft);
-  color: var(--color-primary-accent);
-}
-.work-line--fabrication {
-  border-left: 3px solid var(--color-warning, #d97706);
-}
-.work-line__thumb--btn {
-  padding: 0;
-  cursor: pointer;
-}
-.work-line__aside {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  flex: none;
-}
-.workshop-body {
-  display: grid;
-  gap: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--color-border);
+.work-line__title {
+  margin: 0.3rem 0 0;
+  font-size: 1.12rem;
 }
 .workshop-grid {
   display: grid;
@@ -1493,15 +1508,108 @@ const workOrderTabs = computed(() => [
   gap: var(--space-4);
   align-items: start;
 }
-.workshop-col {
+.workshop-grid--full {
+  grid-template-columns: minmax(0, 1fr);
+}
+.workshop-specs,
+.workshop-media {
   display: grid;
   gap: var(--space-3);
   min-width: 0;
 }
-.ficha-block h4 {
+.spec-section {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-border);
+  border-left-width: 3px;
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+.spec-section h4 {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.45rem;
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+.spec-section--measures {
+  border-left-color: var(--color-primary-accent, #b91c1c);
+}
+.spec-section--measures h4 svg {
+  color: var(--color-primary-accent, #b91c1c);
+}
+.spec-section--general {
+  border-left-color: var(--color-info, #2563eb);
+}
+.spec-section--general h4 svg {
+  color: var(--color-info, #2563eb);
+}
+.spec-section--components {
+  border-left-color: var(--color-warning, #d97706);
+}
+.spec-section--components h4 svg {
+  color: var(--color-warning, #d97706);
+}
+.spec-section--accessories {
+  border-left-color: var(--color-success, #16a34a);
+}
+.spec-section--accessories h4 svg {
+  color: var(--color-success, #16a34a);
+}
+.measures-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 0.55rem;
+  margin: 0;
+}
+.measure-chip {
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-soft);
+}
+.measure-chip dt {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+}
+.measure-chip dd {
+  margin: 0.12rem 0 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.piece-group {
+  display: grid;
+  gap: 0.5rem;
+}
+.piece-group__title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ot-plan-form {
+  display: grid;
+  gap: 0.85rem;
+}
+.ot-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+.ot-plan-grid__full {
+  grid-column: 1 / -1;
+}
+@media (max-width: 47.99rem) {
+  .summary--taller,
+  .ot-plan-grid {
+    grid-template-columns: 1fr;
+  }
 }
 .ot-modal-icon {
   display: grid;

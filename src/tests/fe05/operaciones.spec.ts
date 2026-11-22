@@ -439,7 +439,7 @@ describe('FE05 operaciones', () => {
     expect(w.text()).toContain('Planificación y logística')
     expect(w.text()).toContain('Carlos Méndez')
     expect(w.text()).toContain('Av. Banzer Km 6')
-    expect(w.text()).toContain('Componentes de fabricación')
+    expect(w.text()).toContain('Piezas y componentes')
     expect(w.text()).toContain('Mesón')
     expect(w.text()).toContain('Nogal')
     expect(w.text()).toContain('Conservar pieza original')
@@ -482,7 +482,19 @@ describe('FE05 operaciones', () => {
             estado_info: { id: 20, codigo: 'PENDIENTE', nombre: 'Pendiente' },
             created_by: 2,
             updated_by: 2,
-            detalles: [],
+            detalles: [
+              {
+                id: 91,
+                tipo_item_info: { id: 1, codigo: 'MUEBLE_MEDIDA', nombre: 'Mueble a medida' },
+                producto: null,
+                familia_producto: null,
+                nombre: 'Mesa de directorio',
+                descripcion: null,
+                cantidad: '1.0000',
+                unidad_info: { id: 1, codigo: 'PIEZA', nombre: 'Pieza' },
+                especificacion: null,
+              },
+            ],
           },
         ]),
       ),
@@ -536,7 +548,7 @@ describe('FE05 operaciones', () => {
     )
     const w = await mountAt(OrdenTrabajoDetailView, '/ordenes-trabajo/3')
     await flushPromises()
-    expect(w.text()).toContain('1 fabricación · 0 catálogo')
+    expect(w.text()).toContain('1 mueble a medida')
     expect(w.text()).toContain('Mueble a medida · Ficha técnica reservada a taller')
   })
 

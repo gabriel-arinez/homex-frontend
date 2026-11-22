@@ -33,10 +33,10 @@ const pedido = {
 const detalleOt = {
   id: 21,
   proforma: 4,
-  tipo_item: 1,
-  tipo_item_info: { id: 1, codigo: 'SILLA', nombre: 'Silla' },
-  producto: 8,
-  nombre: 'Silla ejecutiva',
+  tipo_item: 2,
+  tipo_item_info: { id: 2, codigo: 'MUEBLE_MEDIDA', nombre: 'Mueble a medida' },
+  producto: null,
+  nombre: 'Escritorio a medida',
   descripcion: null,
   cantidad: 1,
   unidad: 2,
@@ -294,7 +294,7 @@ test('FE05 OT muestra líneas reales y permite descargar su documento', async ({
   await mock(page)
   await page.goto('/ordenes-trabajo/3')
   await expect(page.getByRole('heading', { name: 'Orden de trabajo #40' })).toBeVisible()
-  await expect(page.getByText('Silla ejecutiva')).toBeVisible()
+  await expect(page.getByText('Escritorio a medida')).toBeVisible()
   await expect(page.getByText('Pieza')).toBeVisible()
 
   const downloadPromise = page.waitForEvent('download')
@@ -348,10 +348,10 @@ test('AP6.0.21 OT muestra ficha técnica autorizada', async ({ page }) => {
   )
   await page.goto('/ordenes-trabajo/3')
   await expect(page.getByText('Escritorio a medida')).toBeVisible()
-  await expect(page.getByText('Componentes de fabricación')).toBeVisible()
+  await expect(page.getByText('Piezas y componentes')).toBeVisible()
   await expect(page.getByText('Conservar pieza original')).toBeVisible()
   await expect(page.getByText(/color a elección/)).toBeVisible()
-  await expect(page.getByText('Silla ejecutiva')).toBeVisible()
+  await expect(page.getByText('Silla ejecutiva')).toHaveCount(0)
   await expect(page.getByText('precio_unitario')).toHaveCount(0)
 })
 

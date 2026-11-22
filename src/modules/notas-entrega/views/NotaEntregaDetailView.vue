@@ -80,15 +80,56 @@ function formatQuantity(value: string | number): string {
   return text
 }
 
-const isCompany = computed(() => Boolean(quote.value?.cliente_resumen?.empresa?.trim()))
+const isCompany = computed(() =>
+  Boolean(
+    item.value?.cliente_resumen?.empresa?.trim() || quote.value?.cliente_resumen?.empresa?.trim(),
+  ),
+)
 
 const clientDisplay = computed(() => {
-  const resumen = quote.value?.cliente_resumen
+  const resumen = item.value?.cliente_resumen ?? quote.value?.cliente_resumen
   if (!resumen) return 'Asociado al pedido'
   return resumen.empresa?.trim() || resumen.nombre?.trim() || 'Asociado al pedido'
 })
 
-const deliveryLines = computed(() => quote.value?.detalles ?? [])
+const proformaNumero = computed(() => item.value?.proforma_numero ?? quote.value?.numero ?? null)
+const proformaTitulo = computed(() => item.value?.proforma_titulo ?? quote.value?.titulo ?? null)
+
+type NotaDetalleView = {
+  id: number
+  tipo_item_info: { codigo: string; nombre: string }
+  producto?: number | null
+  nombre: string
+  descripcion?: string | null
+  cantidad: string
+  unidad_info: { nombre: string }
+  tipo_mueble_nombre?: string | null
+}
+
+const deliveryLines = computed<NotaDetalleView[]>(() => {
+  if (item.value?.detalles?.length) return item.value.detalles
+  return (quote.value?.detalles ?? []).map((d) => ({
+    id: d.id,
+    tipo_item_info: d.tipo_item_info,
+    producto: d.producto ?? null,
+    nombre: d.nombre,
+    descripcion: d.descripcion ?? null,
+    cantidad: d.cantidad,
+    unidad_info: d.unidad_info,
+    tipo_mueble_nombre: d.especificacion?.tipo_mueble_info?.nombre ?? null,
+  }))
+})
+
+const fabricationLines = computed(() =>
+  deliveryLines.value.filter(
+    (line) => line.tipo_item_info.codigo === 'MUEBLE_MEDIDA' || Boolean(line.tipo_mueble_nombre),
+  ),
+)
+const catalogLines = computed(() =>
+  deliveryLines.value.filter(
+    (line) => line.tipo_item_info.codigo !== 'MUEBLE_MEDIDA' && !line.tipo_mueble_nombre,
+  ),
+)
 const deliveryTabs = computed(() => [
   {
     id: 'trazabilidad',
@@ -130,7 +171,16 @@ async function load() {
   try {
     const note = await notasEntregaService.get(id)
     item.value = note
-    void loadRelatedContext(note.pedido)
+    if (note.detalles?.length) {
+      const productIds = note.detalles
+        .map((line) => line.producto)
+        .filter((prodId): prodId is number => typeof prodId === 'number' && prodId > 0)
+      if (productIds.length) {
+        void ensureProductImages(productIds)
+      }
+    } else {
+      void loadRelatedContext(note.pedido)
+    }
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : 'No se pudo cargar la nota.'
   } finally {
@@ -244,7 +294,7 @@ onMounted(load)
             <RouterLink :to="`/pedidos/${item.pedido}`" class="stat__link">
               Pedido #{{ item.pedido }}
             </RouterLink>
-            <small v-if="quote?.titulo">{{ quote.titulo }}</small>
+            <small v-if="proformaTitulo">{{ proformaTitulo }}</small>
           </div>
         </div>
 
@@ -256,7 +306,7 @@ onMounted(load)
           <div class="stat__body">
             <span>Cliente / Destinatario</span>
             <strong class="stat__value" :title="clientDisplay">{{ clientDisplay }}</strong>
-            <small v-if="quote">Proforma #{{ quote.numero }}</small>
+            <small v-if="proformaNumero">Proforma #{{ proformaNumero }}</small>
           </div>
         </div>
 
@@ -329,7 +379,7 @@ onMounted(load)
             <div class="delivery-field-card__body">
               <span class="delivery-field-card__label">Referencia comercial</span>
               <strong class="delivery-field-card__value">
-                {{ quote ? `Proforma #${quote.numero}` : `Pedido #${item.pedido}` }}
+                {{ proformaNumero ? `Proforma #${proformaNumero}` : `Pedido #${item.pedido}` }}
               </strong>
             </div>
           </div>
@@ -381,41 +431,80 @@ onMounted(load)
           </p>
         </div>
 
-        <article v-for="(line, index) in deliveryLines" :key="line.id" class="delivery-line">
-          <div class="delivery-line__main">
-            <div class="delivery-line__identity">
-              <div v-if="line.producto" class="delivery-line__thumb">
-                <ProductImage
-                  :image="productImages[line.producto] ?? null"
-                  :alt="line.nombre"
-                  sizes="64px"
-                />
-              </div>
-              <div v-else class="delivery-line__thumb delivery-line__thumb--icon">
-                <Hammer v-if="line.especificacion" :size="22" aria-hidden="true" />
-                <PackageCheck v-else :size="22" aria-hidden="true" />
-              </div>
-
-              <div class="delivery-line__text">
-                <div class="delivery-line__meta">
-                  <small>
-                    {{ String(index + 1).padStart(2, '0') }} · {{ line.tipo_item_info.nombre }}
-                  </small>
-                  <Badge :tone="line.especificacion ? 'warning' : 'info'">
-                    {{ line.especificacion ? 'A medida' : 'Catálogo' }}
-                  </Badge>
-                </div>
-                <h3>{{ line.nombre }}</h3>
-                <p v-if="line.descripcion" class="delivery-line__desc">{{ line.descripcion }}</p>
-              </div>
-            </div>
-
-            <div class="delivery-line__qty">
-              <strong>{{ formatQuantity(line.cantidad) }}</strong>
-              <span>{{ line.unidad_info.nombre }}</span>
-            </div>
+        <div v-if="fabricationLines.length" class="delivery-group">
+          <div class="delivery-group__head">
+            <Hammer :size="16" aria-hidden="true" />
+            <h3>Mobiliario fabricado a medida</h3>
+            <span class="counter">{{ fabricationLines.length }}</span>
           </div>
-        </article>
+          <div class="delivery-lines-grid">
+            <article v-for="(line, index) in fabricationLines" :key="line.id" class="delivery-line">
+              <div class="delivery-line__main">
+                <div class="delivery-line__identity">
+                  <div class="delivery-line__thumb delivery-line__thumb--icon">
+                    <Hammer :size="22" aria-hidden="true" />
+                  </div>
+                  <div class="delivery-line__text">
+                    <div class="delivery-line__meta">
+                      <small>{{ String(index + 1).padStart(2, '0') }}</small>
+                      <Badge v-if="line.tipo_mueble_nombre" tone="warning">
+                        {{ line.tipo_mueble_nombre }}
+                      </Badge>
+                    </div>
+                    <h3>{{ line.nombre }}</h3>
+                    <p v-if="line.descripcion" class="delivery-line__desc">
+                      {{ line.descripcion }}
+                    </p>
+                  </div>
+                </div>
+                <div class="delivery-line__qty">
+                  <strong>{{ formatQuantity(line.cantidad) }}</strong>
+                  <span>{{ line.unidad_info.nombre }}</span>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <div v-if="catalogLines.length" class="delivery-group">
+          <div class="delivery-group__head">
+            <PackageCheck :size="16" aria-hidden="true" />
+            <h3>Productos de catálogo</h3>
+            <span class="counter">{{ catalogLines.length }}</span>
+          </div>
+          <div class="delivery-lines-grid">
+            <article v-for="(line, index) in catalogLines" :key="line.id" class="delivery-line">
+              <div class="delivery-line__main">
+                <div class="delivery-line__identity">
+                  <div v-if="line.producto" class="delivery-line__thumb">
+                    <ProductImage
+                      :image="productImages[line.producto] ?? null"
+                      :alt="line.nombre"
+                      sizes="64px"
+                    />
+                  </div>
+                  <div v-else class="delivery-line__thumb delivery-line__thumb--icon">
+                    <PackageCheck :size="22" aria-hidden="true" />
+                  </div>
+                  <div class="delivery-line__text">
+                    <div class="delivery-line__meta">
+                      <small>{{ String(index + 1).padStart(2, '0') }}</small>
+                      <Badge tone="info">{{ line.tipo_item_info.nombre }}</Badge>
+                    </div>
+                    <h3>{{ line.nombre }}</h3>
+                    <p v-if="line.descripcion" class="delivery-line__desc">
+                      {{ line.descripcion }}
+                    </p>
+                  </div>
+                </div>
+                <div class="delivery-line__qty">
+                  <strong>{{ formatQuantity(line.cantidad) }}</strong>
+                  <span>{{ line.unidad_info.nombre }}</span>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
       </section>
     </template>
 
@@ -754,9 +843,36 @@ onMounted(load)
   color: var(--color-text-secondary);
   font-size: 0.75rem;
 }
+.delivery-group {
+  display: grid;
+  gap: var(--space-3);
+}
+.delivery-group__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-text);
+}
+.delivery-group__head svg {
+  color: var(--color-primary-accent);
+}
+.delivery-group__head h3 {
+  margin: 0;
+  font-size: 0.96rem;
+}
+.delivery-lines-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
 @media (max-width: 64rem) {
   .summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 47.99rem) {
+  .delivery-lines-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (max-width: 38rem) {
