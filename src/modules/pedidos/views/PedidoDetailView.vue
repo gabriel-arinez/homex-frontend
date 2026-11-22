@@ -5,19 +5,30 @@ import {
   ArrowLeft,
   ArrowRight,
   Ban,
+  Banknote,
   Calendar,
   Check,
   CheckCircle2,
   ChevronDown,
   ClipboardCheck,
+  Clock3,
+  Coins,
+  FileCheck2,
   FileText,
   Hammer,
+  Hash,
+  Landmark,
   PackageCheck,
+  Quote,
   Receipt,
+  RotateCcw,
   Send,
   SlidersHorizontal,
+  TrendingUp,
   Truck,
   UserCheck,
+  Wallet,
+  X,
 } from '@lucide/vue'
 import type {
   EstadoCodigoEnum,
@@ -142,12 +153,25 @@ const form = ref({
 
 const orderCurrency = computed(() => quote.value?.moneda_info?.codigo ?? 'BOB')
 const orderTotal = computed(() => Number(quote.value?.total ?? 0))
+const emittedReceiptsCount = computed(
+  () => receipts.value.filter((r) => r.estado === 'EMITIDO').length,
+)
 const orderPaid = computed(() =>
   receipts.value
     .filter((r) => r.estado === 'EMITIDO')
     .reduce((sum, r) => sum + (Number(r.pago_actual) || 0), 0),
 )
 const orderRemaining = computed(() => Math.max(0, orderTotal.value - orderPaid.value))
+const selectedPaymentType = computed(() =>
+  payments.value.find((x) => String(x.id) === form.value.tipo_pago),
+)
+const selectedPaymentIcon = computed(() =>
+  tipoPagoIcon(selectedPaymentType.value?.codigo, selectedPaymentType.value?.nombre),
+)
+function restoreAutoMontoEnLetras() {
+  montoEnLetrasManual.value = false
+  form.value.monto_en_letras = montoEnLetras(form.value.pago_actual, orderCurrency.value)
+}
 const currentPayAmount = computed(() => {
   const n = Number(String(form.value.pago_actual).replace(',', '.'))
   return Number.isFinite(n) ? n : Number.NaN
@@ -687,24 +711,57 @@ watch(() => route.params.id, load)
 
         <div
           v-if="quote && !docsLoading"
-          class="docs-finance-strip"
+          class="docs-kpis"
           aria-label="Resumen de cobros del pedido"
         >
-          <span class="docs-finance-pill">
-            <span>Total pedido</span>
-            <strong>{{ money(orderTotal, orderCurrency) }}</strong>
-          </span>
-          <span class="docs-finance-pill">
-            <span>Cobrado</span>
-            <strong>{{ money(orderPaid, orderCurrency) }}</strong>
-          </span>
-          <span
-            class="docs-finance-pill"
-            :class="{ 'docs-finance-pill--pending': orderRemaining > 0.0001 }"
-          >
-            <span>Saldo pendiente</span>
-            <strong>{{ money(orderRemaining, orderCurrency) }}</strong>
-          </span>
+          <div class="docs-kpi">
+            <span class="docs-kpi__icon">
+              <FileText :size="18" aria-hidden="true" />
+            </span>
+            <div class="docs-kpi__body">
+              <span class="docs-kpi__label">Total del pedido</span>
+              <strong class="docs-kpi__value">{{ money(orderTotal, orderCurrency) }}</strong>
+              <small class="docs-kpi__sub">Importe aprobado en proforma</small>
+            </div>
+          </div>
+
+          <div class="docs-kpi">
+            <span class="docs-kpi__icon docs-kpi__icon--success">
+              <Wallet :size="18" aria-hidden="true" />
+            </span>
+            <div class="docs-kpi__body">
+              <span class="docs-kpi__label">Cobrado acumulado</span>
+              <strong class="docs-kpi__value docs-kpi__value--success">
+                {{ money(orderPaid, orderCurrency) }}
+              </strong>
+              <small class="docs-kpi__sub">
+                {{
+                  emittedReceiptsCount
+                    ? `${emittedReceiptsCount} recibo${emittedReceiptsCount === 1 ? '' : 's'} emitido${emittedReceiptsCount === 1 ? '' : 's'}`
+                    : 'Sin cobros registrados'
+                }}
+              </small>
+            </div>
+          </div>
+
+          <div class="docs-kpi" :class="{ 'docs-kpi--paid': orderRemaining <= 0.0001 }">
+            <span
+              class="docs-kpi__icon"
+              :class="
+                orderRemaining > 0.0001 ? 'docs-kpi__icon--warning' : 'docs-kpi__icon--success'
+              "
+            >
+              <Clock3 v-if="orderRemaining > 0.0001" :size="18" aria-hidden="true" />
+              <CheckCircle2 v-else :size="18" aria-hidden="true" />
+            </span>
+            <div class="docs-kpi__body">
+              <span class="docs-kpi__label">Saldo pendiente</span>
+              <strong class="docs-kpi__value">{{ money(orderRemaining, orderCurrency) }}</strong>
+              <small class="docs-kpi__sub">
+                {{ orderRemaining > 0.0001 ? 'Pendiente por cobrar' : 'Pedido pagado al 100 %' }}
+              </small>
+            </div>
+          </div>
         </div>
 
         <div v-if="docsLoading" class="docs-skeleton" aria-hidden="true">
@@ -818,82 +875,203 @@ watch(() => route.params.id, load)
 
     <Modal
       :open="receiptOpen"
+      wide
       title="Emitir recibo"
       :description="`El pago se registra sobre el Pedido #${pedidoId} en moneda ${orderCurrency}.`"
       @close="receiptOpen = false"
     >
-      <div class="receipt-summary" aria-label="Resumen financiero del cobro">
-        <div>
-          <span>Total del pedido</span>
-          <strong>{{ money(orderTotal, orderCurrency) }}</strong>
+      <template #title-icon>
+        <span class="receipt-modal-icon">
+          <Receipt :size="20" aria-hidden="true" />
+        </span>
+      </template>
+
+      <div class="receipt-board" aria-label="Resumen financiero del cobro">
+        <div class="receipt-board__context">
+          <div class="receipt-metric">
+            <span class="receipt-metric__icon">
+              <FileText :size="15" aria-hidden="true" />
+            </span>
+            <div>
+              <span>Total del pedido</span>
+              <strong>{{ money(orderTotal, orderCurrency) }}</strong>
+            </div>
+          </div>
+          <div class="receipt-metric">
+            <span class="receipt-metric__icon">
+              <Wallet :size="15" aria-hidden="true" />
+            </span>
+            <div>
+              <span>Pagos anteriores</span>
+              <strong>{{ money(orderPaid, orderCurrency) }}</strong>
+            </div>
+          </div>
         </div>
-        <div>
-          <span>Pagos anteriores</span>
-          <strong>{{ money(orderPaid, orderCurrency) }}</strong>
-        </div>
-        <div>
-          <span>Pago actual</span>
-          <strong>{{ money(validPayAmount, orderCurrency) }}</strong>
-        </div>
-        <div>
-          <span>Acumulado</span>
-          <strong>{{ money(projectedAccumulated, orderCurrency) }}</strong>
-        </div>
-        <div>
-          <span>Saldo restante</span>
-          <strong :class="{ 'receipt-summary__danger': projectedRemaining < -0.0001 }">
-            {{ money(projectedRemaining, orderCurrency) }}
-          </strong>
+
+        <div class="receipt-board__projection">
+          <div class="receipt-metric receipt-metric--highlight">
+            <span class="receipt-metric__icon receipt-metric__icon--primary">
+              <Banknote :size="16" aria-hidden="true" />
+            </span>
+            <div>
+              <span>Pago actual</span>
+              <strong>{{ money(validPayAmount, orderCurrency) }}</strong>
+            </div>
+          </div>
+          <div class="receipt-metric receipt-metric--highlight">
+            <span class="receipt-metric__icon receipt-metric__icon--success">
+              <TrendingUp :size="16" aria-hidden="true" />
+            </span>
+            <div>
+              <span>Acumulado</span>
+              <strong>{{ money(projectedAccumulated, orderCurrency) }}</strong>
+            </div>
+          </div>
+          <div class="receipt-metric receipt-metric--highlight">
+            <span
+              class="receipt-metric__icon"
+              :class="
+                projectedRemaining < -0.0001
+                  ? 'receipt-metric__icon--danger'
+                  : projectedRemaining <= 0.0001
+                    ? 'receipt-metric__icon--success'
+                    : 'receipt-metric__icon--warning'
+              "
+            >
+              <Clock3 :size="16" aria-hidden="true" />
+            </span>
+            <div>
+              <span>Saldo restante</span>
+              <strong
+                :class="{
+                  'receipt-summary__danger': projectedRemaining < -0.0001,
+                  'receipt-summary__success':
+                    projectedRemaining >= -0.0001 && projectedRemaining <= 0.0001,
+                }"
+              >
+                {{ money(projectedRemaining, orderCurrency) }}
+              </strong>
+            </div>
+          </div>
         </div>
       </div>
 
       <form id="receipt" class="receipt-form" @submit.prevent="receipt">
-        <div class="receipt-form__full">
-          <TextField v-model="form.nombre_completo" label="Recibido de" name="nombre" required />
+        <div class="receipt-section receipt-form__full">
+          <div class="receipt-section__header">
+            <UserCheck :size="15" aria-hidden="true" />
+            <span>Pagador e importe del cobro</span>
+          </div>
+          <div class="receipt-section__grid">
+            <div class="receipt-form__full">
+              <TextField
+                v-model="form.nombre_completo"
+                label="Recibido de"
+                name="nombre"
+                required
+              />
+            </div>
+            <div class="receipt-field-wrap">
+              <div class="receipt-field-badge">
+                <Coins :size="13" aria-hidden="true" />
+                <span>Moneda {{ orderCurrency }}</span>
+              </div>
+              <TextField
+                v-model="form.pago_actual"
+                :label="`Pago actual (${orderCurrency})`"
+                name="pago"
+                type="number"
+                min="0.01"
+                step="0.01"
+                :error="receiptAmountError"
+                required
+              />
+            </div>
+            <div class="receipt-field-wrap">
+              <div class="receipt-field-badge">
+                <component :is="selectedPaymentIcon" :size="13" aria-hidden="true" />
+                <span>{{ selectedPaymentType?.nombre || 'Medio de cobro' }}</span>
+              </div>
+              <Select
+                v-model="form.tipo_pago"
+                name="tipo-pago"
+                label="Tipo de pago"
+                :options="[
+                  { label: 'Seleccione', value: '' },
+                  ...payments.map((x) => ({ label: x.nombre, value: String(x.id) })),
+                ]"
+              />
+            </div>
+          </div>
         </div>
-        <TextField
-          v-model="form.pago_actual"
-          :label="`Pago actual (${orderCurrency})`"
-          name="pago"
-          type="number"
-          min="0.01"
-          step="0.01"
-          :error="receiptAmountError"
-          required
-        />
-        <Select
-          v-model="form.tipo_pago"
-          name="tipo-pago"
-          label="Tipo de pago"
-          :options="[
-            { label: 'Seleccione', value: '' },
-            ...payments.map((x) => ({ label: x.nombre, value: String(x.id) })),
-          ]"
-        />
-        <div class="receipt-form__full">
-          <TextField
-            v-model="form.monto_en_letras"
-            label="Monto en letras"
-            name="letras"
-            required
-            @update:model-value="montoEnLetrasManual = true"
-          />
+
+        <div v-if="isCheque" class="receipt-cheque-box receipt-form__full">
+          <div class="receipt-section__header">
+            <FileCheck2 :size="15" aria-hidden="true" />
+            <span>Datos del cheque</span>
+          </div>
+          <div class="receipt-section__grid">
+            <div class="receipt-field-wrap">
+              <div class="receipt-field-badge">
+                <Landmark :size="13" aria-hidden="true" />
+                <span>Entidad bancaria</span>
+              </div>
+              <TextField v-model="form.banco" label="Banco" name="banco" required />
+            </div>
+            <div class="receipt-field-wrap">
+              <div class="receipt-field-badge">
+                <Hash :size="13" aria-hidden="true" />
+                <span>Documento bancario</span>
+              </div>
+              <TextField
+                v-model="form.numero_cheque"
+                label="Número de cheque"
+                name="cheque"
+                required
+              />
+            </div>
+          </div>
         </div>
-        <div class="receipt-form__full">
-          <TextField v-model="form.concepto" label="Concepto" name="concepto" required />
+
+        <div class="receipt-section receipt-form__full">
+          <div class="receipt-section__header">
+            <Quote :size="15" aria-hidden="true" />
+            <span>Respaldo literal y concepto</span>
+          </div>
+          <div class="receipt-section__grid">
+            <div class="receipt-form__full receipt-field-wrap">
+              <div class="receipt-letras-bar">
+                <span class="receipt-letras-tag">
+                  {{ montoEnLetrasManual ? 'Editado manualmente' : 'Autogenerado' }}
+                </span>
+                <button
+                  v-if="montoEnLetrasManual"
+                  type="button"
+                  class="receipt-letras-reset"
+                  @click="restoreAutoMontoEnLetras"
+                >
+                  <RotateCcw :size="12" aria-hidden="true" />
+                  Restaurar automático
+                </button>
+              </div>
+              <TextField
+                v-model="form.monto_en_letras"
+                label="Monto en letras"
+                name="letras"
+                required
+                @update:model-value="montoEnLetrasManual = true"
+              />
+            </div>
+            <div class="receipt-form__full">
+              <TextField v-model="form.concepto" label="Concepto" name="concepto" required />
+            </div>
+          </div>
         </div>
-        <TextField
-          v-if="isCheque"
-          v-model="form.numero_cheque"
-          label="Número de cheque"
-          name="cheque"
-          required
-        />
-        <TextField v-if="isCheque" v-model="form.banco" label="Banco" name="banco" required />
       </form>
       <p v-if="receiptError" class="receipt-error" role="alert">{{ receiptError }}</p>
       <template #footer>
         <Button variant="secondary" :disabled="processing" @click="receiptOpen = false">
+          <X :size="16" aria-hidden="true" />
           Volver
         </Button>
         <Button
@@ -1244,28 +1422,68 @@ watch(() => route.params.id, load)
   background: var(--color-surface-hover);
   color: var(--color-primary-accent);
 }
-.docs-finance-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.55rem;
+.docs-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
   margin-bottom: var(--space-4);
 }
-.docs-finance-pill {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.45rem;
-  padding: 0.35rem 0.7rem;
+.docs-kpi {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-muted);
-  font-size: 0.78rem;
-  font-variant-numeric: tabular-nums;
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  min-width: 0;
 }
-.docs-finance-pill span {
+.docs-kpi--paid {
+  border-color: color-mix(in srgb, var(--color-success) 35%, var(--color-border));
+}
+.docs-kpi__icon {
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: none;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 0.65rem;
+  background: var(--color-surface-muted);
   color: var(--color-text-secondary);
 }
-.docs-finance-pill--pending {
-  border-color: color-mix(in srgb, var(--color-warning, #d97706) 35%, var(--color-border));
+.docs-kpi__icon--success {
+  color: var(--color-success);
+  background: var(--color-success-soft);
+  border-color: color-mix(in srgb, var(--color-success) 35%, transparent);
+}
+.docs-kpi__icon--warning {
+  color: var(--color-warning, #d97706);
+  background: color-mix(in srgb, var(--color-warning, #d97706) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-warning, #d97706) 35%, transparent);
+}
+.docs-kpi__body {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.docs-kpi__label {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.docs-kpi__value {
+  color: var(--color-text);
+  font-size: 1.05rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+.docs-kpi__value--success {
+  color: var(--color-success);
+}
+.docs-kpi__sub {
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
 }
 .docs-list {
   display: grid;
@@ -1462,7 +1680,11 @@ watch(() => route.params.id, load)
 }
 @media (max-width: 47.99rem) {
   .summary,
-  .receipt-form {
+  .docs-kpis,
+  .receipt-form,
+  .receipt-section__grid,
+  .receipt-board__context,
+  .receipt-board__projection {
     grid-template-columns: 1fr;
   }
   .stepper {
@@ -1506,26 +1728,168 @@ watch(() => route.params.id, load)
     text-align: left;
   }
 }
-.receipt-summary {
+.receipt-modal-icon {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: none;
+  place-items: center;
+  border-radius: 0.65rem;
+  background: var(--color-primary-soft);
+  color: var(--color-primary-accent);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 22%, transparent);
+}
+.receipt-board {
+  display: grid;
   gap: 0.65rem;
-  padding: 0.75rem 0.9rem;
-  margin-bottom: 0.9rem;
+  margin-bottom: 1.1rem;
+}
+.receipt-board__context {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+.receipt-board__projection {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+.receipt-metric {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 0.8rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
-  background: var(--color-surface-hover);
+  background: var(--color-surface-muted);
+  min-width: 0;
 }
-.receipt-summary > div {
+.receipt-metric--highlight {
+  background: var(--color-surface);
+  border-color: var(--color-border-strong);
+}
+.receipt-metric > div {
   display: grid;
-  gap: 0.15rem;
+  gap: 0.1rem;
+  min-width: 0;
 }
-.receipt-summary span {
-  font-size: 0.74rem;
+.receipt-metric span {
+  font-size: 0.72rem;
   color: var(--color-text-secondary);
+}
+.receipt-metric strong {
+  font-size: 0.92rem;
+  font-variant-numeric: tabular-nums;
+}
+.receipt-metric__icon {
+  display: grid;
+  width: 1.95rem;
+  height: 1.95rem;
+  flex: none;
+  place-items: center;
+  border-radius: 0.5rem;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+.receipt-metric__icon--primary {
+  background: var(--color-primary-soft);
+  color: var(--color-primary-accent);
+  border-color: color-mix(in srgb, var(--color-primary) 25%, transparent);
+}
+.receipt-metric__icon--success {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+  border-color: color-mix(in srgb, var(--color-success) 30%, transparent);
+}
+.receipt-metric__icon--warning {
+  background: color-mix(in srgb, var(--color-warning, #d97706) 12%, transparent);
+  color: var(--color-warning, #d97706);
+  border-color: color-mix(in srgb, var(--color-warning, #d97706) 30%, transparent);
+}
+.receipt-metric__icon--danger {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 35%, transparent);
 }
 .receipt-summary__danger {
   color: var(--color-danger, #dc2626);
+}
+.receipt-summary__success {
+  color: var(--color-success);
+}
+.receipt-section {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-muted);
+}
+.receipt-cheque-box {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 28%, var(--color-border));
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--color-primary-soft) 35%, var(--color-surface));
+}
+.receipt-section__header {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--color-text);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.receipt-section__header svg {
+  color: var(--color-primary-accent);
+}
+.receipt-section__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.receipt-field-wrap {
+  display: grid;
+  gap: 0.25rem;
+  align-content: start;
+}
+.receipt-field-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.receipt-letras-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.receipt-letras-tag {
+  font-size: 0.71rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+.receipt-letras-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.12rem 0.45rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-primary-accent);
+  font-family: inherit;
+  font-size: 0.71rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+.receipt-letras-reset:hover {
+  background: var(--color-surface-hover);
 }
 .receipt-form__full {
   grid-column: 1 / -1;
