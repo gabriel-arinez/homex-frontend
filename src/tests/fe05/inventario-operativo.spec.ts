@@ -402,4 +402,54 @@ describe('Inventario operativo (P1, P2, P4, P5, P6)', () => {
     )
     expect(keyNewOp).not.toBe(keyTry1)
   })
+
+  it('P6: muestra resumen y saldos del período incluso cuando no hay movimientos en el rango', async () => {
+    const session = useSessionStore()
+    session.capabilities = ['comercial.operar']
+
+    vi.spyOn(movimientosStockService, 'types').mockResolvedValue([])
+    vi.spyOn(movimientosStockService, 'list').mockResolvedValue({
+      count: 0,
+      next: null,
+      previous: null,
+      results: [],
+    })
+    vi.spyOn(productosService, 'get').mockResolvedValue({ ...productoSample })
+    vi.spyOn(movimientosStockService, 'reporte').mockResolvedValue({
+      count: 0,
+      next: null,
+      previous: null,
+      saldo_reconstruible: true,
+      limitacion_saldo: null,
+      resumen: {
+        producto_id: 10,
+        unidad_codigo: 'PIEZA',
+        unidad_nombre: 'Pieza',
+        stock_actual: '5.0000',
+        total_entradas: '0',
+        total_salidas: '0',
+        variacion_neta: '0',
+        saldo_inicial_periodo: '5.0000',
+        saldo_final_periodo: '5.0000',
+        cantidad_movimientos: 0,
+      },
+      results: [],
+    })
+
+    const router = buildRouter()
+    await router.push(
+      '/movimientos-stock?producto=10&desde=2020-01-01&hasta=2020-01-31&vista=reporte',
+    )
+    await router.isReady()
+
+    const wrapper = mount(MovimientosStockListView, {
+      global: { plugins: [router], stubs: { Teleport: true } },
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Sin coincidencias')
+    expect(wrapper.text()).toContain('Saldo inicial del período')
+    expect(wrapper.text()).toContain('Saldo final del período')
+    expect(wrapper.text()).toContain('5.0000 Pieza')
+  })
 })
