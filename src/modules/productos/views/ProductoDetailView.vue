@@ -457,6 +457,19 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 >
                   {{ product.stock_minimo != null ? 'Editar mínimo' : 'Configurar mínimo' }}
                 </button>
+                <button
+                  v-if="session.can('comercial.operar')"
+                  type="button"
+                  class="inline-action-link"
+                  @click="
+                    router.push({
+                      path: '/movimientos-stock',
+                      query: { producto: String(product.id), vista: 'reporte' },
+                    })
+                  "
+                >
+                  Ver reporte de stock
+                </button>
               </div>
             </div>
           </div>

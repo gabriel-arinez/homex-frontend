@@ -11,7 +11,6 @@ import {
   CornerDownRight,
   Cpu,
   Download,
-  FileSpreadsheet,
   PackagePlus,
   Plus,
   RotateCcw,
@@ -594,10 +593,6 @@ onBeforeUnmount(() => {
       @menu="emit('openMenu')"
     >
       <template #actions>
-        <Button variant="secondary" @click="reportMode = !reportMode">
-          <FileSpreadsheet :size="16" aria-hidden="true" />
-          {{ reportMode ? 'Vista historial' : 'Reporte y saldos' }}
-        </Button>
         <Button
           variant="secondary"
           :disabled="exportingCsv || Boolean(dateError)"
@@ -628,12 +623,17 @@ onBeforeUnmount(() => {
             {{ selectedProduct.unidad_stock_info?.nombre || '—' }}
           </p>
         </div>
-        <Badge
-          v-if="estadoStockMeta(selectedProduct.estado_stock).showBadge"
-          :tone="estadoStockMeta(selectedProduct.estado_stock).tone"
-        >
-          {{ estadoStockMeta(selectedProduct.estado_stock).label }}
-        </Badge>
+        <div class="product-context-card__actions">
+          <Badge
+            v-if="estadoStockMeta(selectedProduct.estado_stock).showBadge"
+            :tone="estadoStockMeta(selectedProduct.estado_stock).tone"
+          >
+            {{ estadoStockMeta(selectedProduct.estado_stock).label }}
+          </Badge>
+          <Button variant="secondary" @click="router.push(`/productos/${selectedProduct.id}`)">
+            Volver al producto
+          </Button>
+        </div>
       </div>
       <div class="product-context-card__kpis">
         <div>
@@ -658,7 +658,7 @@ onBeforeUnmount(() => {
     <section class="stock-filters" aria-label="Buscar y filtrar movimientos de stock">
       <div class="stock-filters__main">
         <div class="stock-search">
-          <SearchField v-model="search" label="Buscar por SKU, producto u observación" />
+          <SearchField v-model="search" label="Buscar por SKU, producto, responsable o #pedido" />
         </div>
         <div class="stock-filter-select">
           <Select
@@ -682,24 +682,6 @@ onBeforeUnmount(() => {
               { label: 'Entradas (+)', value: 'ENTRADA' },
               { label: 'Salidas (-)', value: 'SALIDA' },
             ]"
-          />
-        </div>
-        <div class="stock-filter-num">
-          <TextField
-            v-model="pedido"
-            name="pedido-movimiento"
-            label="Pedido"
-            type="number"
-            min="1"
-          />
-        </div>
-        <div class="stock-filter-num">
-          <TextField
-            v-model="producto"
-            name="producto-movimiento"
-            label="Producto"
-            type="number"
-            min="1"
           />
         </div>
         <div class="stock-filter-date">
@@ -1545,7 +1527,14 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  flex-wrap: wrap;
   gap: 1rem;
+}
+.product-context-card__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
 }
 .product-context-card__title {
   font-size: 1rem;
