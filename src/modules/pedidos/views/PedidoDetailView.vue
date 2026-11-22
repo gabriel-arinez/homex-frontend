@@ -29,7 +29,10 @@ import type {
 import { notasEntregaService } from '@/modules/notas-entrega/services/notasEntregaService'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import { recibosService } from '@/modules/recibos/services/recibosService'
+import { montoEnLetras } from '@/modules/recibos/utils/montoEnLetras'
+import { ApiError } from '@/shared/api'
 import { formatearFechaHora } from '@/shared/date/presentacionFecha'
+import { generateUuidV4 } from '@/shared/utils/uuid'
 import { pedidosService } from '../services/pedidosService'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
@@ -66,6 +69,10 @@ const stateMenuOpen = ref(false)
 const stateMenuContainer = ref<HTMLElement | null>(null)
 let loadRequestId = 0
 
+const receiptError = ref('')
+const receiptIdempotencyKey = ref('')
+const montoEnLetrasManual = ref(false)
+
 const form = ref({
   nombre_completo: '',
   monto_en_letras: '',
@@ -75,6 +82,71 @@ const form = ref({
   banco: '',
   pago_actual: '',
 })
+
+const orderCurrency = computed(() => quote.value?.moneda_info?.codigo ?? 'BOB')
+const orderTotal = computed(() => Number(quote.value?.total ?? 0))
+const orderPaid = computed(() =>
+  receipts.value
+    .filter((r) => r.estado === 'EMITIDO')
+    .reduce((sum, r) => sum + (Number(r.pago_actual) || 0), 0),
+)
+const orderRemaining = computed(() => Math.max(0, orderTotal.value - orderPaid.value))
+const currentPayAmount = computed(() => {
+  const n = Number(String(form.value.pago_actual).replace(',', '.'))
+  return Number.isFinite(n) ? n : Number.NaN
+})
+const validPayAmount = computed(() =>
+  Number.isFinite(currentPayAmount.value) && currentPayAmount.value > 0
+    ? currentPayAmount.value
+    : 0,
+)
+const projectedAccumulated = computed(() => orderPaid.value + validPayAmount.value)
+const projectedRemaining = computed(() => orderRemaining.value - validPayAmount.value)
+const receiptAmountError = computed(() => {
+  if (!form.value.pago_actual.trim()) return ''
+  if (!Number.isFinite(currentPayAmount.value) || currentPayAmount.value <= 0) {
+    return 'El importe debe ser mayor a cero.'
+  }
+  if (currentPayAmount.value > orderRemaining.value + 0.0001) {
+    return `El importe supera el saldo pendiente (${money(orderRemaining.value, orderCurrency.value)}).`
+  }
+  return ''
+})
+const receiptFormValid = computed(
+  () =>
+    !receiptAmountError.value &&
+    validPayAmount.value > 0 &&
+    Boolean(form.value.tipo_pago) &&
+    Boolean(form.value.nombre_completo.trim()) &&
+    Boolean(form.value.monto_en_letras.trim()) &&
+    Boolean(form.value.concepto.trim()) &&
+    (!isCheque.value ||
+      (Boolean(form.value.numero_cheque.trim()) && Boolean(form.value.banco.trim()))),
+)
+
+watch(
+  () => form.value.pago_actual,
+  (val) => {
+    if (!montoEnLetrasManual.value) {
+      form.value.monto_en_letras = montoEnLetras(val, orderCurrency.value)
+    }
+  },
+)
+
+watch(orderCurrency, (currency) => {
+  if (!montoEnLetrasManual.value && form.value.pago_actual.trim()) {
+    form.value.monto_en_letras = montoEnLetras(form.value.pago_actual, currency)
+  }
+})
+
+watch(
+  () => quote.value,
+  (q) => {
+    if (receiptOpen.value && !form.value.nombre_completo.trim() && q?.cliente_resumen?.nombre) {
+      form.value.nombre_completo = q.cliente_resumen.nombre
+    }
+  },
+)
 
 const workflowSteps = [
   {
@@ -172,10 +244,27 @@ async function loadRelatedDocuments(currentPedido: Pedido, currentRequest: numbe
   }
 }
 
+function openReceiptModal() {
+  const clientName = quote.value?.cliente_resumen?.nombre || ''
+  form.value = {
+    nombre_completo: clientName,
+    monto_en_letras: '',
+    concepto: `Abono por Pedido #${pedidoId.value}`,
+    tipo_pago: '',
+    numero_cheque: '',
+    banco: '',
+    pago_actual: '',
+  }
+  montoEnLetrasManual.value = false
+  receiptError.value = ''
+  receiptIdempotencyKey.value = generateUuidV4()
+  receiptOpen.value = true
+}
+
 function applyActionQuery() {
   const accion = typeof route.query.accion === 'string' ? route.query.accion : ''
   if (!accion || !pedido.value) return
-  if (accion === 'recibo' && currentCode.value === 'CONFIRMADO') receiptOpen.value = true
+  if (accion === 'recibo' && currentCode.value === 'CONFIRMADO') openReceiptModal()
   if (accion === 'nota' && currentCode.value === 'LISTO_ENTREGA') noteOpen.value = true
   if (accion === 'cancelar' && !['CANCELADO', 'ENTREGADO'].includes(currentCode.value)) {
     cancelOpen.value = true
@@ -247,20 +336,47 @@ const note = () =>
     () => (noteOpen.value = false),
   )
 
-const receipt = () =>
-  action(
-    () =>
-      pedidosService.emitReceipt(pedidoId.value, {
-        nombre_completo: form.value.nombre_completo,
-        monto_en_letras: form.value.monto_en_letras,
-        concepto: form.value.concepto,
+async function receipt() {
+  if (processing.value) return
+  if (receiptAmountError.value || !receiptFormValid.value) {
+    receiptError.value =
+      receiptAmountError.value || 'Completa todos los campos obligatorios con un importe válido.'
+    return
+  }
+  processing.value = true
+  receiptError.value = ''
+  notice.value = ''
+  try {
+    await pedidosService.emitReceipt(
+      pedidoId.value,
+      {
+        nombre_completo: form.value.nombre_completo.trim(),
+        monto_en_letras: form.value.monto_en_letras.trim(),
+        concepto: form.value.concepto.trim(),
         tipo_pago: Number(form.value.tipo_pago),
-        numero_cheque: isCheque.value ? form.value.numero_cheque : null,
-        banco: isCheque.value ? form.value.banco : null,
-        pago_actual: form.value.pago_actual,
-      }),
-    'Recibo emitido.',
-  ).finally(() => (receiptOpen.value = false))
+        numero_cheque: isCheque.value ? form.value.numero_cheque.trim() : null,
+        banco: isCheque.value ? form.value.banco.trim() : null,
+        pago_actual: form.value.pago_actual.trim(),
+      },
+      receiptIdempotencyKey.value,
+    )
+    receiptOpen.value = false
+    await load()
+    notice.value = 'Recibo emitido.'
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 409) {
+      receiptIdempotencyKey.value = generateUuidV4()
+    }
+    receiptError.value =
+      err instanceof ApiError
+        ? err.message
+        : err instanceof Error
+          ? err.message
+          : 'No pudimos emitir el recibo.'
+  } finally {
+    processing.value = false
+  }
+}
 
 function handleOutsideClick(event: Event) {
   if (!stateMenuOpen.value) return
@@ -495,7 +611,7 @@ watch(() => route.params.id, load)
               v-if="currentCode === 'CONFIRMADO'"
               variant="info"
               :disabled="processing"
-              @click="receiptOpen = true"
+              @click="openReceiptModal"
             >
               <Receipt :size="16" aria-hidden="true" />
               Emitir recibo
@@ -572,13 +688,48 @@ watch(() => route.params.id, load)
     <Modal
       :open="receiptOpen"
       title="Emitir recibo"
-      description="El pago se registra sobre este pedido confirmado."
+      :description="`El pago se registra sobre el Pedido #${pedidoId} en moneda ${orderCurrency}.`"
       @close="receiptOpen = false"
     >
+      <div class="receipt-summary" aria-label="Resumen financiero del cobro">
+        <div>
+          <span>Total del pedido</span>
+          <strong>{{ money(orderTotal, orderCurrency) }}</strong>
+        </div>
+        <div>
+          <span>Pagos anteriores</span>
+          <strong>{{ money(orderPaid, orderCurrency) }}</strong>
+        </div>
+        <div>
+          <span>Pago actual</span>
+          <strong>{{ money(validPayAmount, orderCurrency) }}</strong>
+        </div>
+        <div>
+          <span>Acumulado</span>
+          <strong>{{ money(projectedAccumulated, orderCurrency) }}</strong>
+        </div>
+        <div>
+          <span>Saldo restante</span>
+          <strong :class="{ 'receipt-summary__danger': projectedRemaining < -0.0001 }">
+            {{ money(projectedRemaining, orderCurrency) }}
+          </strong>
+        </div>
+      </div>
+
       <form id="receipt" class="receipt-form" @submit.prevent="receipt">
-        <TextField v-model="form.nombre_completo" label="Nombre completo" name="nombre" required />
-        <TextField v-model="form.monto_en_letras" label="Monto en letras" name="letras" required />
-        <TextField v-model="form.concepto" label="Concepto" name="concepto" required />
+        <div class="receipt-form__full">
+          <TextField v-model="form.nombre_completo" label="Recibido de" name="nombre" required />
+        </div>
+        <TextField
+          v-model="form.pago_actual"
+          :label="`Pago actual (${orderCurrency})`"
+          name="pago"
+          type="number"
+          min="0.01"
+          step="0.01"
+          :error="receiptAmountError"
+          required
+        />
         <Select
           v-model="form.tipo_pago"
           name="tipo-pago"
@@ -588,6 +739,18 @@ watch(() => route.params.id, load)
             ...payments.map((x) => ({ label: x.nombre, value: String(x.id) })),
           ]"
         />
+        <div class="receipt-form__full">
+          <TextField
+            v-model="form.monto_en_letras"
+            label="Monto en letras"
+            name="letras"
+            required
+            @update:model-value="montoEnLetrasManual = true"
+          />
+        </div>
+        <div class="receipt-form__full">
+          <TextField v-model="form.concepto" label="Concepto" name="concepto" required />
+        </div>
         <TextField
           v-if="isCheque"
           v-model="form.numero_cheque"
@@ -596,26 +759,20 @@ watch(() => route.params.id, load)
           required
         />
         <TextField v-if="isCheque" v-model="form.banco" label="Banco" name="banco" required />
-        <TextField
-          v-model="form.pago_actual"
-          label="Pago actual"
-          name="pago"
-          type="number"
-          min="0.01"
-          step="0.01"
-          required
-        />
       </form>
+      <p v-if="receiptError" class="receipt-error" role="alert">{{ receiptError }}</p>
       <template #footer>
-        <Button variant="secondary" @click="receiptOpen = false">Volver</Button>
+        <Button variant="secondary" :disabled="processing" @click="receiptOpen = false">
+          Volver
+        </Button>
         <Button
           variant="info"
           type="submit"
           form="receipt"
-          :disabled="processing || !form.tipo_pago"
+          :disabled="processing || !receiptFormValid"
         >
           <Send :size="17" aria-hidden="true" />
-          Emitir
+          {{ processing ? 'Emitiendo...' : 'Emitir' }}
         </Button>
       </template>
     </Modal>
@@ -1080,5 +1237,35 @@ watch(() => route.params.id, load)
     flex-direction: column;
     align-items: flex-start;
   }
+}
+.receipt-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 0.65rem;
+  padding: 0.75rem 0.9rem;
+  margin-bottom: 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-hover);
+}
+.receipt-summary > div {
+  display: grid;
+  gap: 0.15rem;
+}
+.receipt-summary span {
+  font-size: 0.74rem;
+  color: var(--color-text-secondary);
+}
+.receipt-summary__danger {
+  color: var(--color-danger, #dc2626);
+}
+.receipt-form__full {
+  grid-column: 1 / -1;
+}
+.receipt-error {
+  margin: 0.75rem 0 0;
+  color: var(--color-danger, #dc2626);
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 </style>

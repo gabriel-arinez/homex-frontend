@@ -11,14 +11,16 @@ import {
   RotateCcw,
 } from '@lucide/vue'
 import type { Recibo, ValorCatalogoPublico } from '@/generated/api'
+import DocumentViewerModal from '@/modules/proformas/components/DocumentViewerModal.vue'
+import { fechaComercial } from '@/shared/date/presentacionFecha'
 import { downloadBlob } from '@/shared/download/downloadBlob'
+import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
 import { recibosService } from '../services/recibosService'
 import ReceiptActionsMenu from '../components/ReceiptActionsMenu.vue'
 import ActiveFilters from '@/shared/ui/ActiveFilters.vue'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
 import ClientAvatar from '@/shared/ui/ClientAvatar.vue'
-import DatePresentation from '@/shared/ui/DatePresentation.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
@@ -174,17 +176,51 @@ watch(page, () => {
   syncRoute()
 })
 
-async function handleDownload(id: number) {
+const previewOpen = ref(false)
+const previewRecibo = ref<Recibo | null>(null)
+const downloadingPdf = ref(false)
+const {
+  blob: pdfBlob,
+  url: pdfUrl,
+  loading: pdfLoading,
+  error: pdfError,
+  load: loadPdf,
+  clear: clearPdf,
+} = usePdfDocument(recibosService.documentPdf)
+
+async function openPreview(id: number) {
   const target = rows.value.find((row) => row.id === id)
   if (!target) return
+  previewRecibo.value = target
+  previewOpen.value = true
+  await loadPdf(id)
+}
+
+function closePreview() {
+  previewOpen.value = false
+  previewRecibo.value = null
+  clearPdf()
+}
+
+async function handleDownload(id: number) {
+  const target = rows.value.find((row) => row.id === id)
+  if (!target || downloadingPdf.value) return
+  downloadingPdf.value = true
   try {
-    const blob = await recibosService.document(id)
-    downloadBlob(blob, `recibo-${target.numero}.html`)
+    const file =
+      previewOpen.value && previewRecibo.value?.id === id && pdfBlob.value
+        ? pdfBlob.value
+        : await loadPdf(id)
+    if (!file) throw new Error(pdfError.value || 'No se pudo descargar el recibo.')
+    downloadBlob(file, `recibo-${target.numero}.pdf`)
+    if (!previewOpen.value) clearPdf()
     toastTone.value = 'success'
-    toastMessage.value = `Recibo #${target.numero} descargado.`
+    toastMessage.value = `Recibo #${target.numero} descargado en PDF.`
   } catch (cause) {
     toastTone.value = 'danger'
     toastMessage.value = cause instanceof Error ? cause.message : 'No se pudo descargar el recibo.'
+  } finally {
+    downloadingPdf.value = false
   }
 }
 
@@ -382,7 +418,7 @@ onMounted(load)
               </td>
 
               <td class="date-cell" data-label="Emisión">
-                <DatePresentation :timestamp="String(row.fecha)" :date="String(row.fecha)" />
+                <span class="date-label">{{ fechaComercial(String(row.fecha)) }}</span>
               </td>
 
               <td class="amounts-cell numeric" data-label="Importes">
@@ -405,6 +441,7 @@ onMounted(load)
                     :pedido-id="row.pedido"
                     :estado="row.estado"
                     @download="handleDownload"
+                    @preview="openPreview"
                   />
                 </div>
               </td>
@@ -426,6 +463,20 @@ onMounted(load)
         </div>
       </nav>
     </template>
+
+    <DocumentViewerModal
+      :open="previewOpen"
+      :title="previewRecibo ? `Recibo #${previewRecibo.numero}` : 'Comprobante de recibo'"
+      subtitle="Hoja carta con Copia Cliente y Copia HOMEX listas para impresión."
+      :pdf-url="pdfUrl"
+      :loading="pdfLoading"
+      :error="pdfError"
+      :downloading="downloadingPdf"
+      :can-download-pdf="Boolean(previewRecibo)"
+      @close="closePreview"
+      @download="previewRecibo && handleDownload(previewRecibo.id)"
+      @retry="previewRecibo && loadPdf(previewRecibo.id)"
+    />
   </div>
 </template>
 

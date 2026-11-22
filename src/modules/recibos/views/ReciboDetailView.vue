@@ -19,7 +19,9 @@ import {
   Wallet,
 } from '@lucide/vue'
 import type { Recibo, ValorCatalogoPublico } from '@/generated/api'
+import DocumentViewerModal from '@/modules/proformas/components/DocumentViewerModal.vue'
 import { downloadBlob } from '@/shared/download/downloadBlob'
+import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
 import ConfirmDialog from '@/shared/ui/ConfirmDialog.vue'
@@ -55,7 +57,29 @@ const paymentTypeLabel = computed(() => {
 const money = (v: string | number) => {
   const amount = Number(v)
   if (!Number.isFinite(amount)) return '—'
-  return new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' }).format(amount)
+  const code = item.value?.moneda_codigo || 'BOB'
+  return new Intl.NumberFormat('es-BO', { style: 'currency', currency: code }).format(amount)
+}
+
+const previewOpen = ref(false)
+const {
+  blob: pdfBlob,
+  url: pdfUrl,
+  loading: pdfLoading,
+  error: pdfError,
+  load: loadPdf,
+  clear: clearPdf,
+} = usePdfDocument(recibosService.documentPdf)
+
+async function openPdfViewer() {
+  if (!item.value) return
+  previewOpen.value = true
+  await loadPdf(item.value.id)
+}
+
+function closePdfViewer() {
+  previewOpen.value = false
+  clearPdf()
 }
 
 function formatDateLabel(value: string | null | undefined): string {
@@ -97,8 +121,11 @@ async function downloadDocument() {
   downloading.value = true
   error.value = ''
   try {
-    downloadBlob(await recibosService.document(id), `recibo-${item.value.numero}.html`)
-    notice.value = 'Recibo descargado correctamente.'
+    const file = previewOpen.value && pdfBlob.value ? pdfBlob.value : await loadPdf(id)
+    if (!file) throw new Error(pdfError.value || 'No se pudo descargar el recibo.')
+    downloadBlob(file, `recibo-${item.value.numero}.pdf`)
+    if (!previewOpen.value) clearPdf()
+    notice.value = 'Recibo PDF descargado correctamente.'
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'No se pudo descargar el recibo.'
   } finally {
@@ -153,9 +180,13 @@ onMounted(load)
         <Button variant="secondary" @click="router.push('/recibos')">
           <ArrowLeft :size="17" aria-hidden="true" /> Volver
         </Button>
+        <Button v-if="item" variant="secondary" @click="openPdfViewer">
+          <FileText :size="17" aria-hidden="true" />
+          Ver e imprimir PDF
+        </Button>
         <Button v-if="item" variant="secondary" :processing="downloading" @click="downloadDocument">
           <Download :size="17" aria-hidden="true" />
-          Descargar
+          Descargar PDF
         </Button>
         <Button
           v-if="item && item.estado === 'EMITIDO'"
@@ -258,7 +289,7 @@ onMounted(load)
               <UserCheck :size="17" aria-hidden="true" />
             </span>
             <div class="receipt-field-card__body">
-              <span class="receipt-field-card__label">Cliente / receptor</span>
+              <span class="receipt-field-card__label">Recibido de</span>
               <strong class="receipt-field-card__value">{{ item.nombre_completo }}</strong>
             </div>
           </div>
@@ -346,6 +377,20 @@ onMounted(load)
       danger
       @close="confirm = false"
       @confirm="annul"
+    />
+
+    <DocumentViewerModal
+      :open="previewOpen"
+      :title="item ? `Recibo #${item.numero}` : 'Comprobante de recibo'"
+      subtitle="Hoja carta con Copia Cliente y Copia HOMEX listas para impresión."
+      :pdf-url="pdfUrl"
+      :loading="pdfLoading"
+      :error="pdfError"
+      :downloading="downloading"
+      :can-download-pdf="Boolean(item)"
+      @close="closePdfViewer"
+      @download="downloadDocument"
+      @retry="openPdfViewer"
     />
   </div>
 </template>

@@ -8,4 +8,6 @@ export const recibosService = {
     apiRequest<ValorCatalogoPublico[]>('/api/v1/catalogo/opciones/?concepto=TIPO_PAGO'),
   document: (id: number) =>
     apiRequest<Blob>(`/api/v1/recibos/${id}/documento/`, { responseType: 'blob' }),
+  documentPdf: (id: number) =>
+    apiRequest<Blob>(`/api/v1/recibos/${id}/documento-pdf/`, { responseType: 'blob' }),
 }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Ban, ClipboardList, Download, Eye, MoreHorizontal } from '@lucide/vue'
+import { Ban, ClipboardList, Download, Eye, FileText, MoreHorizontal } from '@lucide/vue'
 
 const props = defineProps<{
   id: number
@@ -12,6 +12,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   download: [id: number]
+  preview: [id: number]
 }>()
 
 const open = ref(false)
@@ -51,6 +52,11 @@ async function toggle() {
 function handleDownload() {
   close(false)
   emit('download', props.id)
+}
+
+function handlePreview() {
+  close(false)
+  emit('preview', props.id)
 }
 
 function outside(event: Event) {
@@ -138,11 +144,21 @@ onBeforeUnmount(() => {
         <button
           type="button"
           role="menuitem"
+          class="receipt-actions__item receipt-actions__item--info"
+          @click="handlePreview"
+        >
+          <FileText :size="17" aria-hidden="true" />
+          Ver comprobante PDF
+        </button>
+
+        <button
+          type="button"
+          role="menuitem"
           class="receipt-actions__item receipt-actions__item--success"
           @click="handleDownload"
         >
           <Download :size="17" aria-hidden="true" />
-          Descargar recibo
+          Descargar PDF
         </button>
 
         <RouterLink

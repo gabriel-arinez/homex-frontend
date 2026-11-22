@@ -36,7 +36,7 @@ function horaBolivia(date: Date) {
   return `${String(h % 12 || 12).padStart(2, '0')}:${get('minute')} ${h >= 12 ? 'p. m.' : 'a. m.'}`
 }
 
-function fechaComercial(fecha: string) {
+export function fechaComercial(fecha: string) {
   // Una fecha sin hora no se debe interpretar como instante de creación.
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return 'Fecha no disponible'
   const date = new Date(`${fecha}T12:00:00Z`)

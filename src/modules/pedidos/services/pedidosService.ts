@@ -13,8 +13,12 @@ export const pedidosService = {
   changeState: (id: number, body: CambiarEstadoPedido) =>
     apiRequest<Pedido>(`/api/v1/pedidos/${id}/cambiar-estado/`, { method: 'POST', body }),
   cancel: (id: number) => apiRequest<Pedido>(`/api/v1/pedidos/${id}/cancelar/`, { method: 'POST' }),
-  emitReceipt: (id: number, body: EmitirRecibo) =>
-    apiRequest<Recibo>(`/api/v1/pedidos/${id}/emitir_recibo/`, { method: 'POST', body }),
+  emitReceipt: (id: number, body: EmitirRecibo, idempotencyKey?: string) =>
+    apiRequest<Recibo>(`/api/v1/pedidos/${id}/emitir_recibo/`, {
+      method: 'POST',
+      body,
+      headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+    }),
   emitDeliveryNote: (id: number) =>
     apiRequest<NotaEntrega>(`/api/v1/pedidos/${id}/emitir_nota_entrega/`, { method: 'POST' }),
   options: (concepto: 'ESTADO_PEDIDO' | 'TIPO_PAGO') =>
