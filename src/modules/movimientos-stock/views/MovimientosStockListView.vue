@@ -753,17 +753,6 @@ onBeforeUnmount(() => {
     <ErrorState v-else-if="error" :description="error">
       <button type="button" @click="load">Reintentar</button>
     </ErrorState>
-    <EmptyState
-      v-else-if="!rows.length"
-      :title="hasFilters ? 'Sin coincidencias' : 'Sin movimientos'"
-      :description="
-        hasFilters
-          ? 'No hay movimientos que coincidan con los filtros aplicados.'
-          : 'Todavía no se registraron movimientos de inventario.'
-      "
-    >
-      <Button v-if="hasFilters" variant="secondary" @click="clearFilters">Limpiar filtros</Button>
-    </EmptyState>
     <template v-else>
       <section
         v-if="reportMode && reporteResumen"
@@ -807,169 +796,190 @@ onBeforeUnmount(() => {
         {{ limitacionSaldo }}
       </p>
 
-      <div class="stock-results">
-        <p>{{ total }} movimiento{{ total === 1 ? '' : 's' }}</p>
-        <span>{{ reportMode ? 'Reporte operativo HOMEX' : 'Kardex operativo HOMEX' }}</span>
-      </div>
-
-      <div class="stock-table">
-        <table>
-          <caption class="sr-only">
-            Historial de movimientos de stock
-          </caption>
-          <colgroup>
-            <col class="col-product" />
-            <col class="col-variation" />
-            <col v-if="reportMode && saldoReconstruible" class="col-balance" />
-            <col class="col-trace" />
-            <col class="col-actor" />
-            <col class="col-date" />
-          </colgroup>
-          <thead>
-            <tr>
-              <th scope="col">Producto y movimiento</th>
-              <th scope="col">Tipo y variación</th>
-              <th v-if="reportMode && saldoReconstruible" scope="col">Saldo</th>
-              <th scope="col">Trazabilidad</th>
-              <th scope="col">Responsable y observación</th>
-              <th scope="col">Fecha</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in rows" :key="row.id">
-              <td class="product-cell">
-                <div class="product-identity">
-                  <span
-                    class="movement-badge"
-                    :class="`movement-badge--${movementTone(row.tipo_movimiento_info.codigo)}`"
-                  >
-                    <component
-                      :is="movementIcon(row.tipo_movimiento_info.codigo)"
-                      :size="16"
-                      aria-hidden="true"
-                    />
-                  </span>
-                  <div class="product-identity__text">
-                    <RouterLink
-                      :to="`/productos/${row.producto}`"
-                      class="product-identity__link"
-                      :title="row.producto_resumen.nombre"
-                    >
-                      {{ row.producto_resumen.nombre }}
-                    </RouterLink>
-                    <span class="product-sku">
-                      SKU: {{ row.producto_resumen.sku || `Prod. ${row.producto}` }} · Mov.
-                      {{ row.id }}
-                    </span>
-                  </div>
-                </div>
-              </td>
-
-              <td class="variation-cell" data-label="Tipo y variación">
-                <div class="variation-stack">
-                  <div class="variation-badges">
-                    <Badge
-                      :tone="movementTone(row.tipo_movimiento_info.codigo)"
-                      :title="row.tipo_movimiento_info.nombre"
-                    >
-                      {{
-                        movementLabel(
-                          row.tipo_movimiento_info.codigo,
-                          row.tipo_movimiento_info.nombre,
-                        )
-                      }}
-                    </Badge>
-                    <Badge v-if="row.motivo_label" tone="neutral">
-                      {{ row.motivo_label }}
-                    </Badge>
-                  </div>
-                  <div class="variation-amount">
-                    <component
-                      :is="Number(row.cantidad) < 0 ? ArrowDownRight : ArrowUpRight"
-                      :size="14"
-                      :class="Number(row.cantidad) < 0 ? 'variation-qty--out' : 'variation-qty--in'"
-                      aria-hidden="true"
-                    />
-                    <strong
-                      class="variation-qty"
-                      :class="Number(row.cantidad) < 0 ? 'variation-qty--out' : 'variation-qty--in'"
-                    >
-                      {{ Number(row.cantidad) > 0 ? '+' : '' }}{{ row.cantidad }}
-                    </strong>
-                    <span class="variation-unit">
-                      {{ row.producto_resumen.unidad_stock_info.nombre }}
-                      ({{ Number(row.cantidad) < 0 ? 'Salida' : 'Entrada' }})
-                    </span>
-                  </div>
-                </div>
-              </td>
-
-              <td v-if="reportMode && saldoReconstruible" class="balance-cell" data-label="Saldo">
-                <div
-                  v-if="'saldo_posterior' in row && row.saldo_posterior != null"
-                  class="balance-stack"
-                >
-                  <strong
-                    >{{ row.saldo_posterior }}
-                    {{ row.producto_resumen.unidad_stock_info.nombre }}</strong
-                  >
-                  <small>Ant.: {{ row.saldo_anterior }}</small>
-                </div>
-                <span v-else>—</span>
-              </td>
-
-              <td class="trace-cell" data-label="Trazabilidad">
-                <div class="trace-stack">
-                  <RouterLink
-                    v-if="row.pedido_relacionado"
-                    :to="`/pedidos/${row.pedido_relacionado}`"
-                    class="trace-order-link"
-                  >
-                    <ClipboardList :size="13" aria-hidden="true" />
-                    Pedido #{{ row.pedido_relacionado }}
-                  </RouterLink>
-                  <span v-else class="trace-no-order">Sin pedido</span>
-
-                  <span v-if="row.movimiento_referencia" class="trace-ref">
-                    <CornerDownRight :size="12" aria-hidden="true" />
-                    Orig. #{{ row.movimiento_referencia }}
-                  </span>
-                </div>
-              </td>
-
-              <td class="actor-cell" data-label="Responsable y observación">
-                <div class="actor-stack">
-                  <span class="actor-name">
-                    <UserCheck v-if="row.responsable?.display_name" :size="14" aria-hidden="true" />
-                    <Cpu v-else :size="14" aria-hidden="true" />
-                    <strong>{{ row.responsable?.display_name || 'Sistema' }}</strong>
-                  </span>
-                  <span class="actor-obs" :title="row.observaciones || 'Sin observaciones'">
-                    {{ row.observaciones || '—' }}
-                  </span>
-                </div>
-              </td>
-
-              <td class="date-cell" data-label="Fecha">
-                <DatePresentation :timestamp="String(row.fecha)" />
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <nav class="stock-pagination" aria-label="Paginación de movimientos de stock">
-        <p>Mostrando {{ fromItem }}–{{ toItem }} de {{ total }} movimientos</p>
-        <div v-if="totalPages > 1" class="stock-pagination__buttons">
-          <button type="button" :disabled="page <= 1" @click="page--">
-            <ChevronLeft :size="17" aria-hidden="true" /> Anterior
-          </button>
-          <span>Página {{ page }} de {{ totalPages }}</span>
-          <button type="button" :disabled="page >= totalPages" @click="page++">
-            Siguiente <ChevronRight :size="17" aria-hidden="true" />
-          </button>
+      <EmptyState
+        v-if="!rows.length"
+        :title="hasFilters ? 'Sin coincidencias' : 'Sin movimientos'"
+        :description="
+          hasFilters
+            ? 'No hay movimientos que coincidan con los filtros aplicados.'
+            : 'Todavía no se registraron movimientos de inventario.'
+        "
+      >
+        <Button v-if="hasFilters" variant="secondary" @click="clearFilters">Limpiar filtros</Button>
+      </EmptyState>
+      <template v-else>
+        <div class="stock-results">
+          <p>{{ total }} movimiento{{ total === 1 ? '' : 's' }}</p>
+          <span>{{ reportMode ? 'Reporte operativo HOMEX' : 'Kardex operativo HOMEX' }}</span>
         </div>
-      </nav>
+
+        <div class="stock-table">
+          <table>
+            <caption class="sr-only">
+              Historial de movimientos de stock
+            </caption>
+            <colgroup>
+              <col class="col-product" />
+              <col class="col-variation" />
+              <col v-if="reportMode && saldoReconstruible" class="col-balance" />
+              <col class="col-trace" />
+              <col class="col-actor" />
+              <col class="col-date" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th scope="col">Producto y movimiento</th>
+                <th scope="col">Tipo y variación</th>
+                <th v-if="reportMode && saldoReconstruible" scope="col">Saldo</th>
+                <th scope="col">Trazabilidad</th>
+                <th scope="col">Responsable y observación</th>
+                <th scope="col">Fecha</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in rows" :key="row.id">
+                <td class="product-cell">
+                  <div class="product-identity">
+                    <span
+                      class="movement-badge"
+                      :class="`movement-badge--${movementTone(row.tipo_movimiento_info.codigo)}`"
+                    >
+                      <component
+                        :is="movementIcon(row.tipo_movimiento_info.codigo)"
+                        :size="16"
+                        aria-hidden="true"
+                      />
+                    </span>
+                    <div class="product-identity__text">
+                      <RouterLink
+                        :to="`/productos/${row.producto}`"
+                        class="product-identity__link"
+                        :title="row.producto_resumen.nombre"
+                      >
+                        {{ row.producto_resumen.nombre }}
+                      </RouterLink>
+                      <span class="product-sku">
+                        SKU: {{ row.producto_resumen.sku || `Prod. ${row.producto}` }} · Mov.
+                        {{ row.id }}
+                      </span>
+                    </div>
+                  </div>
+                </td>
+
+                <td class="variation-cell" data-label="Tipo y variación">
+                  <div class="variation-stack">
+                    <div class="variation-badges">
+                      <Badge
+                        :tone="movementTone(row.tipo_movimiento_info.codigo)"
+                        :title="row.tipo_movimiento_info.nombre"
+                      >
+                        {{
+                          movementLabel(
+                            row.tipo_movimiento_info.codigo,
+                            row.tipo_movimiento_info.nombre,
+                          )
+                        }}
+                      </Badge>
+                      <Badge v-if="row.motivo_label" tone="neutral">
+                        {{ row.motivo_label }}
+                      </Badge>
+                    </div>
+                    <div class="variation-amount">
+                      <component
+                        :is="Number(row.cantidad) < 0 ? ArrowDownRight : ArrowUpRight"
+                        :size="14"
+                        :class="
+                          Number(row.cantidad) < 0 ? 'variation-qty--out' : 'variation-qty--in'
+                        "
+                        aria-hidden="true"
+                      />
+                      <strong
+                        class="variation-qty"
+                        :class="
+                          Number(row.cantidad) < 0 ? 'variation-qty--out' : 'variation-qty--in'
+                        "
+                      >
+                        {{ Number(row.cantidad) > 0 ? '+' : '' }}{{ row.cantidad }}
+                      </strong>
+                      <span class="variation-unit">
+                        {{ row.producto_resumen.unidad_stock_info.nombre }}
+                        ({{ Number(row.cantidad) < 0 ? 'Salida' : 'Entrada' }})
+                      </span>
+                    </div>
+                  </div>
+                </td>
+
+                <td v-if="reportMode && saldoReconstruible" class="balance-cell" data-label="Saldo">
+                  <div
+                    v-if="'saldo_posterior' in row && row.saldo_posterior != null"
+                    class="balance-stack"
+                  >
+                    <strong
+                      >{{ row.saldo_posterior }}
+                      {{ row.producto_resumen.unidad_stock_info.nombre }}</strong
+                    >
+                    <small>Ant.: {{ row.saldo_anterior }}</small>
+                  </div>
+                  <span v-else>—</span>
+                </td>
+
+                <td class="trace-cell" data-label="Trazabilidad">
+                  <div class="trace-stack">
+                    <RouterLink
+                      v-if="row.pedido_relacionado"
+                      :to="`/pedidos/${row.pedido_relacionado}`"
+                      class="trace-order-link"
+                    >
+                      <ClipboardList :size="13" aria-hidden="true" />
+                      Pedido #{{ row.pedido_relacionado }}
+                    </RouterLink>
+                    <span v-else class="trace-no-order">Sin pedido</span>
+
+                    <span v-if="row.movimiento_referencia" class="trace-ref">
+                      <CornerDownRight :size="12" aria-hidden="true" />
+                      Orig. #{{ row.movimiento_referencia }}
+                    </span>
+                  </div>
+                </td>
+
+                <td class="actor-cell" data-label="Responsable y observación">
+                  <div class="actor-stack">
+                    <span class="actor-name">
+                      <UserCheck
+                        v-if="row.responsable?.display_name"
+                        :size="14"
+                        aria-hidden="true"
+                      />
+                      <Cpu v-else :size="14" aria-hidden="true" />
+                      <strong>{{ row.responsable?.display_name || 'Sistema' }}</strong>
+                    </span>
+                    <span class="actor-obs" :title="row.observaciones || 'Sin observaciones'">
+                      {{ row.observaciones || '—' }}
+                    </span>
+                  </div>
+                </td>
+
+                <td class="date-cell" data-label="Fecha">
+                  <DatePresentation :timestamp="String(row.fecha)" />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <nav class="stock-pagination" aria-label="Paginación de movimientos de stock">
+          <p>Mostrando {{ fromItem }}–{{ toItem }} de {{ total }} movimientos</p>
+          <div v-if="totalPages > 1" class="stock-pagination__buttons">
+            <button type="button" :disabled="page <= 1" @click="page--">
+              <ChevronLeft :size="17" aria-hidden="true" /> Anterior
+            </button>
+            <span>Página {{ page }} de {{ totalPages }}</span>
+            <button type="button" :disabled="page >= totalPages" @click="page++">
+              Siguiente <ChevronRight :size="17" aria-hidden="true" />
+            </button>
+          </div>
+        </nav>
+      </template>
     </template>
 
     <Modal
