@@ -656,8 +656,14 @@ function submit(): boolean {
     const decisiones = voiceFieldReviews.value.flatMap((review) => {
       const field = catalogFieldNames[review.field] ?? review.field
       const resolution = voiceResolutions.value[field]
-      if (!resolution || resolution.value !== voiceValue(field) || !validVoiceValue(field))
+      const fieldStatus = voiceFields.value.find((item) => item.field === field)?.state
+      if (resolution && resolution.value === voiceValue(field) && validVoiceValue(field)) {
+        // Explicit resolution recorded.
+      } else if (fieldStatus === 'suggested' && validVoiceValue(field)) {
+        // Accepted visually in green without tedious per-field confirmation.
+      } else {
         return []
+      }
       const finalValue = catalogAuditValue(finalValues, review.field)
       // DRF trims textual model fields; JSON specification values retain their actual types.
       const storedValue =
@@ -669,7 +675,7 @@ function submit(): boolean {
           review_id: review.review_id,
           field: review.field,
           evidence_ids: review.evidence_ids,
-          estado: resolution.state === 'reviewed' ? 'confirmado' : 'corregido',
+          estado: resolution?.state === 'edited' ? 'corregido' : 'confirmado',
           valor_original: voiceAuditOriginalValues.value[review.field] ?? null,
           valor_final: storedValue,
         }),
@@ -735,9 +741,38 @@ onBeforeUnmount(() => {
       </Button>
     </header>
 
-    <aside v-if="voiceWarnings.length" aria-label="Observaciones de voz" role="status">
-      <p v-for="(warning, index) in voiceWarnings" :key="index">{{ warning }}</p>
-    </aside>
+    <div
+      v-if="voiceFields.length || voiceWarnings.length"
+      class="voice-hitl-banner"
+      aria-label="Resumen de captura por voz"
+      role="status"
+    >
+      <div v-if="voiceFields.length" class="voice-hitl-banner__pills">
+        <span class="voice-pill voice-pill--ok">
+          <Check :size="14" aria-hidden="true" />
+          {{ voiceFields.filter((f) => f.state !== 'pending').length }}
+          completados por voz
+        </span>
+        <span
+          v-if="voiceFields.some((f) => f.state === 'pending')"
+          class="voice-pill voice-pill--warn"
+        >
+          <AlertTriangle :size="14" aria-hidden="true" />
+          {{ voiceFields.filter((f) => f.state === 'pending').length }}
+          {{
+            voiceFields.filter((f) => f.state === 'pending').length === 1
+              ? 'campo requiere revisión'
+              : 'campos requieren revisión'
+          }}
+        </span>
+      </div>
+      <ul v-if="voiceWarnings.length" class="voice-hitl-banner__warnings">
+        <li v-for="(warning, index) in voiceWarnings" :key="index">
+          <AlertTriangle :size="14" aria-hidden="true" />
+          <span>{{ warning }}</span>
+        </li>
+      </ul>
+    </div>
     <button
       v-if="(recordingActive || assistantProcessing) && !voiceOpen"
       type="button"
@@ -1393,6 +1428,57 @@ onBeforeUnmount(() => {
   font-weight: 600;
   cursor: pointer;
   width: fit-content;
+}
+.voice-hitl-banner {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--color-success) 32%, var(--color-border));
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+.voice-hitl-banner__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.voice-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+.voice-pill--ok {
+  color: var(--color-success);
+  background: var(--color-success-soft);
+}
+.voice-pill--warn {
+  color: var(--color-warning);
+  background: var(--color-warning-soft);
+}
+.voice-hitl-banner__warnings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+.voice-hitl-banner__warnings li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--radius-control);
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.voice-hitl-banner__warnings li span {
+  color: var(--color-text);
 }
 
 .catalog-layout {

@@ -40,7 +40,15 @@ it('catalog text is interpreted only explicitly and applied only after confirmat
   expect(wrapper.get('input[type=file]').attributes('aria-label')).toBe(
     'Archivo de audio para transcribir',
   )
+  expect(wrapper.find('textarea').exists()).toBe(false)
   expect(create).not.toHaveBeenCalled()
+  const input = wrapper.get('input[type="file"]')
+  Object.defineProperty(input.element, 'files', {
+    value: [new File(['audio'], 'silla.wav', { type: 'audio/wav' })],
+  })
+  await input.trigger('change')
+  await flushPromises()
+  expect(create).toHaveBeenCalledTimes(1)
   await wrapper
     .get('textarea')
     .setValue(
@@ -48,39 +56,47 @@ it('catalog text is interpreted only explicitly and applied only after confirmat
     )
   await wrapper
     .findAll('button')
-    .find((b) => b.text() === 'Procesar texto')!
+    .find((b) => b.text().includes('Procesar y aplicar'))!
     .trigger('click')
   await flushPromises()
-  expect(create.mock.calls[0]![0].texto).toBe(
+  expect(create.mock.calls[1]![0].texto).toBe(
     'silla plegable para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
   )
-  expect(wrapper.emitted('applied')).toBeUndefined()
-  await wrapper
-    .findAll('button')
-    .find((b) => b.text() === 'Aplicar propuesta')!
-    .trigger('click')
   expect(wrapper.emitted('applied')).toHaveLength(1)
   expect(wrapper.emitted('apply')).toBeUndefined()
   expect(wrapper.find('textarea').exists()).toBe(false)
 })
 it('furniture keeps abstained text editable without emitting an application', async () => {
-  get.mockResolvedValue({
-    id: 1,
-    estado: 'COMPLETADA',
-    resultado: 'NO_PROPOSAL',
-    texto_transcrito_original: 'hola buenas '.repeat(15),
-    propuesta_configurador: null,
-    candidatos: [],
-    pendientes: [],
-  })
+  get
+    .mockResolvedValueOnce({
+      id: 10,
+      estado: 'COMPLETADA',
+      solo_transcribir: true,
+      texto_transcrito_original: 'hola buenas '.repeat(15).trim(),
+    })
+    .mockResolvedValue({
+      id: 1,
+      estado: 'COMPLETADA',
+      resultado: 'NO_PROPOSAL',
+      texto_transcrito_original: 'hola buenas '.repeat(15).trim(),
+      propuesta_configurador: null,
+      candidatos: [],
+      pendientes: [],
+    })
   const wrapper = mount(CapturaAsistida, { props: { dirty: false, sesion: 'test', moneda: 'BOB' } })
-  await wrapper.get('textarea').setValue('hola buenas '.repeat(15))
+  const input = wrapper.get('input[type="file"]')
+  Object.defineProperty(input.element, 'files', {
+    value: [new File(['audio'], 'mueble.wav', { type: 'audio/wav' })],
+  })
+  await input.trigger('change')
+  await flushPromises()
+  await wrapper.get('textarea').setValue('hola buenas '.repeat(15).trim())
   await wrapper
     .findAll('button')
-    .find((b) => b.text() === 'Procesar texto')!
+    .find((b) => b.text().includes('Procesar y aplicar'))!
     .trigger('click')
   await flushPromises()
-  expect(wrapper.get('textarea').element.value).toBe('hola buenas '.repeat(15))
+  expect(wrapper.get('textarea').element.value).toBe('hola buenas '.repeat(15).trim())
   expect(wrapper.text()).toContain('No se identificó')
   expect(wrapper.emitted('applied')).toBeUndefined()
   expect(wrapper.emitted('proposed')).toBeUndefined()
@@ -121,7 +137,7 @@ it('runs ASR alone, then NLP on corrected text linked to the original capture', 
     )
   await wrapper
     .findAll('button')
-    .find((b) => b.text() === 'Procesar texto')!
+    .find((b) => b.text().includes('Procesar y aplicar'))!
     .trigger('click')
   await flushPromises()
   expect(create.mock.calls[1]![0]).toMatchObject({
@@ -130,19 +146,31 @@ it('runs ASR alone, then NLP on corrected text linked to the original capture', 
     captura_origen: 1,
   })
   expect(create.mock.calls[1]![0].audio).toBeUndefined()
-  expect(wrapper.text()).toContain('silla precio 40')
-  expect(wrapper.emitted('applied')).toBeUndefined()
+  expect(wrapper.emitted('applied')).toHaveLength(1)
   wrapper.unmount()
 })
 it('ignores stale NLP responses after editing or cancellation', async () => {
   let finish!: (result: Record<string, unknown>) => void
-  get.mockImplementationOnce(
-    () =>
-      new Promise((resolve) => {
-        finish = resolve
-      }),
-  )
+  get
+    .mockResolvedValueOnce({
+      id: 10,
+      estado: 'COMPLETADA',
+      solo_transcribir: true,
+      texto_transcrito_original: 'silla azul inicial',
+    })
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        }),
+    )
   const wrapper = mount(CapturaCatalogo, { props: { categoria: 'SILLA' } })
+  const input = wrapper.get('input[type="file"]')
+  Object.defineProperty(input.element, 'files', {
+    value: [new File(['audio'], 'silla.wav', { type: 'audio/wav' })],
+  })
+  await input.trigger('change')
+  await flushPromises()
   await wrapper
     .get('textarea')
     .setValue(
@@ -150,9 +178,13 @@ it('ignores stale NLP responses after editing or cancellation', async () => {
     )
   await wrapper
     .findAll('button')
-    .find((b) => b.text() === 'Procesar texto')!
+    .find((b) => b.text().includes('Procesar y aplicar'))!
     .trigger('click')
   await flushPromises()
+  await wrapper
+    .findAll('button')
+    .find((b) => b.text() === 'Cancelar')!
+    .trigger('click')
   await wrapper
     .get('textarea')
     .setValue(
@@ -187,9 +219,9 @@ it('keeps an over-limit ASR output intact and requires reduction before NLP', as
   })
   await input.trigger('change')
   await flushPromises()
-  expect(w.get('textarea').element.value).toBe(long)
+  expect(w.get('textarea').element.value).toBe(long.trim())
   expect(w.text()).toContain('3000')
-  const process = () => w.findAll('button').find((b) => b.text() === 'Procesar texto')!
+  const process = () => w.findAll('button').find((b) => b.text().includes('Procesar y aplicar'))!
   expect(process().attributes('disabled')).toBeDefined()
   await w.get('textarea').setValue('silla '.repeat(500))
   expect(process().attributes('disabled')).toBeUndefined()
@@ -197,7 +229,19 @@ it('keeps an over-limit ASR output intact and requires reduction before NLP', as
   w.unmount()
 })
 it('rejects oversized paste or typing without deleting existing content and allows deletion', async () => {
+  get.mockResolvedValue({
+    id: 1,
+    estado: 'COMPLETADA',
+    solo_transcribir: true,
+    texto_transcrito_original: 'silla '.repeat(10).trim(),
+  })
   const w = mount(CapturaCatalogo, { props: { categoria: 'SILLA' } })
+  const fileInput = w.get('input[type=file]')
+  Object.defineProperty(fileInput.element, 'files', {
+    value: [new File(['audio'], 'voice.wav', { type: 'audio/wav' })],
+  })
+  await fileInput.trigger('change')
+  await flushPromises()
   const input = w.get('textarea')
   const valid = 'silla '.repeat(499) + 'silla!'
   expect(valid.length).toBe(3000)

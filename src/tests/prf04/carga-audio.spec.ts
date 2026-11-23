@@ -93,13 +93,9 @@ describe('PRF-04 carga de grabaciones', () => {
       expect(wrapper.emitted('applied')).toBeUndefined()
       await wrapper
         .findAll('button')
-        .find((b) => b.text() === 'Procesar texto')!
+        .find((b) => b.text().includes('Procesar y aplicar'))!
         .trigger('click')
       await flushPromises()
-      await wrapper
-        .findAll('button')
-        .find((b) => b.text() === 'Aplicar propuesta')!
-        .trigger('click')
       expect(wrapper.emitted('applied')).toHaveLength(1)
     } finally {
       wrapper.unmount()
@@ -166,15 +162,10 @@ describe('PRF-04 carga de grabaciones', () => {
     wrapper.unmount()
   })
 
-  it('conserva los datos existentes hasta confirmación explícita de la propuesta', async () => {
+  it('muestra solo las dos opciones iniciales antes de transcribir sin aplicar datos', async () => {
     const wrapper = montar(true)
-    await wrapper
-      .get('textarea')
-      .setValue(
-        'Un escritorio para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
-      )
+    expect(wrapper.find('textarea').exists()).toBe(false)
     expect(wrapper.emitted('applied')).toBeUndefined()
-    expect(wrapper.findAll('button').some((b) => b.text() === 'Aplicar propuesta')).toBe(false)
     wrapper.unmount()
   })
 })

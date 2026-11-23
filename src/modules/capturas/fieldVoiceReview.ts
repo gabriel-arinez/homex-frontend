@@ -49,20 +49,26 @@ function render(root: HTMLElement, value: Binding) {
     input.style.outline =
       review.state === 'pending'
         ? '2px dashed var(--color-warning, #947000)'
-        : review.state === 'suggested'
-          ? '1px solid var(--color-primary)'
+        : ['suggested', 'reviewed', 'edited'].includes(review.state)
+          ? '2px solid var(--color-success, #16a34a)'
           : ''
     input.style.outlineOffset = '2px'
     marked.push(input)
     const note = document.createElement('span')
     note.className = 'voice-field-status'
     note.id = `voice-status-${review.field}`
-    note.style.cssText = 'display:block;font-size:.8rem;font-weight:400;margin-top:.35rem;'
+    const toneColor =
+      review.state === 'pending'
+        ? 'var(--color-warning, #b45309)'
+        : ['suggested', 'reviewed', 'edited'].includes(review.state)
+          ? 'var(--color-success, #16a34a)'
+          : 'var(--color-text-secondary)'
+    note.style.cssText = `display:inline-flex;align-items:center;flex-wrap:wrap;gap:.45rem;font-size:.78rem;font-weight:600;margin-top:.35rem;color:${toneColor};`
     const label = {
-      suggested: 'Sugerido por voz',
+      suggested: '✓ Completado por voz',
       pending: 'Requiere revisión',
-      reviewed: 'Confirmado',
-      edited: 'Corregido',
+      reviewed: '✓ Validado',
+      edited: '✓ Corregido',
       discarded: 'Descartado',
     }[review.state]
     const text = document.createElement('span')
@@ -73,13 +79,13 @@ function render(root: HTMLElement, value: Binding) {
     if (
       input.matches('input,select,textarea') &&
       review.confirmable !== false &&
-      ['suggested', 'pending'].includes(review.state)
+      review.state === 'pending'
     ) {
       const button = document.createElement('button')
       button.type = 'button'
-      button.textContent = 'Confirmar campo'
+      button.textContent = 'Validar valor'
       button.style.cssText =
-        'margin-inline-start:.5rem;padding:.2rem .5rem;border:1px solid var(--color-border-strong);border-radius:var(--radius-control);background:var(--color-surface);color:var(--color-text);font:inherit;cursor:pointer;'
+        'padding:.2rem .55rem;border:1px solid var(--color-warning, #d97706);border-radius:999px;background:var(--color-warning-soft, rgba(234,179,8,0.12));color:var(--color-text);font:inherit;font-size:.75rem;font-weight:650;cursor:pointer;'
       button.addEventListener('click', () => {
         if (input.value.trim() && input.checkValidity()) value.resolve(review.field, false)
         else input.focus()

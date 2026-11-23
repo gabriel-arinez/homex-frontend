@@ -1302,18 +1302,15 @@ for (const width of [360, 768, 1440]) {
     await expect(drawer.locator('textarea')).toHaveValue(captura24.texto_transcrito_original!)
     expect(captures).toBe(1)
     await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Mueble previo')
-    await expect(drawer.getByRole('button', { name: 'Procesar texto', exact: true })).toBeDisabled()
+    await expect(
+      drawer.getByRole('button', { name: 'Procesar y aplicar', exact: true }),
+    ).toBeDisabled()
     await drawer
       .locator('textarea')
       .fill(
         `${captura24.texto_transcrito_original} para oficina con acabado natural y entrega programada por el vendedor`,
       )
-    await drawer.getByRole('button', { name: 'Procesar texto', exact: true }).click()
-    await expect(
-      drawer.getByRole('button', { name: 'Aplicar propuesta', exact: true }),
-    ).toBeVisible()
-    await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Mueble previo')
-    await drawer.getByRole('button', { name: 'Aplicar propuesta', exact: true }).click()
+    await drawer.getByRole('button', { name: 'Procesar y aplicar', exact: true }).click()
     await expect(drawer.locator('textarea')).toHaveCount(0)
     // Only explicit confirmation applies the proposal and opens structured review.
     await expect(

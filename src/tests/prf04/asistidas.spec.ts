@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+vi.mock('@/modules/capturas/audioLimits', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@/modules/capturas/audioLimits')>()
+  return { ...original, readAudioDuration: vi.fn<() => Promise<number>>().mockResolvedValue(30) }
+})
 import type {
   PropuestaConfigurador,
   ResultadoAsistida,
@@ -70,17 +74,12 @@ describe('PRF-04 proyección del servidor', () => {
   })
 })
 describe('PRF-04 confirmación del reemplazo', () => {
-  it('no procesa ni aplica cambios existentes mientras se revisa texto', async () => {
+  it('no procesa ni aplica cambios existentes mientras no se haya transcrito audio', async () => {
     const wrapper = mount(CapturaAsistida, {
       props: { dirty: true, sesion: crypto.randomUUID(), moneda: 'BOB' },
     })
-    await wrapper
-      .get('textarea')
-      .setValue(
-        'Un escritorio de madera para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
-      )
+    expect(wrapper.find('textarea').exists()).toBe(false)
     expect(wrapper.emitted('applied')).toBeUndefined()
-    expect(wrapper.findAll('button').some((b) => b.text() === 'Aplicar propuesta')).toBe(false)
     wrapper.unmount()
   })
 })
@@ -122,6 +121,12 @@ describe('PRF-04 aplicación de capturas por voz', () => {
       global: { stubs: { AudioRecorder: true, Teleport: true } },
     })
     try {
+      const input = wrapper.get('input[type="file"]')
+      Object.defineProperty(input.element, 'files', {
+        value: [new File(['audio'], 'escritorio.wav', { type: 'audio/wav' })],
+      })
+      await input.trigger('change')
+      await flushPromises()
       await wrapper
         .get('textarea')
         .setValue(
@@ -129,14 +134,9 @@ describe('PRF-04 aplicación de capturas por voz', () => {
         )
       await wrapper
         .findAll('button')
-        .find((b) => b.text() === 'Procesar texto')!
+        .find((b) => b.text().includes('Procesar y aplicar'))!
         .trigger('click')
       await flushPromises()
-      expect(wrapper.emitted('applied')).toBeUndefined()
-      await wrapper
-        .findAll('button')
-        .find((b) => b.text() === 'Aplicar propuesta')!
-        .trigger('click')
       expect(wrapper.emitted('applied')).toHaveLength(1)
     } finally {
       wrapper.unmount()

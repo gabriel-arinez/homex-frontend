@@ -142,11 +142,9 @@ for (const [category, file] of samples) {
             },
             { timeout: 240_000 },
           )
-          await assistant.getByRole('button', { name: 'Procesar texto', exact: true }).click()
+          await assistant.getByRole('button', { name: 'Procesar y aplicar', exact: true }).click()
           const proposal = (await (await interpreted).json()) as ResultadoCatalogo
           expect(proposal.captura_origen).toBe(asr.id)
-          await expect(page.locator('input[name=nombre]')).toHaveValue('')
-          await assistant.getByRole('button', { name: 'Aplicar propuesta', exact: true }).click()
           await expect(assistant.locator('textarea')).toHaveCount(0)
           await expect(
             page.getByRole('heading', { name: 'Descripción original por voz' }),
@@ -230,7 +228,7 @@ for (const [category, file] of samples) {
             if (!valid) continue
             const confirm = page
               .locator(`[id=${JSON.stringify(id)}]`)
-              .getByRole('button', { name: 'Confirmar campo', exact: true })
+              .getByRole('button', { name: 'Validar valor', exact: true })
             if (!(await confirm.count())) continue
             await confirm.click()
             await expect(confirm).toHaveCount(0)

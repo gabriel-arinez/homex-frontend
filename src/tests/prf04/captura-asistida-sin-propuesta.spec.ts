@@ -19,6 +19,12 @@ async function enviarArchivo() {
     props: { dirty: false, sesion: 'piloto-v13', moneda: 'BOB' },
     global: { stubs: { AudioRecorder: true, Modal: true } },
   })
+  const input = wrapper.get('input[type="file"]')
+  Object.defineProperty(input.element, 'files', {
+    value: [new File(['audio'], 'mueble.wav', { type: 'audio/wav' })],
+  })
+  await input.trigger('change')
+  await flushPromises()
   await wrapper
     .get('textarea')
     .setValue(
@@ -26,7 +32,7 @@ async function enviarArchivo() {
     )
   await wrapper
     .findAll('button')
-    .find((b) => b.text() === 'Procesar texto')!
+    .find((b) => b.text().includes('Procesar y aplicar'))!
     .trigger('click')
   await flushPromises()
   return wrapper
@@ -56,37 +62,46 @@ describe('PRF-04 transcripción visible tras respuesta terminal NLP', () => {
   })
 
   it('aplica la propuesta únicamente cuando requiere revisión y tiene versión válida', async () => {
-    vi.mocked(asistidasService.get).mockResolvedValue({
-      id: 50,
-      estado: 'COMPLETADA',
-      pendientes: [],
-      resultado: 'REQUIRES_REVIEW',
-      texto_transcrito_original:
-        'Un escritorio para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
-      propuesta_configurador: { comercial: { nombre: 'Escritorio' } },
-      version_proyeccion: 'PRF04_2',
-    } as never)
+    vi.mocked(asistidasService.get)
+      .mockResolvedValueOnce({
+        id: 49,
+        estado: 'COMPLETADA',
+        solo_transcribir: true,
+        texto_transcrito_original: 'Un escritorio inicial para oficina',
+      } as never)
+      .mockResolvedValue({
+        id: 50,
+        estado: 'COMPLETADA',
+        pendientes: [],
+        resultado: 'REQUIRES_REVIEW',
+        texto_transcrito_original:
+          'Un escritorio para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+        propuesta_configurador: { comercial: { nombre: 'Escritorio' } },
+        version_proyeccion: 'PRF04_2',
+      } as never)
     const wrapper = await enviarArchivo()
-    expect(wrapper.emitted('applied')).toBeUndefined()
-    await wrapper
-      .findAll('button')
-      .find((b) => b.text() === 'Aplicar propuesta')!
-      .trigger('click')
     expect(wrapper.emitted('applied')).toHaveLength(1)
     wrapper.unmount()
   })
 
   it('no aplica la proyección de una versión no compatible', async () => {
-    vi.mocked(asistidasService.get).mockResolvedValue({
-      id: 50,
-      estado: 'COMPLETADA',
-      pendientes: [],
-      resultado: 'REQUIRES_REVIEW',
-      texto_transcrito_original:
-        'Un escritorio para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
-      propuesta_configurador: { comercial: { nombre: 'Escritorio' } },
-      version_proyeccion: 'PRF04_1',
-    } as never)
+    vi.mocked(asistidasService.get)
+      .mockResolvedValueOnce({
+        id: 49,
+        estado: 'COMPLETADA',
+        solo_transcribir: true,
+        texto_transcrito_original: 'Un escritorio inicial para oficina',
+      } as never)
+      .mockResolvedValue({
+        id: 50,
+        estado: 'COMPLETADA',
+        pendientes: [],
+        resultado: 'REQUIRES_REVIEW',
+        texto_transcrito_original:
+          'Un escritorio para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+        propuesta_configurador: { comercial: { nombre: 'Escritorio' } },
+        version_proyeccion: 'PRF04_1',
+      } as never)
     const wrapper = await enviarArchivo()
     expect(wrapper.emitted('applied')).toBeUndefined()
     wrapper.unmount()

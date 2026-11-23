@@ -108,31 +108,36 @@ it('records distinct reversions while deduplicating unchanged saves across JSON 
   save('B', 18)
   expect(history as unknown[]).toHaveLength(4)
 })
-it('preserves confirmation controls across equivalent updates caused by input blur', async () => {
+it('marks completed voice fields in green without confirmation button and preserves pending confirmation controls across blur', async () => {
   const component = defineComponent({
     directives: { voiceFields: vVoiceFields },
     setup() {
       const fields = ref<FieldVoiceReview[]>([
-        { field: 'color1', state: 'suggested', reason: '', critical: false },
+        { field: 'color1', state: 'pending', reason: 'Confirmar color', critical: false },
+        { field: 'nombre', state: 'suggested', reason: '', critical: false },
       ])
       return {
         fields,
         refresh: () => {
           fields.value = fields.value.map((field) => ({ ...field }))
         },
-        resolve: () => {
-          fields.value = fields.value.map((field) => ({ ...field, state: 'reviewed' }))
+        resolve: (fieldName: string) => {
+          fields.value = fields.value.map((field) =>
+            field.field === fieldName ? { ...field, state: 'reviewed' } : field,
+          )
         },
       }
     },
     template:
-      '<form v-voice-fields="{fields,resolve}"><input name="price" @change="refresh" /><label>Color<select name="color1"><option value="46">Black</option></select></label></form>',
+      '<form v-voice-fields="{fields,resolve}"><input name="price" @change="refresh" /><input name="nombre" value="Silla" /><label>Color<select name="color1"><option value="46">Black</option></select></label></form>',
   })
   const w = mount(component)
-  const confirmation = w.get('button').element
+  expect(w.get('[name="nombre"]').attributes('data-voice-state')).toBe('suggested')
+  expect(w.find('#voice-status-nombre button').exists()).toBe(false)
+  const confirmation = w.get('#voice-status-color1 button').element
   await w.get('[name="price"]').trigger('change')
-  expect(w.get('button').element).toBe(confirmation)
-  await w.get('button').trigger('click')
+  expect(w.get('#voice-status-color1 button').element).toBe(confirmation)
+  await w.get('#voice-status-color1 button').trigger('click')
   expect(w.get('[name="color1"]').attributes('data-voice-state')).toBe('reviewed')
   w.unmount()
 })

@@ -29,9 +29,11 @@ const emit = defineEmits<{
       :disabled="disabled"
       @click="emit('record')"
     >
-      <Mic :size="28" aria-hidden="true" />
+      <span class="source-action__icon source-action__icon--record" aria-hidden="true">
+        <Mic :size="24" />
+      </span>
       <strong>Grabar descripción</strong>
-      <small>Máximo {{ MAX_RECORD_SECONDS / 60 }} minutos</small>
+      <small>Mínimo 15 s · máximo {{ MAX_RECORD_SECONDS / 60 }} min</small>
     </Button>
     <Button
       variant="secondary"
@@ -39,9 +41,11 @@ const emit = defineEmits<{
       :disabled="disabled"
       @click="emit('upload')"
     >
-      <FileAudio :size="28" aria-hidden="true" />
+      <span class="source-action__icon source-action__icon--upload" aria-hidden="true">
+        <FileAudio :size="24" />
+      </span>
       <strong>Seleccionar archivo</strong>
-      <small>Hasta 20 MB y {{ MAX_UPLOAD_SECONDS / 60 }} minutos</small>
+      <small>Mínimo 15 s · hasta 20 MB y {{ MAX_UPLOAD_SECONDS / 60 }} min</small>
     </Button>
     <p v-if="hint" class="hint">{{ hint }}</p>
   </div>
@@ -88,7 +92,21 @@ const emit = defineEmits<{
 .voice-source-actions :deep(.source-action small) {
   font-size: 0.76rem;
   font-weight: 400;
-  opacity: 1;
+  opacity: 0.92;
+}
+.source-action__icon {
+  display: grid;
+  width: 2.85rem;
+  height: 2.85rem;
+  place-items: center;
+  border-radius: 0.85rem;
+}
+.source-action__icon--record {
+  background: rgb(255 255 255 / 16%);
+}
+.source-action__icon--upload {
+  background: var(--color-info-soft);
+  color: var(--color-info);
 }
 .hint {
   grid-column: 1 / -1;

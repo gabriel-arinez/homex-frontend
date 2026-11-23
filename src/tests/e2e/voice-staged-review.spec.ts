@@ -129,22 +129,16 @@ test('@a11y catalog voice uses automatic ASR, corrected text, explicit interpret
   expect((await new AxeBuilder({ page }).include('.staged-voice').analyze()).violations).toEqual([])
   await expect(page.locator('input[name=nombre]')).toHaveValue('')
   await drawer.locator('textarea').fill('dato '.repeat(19).trim())
-  await expect(drawer.getByRole('button', { name: 'Procesar texto', exact: true })).toBeDisabled()
+  await expect(
+    drawer.getByRole('button', { name: 'Procesar y aplicar', exact: true }),
+  ).toBeDisabled()
   await drawer.locator('textarea').fill('dato '.repeat(20).trim())
-  await expect(drawer.getByRole('button', { name: 'Procesar texto', exact: true })).toBeEnabled()
+  await expect(
+    drawer.getByRole('button', { name: 'Procesar y aplicar', exact: true }),
+  ).toBeEnabled()
   expect(textRequests).toBe(0)
   await drawer.locator('textarea').fill(corrected)
-  await drawer.getByRole('button', { name: 'Procesar texto', exact: true }).click()
-  await expect(drawer.getByRole('button', { name: 'Aplicar propuesta', exact: true })).toBeVisible()
-  await expect(drawer.locator('mark.UNRESOLVED')).toHaveText('450')
-  await expect(drawer.locator('pre')).toHaveCount(0)
-  await expect(drawer.getByLabel('Atributos comerciales reconocidos')).toContainText(
-    'Precio de lista (BOB)',
-  )
-  await expect(page.locator('input[name=nombre]')).toHaveValue('')
-  await drawer.getByLabel('Atributos comerciales reconocidos').scrollIntoViewIfNeeded()
-  await page.screenshot({ path: '/tmp/homex-voice-review-before-apply.png', fullPage: true })
-  await drawer.getByRole('button', { name: 'Aplicar propuesta', exact: true }).click()
+  await drawer.getByRole('button', { name: 'Procesar y aplicar', exact: true }).click()
   await expect(page.locator('input[name=nombre]')).toHaveValue('Silla plegable')
   await expect(page.locator('input[name=precio]')).toHaveValue('450.00')
   await expect(drawer.locator('textarea')).toHaveCount(0)
@@ -154,10 +148,7 @@ test('@a11y catalog voice uses automatic ASR, corrected text, explicit interpret
   await expect(
     page.getByRole('alert').filter({ hasText: 'Revisa los campos señalados' }),
   ).toBeVisible()
-  await page
-    .locator('#voice-status-precio')
-    .getByRole('button', { name: 'Confirmar campo' })
-    .click()
+  await page.locator('#voice-status-precio').getByRole('button', { name: 'Validar valor' }).click()
   await expect(page.locator('input[name=precio]')).toHaveAttribute('data-voice-state', 'reviewed')
   expect(audioRequests).toBe(1)
   expect(textRequests).toBe(1)

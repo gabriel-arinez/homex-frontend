@@ -1558,20 +1558,21 @@ function submit(): boolean {
         >('input,select,textarea') ?? [],
       ).find((control) => control.name === field || control.id === field)
       if (
-        !resolution ||
         !suggested ||
         known.has(suggested.field) ||
         !control?.value.trim() ||
         !control.checkValidity()
       )
         continue
+      const fieldState = voiceReview.value.fields.find((item) => item.field === field)?.state
+      if (!resolution && fieldState !== 'suggested') continue
       known.add(suggested.field)
       decisiones.push(
         humanVoiceDecision(props.voiceCaptureId, {
           review_id: `field:${suggested.field}`,
           field: suggested.field,
           evidence_ids: [],
-          estado: resolution.state === 'reviewed' ? 'confirmado' : 'corregido',
+          estado: resolution?.state === 'edited' ? 'corregido' : 'confirmado',
           valor_original: clonarTecnica(suggested.original),
           valor_final: clonarTecnica(suggested.final),
         }),
@@ -1720,20 +1721,31 @@ onMounted(loadCatalog)
           aria-label="Información pendiente"
           aria-live="polite"
         >
-          <h3>Información pendiente</h3>
-          <ul>
-            <li v-for="p in pendientesVisibles" :key="p.indice">
-              <span>{{ p.mensaje }}</span>
+          <div class="pending-summary__head">
+            <span class="pending-summary__icon" aria-hidden="true">
+              <AlertCircle :size="18" />
+            </span>
+            <div>
+              <h3>Información pendiente ({{ pendientesVisibles.length }})</h3>
+              <p>
+                Revisa únicamente estos puntos detectados por el asistente; los campos en verde ya
+                quedaron listos.
+              </p>
+            </div>
+          </div>
+          <ul class="pending-cards">
+            <li v-for="p in pendientesVisibles" :key="p.indice" class="pending-card">
+              <p class="pending-card__message">{{ p.mensaje }}</p>
               <div
                 v-if="
                   p.codigo === 'ESPESOR_SIN_COMPONENTE' &&
                   p.resolucion?.tipo === 'ESPESOR_SIN_COMPONENTE' &&
                   p.resolucion.valor
                 "
-                class="inline"
+                class="pending-card__thickness"
               >
                 <label>
-                  Componente para {{ p.resolucion.valor }}
+                  <span>Componente para {{ p.resolucion.valor }}</span>
                   <select v-model="destinosEspesor[p.indice]" :id="`espesor-destino-${p.indice}`">
                     <option value="">Seleccione un componente</option>
                     <option v-for="c in componentes" :key="c.uid" :value="c.uid">
@@ -1741,22 +1753,34 @@ onMounted(loadCatalog)
                     </option>
                   </select>
                 </label>
-                <Button variant="secondary" @click="aplicarEspesor(p)"> Asignar espesor </Button>
-                <Button variant="secondary" @click="corregirEspesor(p)">
-                  Confirmar corrección de espesor
-                </Button>
+                <div class="pending-card__actions">
+                  <Button variant="success" @click="aplicarEspesor(p)"> Asignar espesor </Button>
+                  <Button variant="secondary" @click="corregirEspesor(p)">
+                    Confirmar corrección de espesor
+                  </Button>
+                </div>
               </div>
-              <Button variant="secondary" @click="reviewPending(p)"
-                >Revisar {{ p.resolucion?.clave || 'campo' }}</Button
-              >
-              <label
-                >Motivo de descarte<input
-                  v-model="motivosDescarte[p.indice]"
-                  :name="`descarte-${p.indice}`"
-              /></label>
-              <Button variant="secondary" @click="descartarPendiente(p)"
-                >Descartar observación</Button
-              >
+              <div class="pending-card__actions">
+                <Button variant="warning" @click="reviewPending(p)">
+                  Revisar {{ p.resolucion?.clave || 'campo' }}
+                </Button>
+                <details class="pending-discard-details">
+                  <summary>Descartar</summary>
+                  <div class="pending-discard-form">
+                    <label>
+                      <span>Motivo de descarte</span>
+                      <input
+                        v-model="motivosDescarte[p.indice]"
+                        :name="`descarte-${p.indice}`"
+                        placeholder="Indica por qué no aplica…"
+                      />
+                    </label>
+                    <Button variant="secondary" @click="descartarPendiente(p)">
+                      Descartar observación
+                    </Button>
+                  </div>
+                </details>
+              </div>
             </li>
           </ul>
         </aside>
@@ -3307,9 +3331,101 @@ onMounted(loadCatalog)
   color: var(--color-text);
 }
 .pending-summary {
+  display: grid;
+  gap: var(--space-3);
   padding: var(--space-4);
-  border: 2px solid var(--color-danger);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 50%, var(--color-border));
+  border-radius: var(--radius-card);
+  background: var(--color-warning-soft);
+}
+.pending-summary__head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.pending-summary__icon {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: none;
+  place-items: center;
+  border-radius: 0.65rem;
+  background: color-mix(in srgb, var(--color-warning) 18%, var(--color-surface));
+  color: var(--color-warning);
+}
+.pending-summary__head h3 {
+  margin: 0;
+  font-size: 0.96rem;
+}
+.pending-summary__head p {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+.pending-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.pending-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-warning);
   border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+.pending-card__message {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+.pending-card__thickness {
+  display: grid;
+  gap: var(--space-2);
+}
+.pending-card__thickness label,
+.pending-discard-form label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+.pending-card__thickness select,
+.pending-discard-form input {
+  min-height: 2.35rem;
+  padding: 0.4rem 0.65rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-background);
+  color: var(--color-text);
+  font: inherit;
+}
+.pending-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.pending-discard-details summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  padding: 0.35rem 0.55rem;
+}
+.pending-discard-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
 }
 .dimension-pending {
   flex-basis: 100%;

@@ -30,11 +30,8 @@ test('PRF-04 voz real hasta guardado integral sin escrituras prematuras', async 
   await expect(transcript).toHaveValue(/escritorio/i, { timeout: 240_000 })
   expect(comerciales).toEqual([])
   await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('')
-  await assistant.getByRole('button', { name: 'Procesar texto', exact: true }).click()
-  await assistant
-    .getByRole('button', { name: 'Aplicar propuesta', exact: true })
-    .click({ timeout: 60_000 })
-  await expect(assistant.locator('textarea')).toHaveCount(0)
+  await assistant.getByRole('button', { name: 'Procesar y aplicar', exact: true }).click()
+  await expect(assistant.locator('textarea')).toHaveCount(0, { timeout: 60_000 })
   await page
     .getByRole('navigation', { name: 'Apartados del mueble a pedido' })
     .getByRole('button', { name: /General/ })

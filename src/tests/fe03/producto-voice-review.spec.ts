@@ -134,7 +134,10 @@ it('audits nested specification corrections with accepted evidence only', async 
   await w.get('[name="sku"]').setValue('NESTED-VOICE')
   const field = w.get('[name="especificaciones.material_respaldo"]')
   await field.setValue('PVC')
-  await w.get('[id="voice-status-especificaciones.apilable"] button').trigger('click')
+  expect(w.get('[name="especificaciones.apilable"]').attributes('data-voice-state')).toBe(
+    'suggested',
+  )
+  expect(w.find('[id="voice-status-especificaciones.apilable"] button').exists()).toBe(false)
   expect(field.attributes('data-voice-state')).toBe('edited')
   await w.get('form').trigger('submit')
   const body = w.emitted('save')![0]![0] as {
@@ -212,8 +215,7 @@ it('confirms and corrects suggested multiline notes through the actual textarea'
   await w.get('[name="sku"]').setValue('NOTES-VOICE')
   await w.get('[name="unidad"]').setValue('6')
   const notes = w.get('textarea[name="observaciones"]')
-  await w.get('#voice-status-observaciones button').trigger('click')
-  expect(notes.attributes('data-voice-state')).toBe('reviewed')
+  expect(notes.attributes('data-voice-state')).toBe('suggested')
   await notes.setValue('Acabado satinado')
   expect(notes.attributes('data-voice-state')).toBe('edited')
   await w.get('form').trigger('submit')
@@ -251,8 +253,7 @@ it('confirms an accepted mapped color select and persists its real evidence', as
   const color = w.get<HTMLSelectElement>('#color1')
   expect(color.element.value).toBe('46')
   expect(color.element.checkValidity()).toBe(true)
-  await w.get('#voice-status-color1 button').trigger('click')
-  expect(color.attributes('data-voice-state')).toBe('reviewed')
+  expect(color.attributes('data-voice-state')).toBe('suggested')
   await w.get('[name="sku"]').setValue('COLOR-VOICE')
   await w.get('form').trigger('submit')
   const body = w.emitted('save')![0]![0] as {

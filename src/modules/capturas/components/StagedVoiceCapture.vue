@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { AlertTriangle, CheckCircle2, FileText, Mic, RotateCcw, Sparkles } from '@lucide/vue'
 import type { CategoriaEnum, ResultadoCatalogo, ResultadoAsistida } from '@/generated/api'
 import { catalogoCapturaService } from '@/modules/productos/services/catalogoCapturaService'
 import { asistidasService } from '../services/asistidasService'
@@ -13,12 +14,9 @@ import {
   countTranscriptCharacters,
 } from '../audioLimits'
 import { prepareAudioForCapture } from '../audioConversion'
-import ProposalSummary from './ProposalSummary.vue'
-import type { VoiceEvidence } from '../voiceEvidence'
 import AudioRecorder from './AudioRecorder.vue'
 import AudioReview from './AudioReview.vue'
 import VoiceCaptureControls from './VoiceCaptureControls.vue'
-import TranscriptEvidence from './TranscriptEvidence.vue'
 import Button from '@/shared/ui/Button.vue'
 const props = defineProps<{
   mode: 'catalog' | 'furniture'
@@ -54,13 +52,15 @@ const originCaptureId = computed(() => asrCaptureId.value ?? lastInterpretationI
 const busy = computed(
   () => processing.value || recording.value || requesting.value || preparingAudio.value,
 )
-let proposalGeneration = -1
-let proposalText = ''
 let settingAsrText = false
 const editError = ref('')
+const appliedWarnings = ref<string[]>([])
 const transcriptWords = computed(() => countTranscriptWords(text.value))
 const transcriptCharacters = computed(() => countTranscriptCharacters(text.value))
 const transcriptError = computed(() => validateTranscript(text.value))
+const hasTranscriptStage = computed(() =>
+  Boolean(text.value || original.value || asrCaptureId.value),
+)
 const catalog = computed(() => (result.value && 'propuesta' in result.value ? result.value : null))
 const furniture = computed(() =>
   result.value && 'propuesta_configurador' in result.value ? result.value : null,
@@ -73,10 +73,6 @@ const proposal = computed(() =>
       ? furniture.value.propuesta_configurador
       : null,
 )
-const evidence = computed(
-  () =>
-    (catalog.value?.propuesta?.evidence ?? furniture.value?.candidatos ?? []) as VoiceEvidence[],
-)
 const warnings = computed(
   () =>
     catalog.value?.propuesta?.warnings ?? furniture.value?.pendientes.map((p) => p.mensaje) ?? [],
@@ -87,7 +83,6 @@ function cancel() {
   generation++
   controller?.abort()
   result.value = null
-  proposalGeneration = -1
   processing.value = false
   preparingAudio.value = false
   emit('processing', false)
@@ -120,8 +115,19 @@ watch(
     asrCaptureId.value = null
     lastInterpretationId.value = null
     applied.value = false
+    appliedWarnings.value = []
   },
 )
+function resetAll() {
+  discard()
+  result.value = null
+  text.value = ''
+  original.value = ''
+  asrCaptureId.value = null
+  lastInterpretationId.value = null
+  applied.value = false
+  appliedWarnings.value = []
+}
 onBeforeUnmount(discard)
 async function start() {
   if (processing.value || requesting.value) return
@@ -148,6 +154,15 @@ async function start() {
 }
 function status(state: string, seconds: number) {
   paused.value = state === 'PAUSED'
+  if (['ERROR', 'DENIED', 'UNSUPPORTED'].includes(state) && recording.value) {
+    recording.value = false
+    paused.value = false
+    requesting.value = false
+    error.value =
+      recorder.value?.getError?.() || 'La grabación no cumplió el mínimo requerido de 15 segundos.'
+    emit('recording-state', false, false, 0)
+    return
+  }
   emit(
     'recording-state',
     recording.value && ['RECORDING', 'PAUSED'].includes(state),
@@ -212,7 +227,17 @@ async function process(useAudio = false) {
   const current = generation,
     abort = new AbortController()
   controller = abort
-  const submittedText = text.value
+  const submittedText = useAudio
+    ? text.value
+    : text.value
+        .normalize('NFC')
+        .replace(/[ \t]+/g, ' ')
+        .trim()
+  if (!useAudio && submittedText !== text.value) {
+    settingAsrText = true
+    text.value = submittedText
+    settingAsrText = false
+  }
   processing.value = true
   emit('processing', true)
   try {
@@ -248,18 +273,22 @@ async function process(useAudio = false) {
           useAudio &&
           (response.estado === 'COMPLETADA' || response.texto_transcrito_original?.trim())
         ) {
-          // Set editable text before the result: the watcher invalidates prior interpretations.
-          asrCaptureId.value = response.id
-          settingAsrText = true
-          text.value = response.texto_transcrito_original ?? ''
-          settingAsrText = false
-          original.value = response.texto_asr_original ?? response.texto_transcrito_original ?? ''
-          if (text.value.trim()) audio.value = null
-          else if (response.estado === 'COMPLETADA') {
+          const normalizedTranscript = (response.texto_transcrito_original ?? '')
+            .normalize('NFC')
+            .replace(/[ \t]+/g, ' ')
+            .trim()
+          if (!normalizedTranscript && response.estado === 'COMPLETADA') {
             error.value =
               'No se reconoció texto. Escucha el audio, repite la grabación o reintenta la transcripción.'
             return
           }
+          // Set editable text before the result: the watcher invalidates prior interpretations.
+          asrCaptureId.value = response.id
+          settingAsrText = true
+          text.value = normalizedTranscript
+          settingAsrText = false
+          original.value = response.texto_asr_original ?? normalizedTranscript
+          if (text.value.trim()) audio.value = null
         }
         if (response.estado === 'ERROR') {
           error.value =
@@ -270,12 +299,16 @@ async function process(useAudio = false) {
         }
         if (!useAudio) {
           lastInterpretationId.value = response.id
-          proposalText = submittedText
-          proposalGeneration = current
           result.value = response
-          if (!proposal.value)
+          if (!proposal.value) {
             error.value =
               'No se identificó una propuesta comercial. Añade o corrige la descripción y vuelve a procesar.'
+          } else {
+            appliedWarnings.value = [...warnings.value]
+            applied.value = true
+            emit('applied', response)
+            result.value = null
+          }
         }
         return
       }
@@ -333,29 +366,6 @@ function pasteTranscript(event: ClipboardEvent) {
       'No se pegó el texto: el máximo es 3000 caracteres. El contenido existente se conserva.'
   }
 }
-function normalizeText() {
-  text.value = text.value
-    .normalize('NFC')
-    .replace(/[ \t]+/g, ' ')
-    .trim()
-}
-
-const canApply = computed(() =>
-  Boolean(
-    result.value &&
-    proposal.value &&
-    !busy.value &&
-    !audio.value &&
-    proposalGeneration === generation &&
-    proposalText === text.value,
-  ),
-)
-function apply() {
-  if (!canApply.value || !result.value) return
-  applied.value = true
-  emit('applied', result.value)
-  result.value = null
-}
 </script>
 <template>
   <section
@@ -363,9 +373,13 @@ function apply() {
     aria-label="Captura por voz con revisión humana"
     :aria-busy="processing"
   >
-    <h3>Descripción por voz</h3>
-    <p>Dicta nombre, medidas, materiales o características del mueble o producto.</p>
+    <div class="voice-intro">
+      <h3>Descripción por voz</h3>
+      <p>Dicta o sube un audio con el nombre, medidas, materiales y precio.</p>
+    </div>
+
     <VoiceCaptureControls
+      v-if="!hasTranscriptStage && !applied && !processing && !preparingAudio"
       :recording="recording"
       :paused="paused"
       :disabled="processing || requesting || preparingAudio"
@@ -376,16 +390,18 @@ function apply() {
       @finish="recorder?.stopRecording()"
       @cancel="discard"
     >
-      <template #recorder
-        ><AudioRecorder
+      <template #recorder>
+        <AudioRecorder
           v-if="recording"
           ref="recorder"
           compact
           :min-duration-seconds="MIN_AUDIO_SECONDS"
           @ready="recorded"
           @status="status"
-      /></template>
+        />
+      </template>
     </VoiceCaptureControls>
+
     <input
       ref="fileInput"
       type="file"
@@ -397,122 +413,460 @@ function apply() {
       :disabled="busy"
       @change="upload"
     />
+
+    <!-- Animación de procesamiento ASR o NLP -->
+    <div v-if="preparingAudio || processing" class="voice-processing-card" role="status">
+      <div class="voice-processing-card__visual" aria-hidden="true">
+        <span class="voice-pulse-ring" />
+        <Mic v-if="preparingAudio || audio" :size="22" />
+        <Sparkles v-else :size="22" />
+      </div>
+      <div class="voice-processing-card__copy">
+        <strong>
+          {{
+            preparingAudio
+              ? 'Validando audio…'
+              : audio
+                ? 'Transcribiendo audio…'
+                : 'Procesando con NLP y aplicando…'
+          }}
+        </strong>
+        <span>
+          {{
+            preparingAudio
+              ? 'Comprobando formato y duración mínima de 15 segundos.'
+              : audio
+                ? 'Convirtiendo tu grabación en texto para que puedas revisarlo.'
+                : 'Extrayendo campos técnicos y comerciales para el formulario.'
+          }}
+        </span>
+        <div class="voice-progress-bar" aria-hidden="true">
+          <span class="voice-progress-bar__fill" />
+        </div>
+      </div>
+      <Button variant="secondary" @click="preparingAudio ? discard() : cancel()">Cancelar</Button>
+    </div>
+
+    <!-- Pista de audio grabada (estilizada) -->
     <AudioReview
-      v-if="previewAudio && !applied"
+      v-if="previewAudio && !applied && !processing"
       :audio="previewAudio"
       :disabled="processing"
       :retry="Boolean(audio) && !processing"
       @retry="process(true)"
-      @discard="discard"
+      @discard="resetAll"
     />
-    <template v-if="!applied">
-      <label
-        >Revisar y corregir transcripción<textarea
+
+    <!-- Alertas de validación o error con botón de reinicio -->
+    <div v-if="error && !processing" class="voice-alert-card" role="alert">
+      <div class="voice-alert-card__head">
+        <AlertTriangle :size="18" aria-hidden="true" />
+        <div>
+          <strong>Revisa antes de continuar</strong>
+          <p>{{ error }}</p>
+        </div>
+      </div>
+      <div v-if="!hasTranscriptStage" class="voice-alert-card__actions">
+        <Button variant="warning" @click="start">
+          <RotateCcw :size="15" aria-hidden="true" />
+          Reiniciar grabación
+        </Button>
+        <Button variant="secondary" @click="chooseAudio">Subir otro archivo</Button>
+      </div>
+    </div>
+
+    <!-- Único apartado de Revisión y Corrección tras transcribir -->
+    <section
+      v-if="hasTranscriptStage && !applied && !processing"
+      class="transcript-review-card"
+      aria-label="Revisión y corrección de transcripción"
+    >
+      <div class="transcript-review-card__head">
+        <span class="transcript-review-card__icon" aria-hidden="true">
+          <FileText :size="18" />
+        </span>
+        <div>
+          <h4>Revisar y corregir transcripción</h4>
+          <p>Ajusta cualquier palabra o número y aplica directamente al formulario.</p>
+        </div>
+      </div>
+
+      <label class="transcript-label">
+        <span class="sr-only">Revisar y corregir transcripción</span>
+        <textarea
           :value="text"
+          class="transcript-textarea"
+          aria-label="Revisar y corregir transcripción"
           aria-describedby="voice-transcript-count voice-transcript-error"
-          @input="updateTranscript"
-          @paste="pasteTranscript"
           :aria-invalid="Boolean(transcriptError && text)"
           rows="7"
           :disabled="recording"
+          @input="updateTranscript"
+          @paste="pasteTranscript"
         />
       </label>
-      <Button
-        variant="secondary"
-        :disabled="processing || recording || !text"
-        @click="normalizeText"
-        >Normalizar espacios</Button
+
+      <div id="voice-transcript-count" class="transcript-constraints" aria-live="polite">
+        <span
+          class="constraint-pill"
+          :class="transcriptWords >= 20 ? 'constraint-pill--ok' : 'constraint-pill--warn'"
+        >
+          {{ transcriptWords }} / 20 palabras mínimas
+        </span>
+        <span
+          class="constraint-pill"
+          :class="
+            transcriptCharacters <= MAX_TRANSCRIPT_CHARACTERS
+              ? 'constraint-pill--neutral'
+              : 'constraint-pill--danger'
+          "
+        >
+          {{ transcriptCharacters }} / {{ MAX_TRANSCRIPT_CHARACTERS }} caracteres máx.
+        </span>
+      </div>
+
+      <p
+        v-if="text && transcriptError"
+        id="voice-transcript-error"
+        class="transcript-inline-alert"
+        role="alert"
       >
-      <small id="voice-transcript-count" aria-live="polite"
-        >{{ transcriptWords }} / 20 palabras mínimas · {{ transcriptCharacters }} /
-        {{ MAX_TRANSCRIPT_CHARACTERS }} caracteres</small
-      >
-      <details v-if="original">
-        <summary>Transcripción original del ASR (evidencia)</summary>
-        <p class="original">{{ original }}</p>
-      </details>
-      <p id="voice-transcript-error" :role="text && transcriptError ? 'alert' : undefined">
-        {{ transcriptError }}
+        <AlertTriangle :size="15" aria-hidden="true" />
+        <span>{{ transcriptError }}</span>
       </p>
-      <p v-if="editError" role="alert">{{ editError }}</p>
-      <Button :disabled="busy || Boolean(audio) || Boolean(transcriptError)" @click="process(false)"
-        >Procesar texto</Button
-      >
-      <section v-if="result && proposal" aria-label="Revisar propuesta comercial">
-        <h3>Revisar propuesta</h3>
-        <TranscriptEvidence :text="text" :evidence="evidence" />
-        <ProposalSummary
-          :result="result"
-          :evidence="evidence"
-          :options="options"
-          :currency="moneda"
-        />
-        <ul v-if="warnings.length">
-          <li v-for="warning in warnings" :key="warning">{{ warning }}</li>
+      <p v-if="editError" class="transcript-inline-alert" role="alert">
+        <AlertTriangle :size="15" aria-hidden="true" />
+        <span>{{ editError }}</span>
+      </p>
+
+      <div class="transcript-actions">
+        <Button
+          variant="success"
+          :disabled="busy || Boolean(audio) || Boolean(transcriptError)"
+          @click="process(false)"
+        >
+          <Sparkles :size="16" aria-hidden="true" />
+          Procesar y aplicar
+        </Button>
+        <Button variant="secondary" :disabled="busy" @click="resetAll">
+          <RotateCcw :size="15" aria-hidden="true" />
+          Grabar de nuevo
+        </Button>
+      </div>
+    </section>
+
+    <!-- Estado posterior a la aplicación directa al formulario -->
+    <div v-if="applied" class="voice-applied-stack">
+      <div class="voice-success-card" role="status">
+        <CheckCircle2 :size="20" aria-hidden="true" />
+        <div>
+          <strong>Propuesta aplicada al formulario</strong>
+          <p>
+            Los campos detectados se marcaron en verde. Si hay observaciones, aparecerán señaladas
+            en el formulario.
+          </p>
+        </div>
+      </div>
+
+      <div v-if="appliedWarnings.length" class="voice-warnings-card" role="status">
+        <div class="voice-warnings-card__head">
+          <AlertTriangle :size="17" aria-hidden="true" />
+          <strong>Observaciones detectadas ({{ appliedWarnings.length }})</strong>
+        </div>
+        <ul>
+          <li v-for="warning in appliedWarnings" :key="warning">{{ warning }}</li>
         </ul>
-        <p v-if="dirty">
-          La aplicación reemplazará la información de este mueble. Revisa los datos antes de
-          confirmar.
-        </p>
-        <p>
-          Confirma la propuesta para incorporarla. Las observaciones pendientes se revisarán en los
-          campos del formulario.
-        </p>
-        <Button :disabled="!canApply" @click="apply">Aplicar propuesta</Button>
-      </section>
-    </template>
-    <p v-else role="status">Propuesta aplicada. Continúa en los campos del formulario.</p>
-    <p v-if="preparingAudio" role="status">
-      Validando y preparando audio…<Button variant="secondary" @click="discard">Cancelar</Button>
-    </p>
-    <p v-if="processing" role="status">
-      {{
-        audio
-          ? 'Transcribiendo audio; todavía no se ejecuta NLP.'
-          : 'Interpretando el texto revisado.'
-      }}
-      <Button variant="secondary" @click="cancel">Cancelar</Button>
-    </p>
-    <p v-if="error" role="alert">{{ error }}</p>
+      </div>
+
+      <div class="voice-applied-actions">
+        <Button variant="secondary" @click="applied = false">
+          <FileText :size="15" aria-hidden="true" />
+          Editar transcripción
+        </Button>
+        <Button variant="secondary" @click="resetAll">
+          <RotateCcw :size="15" aria-hidden="true" />
+          Nueva captura por voz
+        </Button>
+      </div>
+    </div>
   </section>
 </template>
 <style scoped>
 .staged-voice {
   padding: var(--space-5);
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-4);
+}
+.voice-intro {
+  display: grid;
+  gap: 0.25rem;
 }
 h3,
+h4,
 p {
   margin: 0;
 }
-label {
-  display: grid;
-  gap: var(--space-2);
-  font-weight: 600;
+.voice-intro p {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
 }
-textarea {
+.voice-processing-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--color-info) 38%, var(--color-border));
+  border-radius: var(--radius-card);
+  background: var(--color-info-soft);
+}
+.voice-processing-card__visual {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 2.85rem;
+  height: 2.85rem;
+  border-radius: 999px;
+  background: var(--color-info);
+  color: #fff;
+}
+.voice-pulse-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 999px;
+  border: 2px solid var(--color-info);
+  animation: voice-pulse 1.4s ease-out infinite;
+}
+.voice-processing-card__copy {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.voice-processing-card__copy strong {
+  font-size: 0.92rem;
+}
+.voice-processing-card__copy span {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+.voice-progress-bar {
+  position: relative;
+  height: 0.3rem;
+  margin-top: 0.25rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-info) 20%, transparent);
+  overflow: hidden;
+}
+.voice-progress-bar__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 42%;
+  border-radius: 999px;
+  background: var(--color-info);
+  animation: voice-slide 1.2s ease-in-out infinite;
+}
+@keyframes voice-pulse {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1.28);
+    opacity: 0;
+  }
+}
+@keyframes voice-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+.voice-alert-card {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 50%, var(--color-border));
+  border-radius: var(--radius-card);
+  background: var(--color-warning-soft);
+}
+.voice-alert-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  color: var(--color-warning);
+}
+.voice-alert-card__head strong {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+.voice-alert-card__head p {
+  margin-top: 0.2rem;
+  font-size: 0.84rem;
+  color: var(--color-text);
+}
+.voice-alert-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.transcript-review-card {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+.transcript-review-card__head {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+.transcript-review-card__icon {
+  display: grid;
+  width: 2.2rem;
+  height: 2.2rem;
+  flex: none;
+  place-items: center;
+  border-radius: 0.65rem;
+  background: var(--color-primary-soft);
+  color: var(--color-primary-accent);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 24%, transparent);
+}
+.transcript-review-card__head h4 {
+  font-size: 0.95rem;
+}
+.transcript-review-card__head p {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+.transcript-label {
+  display: grid;
+}
+.transcript-textarea {
   width: 100%;
   box-sizing: border-box;
-  padding: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   color: var(--color-text);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  background: var(--color-background);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-control);
   font: inherit;
+  font-size: 1.04rem;
+  line-height: 1.6;
   resize: vertical;
+}
+.transcript-textarea:focus {
+  outline: 2px solid var(--color-primary-accent);
+  outline-offset: 1px;
+}
+.transcript-constraints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.constraint-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 650;
+  border: 1px solid var(--color-border);
+}
+.constraint-pill--ok {
+  color: var(--color-success);
+  background: var(--color-success-soft);
+  border-color: color-mix(in srgb, var(--color-success) 35%, transparent);
+}
+.constraint-pill--warn {
+  color: var(--color-warning);
+  background: var(--color-warning-soft);
+  border-color: color-mix(in srgb, var(--color-warning) 35%, transparent);
+}
+.constraint-pill--danger {
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+  border-color: color-mix(in srgb, var(--color-danger) 35%, transparent);
+}
+.constraint-pill--neutral {
+  color: var(--color-text-secondary);
+  background: var(--color-surface-soft);
+}
+.transcript-inline-alert {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-control);
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.transcript-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.voice-applied-stack {
+  display: grid;
+  gap: var(--space-3);
+}
+.voice-applied-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.voice-success-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--color-success) 40%, var(--color-border));
+  border-radius: var(--radius-card);
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+.voice-success-card strong {
+  display: block;
+  color: var(--color-text);
+  font-size: 0.94rem;
+}
+.voice-success-card p {
+  margin-top: 0.2rem;
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+}
+.voice-warnings-card {
+  display: grid;
+  gap: 0.5rem;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 40%, var(--color-border));
+  border-radius: var(--radius-card);
+  background: var(--color-warning-soft);
+}
+.voice-warnings-card__head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--color-warning);
+  font-size: 0.86rem;
+}
+.voice-warnings-card ul {
+  margin: 0;
+  padding-left: 1.15rem;
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.82rem;
 }
 .file-input {
   position: absolute;
   width: 1px;
   height: 1px;
   clip-path: inset(50%);
-}
-.original,
-.proposal {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  max-height: 24rem;
-  overflow-y: auto;
 }
 </style>

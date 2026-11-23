@@ -15,7 +15,7 @@ vi.mock('@/modules/capturas/services/asistidasService', () => ({
 }))
 vi.mock('@/modules/capturas/audioConversion', () => ({ prepareAudioForCapture: prepare }))
 const button = (w: ReturnType<typeof mount>, text: string) =>
-  w.findAll('button').find((b) => b.text() === text)
+  w.findAll('button').find((b) => b.text().includes(text))
 const blob = new Blob(['valid audio'], { type: 'audio/wav' })
 const recorder = defineComponent({
   emits: ['ready'],
@@ -72,7 +72,7 @@ for (const mode of ['catalog', 'furniture'] as const) {
         'Silla plegable precio 450 para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
       )
     expect(create).toHaveBeenCalledTimes(1)
-    await button(w, 'Procesar texto')!.trigger('click')
+    await button(w, 'Procesar y aplicar')!.trigger('click')
     await flushPromises()
     expect(create).toHaveBeenCalledTimes(2)
     expect(create.mock.calls[1]![0]).toMatchObject({
@@ -117,17 +117,17 @@ it('a cancelled conversion cannot auto-submit after a newer valid file', async (
   expect(w.get('textarea').element.value).toContain('Silla plegable')
   w.unmount()
 })
-it('an invalid file never starts ASR and keeps previous editable text', async () => {
+it('an invalid file never starts ASR and shows reset alert before transcription', async () => {
   const w = setup('furniture')
-  await w.get('textarea').setValue('Mesa de madera')
+  expect(w.find('textarea').exists()).toBe(false)
   prepare.mockRejectedValue(new Error('Audio incompatible'))
   await upload(w)
   expect(create).not.toHaveBeenCalled()
-  expect(w.get('textarea').element.value).toBe('Mesa de madera')
   expect(w.text()).toContain('incompatible')
+  expect(button(w, 'Reiniciar grabación')).toBeDefined()
   w.unmount()
 })
-it('empty ASR stays retryable and never enables NLP or an application', async () => {
+it('empty ASR stays retryable and never renders transcript review or application', async () => {
   get.mockResolvedValue({
     id: 1,
     estado: 'COMPLETADA',
@@ -139,7 +139,7 @@ it('empty ASR stays retryable and never enables NLP or an application', async ()
   expect(create).toHaveBeenCalledTimes(1)
   expect(w.get('[role=alert]').text()).toContain('No se reconoció texto')
   expect(button(w, 'Reintentar transcripción')).toBeDefined()
-  expect(button(w, 'Procesar texto')!.attributes('disabled')).toBeDefined()
+  expect(button(w, 'Procesar y aplicar')).toBeUndefined()
   expect(w.emitted('applied')).toBeUndefined()
   w.unmount()
 })

@@ -46,12 +46,12 @@ function mockResult(category: CategoriaEnum) {
 }
 
 function button(wrapper: ReturnType<typeof mount>, label: string) {
-  return wrapper.findAll('button').find((b) => b.text() === label)!
+  return wrapper.findAll('button').find((b) => b.text().includes(label))!
 }
 
 describe('Voz en creación de catálogo', () => {
   it.each(['SILLA', 'PISO_FLOTANTE', 'OTRO'] as const)(
-    'sube audio, conserva categoría y revisa y confirma propuesta: %s',
+    'sube audio, conserva categoría y procesa y aplica propuesta: %s',
     async (category) => {
       mockResult(category)
       const w = mount(CapturaCatalogo, { props: { categoria: category } })
@@ -72,9 +72,8 @@ describe('Voz en creación de catálogo', () => {
         .setValue(
           'nombre: Zócalo para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
         )
-      await button(w, 'Procesar texto').trigger('click')
+      await button(w, 'Procesar y aplicar').trigger('click')
       await flushPromises()
-      await button(w, 'Aplicar propuesta').trigger('click')
       expect(w.emitted('applied')).toEqual([
         [
           {
@@ -150,6 +149,7 @@ describe('Voz en creación de catálogo', () => {
   })
 
   it('conserva la transcripción y grabación al minimizar y reabrir el asistente', async () => {
+    mockResult('SILLA')
     vi.spyOn(proformasService, 'families').mockResolvedValue({
       count: 0,
       next: null,
@@ -170,6 +170,11 @@ describe('Voz en creación de catálogo', () => {
     await flushPromises()
     await w.get('.voice-trigger').trigger('click')
     const assistant = w.getComponent(CapturaCatalogo)
+    const file = new File(['audio'], 'homex.wav', { type: 'audio/wav' })
+    const input = assistant.get('input[type="file"]')
+    Object.defineProperty(input.element, 'files', { value: [file] })
+    await input.trigger('change')
+    await flushPromises()
     await assistant.get('textarea').setValue('Silla plegable corregida')
     await flushPromises()
     await w.get('button[aria-label="Cerrar asistente de voz"]').trigger('click')
@@ -259,7 +264,7 @@ describe('Voz en creación de catálogo', () => {
     // La barra lateral muestra la transcripción conservada y sus avisos
     expect(w.text()).not.toContain('Descripción original por voz')
     expect(w.text()).not.toContain('Nombre Silla Ergonómica Pro precio 4500')
-    expect(w.text()).toContain('Sugerido por voz')
+    expect(w.text()).toContain('✓ Completado por voz')
     expect(w.emitted('save')).toBeUndefined()
     w.unmount()
   })

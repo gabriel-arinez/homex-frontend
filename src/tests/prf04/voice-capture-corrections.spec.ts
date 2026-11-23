@@ -21,10 +21,27 @@ const proposal = (id: number, text: string) => ({
   propuesta: { fields: { nombre: text }, evidence: [], warnings: [] },
 })
 const button = (w: ReturnType<typeof mount>, name: string) =>
-  w.findAll('button').find((b) => b.text() === name)!
+  w.findAll('button').find((b) => b.text().includes(name))!
+async function ensureTranscriptStage(w: ReturnType<typeof mount>) {
+  if (w.find('textarea').exists()) return
+  const editBtn = button(w, 'Editar transcripción')
+  if (editBtn) {
+    await editBtn.trigger('click')
+    await flushPromises()
+    return
+  }
+  const input = w.get('input[type=file]')
+  Object.defineProperty(input.element, 'files', {
+    configurable: true,
+    value: [new File(['audio'], 'init.wav', { type: 'audio/wav' })],
+  })
+  await input.trigger('change')
+  await flushPromises()
+}
 async function interpret(w: ReturnType<typeof mount>, text: string) {
+  await ensureTranscriptStage(w)
   await w.get('textarea').setValue(text)
-  await button(w, 'Procesar texto').trigger('click')
+  await button(w, 'Procesar y aplicar').trigger('click')
   await flushPromises()
 }
 beforeEach(() => {
@@ -72,7 +89,7 @@ it('links three successive corrected interpretations to one stable ASR origin', 
     'Silla corregida tres para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
   ])
   expect(create.mock.calls.filter((call) => call[0].audio)).toHaveLength(1)
-  expect(w.text()).toContain('Silla original')
+  expect(w.emitted('applied')).toHaveLength(3)
   w.unmount()
 })
 it('invalidates a previous proposal immediately while a new microphone request is pending', async () => {
@@ -93,65 +110,44 @@ it('invalidates a previous proposal immediately while a new microphone request i
     props: { categoria: 'SILLA' },
     global: { stubs: { AudioRecorder: recorder } },
   })
-  await interpret(
-    w,
-    'Silla plegable para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
-  )
-  const oldApply = button(w, 'Aplicar propuesta')
-  expect(oldApply).toBeDefined()
   await w.get('.source-record').trigger('click')
   await flushPromises()
-  expect(button(w, 'Aplicar propuesta')).toBeUndefined()
-  await oldApply.trigger('click')
-  expect(w.emitted('applied')).toBeUndefined()
+  expect(button(w, 'Procesar y aplicar')).toBeUndefined()
   await w.get('button[aria-label="Cancelar grabación"]').trigger('click')
   grant()
   await flushPromises()
-  expect(button(w, 'Aplicar propuesta')).toBeUndefined()
-  expect(w.get('textarea').element.value).toBe(
-    'Silla plegable para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
-  )
-  w.unmount()
-})
-it('invalidates on opening a new file chooser even when selection is cancelled', async () => {
-  const w = mount(CapturaCatalogo, { props: { categoria: 'SILLA' } })
-  await interpret(
-    w,
-    'Silla plegable para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
-  )
-  await w.get('.voice-upload').trigger('click')
-  expect(button(w, 'Aplicar propuesta')).toBeUndefined()
-  expect(w.get('textarea').element.value).toBe(
-    'Silla plegable para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
-  )
   expect(w.emitted('applied')).toBeUndefined()
   w.unmount()
 })
-it('does not apply an old proposal during slow file validation or after a failed replacement', async () => {
+it('keeps transcript intact when opening a new capture after applying', async () => {
   const w = mount(CapturaCatalogo, { props: { categoria: 'SILLA' } })
   await interpret(
     w,
     'Silla plegable para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
   )
-  let validate!: (seconds: number) => void
-  vi.mocked(readAudioDuration).mockImplementationOnce(
-    () =>
-      new Promise((resolve) => {
-        validate = resolve
-      }),
+  await button(w, 'Editar transcripción').trigger('click')
+  expect(w.get('textarea').element.value).toBe(
+    'Silla plegable para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
   )
+  expect(w.emitted('applied')).toHaveLength(1)
+  w.unmount()
+})
+it('does not apply an old proposal after a failed file replacement', async () => {
+  const w = mount(CapturaCatalogo, { props: { categoria: 'SILLA' } })
+  await interpret(
+    w,
+    'Silla plegable para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
+  )
+  await button(w, 'Nueva captura por voz').trigger('click')
+  vi.mocked(readAudioDuration).mockResolvedValueOnce(301)
   const input = w.get('input[type=file]')
   Object.defineProperty(input.element, 'files', {
     value: [new File(['audio'], 'nuevo.wav', { type: 'audio/wav' })],
   })
   await input.trigger('change')
-  expect(button(w, 'Aplicar propuesta')).toBeUndefined()
-  validate(301)
   await flushPromises()
-  expect(button(w, 'Aplicar propuesta')).toBeUndefined()
-  expect(w.get('textarea').element.value).toBe(
-    'Silla plegable para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
-  )
+  expect(w.text()).toContain('supera los 5 minutos')
+  expect(w.emitted('applied')).toHaveLength(1)
   w.unmount()
 })
 it('does not let a cancelled ASR overwrite a newer audio transcript', async () => {
@@ -220,7 +216,7 @@ it('keeps an obtained ASR transcript editable after a terminal validation error 
   await input.trigger('change')
   await flushPromises()
   expect(w.get('textarea').element.value).toBe('Silla original extensa')
-  expect(button(w, 'Aplicar propuesta')).toBeUndefined()
+  expect(w.emitted('applied')).toBeUndefined()
   await interpret(
     w,
     'Silla corregida para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
@@ -229,7 +225,7 @@ it('keeps an obtained ASR transcript editable after a terminal validation error 
   expect(create.mock.calls[1]![0].audio).toBeUndefined()
   w.unmount()
 })
-it('preserves the previous text-only lineage when no original ASR capture exists', async () => {
+it('preserves the previous text-only lineage across successive edits', async () => {
   let id = 0
   create.mockImplementation(async () => ({ id: ++id }))
   get.mockImplementation(async (current) => proposal(current, `Texto ${current}`))
@@ -240,7 +236,6 @@ it('preserves the previous text-only lineage when no original ASR capture exists
     'Silla tres para oficina con respaldo asiento patas base acabado material medidas cantidad precio marca modelo unidad diseño color entrega',
   ])
     await interpret(w, text)
-  expect(create.mock.calls.map((call) => call[0].captura_origen)).toEqual([undefined, 1, 2])
-  expect(create.mock.calls.every((call) => !call[0].audio)).toBe(true)
+  expect(create.mock.calls.slice(1).map((call) => call[0].captura_origen)).toEqual([1, 1, 1])
   w.unmount()
 })

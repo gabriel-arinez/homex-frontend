@@ -56,6 +56,21 @@ function cancel() {
         String(MAX_RECORD_SECONDS % 60).padStart(2, '0')
       }}
     </p>
+    <p
+      v-if="
+        props.minDurationSeconds > 2 &&
+        (r.state.value === 'RECORDING' || r.state.value === 'PAUSED')
+      "
+      class="min-duration-hint"
+      :class="{ 'min-duration-hint--ready': r.elapsed.value >= props.minDurationSeconds }"
+      role="status"
+    >
+      <template v-if="r.elapsed.value < props.minDurationSeconds">
+        Mínimo {{ props.minDurationSeconds }} s · faltan
+        {{ props.minDurationSeconds - r.elapsed.value }} s
+      </template>
+      <template v-else> ✓ Duración mínima de {{ props.minDurationSeconds }} s alcanzada </template>
+    </p>
     <p v-if="r.elapsed.value >= MAX_RECORD_SECONDS - 30 && r.state.value !== 'READY'" role="status">
       Quedan {{ MAX_RECORD_SECONDS - r.elapsed.value }} segundos para finalizar automáticamente.
     </p>
@@ -162,6 +177,15 @@ h2 {
   border-radius: var(--radius-control);
   color: var(--color-text);
   font-variant-numeric: tabular-nums;
+}
+.min-duration-hint {
+  margin: 0.45rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-warning);
+}
+.min-duration-hint--ready {
+  color: var(--color-success);
 }
 .live-waveform {
   display: flex;
