@@ -506,8 +506,15 @@ onBeforeUnmount(() => {
           >
           <small>Stock actual: {{ producto.stock }} {{ producto.unidad_stock_info?.nombre }}</small>
           <div class="card-quote-controls">
-            <Button variant="info" @click="preview = producto">
-              <Eye :size="16" aria-hidden="true" /> Ver ficha
+            <Button
+              variant="info"
+              class="card-view-btn"
+              title="Ver ficha"
+              :aria-label="'Ver ficha de ' + producto.nombre"
+              @click="preview = producto"
+            >
+              <Eye :size="16" aria-hidden="true" />
+              <span class="sr-only">Ver ficha</span>
             </Button>
             <input
               v-if="!existingProductIds.includes(producto.id)"
@@ -520,7 +527,7 @@ onBeforeUnmount(() => {
               :aria-label="'Cantidad para ' + producto.nombre"
               @input="setQty(producto.id, ($event.target as HTMLInputElement).value)"
             />
-            <Button variant="primary" @click="selectProduct(producto)">
+            <Button variant="primary" class="card-select-btn" @click="selectProduct(producto)">
               <Check
                 v-if="existingProductIds.includes(producto.id)"
                 :size="16"
@@ -581,10 +588,13 @@ onBeforeUnmount(() => {
               <div class="table-actions">
                 <Button
                   variant="info"
+                  class="card-view-btn"
+                  title="Ver ficha"
                   :aria-label="'Ver ficha de ' + producto.nombre"
                   @click="preview = producto"
                 >
-                  <Eye :size="16" aria-hidden="true" /> Ver ficha
+                  <Eye :size="16" aria-hidden="true" />
+                  <span class="sr-only">Ver ficha</span>
                 </Button>
                 <input
                   v-if="!existingProductIds.includes(producto.id)"
@@ -760,7 +770,7 @@ onBeforeUnmount(() => {
 }
 .resultados-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17.5rem), 1fr));
   gap: var(--space-3);
 }
 .results-tools {
@@ -923,38 +933,51 @@ onBeforeUnmount(() => {
   min-width: 0;
   overflow: hidden;
   display: grid;
+  grid-template-rows: auto 1fr;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
 }
 
 .detalle {
-  display: grid;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-4);
-}
-.detalle > .button:last-child {
-  justify-self: stretch;
+  min-width: 0;
 }
 .detalle h4 {
   font-size: 1rem;
+  margin: 0;
 }
 .detalle small {
   font-size: 0.78rem;
 }
 .detalle p {
   font-size: 0.82rem;
-}
-.detalle button {
-  justify-self: start;
+  margin: 0;
 }
 .card-quote-controls {
   display: grid;
-  grid-template-columns: auto minmax(4.5rem, 5.5rem) minmax(0, 1fr);
-  gap: var(--space-2);
+  grid-template-columns: auto minmax(3.4rem, 4.4rem) minmax(0, 1fr);
+  gap: 0.45rem;
   align-items: center;
-  margin-top: var(--space-1);
+  margin-top: auto;
+  padding-top: var(--space-2);
+}
+.card-quote-controls:has(> :nth-child(2):last-child) {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+.card-view-btn {
+  padding-inline: 0.65rem;
+  min-width: 2.5rem;
+  justify-content: center;
+}
+.card-select-btn {
+  width: 100%;
+  min-width: 0;
+  justify-content: center;
+  white-space: nowrap;
 }
 .card-qty-input {
   width: 5.25rem;
@@ -968,6 +991,9 @@ onBeforeUnmount(() => {
   font: inherit;
   font-variant-numeric: tabular-nums;
   text-align: center;
+}
+.card-quote-controls .card-qty-input {
+  width: 100%;
 }
 .card-actions {
   display: flex;
