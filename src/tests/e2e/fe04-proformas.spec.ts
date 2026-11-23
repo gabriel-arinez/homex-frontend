@@ -1314,9 +1314,9 @@ for (const width of [360, 768, 1440]) {
     await expect(drawer.locator('textarea')).toHaveCount(0)
     // Only explicit confirmation applies the proposal and opens structured review.
     await expect(
-      page.locator('.review-pending').getByText('unidad del ancho', { exact: false }),
+      page.locator('.pending-summary').getByText('unidad del ancho', { exact: false }),
     ).toBeVisible()
-    await expect(page.locator('.studio-review-transcript')).toHaveCount(0)
+    await expect(page.locator('.studio-review-transcript')).toBeVisible()
     await studioStep(page, 'General')
     await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Escritorio')
     await studioStep(page, 'Precio')

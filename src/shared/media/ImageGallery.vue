@@ -500,7 +500,7 @@ defineExpose({ flush: upload, count: computed(() => all.value.length) })
       <div
         v-if="streamlined"
         class="drop-zone"
-        :class="{ 'drop-zone--active': dropActive }"
+        :class="{ 'drop-zone--active': dropActive, 'drop-zone--empty': !all.length }"
         @dragenter.prevent="dropActive = true"
         @dragover.prevent
         @dragleave="dropActive = false"
@@ -511,6 +511,14 @@ defineExpose({ flush: upload, count: computed(() => all.value.length) })
         </span>
         <strong>Arrastra imágenes aquí</strong>
         <span>JPEG, PNG o WebP · hasta 10 MiB por archivo</span>
+        <Button
+          v-if="!all.length"
+          type="button"
+          variant="secondary"
+          :disabled="loading || busy || selecting || all.length >= limit"
+          @click="input?.click()"
+          ><ImagePlus :size="16" aria-hidden="true" />Agregar imágenes</Button
+        >
       </div>
       <input
         ref="input"
@@ -522,6 +530,7 @@ defineExpose({ flush: upload, count: computed(() => all.value.length) })
         :disabled="loading || busy || selecting"
         @change="pick"
       /><Button
+        v-if="!streamlined || all.length > 0"
         type="button"
         variant="secondary"
         :disabled="loading || busy || selecting || all.length >= limit"
@@ -967,6 +976,9 @@ h3 small,
   flex-wrap: wrap;
 }
 .drop-zone {
+  width: 100%;
+  flex: 1 1 100%;
+  box-sizing: border-box;
   display: grid;
   justify-items: center;
   gap: var(--space-2);
@@ -980,6 +992,12 @@ h3 small,
   transition:
     border-color var(--transition-fast),
     background var(--transition-fast);
+}
+.drop-zone--empty {
+  padding: var(--space-5) var(--space-4);
+}
+.drop-zone--empty :deep(button) {
+  margin-top: var(--space-2);
 }
 .drop-zone__icon {
   display: grid;

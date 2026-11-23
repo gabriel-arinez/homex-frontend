@@ -84,7 +84,7 @@ it('routes missing axes to real dimension controls without resolving by confirma
     {},
     true,
   )
-  await w.get('.review-pending button').trigger('click')
+  await w.get('.pending-card__footer button').trigger('click')
   expect(w.emitted('requestSection')?.slice(-1)[0]).toEqual(['general'])
   await w.setProps({ activeSection: 'general' })
   await flushPromises()
@@ -103,7 +103,7 @@ it('creates a real general conflict control and focuses it in the studio', async
     {},
     true,
   )
-  await w.get('.review-pending button').trigger('click')
+  await w.get('.pending-card__footer button').trigger('click')
   await w.setProps({ activeSection: 'general' })
   await flushPromises()
   const control = w.get('[name="general-0"]')
@@ -126,7 +126,7 @@ it('routes a component conflict to its actual selected piece', async () => {
     },
     true,
   )
-  await w.get('.review-pending button').trigger('click')
+  await w.get('.pending-card__footer button').trigger('click')
   await w.setProps({ activeSection: 'estructura' })
   await flushPromises()
   expect(document.activeElement).toBe(w.get('[name="componente-material-1"]').element)
@@ -279,7 +279,7 @@ it('keeps actual studio navigation from stealing focus back from the requested f
     global: { stubs: { ImageGallery: true, CapturaAsistida: true } },
   })
   await flushPromises()
-  await w.get('.review-pending button').trigger('click')
+  await w.get('.pending-card__footer button').trigger('click')
   await flushPromises()
   const control = w.get('[name="componente-material-1"]')
   expect(control.isVisible()).toBe(true)

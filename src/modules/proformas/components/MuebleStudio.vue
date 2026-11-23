@@ -12,7 +12,10 @@ import {
   Wallet,
   ImagePlus,
   Mic,
+  FileText,
 } from '@lucide/vue'
+import TranscriptEvidence from '@/modules/capturas/components/TranscriptEvidence.vue'
+import { buildFurnitureTranscriptEvidence } from '@/modules/capturas/voiceEvidence'
 import type {
   EspecificacionMueble,
   EspecificacionMuebleWritable,
@@ -76,6 +79,24 @@ const emit = defineEmits<{
 }>()
 const voiceOpen = ref(false)
 const voiceSuggestedFields = ref<string[]>([])
+const lastCaptureResult = ref<ResultadoAsistida | null>(null)
+const reviewTranscriptText = computed(() => {
+  const res = lastCaptureResult.value
+  return (
+    res?.texto_corregido?.trim() ||
+    res?.texto_transcrito_original?.trim() ||
+    res?.texto_asr_original?.trim() ||
+    ''
+  )
+})
+const reviewTranscriptEvidence = computed(() => {
+  if (!reviewTranscriptText.value || !lastCaptureResult.value) return []
+  return buildFurnitureTranscriptEvidence(
+    reviewTranscriptText.value,
+    lastCaptureResult.value.propuesta_configurador,
+    lastCaptureResult.value.pendientes,
+  )
+})
 const leaveVoiceConfirm = ref(false)
 function requestCloseStudio() {
   if (voiceActive.value) {
@@ -203,6 +224,7 @@ function editarDesdeRevision(section: Seccion) {
   seccion.value = section
 }
 function recibirCaptura(result: ResultadoAsistida) {
+  lastCaptureResult.value = result
   const proposal = result.propuesta_configurador
   if (proposal) {
     const commercialFields: Record<string, string> = {
@@ -415,6 +437,20 @@ defineExpose({ save: guardarDesdeEstudio, hasRealChanges })
           @click="seccion = 'imagenes'"
           ><ImagePlus :size="16" aria-hidden="true" />Gestionar imágenes</Button
         >
+        <section
+          v-if="seccion === 'revision' && reviewTranscriptText"
+          class="studio-review-transcript"
+          aria-label="Transcripción analizada"
+        >
+          <header class="studio-review-transcript__header">
+            <FileText :size="16" aria-hidden="true" />
+            <h4>Transcripción del dictado</h4>
+          </header>
+          <TranscriptEvidence
+            :text="reviewTranscriptText"
+            :evidence="reviewTranscriptEvidence"
+          />
+        </section>
       </section>
       <fieldset
         v-show="seccion !== 'imagenes' || Boolean(externalError)"

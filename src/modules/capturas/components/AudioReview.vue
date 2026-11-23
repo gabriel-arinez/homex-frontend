@@ -63,7 +63,7 @@ onBeforeUnmount(() => {
         <RotateCcw :size="15" aria-hidden="true" />
         Reintentar transcripción
       </Button>
-      <Button variant="secondary" :disabled="disabled" @click="emit('discard')">
+      <Button variant="danger" :disabled="disabled" @click="emit('discard')">
         <Trash2 :size="15" aria-hidden="true" />
         Descartar y repetir
       </Button>

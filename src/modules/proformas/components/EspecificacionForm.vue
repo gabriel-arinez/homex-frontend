@@ -24,6 +24,7 @@ import {
   Pencil,
   ArrowUp,
   ArrowDown,
+  ArrowUpRight,
   MessageSquareText,
   AlertCircle,
   Check,
@@ -237,6 +238,7 @@ watch(
   { immediate: true, flush: 'sync' },
 )
 const motivosDescarte = reactive<Record<number, string>>({})
+const discardOpen = reactive<Record<number, boolean>>({})
 // Local human decisions never mutate the original NLP pending or its evidence.
 const descartes = reactive<Record<number, { pendiente: PendienteAsistida; motivo: string }>>({})
 watch(
@@ -1754,32 +1756,44 @@ onMounted(loadCatalog)
                   </select>
                 </label>
                 <div class="pending-card__actions">
-                  <Button variant="success" @click="aplicarEspesor(p)"> Asignar espesor </Button>
-                  <Button variant="secondary" @click="corregirEspesor(p)">
+                  <Button variant="success" @click="aplicarEspesor(p)">
+                    <CheckCircle2 :size="15" aria-hidden="true" />
+                    Asignar espesor
+                  </Button>
+                  <Button variant="info" @click="corregirEspesor(p)">
+                    <SlidersHorizontal :size="15" aria-hidden="true" />
                     Confirmar corrección de espesor
                   </Button>
                 </div>
               </div>
-              <div class="pending-card__actions">
-                <Button variant="warning" @click="reviewPending(p)">
+              <div class="pending-card__footer">
+                <Button type="button" variant="warning" @click="reviewPending(p)">
+                  <ArrowUpRight :size="15" aria-hidden="true" />
                   Revisar {{ p.resolucion?.clave || 'campo' }}
                 </Button>
-                <details class="pending-discard-details">
-                  <summary>Descartar</summary>
-                  <div class="pending-discard-form">
-                    <label>
-                      <span>Motivo de descarte</span>
-                      <input
-                        v-model="motivosDescarte[p.indice]"
-                        :name="`descarte-${p.indice}`"
-                        placeholder="Indica por qué no aplica…"
-                      />
-                    </label>
-                    <Button variant="secondary" @click="descartarPendiente(p)">
-                      Descartar observación
-                    </Button>
-                  </div>
-                </details>
+                <button
+                  type="button"
+                  class="pending-discard-trigger"
+                  :aria-expanded="Boolean(discardOpen[p.indice])"
+                  @click="discardOpen[p.indice] = !discardOpen[p.indice]"
+                >
+                  <Trash2 :size="14" aria-hidden="true" />
+                  {{ discardOpen[p.indice] ? 'Cancelar descarte' : 'Descartar' }}
+                </button>
+              </div>
+              <div v-show="discardOpen[p.indice]" class="pending-discard-form">
+                <label>
+                  <span>Motivo de descarte</span>
+                  <input
+                    v-model="motivosDescarte[p.indice]"
+                    :name="`descarte-${p.indice}`"
+                    placeholder="Indica por qué no aplica…"
+                  />
+                </label>
+                <Button type="button" variant="danger" @click="descartarPendiente(p)">
+                  <Trash2 :size="15" aria-hidden="true" />
+                  Descartar observación
+                </Button>
               </div>
             </li>
           </ul>
@@ -3054,21 +3068,6 @@ onMounted(loadCatalog)
               </template>
             </div>
           </div>
-          <div v-if="pendientesVisibles.length" class="review-pending">
-            <h4>Datos reconocidos por voz pendientes de comprobación</h4>
-            <p>
-              Revisa las propuestas del dictado. Los datos ambiguos no se confirmarán
-              automáticamente.
-            </p>
-            <ul>
-              <li v-for="p in pendientesVisibles" :key="p.indice">
-                {{ p.mensaje }}
-                <Button type="button" variant="secondary" @click="reviewPending(p)"
-                  >Revisar campo</Button
-                >
-              </li>
-            </ul>
-          </div>
           <article class="review-card review-card--full">
             <header>
               <h4><Tag v-if="studio" :size="18" aria-hidden="true" />Información general</h4>
@@ -3411,21 +3410,48 @@ onMounted(loadCatalog)
   align-items: center;
   gap: var(--space-2);
 }
-.pending-discard-details summary {
-  cursor: pointer;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  padding: 0.35rem 0.55rem;
-}
-.pending-discard-form {
+.pending-card__footer {
   display: flex;
   flex-wrap: wrap;
-  align-items: end;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-2);
-  margin-top: var(--space-2);
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--color-border);
+}
+.pending-discard-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 35%, transparent);
+  border-radius: var(--radius-control);
+  padding: 0.42rem 0.75rem;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast);
+}
+.pending-discard-trigger:hover {
+  background: color-mix(in srgb, var(--color-danger) 18%, transparent);
+  border-color: var(--color-danger);
+}
+.pending-discard-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 35%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger) 7%, var(--color-surface));
+}
+@media (max-width: 40rem) {
+  .pending-discard-form {
+    grid-template-columns: 1fr;
+  }
 }
 .dimension-pending {
   flex-basis: 100%;
@@ -4695,7 +4721,6 @@ details.card[open] > summary {
 }
 .configurator--studio #revision > .review-hero,
 .configurator--studio #revision > .review-alert,
-.configurator--studio #revision > .review-pending,
 .configurator--studio #revision > .review-card--full {
   grid-column: 1 / -1;
 }

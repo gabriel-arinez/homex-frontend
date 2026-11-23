@@ -16,8 +16,14 @@ import {
 import { prepareAudioForCapture } from '../audioConversion'
 import AudioRecorder from './AudioRecorder.vue'
 import AudioReview from './AudioReview.vue'
+import TranscriptEvidence from './TranscriptEvidence.vue'
 import VoiceCaptureControls from './VoiceCaptureControls.vue'
 import Button from '@/shared/ui/Button.vue'
+import {
+  buildFurnitureTranscriptEvidence,
+  categorizeEvidenceLabel,
+  type VoiceEvidence,
+} from '../voiceEvidence'
 const props = defineProps<{
   mode: 'catalog' | 'furniture'
   categoria?: CategoriaEnum
@@ -55,6 +61,25 @@ const busy = computed(
 let settingAsrText = false
 const editError = ref('')
 const appliedWarnings = ref<string[]>([])
+const appliedResult = ref<ResultadoCatalogo | ResultadoAsistida | null>(null)
+const appliedEvidence = computed<VoiceEvidence[]>(() => {
+  const res = appliedResult.value
+  const transcript = text.value.trim()
+  if (!res || !transcript) return []
+  if ('propuesta_configurador' in res) {
+    return buildFurnitureTranscriptEvidence(
+      transcript,
+      res.propuesta_configurador,
+      res.pendientes,
+    )
+  }
+  const ev = res.propuesta?.evidence ?? []
+  return ev.map((item) => ({
+    ...item,
+    category: categorizeEvidenceLabel(item.label, item.decision),
+    fieldLabel: item.label,
+  }))
+})
 const transcriptWords = computed(() => countTranscriptWords(text.value))
 const transcriptCharacters = computed(() => countTranscriptCharacters(text.value))
 const transcriptError = computed(() => validateTranscript(text.value))
@@ -305,6 +330,7 @@ async function process(useAudio = false) {
               'No se identificó una propuesta comercial. Añade o corrige la descripción y vuelve a procesar.'
           } else {
             appliedWarnings.value = [...warnings.value]
+            appliedResult.value = response
             applied.value = true
             emit('applied', response)
             result.value = null
@@ -576,6 +602,10 @@ function pasteTranscript(event: ClipboardEvent) {
         <ul>
           <li v-for="warning in appliedWarnings" :key="warning">{{ warning }}</li>
         </ul>
+      </div>
+
+      <div v-if="text.trim()" class="voice-applied-evidence">
+        <TranscriptEvidence :text="text" :evidence="appliedEvidence" />
       </div>
 
       <div class="voice-applied-actions">

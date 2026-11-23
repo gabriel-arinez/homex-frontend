@@ -107,7 +107,7 @@ function cancel() {
         variant="secondary"
         @click="cancel"
         ><X />Cancelar</Button
-      ><Button v-if="r.state.value === 'READY'" variant="secondary" @click="cancel"
+      ><Button v-if="r.state.value === 'READY'" variant="danger" @click="cancel"
         ><RotateCcw />Descartar y repetir</Button
       >
     </div>

@@ -42,18 +42,28 @@ function render(root: HTMLElement, value: Binding) {
   cleanup.get(root)?.()
   const elements: HTMLElement[] = []
   const marked: HTMLElement[] = []
+  const restoredAria: Array<{
+    input: VoiceControl
+    prevLabelledBy: string | null
+    span?: HTMLElement
+    prevSpanId?: string | null
+  }> = []
   for (const [index, review] of value.fields.entries()) {
     const input = controls[index]
     if (!input) continue
+    // Never inject duplicate voice-review banners inside pending resolution cards.
+    if (input.closest('.pending-card')) continue
     input.dataset.voiceState = review.state
     input.style.outline =
       review.state === 'pending'
-        ? '2px dashed var(--color-warning, #947000)'
+        ? '2px dashed var(--color-warning, #d97706)'
         : ['suggested', 'reviewed', 'edited'].includes(review.state)
           ? '2px solid var(--color-success, #16a34a)'
           : ''
     input.style.outlineOffset = '2px'
     marked.push(input)
+    const rowCard = input.closest<HTMLElement>('.measure-row, .studio-attribute-row')
+    const hasDimensionPending = Boolean(rowCard?.querySelector('.dimension-pending'))
     const note = document.createElement('span')
     note.className = 'voice-field-status'
     note.id = `voice-status-${review.field}`
@@ -63,18 +73,26 @@ function render(root: HTMLElement, value: Binding) {
         : ['suggested', 'reviewed', 'edited'].includes(review.state)
           ? 'var(--color-success, #16a34a)'
           : 'var(--color-text-secondary)'
-    note.style.cssText = `display:inline-flex;align-items:center;flex-wrap:wrap;gap:.45rem;font-size:.78rem;font-weight:600;margin-top:.35rem;color:${toneColor};`
+    const toneBg =
+      review.state === 'pending'
+        ? 'color-mix(in srgb, var(--color-warning) 12%, transparent)'
+        : ['suggested', 'reviewed', 'edited'].includes(review.state)
+          ? 'color-mix(in srgb, var(--color-success) 10%, transparent)'
+          : 'transparent'
+    note.style.cssText = `display:inline-flex;align-items:center;flex-wrap:wrap;gap:.4rem;font-size:.76rem;font-weight:600;margin-top:.25rem;padding:.2rem .55rem;border-radius:6px;width:fit-content;max-width:100%;background:${toneBg};color:${toneColor};line-height:1.35;`
+    if (rowCard) note.style.gridColumn = '1 / -1'
     const label = {
       suggested: '✓ Completado por voz',
-      pending: 'Requiere revisión',
+      pending: '⚠ Requiere revisión',
       reviewed: '✓ Validado',
       edited: '✓ Corregido',
       discarded: 'Descartado',
     }[review.state]
+    const showReason =
+      review.reason &&
+      (['pending', 'suggested'].includes(review.state) && !(hasDimensionPending && review.state === 'pending'))
     const text = document.createElement('span')
-    text.textContent =
-      label +
-      (review.reason && ['pending', 'suggested'].includes(review.state) ? ': ' + review.reason : '')
+    text.textContent = label + (showReason ? ': ' + review.reason : '')
     note.append(text)
     if (
       input.matches('input,select,textarea') &&
@@ -85,7 +103,7 @@ function render(root: HTMLElement, value: Binding) {
       button.type = 'button'
       button.textContent = 'Validar valor'
       button.style.cssText =
-        'padding:.2rem .55rem;border:1px solid var(--color-warning, #d97706);border-radius:999px;background:var(--color-warning-soft, rgba(234,179,8,0.12));color:var(--color-text);font:inherit;font-size:.75rem;font-weight:650;cursor:pointer;'
+        'padding:.18rem .55rem;border:1px solid var(--color-warning, #d97706);border-radius:999px;background:var(--color-warning-soft, rgba(234,179,8,0.14));color:var(--color-text);font:inherit;font-size:.73rem;font-weight:650;cursor:pointer;'
       button.addEventListener('click', () => {
         if (input.value.trim() && input.checkValidity()) value.resolve(review.field, false)
         else input.focus()
@@ -94,9 +112,34 @@ function render(root: HTMLElement, value: Binding) {
     }
     const described = input.getAttribute('aria-describedby') ?? ''
     input.setAttribute('aria-describedby', [described, note.id].filter(Boolean).join(' '))
-    // Keep review controls outside the label: descriptions must not change its accessible name.
-    const anchor = input.closest('label') ?? input
-    anchor.insertAdjacentElement('afterend', note)
+    if (rowCard) {
+      const existingPending = rowCard.querySelector<HTMLElement>('.dimension-pending')
+      if (existingPending) existingPending.insertAdjacentElement('beforebegin', note)
+      else rowCard.append(note)
+    } else {
+      const labelEl = input.closest('label')
+      const titleSpan = labelEl?.querySelector<HTMLElement>(':scope > span:first-child')
+      if (labelEl && titleSpan) {
+        // Bind aria-labelledby to the original title span so appending inside <label>
+        // never pollutes the accessible name nor breaks multi-column CSS Grid tracks.
+        if (!input.hasAttribute('aria-label') && !input.hasAttribute('aria-labelledby')) {
+          const prevSpanId = titleSpan.getAttribute('id')
+          const spanId = prevSpanId || `voice-lbl-${review.field}`
+          titleSpan.id = spanId
+          restoredAria.push({
+            input,
+            prevLabelledBy: input.getAttribute('aria-labelledby'),
+            span: titleSpan,
+            prevSpanId,
+          })
+          input.setAttribute('aria-labelledby', spanId)
+        }
+        labelEl.append(note)
+      } else {
+        const anchor = labelEl ?? input
+        anchor.insertAdjacentElement('afterend', note)
+      }
+    }
     elements.push(note)
   }
   const onInput = (event: Event) => {
@@ -121,6 +164,14 @@ function render(root: HTMLElement, value: Binding) {
       delete el.dataset.voiceState
       el.style.outline = ''
       el.style.outlineOffset = ''
+    })
+    restoredAria.forEach(({ input, prevLabelledBy, span, prevSpanId }) => {
+      if (prevLabelledBy === null) input.removeAttribute('aria-labelledby')
+      else input.setAttribute('aria-labelledby', prevLabelledBy)
+      if (span) {
+        if (prevSpanId === null || prevSpanId === undefined) span.removeAttribute('id')
+        else span.setAttribute('id', prevSpanId)
+      }
     })
   })
 }
