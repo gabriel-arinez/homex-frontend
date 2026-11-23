@@ -67,11 +67,7 @@ const appliedEvidence = computed<VoiceEvidence[]>(() => {
   const transcript = text.value.trim()
   if (!res || !transcript) return []
   if ('propuesta_configurador' in res) {
-    return buildFurnitureTranscriptEvidence(
-      transcript,
-      res.propuesta_configurador,
-      res.pendientes,
-    )
+    return buildFurnitureTranscriptEvidence(transcript, res.propuesta_configurador, res.pendientes)
   }
   const ev = res.propuesta?.evidence ?? []
   return ev.map((item) => ({

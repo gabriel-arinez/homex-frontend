@@ -73,13 +73,7 @@ function render(root: HTMLElement, value: Binding) {
         : ['suggested', 'reviewed', 'edited'].includes(review.state)
           ? 'var(--color-success, #16a34a)'
           : 'var(--color-text-secondary)'
-    const toneBg =
-      review.state === 'pending'
-        ? 'color-mix(in srgb, var(--color-warning) 12%, transparent)'
-        : ['suggested', 'reviewed', 'edited'].includes(review.state)
-          ? 'color-mix(in srgb, var(--color-success) 10%, transparent)'
-          : 'transparent'
-    note.style.cssText = `display:inline-flex;align-items:center;flex-wrap:wrap;gap:.4rem;font-size:.76rem;font-weight:600;margin-top:.25rem;padding:.2rem .55rem;border-radius:6px;width:fit-content;max-width:100%;background:${toneBg};color:${toneColor};line-height:1.35;`
+    note.style.cssText = `display:inline-flex;align-items:center;flex-wrap:wrap;gap:.4rem;font-size:.76rem;font-weight:600;margin-top:.2rem;max-width:100%;color:${toneColor};line-height:1.35;`
     if (rowCard) note.style.gridColumn = '1 / -1'
     const label = {
       suggested: '✓ Completado por voz',
@@ -90,7 +84,8 @@ function render(root: HTMLElement, value: Binding) {
     }[review.state]
     const showReason =
       review.reason &&
-      (['pending', 'suggested'].includes(review.state) && !(hasDimensionPending && review.state === 'pending'))
+      ['pending', 'suggested'].includes(review.state) &&
+      !(hasDimensionPending && review.state === 'pending')
     const text = document.createElement('span')
     text.textContent = label + (showReason ? ': ' + review.reason : '')
     note.append(text)

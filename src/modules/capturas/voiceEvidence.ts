@@ -1,11 +1,7 @@
 import type { PendienteAsistida, PropuestaConfigurador } from '@/generated/api'
 
 export type EvidenceCategory =
-  | 'commercial'
-  | 'dimensions'
-  | 'structure'
-  | 'pending'
-  | 'unidentified'
+  'commercial' | 'dimensions' | 'structure' | 'pending' | 'unidentified'
 
 export type VoiceEvidence = {
   label?: string
@@ -25,9 +21,7 @@ export function categorizeEvidenceLabel(
   if (decision === 'UNRESOLVED') return 'pending'
   if (decision === 'REJECTED') return 'unidentified'
   const key = (label ?? '').toLowerCase()
-  if (
-    /precio|costo|cantidad|unidad|descuento|moneda|nombre|sku|promocion|comercial/.test(key)
-  ) {
+  if (/precio|costo|cantidad|unidad|descuento|moneda|nombre|sku|promocion|comercial/.test(key)) {
     return 'commercial'
   }
   if (/ancho|alto|profundidad|largo|espesor_piso|m2|medida|dimension/.test(key)) {
@@ -169,7 +163,8 @@ export function buildFurnitureTranscriptEvidence(
   // 1. Pendientes primero para que tengan prioridad visual
   for (const p of pendientes) {
     const val = p.resolucion?.valor?.trim()
-    if (val) claimPattern(val, 'pending', p.resolucion?.clave || 'Pendiente', 'UNRESOLVED', p.mensaje)
+    if (val)
+      claimPattern(val, 'pending', p.resolucion?.clave || 'Pendiente', 'UNRESOLVED', p.mensaje)
   }
 
   // 2. Campos comerciales
@@ -200,7 +195,9 @@ export function buildFurnitureTranscriptEvidence(
 
   for (const [key, entry] of Object.entries(general?.dimensiones ?? {})) {
     const val =
-      entry && typeof entry === 'object' && 'valor' in entry ? (entry as { valor: unknown }).valor : entry
+      entry && typeof entry === 'object' && 'valor' in entry
+        ? (entry as { valor: unknown }).valor
+        : entry
     const unit =
       entry && typeof entry === 'object' && 'unidad' in entry
         ? String((entry as { unidad?: string }).unidad ?? '')
@@ -214,7 +211,9 @@ export function buildFurnitureTranscriptEvidence(
 
   for (const [key, entry] of Object.entries(general?.atributos ?? {})) {
     const val =
-      entry && typeof entry === 'object' && 'valor' in entry ? (entry as { valor: unknown }).valor : entry
+      entry && typeof entry === 'object' && 'valor' in entry
+        ? (entry as { valor: unknown }).valor
+        : entry
     if (val != null && String(val).trim()) {
       claimPattern(String(val), 'structure', `Atributo: ${key}`)
     }

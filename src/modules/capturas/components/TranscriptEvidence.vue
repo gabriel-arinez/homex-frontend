@@ -1,12 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import {
-  AlertCircle,
-  Ban,
-  Layers3,
-  Ruler,
-  Wallet,
-} from '@lucide/vue'
+import { AlertCircle, Ban, Layers3, Ruler, Wallet } from '@lucide/vue'
 import {
   categorizeEvidenceLabel,
   evidenceSegments,

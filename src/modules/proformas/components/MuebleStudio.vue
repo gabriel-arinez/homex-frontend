@@ -446,10 +446,7 @@ defineExpose({ save: guardarDesdeEstudio, hasRealChanges })
             <FileText :size="16" aria-hidden="true" />
             <h4>Transcripción del dictado</h4>
           </header>
-          <TranscriptEvidence
-            :text="reviewTranscriptText"
-            :evidence="reviewTranscriptEvidence"
-          />
+          <TranscriptEvidence :text="reviewTranscriptText" :evidence="reviewTranscriptEvidence" />
         </section>
       </section>
       <fieldset

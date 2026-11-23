@@ -977,7 +977,6 @@ h3 small,
 }
 .drop-zone {
   width: 100%;
-  flex: 1 1 100%;
   box-sizing: border-box;
   display: grid;
   justify-items: center;
