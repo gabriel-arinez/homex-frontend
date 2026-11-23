@@ -6,10 +6,12 @@ import {
   ArrowDownRight,
   ArrowLeft,
   ArrowUpRight,
+  BarChart3,
   Boxes,
   CheckCircle2,
   CircleAlert,
   Clock3,
+  FileSearch,
   Images,
   Info,
   Layers,
@@ -17,6 +19,7 @@ import {
   PackageCheck,
   Pencil,
   Ruler,
+  SlidersHorizontal,
   StickyNote,
   Tag,
 } from '@lucide/vue'
@@ -67,6 +70,7 @@ const toastMessage = ref('')
 const confirmCancel = ref(false)
 const dirty = ref(false)
 const conflicted = ref(false)
+const productForm = ref<InstanceType<typeof ProductoForm> | null>(null)
 const catalogOptions = reactive<Record<string, ValorCatalogoPublico[]>>({})
 let requestId = 0
 
@@ -222,11 +226,27 @@ async function save(body: ProductoWritable) {
   }
 }
 
+function hasRealEditChanges(): boolean {
+  return editing.value && (productForm.value?.hasRealChanges ?? dirty.value)
+}
+
+function handleCancelEdit() {
+  if (saving.value) return
+  if (hasRealEditChanges()) {
+    confirmCancel.value = true
+    return
+  }
+  discardEdit()
+}
+
 function discardEdit() {
   confirmCancel.value = false
   editing.value = false
   dirty.value = false
   error.value = ''
+  if (contextualDestination.value && route.query.editar === '1') {
+    returnToProforma()
+  }
 }
 
 const confirmLeave = ref(false)
@@ -239,7 +259,7 @@ function answerLeave(answer: boolean) {
 }
 function confirmNavigation(): boolean | Promise<boolean> {
   if (saving.value) return false
-  if (!editing.value || !dirty.value) return true
+  if (!hasRealEditChanges()) return true
   return new Promise<boolean>((resolve) => {
     if (resolveLeave) resolveLeave(false)
     resolveLeave = resolve
@@ -247,7 +267,7 @@ function confirmNavigation(): boolean | Promise<boolean> {
   })
 }
 function beforeUnload(event: BeforeUnloadEvent) {
-  if (editing.value && dirty.value) event.preventDefault()
+  if (hasRealEditChanges()) event.preventDefault()
 }
 onBeforeRouteLeave(() => confirmNavigation())
 onBeforeRouteUpdate((to, from) => to.params.id === from.params.id || confirmNavigation())
@@ -394,21 +414,21 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         </Button>
         <Button
           v-if="product && !editing && canAdmin"
-          variant="secondary"
+          variant="success"
           @click="openAjusteStock('ENTRADA')"
         >
           <ArrowUpRight :size="17" aria-hidden="true" /> Entrada stock
         </Button>
         <Button
           v-if="product && !editing && canAdmin"
-          variant="secondary"
+          variant="warning"
           @click="openAjusteStock('SALIDA')"
         >
           <ArrowDownRight :size="17" aria-hidden="true" /> Salida stock
         </Button>
         <Button
           v-if="product && !editing && session.can('comercial.operar')"
-          variant="secondary"
+          variant="info"
           @click="
             router.push({ path: '/movimientos-stock', query: { producto: String(product.id) } })
           "
@@ -442,13 +462,14 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           </div>
         </div>
         <ProductoForm
+          ref="productForm"
           :key="product.id"
           :initial="product"
           :processing="saving"
           :can-upload-image="canEdit"
           @save="save"
           @change="dirty = true"
-          @cancel="confirmCancel = true"
+          @cancel="handleCancelEdit"
         />
         <p v-if="error" class="form-error" role="alert">{{ error }}</p>
         <div v-if="conflicted" class="conflict-actions">
@@ -493,15 +514,16 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 <button
                   v-if="canAdmin"
                   type="button"
-                  class="inline-action-link"
+                  class="stat-action-pill"
                   @click="openStockMinimoModal"
                 >
+                  <SlidersHorizontal :size="13" aria-hidden="true" />
                   {{ product.stock_minimo != null ? 'Editar mínimo' : 'Configurar mínimo' }}
                 </button>
                 <button
                   v-if="session.can('comercial.operar')"
                   type="button"
-                  class="inline-action-link"
+                  class="stat-action-pill stat-action-pill--info"
                   @click="
                     router.push({
                       path: '/movimientos-stock',
@@ -509,6 +531,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                     })
                   "
                 >
+                  <BarChart3 :size="13" aria-hidden="true" />
                   Ver reporte de stock
                 </button>
               </div>
@@ -526,7 +549,12 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               </strong>
               <small>Proformas en revisión o enviadas (no reserva stock)</small>
               <div class="stat__badges">
-                <button type="button" class="inline-action-link" @click="openDemandaModal">
+                <button
+                  type="button"
+                  class="stat-action-pill stat-action-pill--warning"
+                  @click="openDemandaModal"
+                >
+                  <FileSearch :size="13" aria-hidden="true" />
                   Ver origen de demanda
                 </button>
               </div>
@@ -1227,6 +1255,36 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   align-items: center;
   gap: 0.45rem;
   margin-top: 0.25rem;
+}
+.stat-action-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface-soft);
+  color: var(--color-text);
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast);
+}
+.stat-action-pill:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border-strong);
+}
+.stat-action-pill--info {
+  color: var(--color-info);
+  border-color: color-mix(in srgb, var(--color-info) 35%, var(--color-border));
+  background: var(--color-info-soft);
+}
+.stat-action-pill--warning {
+  color: var(--color-warning);
+  border-color: color-mix(in srgb, var(--color-warning) 35%, var(--color-border));
+  background: var(--color-warning-soft);
 }
 .inline-action-link {
   background: none;

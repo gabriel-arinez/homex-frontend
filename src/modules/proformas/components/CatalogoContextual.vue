@@ -5,7 +5,9 @@ import type { FamiliaProducto, Producto, ValorCatalogoPublico } from '@/generate
 import { productosService } from '@/modules/productos/services/productosService'
 import { proformasService } from '../services/proformasService'
 import ProductImage from '@/modules/productos/components/ProductImage.vue'
-import ProductoVistaRapida from '@/modules/productos/components/ProductoVistaRapida.vue'
+import ProductoVistaRapida, {
+  type QuickQuotePayload,
+} from '@/modules/productos/components/ProductoVistaRapida.vue'
 import Button from '@/shared/ui/Button.vue'
 import SearchField from '@/shared/ui/SearchField.vue'
 import Select from '@/shared/ui/Select.vue'
@@ -41,9 +43,10 @@ const props = defineProps<{
   canCreate?: boolean
   canEditProduct?: (producto: Producto) => boolean
   initialState?: CatalogoContextState
+  moneda?: string
 }>()
 const emit = defineEmits<{
-  select: [producto: Producto]
+  select: [producto: Producto, quote?: QuickQuotePayload]
   duplicate: [productoId: number]
   create: [categoryCode: string]
   edit: [productId: number]
@@ -103,9 +106,44 @@ function categoryIcon(code: string) {
   if (code === 'PISO_FLOTANTE') return Layers
   return Package
 }
+const quantities = reactive<Record<number, string>>({})
+function qtyFor(product: Producto): string {
+  return quantities[product.id] ?? '1'
+}
+function setQty(productId: number, value: string) {
+  quantities[productId] = value
+}
 function selectProduct(product: Producto) {
-  if (props.existingProductIds.includes(product.id)) emit('duplicate', product.id)
-  else emit('select', product)
+  if (props.existingProductIds.includes(product.id)) {
+    emit('duplicate', product.id)
+    return
+  }
+  const raw = qtyFor(product).trim()
+  const qty = Number(raw)
+  const unitCode = product.unidad_stock_info?.codigo ?? 'PIEZA'
+  const stock = Number(product.stock ?? 0)
+  if (!Number.isFinite(qty) || qty <= 0) {
+    errorToast.value = 'Ingresa una cantidad mayor que cero.'
+    return
+  }
+  if (unitCode !== 'M2' && !Number.isInteger(qty)) {
+    errorToast.value = 'Esta unidad comercial requiere una cantidad entera.'
+    return
+  }
+  if (stock <= 0) {
+    errorToast.value = `«${product.nombre}» no tiene stock disponible en este momento.`
+    return
+  }
+  if (qty > stock) {
+    errorToast.value = `La cantidad (${qty}) supera el stock actual (${product.stock} ${product.unidad_stock_info?.nombre ?? ''}).`
+    return
+  }
+  emit('select', product, {
+    cantidad: raw,
+    precio_unitario: product.precio_vigente,
+    descuento: '0.00',
+    descripcion: '',
+  })
 }
 const page = ref(props.initialState?.page ?? 1)
 const products = ref<Producto[]>([])
@@ -115,6 +153,22 @@ function selectPreviewProduct() {
   if (!selected) return
   selectProduct(selected)
   preview.value = null
+}
+function onSelectFromPreview(payload: QuickQuotePayload) {
+  const selected = preview.value
+  if (!selected) return
+  if (props.existingProductIds.includes(selected.id)) {
+    emit('duplicate', selected.id)
+    preview.value = null
+    return
+  }
+  setQty(selected.id, payload.cantidad)
+  emit('select', selected, payload)
+  preview.value = null
+}
+function onEditFromPreview(productId: number) {
+  preview.value = null
+  emit('edit', productId)
 }
 const total = ref(0)
 const loading = ref(false)
@@ -450,25 +504,32 @@ onBeforeUnmount(() => {
           <small v-if="producto.promocion?.vigente"
             >Promoción vigente incluida en precio de referencia</small
           >
-          <small>Disponibilidad referencial: {{ producto.disponibilidad_referencial }}</small>
-          <div class="card-actions">
-            <Button variant="secondary" @click="preview = producto"
-              ><Eye :size="16" aria-hidden="true" /> Ver ficha</Button
-            >
-            <Button
-              v-if="canEditProduct?.(producto)"
-              variant="secondary"
-              @click="emit('edit', producto.id)"
-              >Editar ficha</Button
-            >
+          <small>Stock actual: {{ producto.stock }} {{ producto.unidad_stock_info?.nombre }}</small>
+          <div class="card-quote-controls">
+            <Button variant="info" @click="preview = producto">
+              <Eye :size="16" aria-hidden="true" /> Ver ficha
+            </Button>
+            <input
+              v-if="!existingProductIds.includes(producto.id)"
+              :value="qtyFor(producto)"
+              type="number"
+              class="card-qty-input"
+              :min="producto.unidad_stock_info?.codigo === 'M2' ? '0.0001' : '1'"
+              :step="producto.unidad_stock_info?.codigo === 'M2' ? '0.0001' : '1'"
+              :max="Number(producto.stock) > 0 ? producto.stock : undefined"
+              :aria-label="'Cantidad para ' + producto.nombre"
+              @input="setQty(producto.id, ($event.target as HTMLInputElement).value)"
+            />
+            <Button variant="primary" @click="selectProduct(producto)">
+              <Check
+                v-if="existingProductIds.includes(producto.id)"
+                :size="16"
+                aria-hidden="true"
+              />
+              <Plus v-else :size="16" aria-hidden="true" />
+              {{ existingProductIds.includes(producto.id) ? 'Ir a línea' : 'Seleccionar' }}
+            </Button>
           </div>
-          <Button variant="primary" @click="selectProduct(producto)">
-            <Check v-if="existingProductIds.includes(producto.id)" :size="16" aria-hidden="true" />
-            <Plus v-else :size="16" aria-hidden="true" />
-            {{
-              existingProductIds.includes(producto.id) ? 'Ir a línea' : 'Seleccionar para cotizar'
-            }}
-          </Button>
         </div>
       </article>
     </div>
@@ -519,19 +580,23 @@ onBeforeUnmount(() => {
             <td data-label="Acciones">
               <div class="table-actions">
                 <Button
-                  variant="secondary"
+                  variant="info"
                   :aria-label="'Ver ficha de ' + producto.nombre"
                   @click="preview = producto"
                 >
-                  <Eye :size="16" aria-hidden="true" />
+                  <Eye :size="16" aria-hidden="true" /> Ver ficha
                 </Button>
-                <Button
-                  v-if="canEditProduct?.(producto)"
-                  variant="secondary"
-                  @click="emit('edit', producto.id)"
-                >
-                  Editar
-                </Button>
+                <input
+                  v-if="!existingProductIds.includes(producto.id)"
+                  :value="qtyFor(producto)"
+                  type="number"
+                  class="card-qty-input"
+                  :min="producto.unidad_stock_info?.codigo === 'M2' ? '0.0001' : '1'"
+                  :step="producto.unidad_stock_info?.codigo === 'M2' ? '0.0001' : '1'"
+                  :max="Number(producto.stock) > 0 ? producto.stock : undefined"
+                  :aria-label="'Cantidad para ' + producto.nombre"
+                  @input="setQty(producto.id, ($event.target as HTMLInputElement).value)"
+                />
                 <Button @click="selectProduct(producto)">
                   <Check
                     v-if="existingProductIds.includes(producto.id)"
@@ -539,7 +604,7 @@ onBeforeUnmount(() => {
                     aria-hidden="true"
                   />
                   <Plus v-else :size="16" aria-hidden="true" />
-                  {{ existingProductIds.includes(producto.id) ? 'Ir a línea' : 'Añadir' }}
+                  {{ existingProductIds.includes(producto.id) ? 'Ir a línea' : 'Seleccionar' }}
                 </Button>
               </div>
             </td>
@@ -556,15 +621,19 @@ onBeforeUnmount(() => {
     <ProductoVistaRapida
       :open="Boolean(preview)"
       :product="preview"
+      :quote-mode="true"
+      :initial-quantity="preview ? qtyFor(preview) : '1'"
+      :can-edit="Boolean(preview && canEditProduct?.(preview))"
+      :moneda="moneda"
       :action-label="
-        preview && existingProductIds.includes(preview.id)
-          ? 'Ir a línea'
-          : 'Seleccionar para cotizar'
+        preview && existingProductIds.includes(preview.id) ? 'Ir a línea' : 'Seleccionar'
       "
       :detail-to="preview ? `/productos/${preview.id}` : ''"
       :gallery-endpoint="preview ? `/api/v1/catalogo/productos/${preview.id}/imagenes/` : ''"
       @close="preview = null"
       @action="selectPreviewProduct"
+      @edit="onEditFromPreview"
+      @select-quote="onSelectFromPreview"
     />
     <div v-if="category && family" class="pendiente">
       <p>¿Aún no está definida la variante de esta familia?</p>
@@ -879,6 +948,26 @@ onBeforeUnmount(() => {
 }
 .detalle button {
   justify-self: start;
+}
+.card-quote-controls {
+  display: grid;
+  grid-template-columns: auto minmax(4.5rem, 5.5rem) minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+  margin-top: var(--space-1);
+}
+.card-qty-input {
+  width: 5.25rem;
+  min-width: 0;
+  min-height: 2.5rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 .card-actions {
   display: flex;

@@ -41,12 +41,8 @@ async function addCatalogLine(page: Page) {
   await page
     .locator('article')
     .filter({ hasText: 'FE08-SILLA-001' })
-    .getByRole('button', { name: 'Seleccionar para cotizar' })
+    .getByRole('button', { name: 'Seleccionar' })
     .click()
-  await page.getByLabel('Cantidad', { exact: true }).fill('1')
-  await expect(page.locator('#unidad-linea')).toBeDisabled()
-  await expect(page.locator('#unidad-linea option:checked')).toHaveText('Pieza')
-  await page.getByRole('button', { name: 'Guardar línea' }).click()
   // Verificar la línea incorporada, no la tarjeta del catálogo oculto con v-show.
   await expect(
     page.locator('.line-card').getByText('Silla integración FE08', { exact: true }),

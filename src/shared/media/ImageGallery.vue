@@ -467,18 +467,16 @@ defineExpose({ flush: upload, count: computed(() => all.value.length) })
         {{ editable ? 'Ampliar o gestionar' : 'Ampliar imagen' }}
       </span>
     </button>
-    <div v-else-if="streamlined" class="empty empty--streamlined">
+    <div v-else-if="streamlined && !editable" class="empty empty--streamlined">
       <span class="empty__icon" aria-hidden="true">
         <ImagePlus :size="24" />
       </span>
       <strong>Sin imágenes cargadas todavía</strong>
-      <span v-if="editable">
-        Este paso es opcional. Arrastra o selecciona fotos aquí si deseas ilustrar
-        {{ subjectLabel }}.
-      </span>
-      <span v-else>Este registro aún no cuenta con fotografías en galería.</span>
+      <span>Este registro aún no cuenta con fotografías en galería.</span>
     </div>
-    <p v-else class="empty">Sin imágenes. Puedes guardar sin adjuntar fotografías.</p>
+    <p v-else-if="!streamlined" class="empty">
+      Sin imágenes. Puedes guardar sin adjuntar fotografías.
+    </p>
     <div class="thumbs">
       <button
         v-for="(item, index) in all"

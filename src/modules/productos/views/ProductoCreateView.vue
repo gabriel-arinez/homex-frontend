@@ -25,6 +25,7 @@ const confirmCancel = ref(false)
 const confirmLeave = ref(false)
 let resolveLeave: ((answer: boolean) => void) | null = null
 let allowNavigationAfterSave = false
+let allowNavigationAfterDiscard = false
 
 const pageTitle = computed(() => {
   const cat = route.query.categoria
@@ -125,11 +126,15 @@ async function save(body: ProductoWritable, images: LocalImage[]) {
     saving.value = false
   }
 }
+function hasUnsavedChanges() {
+  return (
+    (productForm.value?.hasRealChanges ?? dirty.value) || Boolean(productForm.value?.hasRecording())
+  )
+}
 function cancel() {
   if (saving.value) return
   exitError.value = ''
-  if (createdId.value !== null || dirty.value || productForm.value?.hasRecording())
-    confirmCancel.value = true
+  if (createdId.value !== null || hasUnsavedChanges()) confirmCancel.value = true
   else void router.push(destination())
 }
 function stay() {
@@ -161,7 +166,10 @@ function discard() {
   if (confirmLeave.value) answerLeave(true)
   else {
     confirmCancel.value = false
-    void router.push(destination())
+    allowNavigationAfterDiscard = true
+    void router.push(destination()).finally(() => {
+      allowNavigationAfterDiscard = false
+    })
   }
 }
 function submitAndLeave() {
@@ -180,11 +188,11 @@ function answerLeave(answer: boolean) {
   resolve?.(answer)
 }
 function confirmNavigation(): boolean | Promise<boolean> {
-  // Allow the redirect caused by a successfully persisted product,
+  // Allow the redirect caused by a successfully persisted product or confirmed discard,
   // while preventing unrelated navigation during a pending save.
-  if (allowNavigationAfterSave) return true
+  if (allowNavigationAfterSave || allowNavigationAfterDiscard) return true
   if (saving.value) return false
-  if (!dirty.value && !productForm.value?.hasRecording()) return true
+  if (!hasUnsavedChanges()) return true
   return new Promise<boolean>((resolve) => {
     if (resolveLeave) resolveLeave(false)
     resolveLeave = resolve
@@ -193,7 +201,7 @@ function confirmNavigation(): boolean | Promise<boolean> {
   })
 }
 function beforeUnload(event: BeforeUnloadEvent) {
-  if (dirty.value || productForm.value?.hasRecording()) event.preventDefault()
+  if (hasUnsavedChanges()) event.preventDefault()
 }
 onBeforeRouteLeave(confirmNavigation)
 onMounted(() => window.addEventListener('beforeunload', beforeUnload))

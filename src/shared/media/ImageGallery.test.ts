@@ -119,9 +119,8 @@ describe('Galería reutilizable', () => {
       global: { stubs },
     })
     await flushPromises()
-    expect(emptyWrapper.find('.empty--streamlined').text()).toContain(
-      'Sin imágenes cargadas todavía',
-    )
+    expect(emptyWrapper.find('.empty--streamlined').exists()).toBe(false)
+    expect(emptyWrapper.find('.drop-zone').text()).toContain('Arrastra imágenes aquí')
     expect(emptyWrapper.get('h3').text()).toContain('0/8')
     emptyWrapper.unmount()
 

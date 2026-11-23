@@ -6,7 +6,6 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   Boxes,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Eye,
@@ -19,7 +18,6 @@ import {
   Pencil,
   Power,
   RotateCcw,
-  SlidersHorizontal,
   Tag,
 } from '@lucide/vue'
 import type { FamiliaProducto, Producto, ValorCatalogoPublico } from '@/generated/api'
@@ -85,10 +83,7 @@ const categoryError = ref('')
 const categoryLoading = ref(true)
 const categories = ref<ValorCatalogoPublico[]>([])
 const families = ref<FamiliaProducto[]>([])
-const options = reactive<Record<string, ValorCatalogoPublico[]>>({})
-const advancedLoading = ref(false)
-const advancedLoaded = ref(false)
-const advancedError = ref('')
+const familiesLoading = ref(false)
 const showAdvanced = ref(false)
 
 const openMenuId = ref<number | null>(null)
@@ -214,10 +209,6 @@ let mounted = false
 
 const numberId = (value: string): number | undefined =>
   catalogoId(value) ? Number(value) : undefined
-const optionList = (code: string, placeholder: string) => [
-  { value: '', label: placeholder },
-  ...(options[code] || []).map((value) => ({ value: String(value.id), label: value.nombre })),
-]
 const familyOptions = computed(() => [
   { value: '', label: 'Todas las familias' },
   ...families.value
@@ -347,41 +338,16 @@ async function loadCategories() {
     categoryLoading.value = false
   }
 }
-async function loadAdvanced() {
-  if (advancedLoaded.value || advancedLoading.value) return
-  advancedLoading.value = true
-  advancedError.value = ''
+async function loadFamilies() {
+  familiesLoading.value = true
   try {
-    const keys = [
-      'MARCA',
-      'COLOR',
-      'TIPO_PISO',
-      'MATERIAL_PISO',
-      'DISENO_PISO',
-      'ACABADO_PISO',
-      'UNIDAD_MEDIDA',
-    ] as const
-    const [response, ...values] = await Promise.all([
-      proformasService.families(),
-      ...keys.map((code) => proformasService.options(code)),
-    ])
+    const response = await proformasService.families()
     families.value = response.results
-    keys.forEach((key, index) => {
-      options[key] = values[index] as ValorCatalogoPublico[]
-    })
-    advancedLoaded.value = true
-    if (response.count > response.results.length)
-      advancedError.value =
-        'Hay más familias disponibles. La búsqueda avanzada muestra las primeras 100.'
   } catch {
-    advancedError.value = 'No se pudieron cargar los filtros avanzados. Puedes reintentarlo.'
+    // Mantiene la barra operativa aun si falla la carga de familias.
   } finally {
-    advancedLoading.value = false
+    familiesLoading.value = false
   }
-}
-function toggleAdvanced() {
-  showAdvanced.value = !showAdvanced.value
-  if (showAdvanced.value) void loadAdvanced()
 }
 function createProduct(code: 'SILLA' | 'PISO_FLOTANTE' | 'OTRO') {
   if (!canCreate.value) return
@@ -471,8 +437,7 @@ function restoreFilters() {
   for (const key of extraKeys)
     extras[key] =
       key === 'modelo' || key === 'espesor_mm' ? routeString(key) : catalogoId(routeString(key))
-  showAdvanced.value = extraKeys.some((key) => Boolean(extras[key]))
-  if (showAdvanced.value) void loadAdvanced()
+  showAdvanced.value = false
   void nextTick(() => {
     restoring = false
     if (mounted) scheduleLoad()
@@ -503,7 +468,7 @@ onMounted(() => {
   document.addEventListener('keydown', onDocumentKeydown)
   void load()
   void loadCategories()
-  if (showAdvanced.value) void loadAdvanced()
+  void loadFamilies()
 })
 onBeforeUnmount(() => {
   mounted = false
@@ -597,6 +562,14 @@ onBeforeUnmount(() => {
           @update:model-value="changeCategory"
         />
         <Select
+          v-model="extras.familia"
+          name="familia-producto-filtro"
+          label="Familia"
+          :active="Boolean(extras.familia)"
+          :options="familyOptions"
+          :disabled="familiesLoading"
+        />
+        <Select
           v-model="status"
           name="estado-producto"
           label="Estado"
@@ -620,21 +593,8 @@ onBeforeUnmount(() => {
             { label: 'Sin mínimo configurado', value: 'SIN_MINIMO' },
           ]"
         />
-        <div class="filters-primary__actions">
-          <button
-            type="button"
-            class="more-filters"
-            :aria-expanded="showAdvanced"
-            :aria-controls="showAdvanced ? 'productos-filtros-avanzados' : undefined"
-            @click="toggleAdvanced"
-          >
-            <SlidersHorizontal :size="18" aria-hidden="true" />Más filtros<ChevronDown
-              :size="16"
-              aria-hidden="true"
-            />
-          </button>
+        <div v-if="hasFilters" class="filters-primary__actions">
           <Button
-            v-if="hasFilters"
             variant="danger"
             class="clear-filters-btn"
             aria-label="Limpiar filtros"
@@ -643,108 +603,6 @@ onBeforeUnmount(() => {
           >
             <RotateCcw :size="16" aria-hidden="true" />
           </Button>
-        </div>
-      </div>
-      <div v-if="showAdvanced" id="productos-filtros-avanzados" class="advanced-filters">
-        <p class="advanced-hint">
-          Selecciona los atributos que quieras utilizar para encontrar el producto.
-        </p>
-        <p v-if="advancedLoading" role="status">Cargando filtros…</p>
-        <p v-if="advancedError" role="status" class="filter-message">
-          {{ advancedError }}
-          <button v-if="!advancedLoaded" type="button" @click="loadAdvanced">Reintentar</button>
-        </p>
-        <div class="advanced-grid">
-          <Select
-            v-model="extras.familia"
-            name="familia-producto-filtro"
-            label="Familia"
-            :active="Boolean(extras.familia)"
-            :options="familyOptions"
-            :disabled="!advancedLoaded"
-          />
-          <template v-if="categoryCode === 'SILLA' || categoryCode === 'PISO_FLOTANTE'">
-            <Select
-              v-model="extras.marca"
-              name="marca-producto-filtro"
-              label="Marca"
-              :active="Boolean(extras.marca)"
-              :options="optionList('MARCA', 'Todas las marcas')"
-              :disabled="!advancedLoaded"
-            />
-          </template>
-          <template v-if="categoryCode === 'SILLA'">
-            <label
-              class="advanced-input"
-              :class="{ 'advanced-input--active': Boolean(extras.modelo) }"
-              ><span>Modelo</span>
-              <input v-model.trim="extras.modelo" maxlength="150" placeholder="Buscar modelo…" />
-            </label>
-            <Select
-              v-model="extras.color_primario"
-              name="color-producto-filtro"
-              label="Color"
-              :active="Boolean(extras.color_primario)"
-              :options="optionList('COLOR', 'Todos los colores')"
-              :disabled="!advancedLoaded"
-            />
-          </template>
-          <template v-if="categoryCode === 'PISO_FLOTANTE'">
-            <Select
-              v-model="extras.tipo"
-              name="tipo-producto-filtro"
-              label="Tipo de piso"
-              :active="Boolean(extras.tipo)"
-              :options="optionList('TIPO_PISO', 'Todos los tipos')"
-              :disabled="!advancedLoaded"
-            />
-            <Select
-              v-model="extras.material"
-              name="material-producto-filtro"
-              label="Material"
-              :active="Boolean(extras.material)"
-              :options="optionList('MATERIAL_PISO', 'Todos los materiales')"
-              :disabled="!advancedLoaded"
-            />
-            <Select
-              v-model="extras.diseno"
-              name="diseno-producto-filtro"
-              label="Diseño"
-              :active="Boolean(extras.diseno)"
-              :options="optionList('DISENO_PISO', 'Todos los diseños')"
-              :disabled="!advancedLoaded"
-            />
-            <Select
-              v-model="extras.acabado"
-              name="acabado-producto-filtro"
-              label="Acabado"
-              :active="Boolean(extras.acabado)"
-              :options="optionList('ACABADO_PISO', 'Todos los acabados')"
-              :disabled="!advancedLoaded"
-            />
-            <label
-              class="advanced-input"
-              :class="{ 'advanced-input--active': Boolean(extras.espesor_mm) }"
-              ><span>Espesor (mm)</span>
-              <input
-                v-model="extras.espesor_mm"
-                type="number"
-                min="0.01"
-                max="999999"
-                step="0.01"
-                placeholder="Ej. 8"
-              />
-            </label>
-          </template>
-          <Select
-            v-if="categoryCode === 'OTRO'"
-            v-model="extras.unidad_stock"
-            name="unidad-producto-filtro"
-            label="Unidad comercial"
-            :active="Boolean(extras.unidad_stock)"
-            :options="optionList('UNIDAD_MEDIDA', 'Todas las unidades')"
-            :disabled="!advancedLoaded"
-          />
         </div>
       </div>
     </section>
@@ -805,13 +663,19 @@ onBeforeUnmount(() => {
                 role="menu"
                 :aria-label="'Acciones disponibles para ' + product.nombre"
               >
-                <button type="button" role="menuitem" @click="openProductDetail(product)">
+                <button
+                  type="button"
+                  role="menuitem"
+                  class="menu-item--info"
+                  @click="openProductDetail(product)"
+                >
                   <Eye :size="15" aria-hidden="true" /> Ver ficha del producto
                 </button>
                 <button
                   v-if="canEditProduct(product)"
                   type="button"
                   role="menuitem"
+                  class="menu-item--warning"
                   @click="openProductEdit(product)"
                 >
                   <Pencil :size="15" aria-hidden="true" /> Editar producto
@@ -820,6 +684,7 @@ onBeforeUnmount(() => {
                   v-if="canAdmin"
                   type="button"
                   role="menuitem"
+                  class="menu-item--success"
                   @click="openProductStockAjuste(product, 'ENTRADA')"
                 >
                   <ArrowUpRight :size="15" aria-hidden="true" /> Registrar entrada
@@ -828,6 +693,7 @@ onBeforeUnmount(() => {
                   v-if="canAdmin"
                   type="button"
                   role="menuitem"
+                  class="menu-item--warning"
                   @click="openProductStockAjuste(product, 'SALIDA')"
                 >
                   <ArrowDownRight :size="15" aria-hidden="true" /> Registrar salida
@@ -836,6 +702,7 @@ onBeforeUnmount(() => {
                   v-if="canOperate"
                   type="button"
                   role="menuitem"
+                  class="menu-item--info"
                   @click="openProductMovements(product)"
                 >
                   <Boxes :size="15" aria-hidden="true" /> Historial de stock
@@ -844,6 +711,7 @@ onBeforeUnmount(() => {
                   v-if="canEditProduct(product)"
                   type="button"
                   role="menuitem"
+                  :class="product.activo === false ? 'menu-item--success' : 'menu-item--danger'"
                   @click="askToggleProductStatus(product)"
                 >
                   <Power :size="15" aria-hidden="true" />
@@ -1006,13 +874,19 @@ onBeforeUnmount(() => {
                     role="menu"
                     :aria-label="'Acciones disponibles para ' + product.nombre"
                   >
-                    <button type="button" role="menuitem" @click="openProductDetail(product)">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      class="menu-item--info"
+                      @click="openProductDetail(product)"
+                    >
                       <Eye :size="15" aria-hidden="true" /> Ver ficha del producto
                     </button>
                     <button
                       v-if="canEditProduct(product)"
                       type="button"
                       role="menuitem"
+                      class="menu-item--warning"
                       @click="openProductEdit(product)"
                     >
                       <Pencil :size="15" aria-hidden="true" /> Editar producto
@@ -1021,6 +895,7 @@ onBeforeUnmount(() => {
                       v-if="canAdmin"
                       type="button"
                       role="menuitem"
+                      class="menu-item--success"
                       @click="openProductStockAjuste(product, 'ENTRADA')"
                     >
                       <ArrowUpRight :size="15" aria-hidden="true" /> Registrar entrada
@@ -1029,6 +904,7 @@ onBeforeUnmount(() => {
                       v-if="canAdmin"
                       type="button"
                       role="menuitem"
+                      class="menu-item--warning"
                       @click="openProductStockAjuste(product, 'SALIDA')"
                     >
                       <ArrowDownRight :size="15" aria-hidden="true" /> Registrar salida
@@ -1037,6 +913,7 @@ onBeforeUnmount(() => {
                       v-if="canOperate"
                       type="button"
                       role="menuitem"
+                      class="menu-item--info"
                       @click="openProductMovements(product)"
                     >
                       <Boxes :size="15" aria-hidden="true" /> Historial de stock
@@ -1045,6 +922,7 @@ onBeforeUnmount(() => {
                       v-if="canEditProduct(product)"
                       type="button"
                       role="menuitem"
+                      :class="product.activo === false ? 'menu-item--success' : 'menu-item--danger'"
                       @click="askToggleProductStatus(product)"
                     >
                       <Power :size="15" aria-hidden="true" />
@@ -1194,7 +1072,7 @@ onBeforeUnmount(() => {
 .filters-primary {
   display: grid;
   grid-template-columns:
-    minmax(11rem, 1fr) minmax(9rem, 12rem) minmax(7.5rem, 10rem) minmax(9rem, 12rem)
+    minmax(12rem, 1.5fr) repeat(4, minmax(8.5rem, 1fr))
     auto;
   gap: var(--space-3);
   align-items: end;
@@ -1352,7 +1230,30 @@ onBeforeUnmount(() => {
 }
 .menu-dropdown button:hover {
   background: var(--color-surface-hover);
-  color: var(--color-primary-accent);
+}
+.menu-dropdown .menu-item--info {
+  color: var(--color-info);
+}
+.menu-dropdown .menu-item--info:hover {
+  background: var(--color-info-soft);
+}
+.menu-dropdown .menu-item--warning {
+  color: var(--color-warning);
+}
+.menu-dropdown .menu-item--warning:hover {
+  background: var(--color-warning-soft);
+}
+.menu-dropdown .menu-item--success {
+  color: var(--color-success);
+}
+.menu-dropdown .menu-item--success:hover {
+  background: var(--color-success-soft);
+}
+.menu-dropdown .menu-item--danger {
+  color: var(--color-danger);
+}
+.menu-dropdown .menu-item--danger:hover {
+  background: var(--color-danger-soft);
 }
 
 /* Grid view */

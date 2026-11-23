@@ -3,18 +3,22 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
   ArrowDownRight,
+  ArrowLeft,
   ArrowUpRight,
   Boxes,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  Clock3,
   CornerDownRight,
   Cpu,
   Download,
+  PackageCheck,
   PackagePlus,
   Plus,
   RotateCcw,
   SlidersHorizontal,
+  Tag,
   UserCheck,
 } from '@lucide/vue'
 import type {
@@ -25,6 +29,7 @@ import type {
   ValorCatalogoPublico,
 } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
+import ProductImage from '@/modules/productos/components/ProductImage.vue'
 import ProductoStockAjusteModal from '@/modules/productos/components/ProductoStockAjusteModal.vue'
 import { productosService } from '@/modules/productos/services/productosService'
 import {
@@ -465,14 +470,28 @@ onBeforeUnmount(() => {
       aria-label="Resumen contextual del producto"
     >
       <div class="product-context-card__header">
-        <div>
-          <RouterLink :to="`/productos/${selectedProduct.id}`" class="product-context-card__title">
-            {{ selectedProduct.nombre }}
-          </RouterLink>
-          <p class="product-context-card__meta">
-            SKU: {{ selectedProduct.sku || `#${selectedProduct.id}` }} · Unidad:
-            {{ selectedProduct.unidad_stock_info?.nombre || '—' }}
-          </p>
+        <div class="product-context-card__identity">
+          <div class="product-context-card__thumb">
+            <ProductImage
+              :image="selectedProduct.imagen_principal"
+              :alt="selectedProduct.nombre"
+              :category-code="selectedProduct.categoria_info?.codigo"
+              sizes="56px"
+            />
+          </div>
+          <div>
+            <RouterLink
+              :to="`/productos/${selectedProduct.id}`"
+              class="product-context-card__title"
+            >
+              {{ selectedProduct.nombre }}
+            </RouterLink>
+            <p class="product-context-card__meta">
+              <Tag :size="12" aria-hidden="true" />
+              SKU: {{ selectedProduct.sku || `#${selectedProduct.id}` }} · Unidad:
+              {{ selectedProduct.unidad_stock_info?.nombre || '—' }}
+            </p>
+          </div>
         </div>
         <div class="product-context-card__actions">
           <Badge
@@ -482,26 +501,42 @@ onBeforeUnmount(() => {
             {{ estadoStockMeta(selectedProduct.estado_stock).label }}
           </Badge>
           <Button variant="secondary" @click="router.push(`/productos/${selectedProduct.id}`)">
+            <ArrowLeft :size="16" aria-hidden="true" />
             Volver al producto
           </Button>
         </div>
       </div>
       <div class="product-context-card__kpis">
-        <div>
-          <span>Stock actual</span>
-          <strong>{{ unidadesProducto(selectedProduct, selectedProduct.stock) }}</strong>
+        <div class="context-kpi">
+          <span class="context-kpi__icon context-kpi__icon--success" aria-hidden="true">
+            <PackageCheck :size="17" />
+          </span>
+          <div>
+            <span>Stock actual</span>
+            <strong>{{ unidadesProducto(selectedProduct, selectedProduct.stock) }}</strong>
+          </div>
         </div>
-        <div>
-          <span>Demanda pendiente</span>
-          <strong>{{
-            unidadesProducto(selectedProduct, selectedProduct.demanda_pendiente)
-          }}</strong>
+        <div class="context-kpi">
+          <span class="context-kpi__icon context-kpi__icon--warning" aria-hidden="true">
+            <Clock3 :size="17" />
+          </span>
+          <div>
+            <span>Demanda pendiente</span>
+            <strong>{{
+              unidadesProducto(selectedProduct, selectedProduct.demanda_pendiente)
+            }}</strong>
+          </div>
         </div>
-        <div>
-          <span>Disponibilidad referencial</span>
-          <Badge :tone="disponibilidadMeta(selectedProduct.disponibilidad_referencial).tone">
-            {{ unidadesProducto(selectedProduct, selectedProduct.disponibilidad_referencial) }}
-          </Badge>
+        <div class="context-kpi">
+          <span class="context-kpi__icon context-kpi__icon--info" aria-hidden="true">
+            <Boxes :size="17" />
+          </span>
+          <div>
+            <span>Disponibilidad referencial</span>
+            <Badge :tone="disponibilidadMeta(selectedProduct.disponibilidad_referencial).tone">
+              {{ unidadesProducto(selectedProduct, selectedProduct.disponibilidad_referencial) }}
+            </Badge>
+          </div>
         </div>
       </div>
     </section>
@@ -1279,8 +1314,36 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   gap: 0.65rem;
 }
+.product-context-card__identity {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+}
+.product-context-card__thumb {
+  width: 3.5rem;
+  height: 3.5rem;
+  flex: none;
+  border-radius: 0.6rem;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  background: var(--color-background);
+}
+.product-context-card__thumb :deep(.product-image) {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  aspect-ratio: 1 !important;
+}
+.product-context-card__thumb :deep(.fallback-label) {
+  display: none;
+}
+.product-context-card__thumb :deep(.fallback-icon-box) {
+  width: 2.2rem;
+  height: 2.2rem;
+}
 .product-context-card__title {
-  font-size: 1rem;
+  font-size: 1.02rem;
   font-weight: 700;
   color: var(--color-text);
   text-decoration: none;
@@ -1290,22 +1353,58 @@ onBeforeUnmount(() => {
   text-decoration: underline;
 }
 .product-context-card__meta {
-  margin: 0.2rem 0 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.25rem 0 0;
   font-size: 0.82rem;
   color: var(--color-text-secondary);
 }
 .product-context-card__kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
   gap: 0.75rem;
 }
-.product-context-card__kpis > div {
+.context-kpi {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-soft);
+}
+.context-kpi > div:last-child {
   display: grid;
   gap: 0.2rem;
   justify-items: start;
 }
+.context-kpi__icon {
+  display: grid;
+  width: 2.2rem;
+  height: 2.2rem;
+  flex: none;
+  place-items: center;
+  border-radius: 0.65rem;
+  border: 1px solid var(--color-border);
+}
+.context-kpi__icon--success {
+  color: var(--color-success);
+  background: var(--color-success-soft);
+  border-color: color-mix(in srgb, var(--color-success) 30%, transparent);
+}
+.context-kpi__icon--warning {
+  color: var(--color-warning);
+  background: var(--color-warning-soft);
+  border-color: color-mix(in srgb, var(--color-warning) 30%, transparent);
+}
+.context-kpi__icon--info {
+  color: var(--color-info);
+  background: var(--color-info-soft);
+  border-color: color-mix(in srgb, var(--color-info) 30%, transparent);
+}
 .product-context-card__kpis span {
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: var(--color-text-secondary);
 }
 .report-summary-bar {

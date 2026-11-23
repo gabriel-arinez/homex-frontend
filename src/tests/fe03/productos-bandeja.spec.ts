@@ -125,27 +125,21 @@ describe('Bandeja administrativa de productos', () => {
     }
   })
 
-  it('envía la categoría y sus atributos permitidos al backend y los conserva en la URL', async () => {
+  it('envía la categoría y familia al backend y las conserva en la URL sin más filtros', async () => {
     const list = mockServices()
     const { wrapper, router } = await makeMounted()
     try {
+      expect(wrapper.find('.more-filters').exists()).toBe(false)
+      expect(wrapper.find('#familia-producto-filtro').exists()).toBe(true)
       await wrapper.get('#categoria-producto-filtro').setValue('1')
       await flushPromises()
       expect(list).toHaveBeenLastCalledWith(
         expect.objectContaining({ categoria: 1, activo: true, page: 1 }),
       )
-      await wrapper.get('.more-filters').trigger('click')
-      await flushPromises()
-      expect(wrapper.find('#material-producto-filtro').exists()).toBe(false)
-      await wrapper.get('#marca-producto-filtro').setValue('10')
-      await flushPromises()
-      expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ categoria: 1, marca: 10 }))
-      expect(router.currentRoute.value.query.marca).toBe('10')
       expect(router.currentRoute.value.query.categoria).toBe('1')
       await wrapper.get('#categoria-producto-filtro').setValue('2')
       await flushPromises()
-      expect(wrapper.find('#material-producto-filtro').exists()).toBe(true)
-      expect(router.currentRoute.value.query.marca).toBeUndefined()
+      expect(router.currentRoute.value.query.categoria).toBe('2')
     } finally {
       wrapper.unmount()
     }

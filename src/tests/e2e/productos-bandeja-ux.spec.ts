@@ -234,21 +234,14 @@ test('@a11y menú de acciones de productos responde en móvil y respeta tema osc
   await expect(menu).toBeHidden()
 })
 
-test('FE03 filtros por categoría y atributos conservan búsqueda y vista en URL', async ({
-  page,
-}) => {
+test('FE03 filtros por categoría y familia conservan búsqueda y vista en URL', async ({ page }) => {
   const calls = await mockBackend(page)
   await page.goto('/productos')
   await page.getByRole('combobox', { name: 'Categoría', exact: true }).selectOption('1')
   await expect.poll(() => calls[calls.length - 1]?.searchParams.get('categoria')).toBe('1')
-  await page.getByRole('button', { name: 'Más filtros' }).click()
-  await page.getByRole('combobox', { name: 'Marca', exact: true }).selectOption('10')
-  await expect.poll(() => calls[calls.length - 1]?.searchParams.get('marca')).toBe('10')
-  await expect(page).toHaveURL(/marca=10/)
-  await expect(page.getByRole('combobox', { name: 'Material' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Más filtros' })).toHaveCount(0)
+  await expect(page.getByRole('combobox', { name: 'Familia', exact: true })).toBeVisible()
   await page.getByRole('combobox', { name: 'Categoría', exact: true }).selectOption('2')
-  await expect(page.getByRole('combobox', { name: 'Material' })).toBeVisible()
-  await expect(page).not.toHaveURL(/marca=10/)
   await page.getByRole('button', { name: 'Cuadrícula' }).click()
   await expect(page).toHaveURL(/vista=grid/)
   await page.reload()

@@ -401,8 +401,11 @@ async function submit() {
           </div>
         </header>
 
-        <!-- Visor de galería con controles arriba y miniaturas laterales -->
-        <div class="master-gallery">
+        <!-- Visor de galería con controles arriba y miniaturas laterales (solo si tiene imágenes) -->
+        <div
+          v-if="masterGallery.length > 0 || master.imagen_principal || masterGalleryLoading"
+          class="master-gallery"
+        >
           <div class="master-gallery__bar">
             <span>
               {{

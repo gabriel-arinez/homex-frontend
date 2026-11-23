@@ -147,10 +147,11 @@ describe('PRF-02 catálogo contextual', () => {
     expect(wrapper.text()).toContain('SILLA-41')
     const seleccionar = wrapper
       .findAll('button')
-      .find((button) => button.text().includes('Seleccionar para cotizar'))
+      .find((button) => button.text().includes('Seleccionar'))
     expect(seleccionar).toBeDefined()
     await seleccionar!.trigger('click')
     expect(wrapper.emitted('select')?.[0]?.[0]).toMatchObject({ id: 41 })
+    expect(wrapper.emitted('select')?.[0]?.[1]).toMatchObject({ cantidad: '1' })
     expect(lecturas).toBeGreaterThan(0)
     expect(escrituras).toBe(0)
     wrapper.unmount()
@@ -206,9 +207,7 @@ describe('PRF-02 catálogo contextual', () => {
         '.viewer-footer .context-action',
       )
       expect(select).not.toBeNull()
-      expect(document.body.querySelector('.full-detail')?.getAttribute('href')).toBe(
-        '/productos/41',
-      )
+      expect(document.body.querySelector('.no-media-hero')).not.toBeNull()
       select!.click()
       await flushPromises()
       expect(wrapper.emitted('select')).toHaveLength(1)

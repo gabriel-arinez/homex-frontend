@@ -475,6 +475,22 @@ function onVoiceApplied(payload: {
   clearResolvedVoiceError()
 }
 
+const initialSnapshot = ref('')
+
+function currentSnapshot() {
+  return JSON.stringify({
+    form: { ...form },
+    camposSilla: camposSilla.value.map((c) => ({ ...c })),
+    images: images.value.map((i) => ({ digest: i.digest, principal: i.principal })),
+  })
+}
+
+initialSnapshot.value = currentSnapshot()
+
+const hasRealChanges = computed(
+  () => Boolean(initialSnapshot.value) && currentSnapshot() !== initialSnapshot.value,
+)
+
 async function load() {
   loading.value = true
   try {
@@ -495,6 +511,7 @@ async function load() {
     familias.value = f.results
     keys.forEach((k, i) => (opciones[k] = values[i] as ValorCatalogoPublico[]))
     if (!props.initial && props.preselectCategory) {
+      const wasPristine = !hasRealChanges.value
       const cat = opciones.CATEGORIA_PRODUCTO?.find(
         (item) => item.codigo === props.preselectCategory,
       )
@@ -503,6 +520,10 @@ async function load() {
         const unidadCodigo = cat.codigo === 'PISO_FLOTANTE' ? 'M2' : 'PIEZA'
         const unidad = opciones.UNIDAD_MEDIDA?.find((item) => item.codigo === unidadCodigo)
         if (unidad) form.unidad_stock = String(unidad.id)
+      }
+      if (wasPristine) {
+        await nextTick()
+        initialSnapshot.value = currentSnapshot()
       }
     }
   } catch (cause) {
@@ -666,7 +687,7 @@ function submit(): boolean {
   return true
 }
 
-defineExpose({ submit, hasRecording: () => recordingActive.value })
+defineExpose({ submit, hasRecording: () => recordingActive.value, hasRealChanges })
 watch(
   [
     () => form.sku,
@@ -860,8 +881,10 @@ onBeforeUnmount(() => {
           aria-labelledby="features-title"
         >
           <div class="section-heading">
-            <Armchair v-if="categoria === 'SILLA'" :size="20" aria-hidden="true" />
-            <Layers v-else :size="20" aria-hidden="true" />
+            <span class="section-icon">
+              <Armchair v-if="categoria === 'SILLA'" :size="19" aria-hidden="true" />
+              <Layers v-else :size="19" aria-hidden="true" />
+            </span>
             <div>
               <h3 id="features-title">
                 {{
@@ -1061,7 +1084,7 @@ onBeforeUnmount(() => {
         <!-- 3. Precio y Promociones con Jerarquía de 3 Capas -->
         <section class="catalog-section" aria-labelledby="price-title">
           <div class="section-heading">
-            <Tag :size="20" aria-hidden="true" />
+            <span class="section-icon"><Tag :size="19" aria-hidden="true" /></span>
             <div class="heading-split">
               <div>
                 <h3 id="price-title">Precio y promociones</h3>
@@ -1186,7 +1209,7 @@ onBeforeUnmount(() => {
         <!-- 4. Observaciones -->
         <section class="catalog-section" aria-labelledby="notes-title">
           <div class="section-heading">
-            <FileText :size="20" aria-hidden="true" />
+            <span class="section-icon"><FileText :size="19" aria-hidden="true" /></span>
             <div>
               <h3 id="notes-title">Observaciones comerciales</h3>
               <p>Información complementaria, recomendaciones de uso y detalles de entrega.</p>
@@ -1245,7 +1268,7 @@ onBeforeUnmount(() => {
         <!-- Disponibilidad y existencias -->
         <section class="catalog-section aside-card" aria-labelledby="status-title">
           <div class="aside-heading">
-            <Check :size="19" aria-hidden="true" />
+            <span class="section-icon"><Check :size="18" aria-hidden="true" /></span>
             <h3 id="status-title">Disponibilidad</h3>
           </div>
           <label class="toggle-row">

@@ -959,8 +959,8 @@ test('FE04 selecciona cliente y producto fuera de la primera página', async ({ 
     .getByRole('button', { name: 'Siguiente' })
     .click()
   await expect(page.getByText('Silla segunda página')).toBeVisible()
-  await page.getByRole('button', { name: 'Seleccionar para cotizar' }).click()
-  await expect(page.getByLabel('Nombre comercial')).toHaveValue('Silla segunda página')
+  await page.getByRole('button', { name: 'Seleccionar' }).click()
+  await expect(page.locator('.line-card').filter({ hasText: 'Silla segunda página' })).toBeVisible()
 })
 
 test('PRF-01 previene líneas inválidas y conserva edición al cerrar', async ({ page }) => {
@@ -1177,16 +1177,8 @@ test('PRF-02 selecciona catálogo, consulta detalle y deshace sin escribir profo
   expect(catalogThumbnail?.width).toBe(96)
   await page.getByRole('button', { name: 'Cuadrícula' }).click()
 
-  await page.getByRole('button', { name: 'Seleccionar para cotizar' }).click()
-  await expect(page.getByLabel('Nombre comercial')).toHaveValue('Silla ejecutiva')
-  await expect(page.getByLabel('Precio unitario (BOB)')).toHaveValue('1200.00')
-  await page.getByRole('dialog').getByRole('button', { name: 'Cancelar' }).click()
-  await expect(page.getByRole('dialog')).toHaveCount(0)
-  expect(writes).toBe(0)
-
-  await page.getByRole('button', { name: 'Seleccionar para cotizar' }).click()
-  await page.getByLabel('Cantidad', { exact: true }).fill('2')
-  await page.getByRole('button', { name: 'Guardar línea' }).click()
+  await page.getByLabel('Cantidad para Silla ejecutiva').fill('2')
+  await page.getByRole('button', { name: 'Seleccionar' }).click()
   const quoteLine = page.locator('.line-card').filter({ hasText: 'Silla ejecutiva' })
   await expect(quoteLine.getByText('Silla ejecutiva')).toBeVisible()
   const thumbnailBox = await quoteLine.locator('.line-thumbnail').boundingBox()

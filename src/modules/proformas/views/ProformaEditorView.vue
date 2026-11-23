@@ -81,7 +81,9 @@ import { retornoAProformas } from '../utils/navegacionProformas'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { productosService } from '@/modules/productos/services/productosService'
 import ProductImage from '@/modules/productos/components/ProductImage.vue'
-import ProductoVistaRapida from '@/modules/productos/components/ProductoVistaRapida.vue'
+import ProductoVistaRapida, {
+  type QuickQuotePayload,
+} from '@/modules/productos/components/ProductoVistaRapida.vue'
 import GalleryPhoto from '@/shared/media/GalleryPhoto.vue'
 import { useQuoteFurnitureCovers } from '../composables/useQuoteFurnitureCovers'
 import { useQuoteProductImages } from '../composables/useQuoteProductImages'
@@ -1554,11 +1556,38 @@ function chooseCatalog() {
   catalogInitialized.value = true
   additionMode.value = 'catalog'
 }
-function selectCatalogProduct(product: Producto) {
+function selectCatalogProduct(product: Producto, quote?: QuickQuotePayload) {
   rememberQuoteImage(product)
   if (existingProductIds.value.includes(product.id)) {
     void focusDuplicateProduct(product.id)
     return
+  }
+  if (quote) {
+    const tipo =
+      tipos.value.find((item) => item.codigo === product.categoria_info?.codigo) ??
+      tipos.value.find((item) => item.codigo !== 'MUEBLE_MEDIDA')
+    if (tipo) {
+      lineas.value.push({
+        localId: localId(),
+        tipo_item: tipo.id,
+        producto: product.id,
+        familia_producto: product.familia ?? null,
+        nombre: product.nombre,
+        descripcion: quote.descripcion || null,
+        cantidad: quote.cantidad,
+        unidad: product.unidad_stock,
+        modo_calculo: 'PRECIO_UNITARIO',
+        precio_unitario: quote.precio_unitario || product.precio_vigente,
+        importe_negociado: null,
+        descuento: quote.descuento || '0.00',
+        especificacion: null,
+      })
+      additionMode.value = 'none'
+      preferredProductId.value = null
+      markDirty()
+      success.value = `«${product.nombre}» añadido a la proforma.`
+      return
+    }
   }
   preferredProductId.value = product.id
   openLine()
@@ -2023,6 +2052,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               :can-create="session.can('catalogo.crear_producto')"
               :can-edit-product="canEditCatalogProduct"
               :initial-state="catalogState ?? undefined"
+              :moneda="header.moneda_codigo"
               @state-change="catalogState = $event"
               @create="createProductFromCategory"
               @edit="editProductContextually"

@@ -5,10 +5,13 @@ import {
   Armchair,
   ArrowUpRight,
   Boxes,
+  Check,
   ChevronLeft,
   ChevronRight,
   Layers,
   Package,
+  Pencil,
+  Plus,
   RotateCw,
   Tag,
   ZoomIn,
@@ -28,6 +31,13 @@ import {
   unidadesProducto,
 } from '../utils/presentacionCatalogo'
 
+export type QuickQuotePayload = {
+  cantidad: string
+  precio_unitario: string
+  descuento: string
+  descripcion: string
+}
+
 const props = withDefaults(
   defineProps<{
     open: boolean
@@ -43,6 +53,9 @@ const props = withDefaults(
     galleryEndpoint?: string
     galleryFallbackEndpoint?: string
     moneda?: string
+    quoteMode?: boolean
+    initialQuantity?: string | number
+    canEdit?: boolean
   }>(),
   {
     product: null,
@@ -57,12 +70,17 @@ const props = withDefaults(
     galleryEndpoint: '',
     galleryFallbackEndpoint: '',
     moneda: '',
+    quoteMode: false,
+    initialQuantity: '1',
+    canEdit: false,
   },
 )
 const emit = defineEmits<{
   close: []
   retry: []
   action: []
+  edit: [productId: number]
+  selectQuote: [payload: QuickQuotePayload]
 }>()
 
 const activeImage = ref(0)
@@ -336,6 +354,96 @@ const summaryDimensions = computed(() => {
     .slice(0, 4)
 })
 const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.trim() ?? '')
+
+const hasMedia = computed(() =>
+  Boolean(
+    galleryImages.value.length > 0 ||
+    props.product?.imagen_principal ||
+    galleryLoading.value ||
+    galleryError.value,
+  ),
+)
+
+const quoteQty = ref('1')
+const quotePrice = ref('')
+const quoteDiscount = ref('0')
+const quoteDesc = ref('')
+const quoteError = ref('')
+
+watch(
+  () => [props.open, props.product?.id, props.initialQuantity] as const,
+  ([open]) => {
+    if (!open) return
+    quoteQty.value = String(props.initialQuantity ?? '1')
+    quotePrice.value = props.product?.precio_vigente ?? ''
+    quoteDiscount.value = '0'
+    quoteDesc.value = ''
+    quoteError.value = ''
+  },
+  { immediate: true },
+)
+
+const quoteUnitCode = computed(() => props.product?.unidad_stock_info?.codigo ?? 'PIEZA')
+const quoteQtyStep = computed(() => (quoteUnitCode.value === 'M2' ? '0.0001' : '1'))
+const quoteQtyMin = computed(() => (quoteUnitCode.value === 'M2' ? '0.0001' : '1'))
+
+const quotePreviewTotal = computed(() => {
+  const q = Number(quoteQty.value)
+  const p = Number(quotePrice.value)
+  const d = Number(quoteDiscount.value || 0)
+  if (!Number.isFinite(q) || !Number.isFinite(p) || q <= 0 || p <= 0) return null
+  const gross = q * p
+  const disc = Number.isFinite(d) && d > 0 ? d : 0
+  return { gross, disc, net: Math.max(0, gross - disc) }
+})
+
+function submitQuickQuote() {
+  if (!props.product) return
+  if (props.actionLabel === 'Ir a línea') {
+    emit('action')
+    return
+  }
+  quoteError.value = ''
+  const qty = Number(quoteQty.value)
+  const stock = Number(props.product.stock ?? 0)
+  const price = Number(quotePrice.value)
+  const disc = quoteDiscount.value === '' ? 0 : Number(quoteDiscount.value)
+
+  if (!Number.isFinite(qty) || qty <= 0) {
+    quoteError.value = 'La cantidad debe ser mayor que cero.'
+    return
+  }
+  if (quoteUnitCode.value !== 'M2' && !Number.isInteger(qty)) {
+    quoteError.value = 'Esta unidad comercial requiere una cantidad entera.'
+    return
+  }
+  if (stock <= 0) {
+    quoteError.value = 'Este producto no tiene stock disponible actualmente.'
+    return
+  }
+  if (qty > stock) {
+    quoteError.value = `La cantidad solicitada (${qty}) supera el stock actual (${unidadesProducto(props.product, props.product.stock)}).`
+    return
+  }
+  if (!Number.isFinite(price) || price <= 0) {
+    quoteError.value = 'El precio unitario debe ser mayor que cero.'
+    return
+  }
+  if (!Number.isFinite(disc) || disc < 0) {
+    quoteError.value = 'El descuento no puede ser negativo.'
+    return
+  }
+  if (disc > qty * price) {
+    quoteError.value = 'El descuento no puede superar el importe de la línea.'
+    return
+  }
+  emit('selectQuote', {
+    cantidad: String(quoteQty.value).trim(),
+    precio_unitario: String(quotePrice.value).trim(),
+    descuento: disc > 0 ? disc.toFixed(2) : '0.00',
+    descripcion: quoteDesc.value.trim(),
+  })
+}
 </script>
 
 <template>
@@ -354,7 +462,10 @@ const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.t
     <template #title-icon>
       <component :is="headerIcon" class="quick-view-icon" :size="22" aria-hidden="true" />
     </template>
-    <div class="quick-view" :class="{ 'quick-view--line': line }">
+    <div
+      class="quick-view"
+      :class="{ 'quick-view--line': line, 'quick-view--no-media': product && !line && !hasMedia }"
+    >
       <div
         v-if="loading && !line && !product"
         class="viewer-state"
@@ -387,7 +498,7 @@ const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.t
             Reintentar
           </button>
         </div>
-        <section class="media-panel" aria-label="Imágenes del producto">
+        <section v-if="line || hasMedia" class="media-panel" aria-label="Imágenes del producto">
           <div class="media-panel__header">
             <span class="media-panel__title">
               {{
@@ -501,8 +612,35 @@ const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.t
         </section>
 
         <div class="detail-panels">
-          <section v-if="product && !line" class="info-card">
-            <h3><Package :size="18" aria-hidden="true" />Identificación de catálogo</h3>
+          <div v-if="product && !line && !hasMedia" class="no-media-hero">
+            <span class="no-media-hero__icon" aria-hidden="true">
+              <component :is="headerIcon" :size="26" />
+            </span>
+            <div class="no-media-hero__copy">
+              <div class="no-media-hero__badges">
+                <Badge tone="info">{{ product.categoria_info?.nombre || 'Catálogo' }}</Badge>
+                <Badge v-if="product.familia_info" tone="neutral">{{
+                  product.familia_info.nombre
+                }}</Badge>
+                <Badge :tone="product.activo === false ? 'neutral' : 'success'">
+                  {{ product.activo === false ? 'Inactivo' : 'Activo' }}
+                </Badge>
+                <Badge v-if="product.promocion?.vigente" tone="warning">Promoción vigente</Badge>
+              </div>
+              <strong>{{ product.nombre }}</strong>
+              <small
+                >SKU: {{ product.sku || 'No aplica' }} ·
+                {{ product.unidad_stock_info?.nombre }}</small
+              >
+            </div>
+          </div>
+          <section v-if="product && !line" class="info-card info-card--identity">
+            <h3>
+              <span class="card-heading-icon card-heading-icon--info" aria-hidden="true">
+                <Package :size="16" />
+              </span>
+              Identificación de catálogo
+            </h3>
             <dl>
               <div>
                 <dt>SKU</dt>
@@ -533,8 +671,13 @@ const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.t
             </dl>
           </section>
 
-          <section v-if="product && !line" class="info-card">
-            <h3><Tag :size="18" aria-hidden="true" />Información comercial actual</h3>
+          <section v-if="product && !line" class="info-card info-card--commercial">
+            <h3>
+              <span class="card-heading-icon card-heading-icon--success" aria-hidden="true">
+                <Tag :size="16" />
+              </span>
+              Información comercial actual
+            </h3>
             <p class="section-note">
               Valores vigentes del catálogo; no reemplazan importes negociados de la proforma.
             </p>
@@ -649,7 +792,12 @@ const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.t
           </section>
 
           <section v-if="product && !line && productFields(product).length" class="info-card">
-            <h3>Características del producto</h3>
+            <h3>
+              <span class="card-heading-icon card-heading-icon--warning" aria-hidden="true">
+                <Boxes :size="16" />
+              </span>
+              Características del producto
+            </h3>
             <dl>
               <div
                 v-for="(field, index) in productFields(product)"
@@ -660,6 +808,56 @@ const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.t
               </div>
             </dl>
           </section>
+
+          <section
+            v-if="quoteMode && product && !line && actionLabel !== 'Ir a línea'"
+            class="info-card info-card--quote"
+            aria-label="Opciones para agregar a la proforma"
+          >
+            <h3>
+              <span class="card-heading-icon card-heading-icon--primary" aria-hidden="true">
+                <Plus :size="16" />
+              </span>
+              Agregar a la proforma
+            </h3>
+            <div class="quote-inputs-grid">
+              <label class="quote-field">
+                <span>Cantidad ({{ product.unidad_stock_info?.nombre || 'u.' }})</span>
+                <input
+                  v-model="quoteQty"
+                  type="number"
+                  :min="quoteQtyMin"
+                  :step="quoteQtyStep"
+                  :max="Number(product.stock) > 0 ? product.stock : undefined"
+                />
+              </label>
+              <label class="quote-field">
+                <span>Precio unitario ({{ moneda || 'BOB' }})</span>
+                <input v-model="quotePrice" type="number" min="0.01" step="0.01" />
+              </label>
+              <label class="quote-field">
+                <span>Descuento de línea ({{ moneda || 'BOB' }})</span>
+                <input v-model="quoteDiscount" type="number" min="0" step="0.01" />
+              </label>
+              <label class="quote-field quote-field--full">
+                <span>Descripción / nota de línea (opcional)</span>
+                <input
+                  v-model="quoteDesc"
+                  type="text"
+                  maxlength="240"
+                  placeholder="Ej. Color o detalle comercial para la proforma…"
+                />
+              </label>
+            </div>
+            <div v-if="quotePreviewTotal" class="quote-preview-summary">
+              <span>Subtotal: {{ formatUnitPrice(quotePreviewTotal.gross) }}</span>
+              <span v-if="quotePreviewTotal.disc > 0" class="quote-preview-discount">
+                Descuento: −{{ formatUnitPrice(quotePreviewTotal.disc) }}
+              </span>
+              <strong>Total línea: {{ formatUnitPrice(quotePreviewTotal.net) }}</strong>
+            </div>
+            <p v-if="quoteError" class="quote-error" role="alert">{{ quoteError }}</p>
+          </section>
         </div>
       </template>
     </div>
@@ -667,12 +865,25 @@ const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.t
     <template #footer>
       <div class="viewer-footer">
         <Button variant="secondary" @click="emit('close')">Cerrar</Button>
-        <Button v-if="actionLabel" class="context-action" @click="emit('action')">{{
-          actionLabel
-        }}</Button>
-        <RouterLink v-if="detailTo" class="full-detail" :to="detailTo"
-          ><ArrowUpRight :size="16" aria-hidden="true" />Ver ficha completa</RouterLink
-        >
+        <template v-if="quoteMode && product && !line">
+          <Button v-if="canEdit" variant="warning" @click="emit('edit', product.id)">
+            <Pencil :size="16" aria-hidden="true" />
+            Editar producto
+          </Button>
+          <Button variant="success" class="context-action" @click="submitQuickQuote">
+            <Check v-if="actionLabel === 'Ir a línea'" :size="16" aria-hidden="true" />
+            <Plus v-else :size="16" aria-hidden="true" />
+            {{ actionLabel === 'Ir a línea' ? 'Ir a línea' : 'Seleccionar' }}
+          </Button>
+        </template>
+        <template v-else>
+          <Button v-if="actionLabel" class="context-action" @click="emit('action')">{{
+            actionLabel
+          }}</Button>
+          <RouterLink v-if="detailTo" class="full-detail" :to="detailTo"
+            ><ArrowUpRight :size="16" aria-hidden="true" />Ver ficha completa</RouterLink
+          >
+        </template>
       </div>
     </template>
   </Modal>
@@ -684,6 +895,133 @@ const summaryNotes = computed(() => props.line?.especificacion?.observaciones?.t
   grid-template-columns: minmax(20rem, 1.05fr) minmax(0, 1.15fr);
   gap: var(--space-5);
   align-items: start;
+}
+.quick-view--no-media {
+  grid-template-columns: minmax(0, 1fr);
+}
+.no-media-hero {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 28%, var(--color-border));
+  border-radius: var(--radius-card);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-primary-soft) 75%, var(--color-surface)),
+    var(--color-surface)
+  );
+}
+.no-media-hero__icon {
+  display: grid;
+  width: 3.2rem;
+  height: 3.2rem;
+  flex: none;
+  place-items: center;
+  border-radius: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 25%, transparent);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-accent);
+}
+.no-media-hero__copy {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.no-media-hero__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.no-media-hero__copy strong {
+  font-size: 1.05rem;
+}
+.no-media-hero__copy small {
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+}
+.card-heading-icon {
+  display: grid;
+  width: 1.85rem;
+  height: 1.85rem;
+  flex: none;
+  place-items: center;
+  border-radius: 0.55rem;
+  border: 1px solid var(--color-border);
+}
+.card-heading-icon--info {
+  color: var(--color-info);
+  background: var(--color-info-soft);
+  border-color: color-mix(in srgb, var(--color-info) 30%, transparent);
+}
+.card-heading-icon--success {
+  color: var(--color-success);
+  background: var(--color-success-soft);
+  border-color: color-mix(in srgb, var(--color-success) 30%, transparent);
+}
+.card-heading-icon--warning {
+  color: var(--color-warning);
+  background: var(--color-warning-soft);
+  border-color: color-mix(in srgb, var(--color-warning) 30%, transparent);
+}
+.card-heading-icon--primary {
+  color: var(--color-primary-accent);
+  background: var(--color-primary-soft);
+  border-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
+}
+.info-card--quote {
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+}
+.quote-inputs-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.quote-field {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.quote-field--full {
+  grid-column: 1 / -1;
+}
+.quote-field span {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+.quote-field input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+.quote-preview-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-soft, var(--color-surface-muted));
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+.quote-preview-discount {
+  color: var(--color-success);
+}
+.quote-error {
+  margin: var(--space-2) 0 0;
+  color: var(--color-danger);
+  font-size: 0.83rem;
+  font-weight: 600;
 }
 .quick-view-icon {
   flex: 0 0 auto;
