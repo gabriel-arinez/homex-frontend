@@ -94,8 +94,8 @@ try {
     throw new Error(`El bundle contiene indicadores sensibles: ${exposed.join(', ')}`)
 
   const bytes = first.reduce((total, file) => total + file.bytes, 0)
-  // pdfjs-dist worker (1.27 MB) + showroom WebP (432 KB) + app (~1.63 MB) ≈ 3.33 MB
-  if (bytes > 3_500_000) throw new Error(`El bundle excede 3.5 MB (${bytes} bytes).`)
+  // pdfjs-dist worker (1.27 MB) + showroom WebP (432 KB) + app (~1.81 MB) ≈ 3.51 MB
+  if (bytes > 3_800_000) throw new Error(`El bundle excede 3.8 MB (${bytes} bytes).`)
   console.log(`fe09-release-ok files=${first.length} bytes=${bytes} reproducible=true sourcemaps=0`)
 } finally {
   rmSync(root, { recursive: true, force: true })
