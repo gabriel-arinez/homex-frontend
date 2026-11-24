@@ -242,6 +242,7 @@ describe('Inventario operativo (P1, P2, P4, P5, P6)', () => {
         {
           id: 100,
           fecha: '2026-11-20T12:00:00Z',
+          registrado_en: '2026-11-20T12:00:00Z',
           tipo_movimiento: 1,
           tipo_movimiento_info: { id: 1, codigo: 'AJUSTE', nombre: 'Ajuste' },
           cantidad: '5.0000',

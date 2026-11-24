@@ -21,6 +21,8 @@ function quote(id: number, status: string): ProformaListado {
     fecha_vencimiento: null,
     creado_en: null,
     actualizado_en: null,
+    ultima_actividad_comercial: null,
+    naturaleza: 'REAL',
     plazo_entrega: null,
     validez_oferta: null,
     porcentaje_adelanto: null,

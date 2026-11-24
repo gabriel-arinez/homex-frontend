@@ -105,6 +105,10 @@ describe('Alertas dinámicas entre roles', () => {
       {
         id: 9,
         fecha_confirmacion: '2026-11-20T10:00:00Z',
+        fecha_entrega_efectiva: null,
+        fecha_entrega_programada: null,
+        nota_entrega_fecha: null,
+        naturaleza: 'REAL',
         proforma: 101,
         proforma_numero: 101,
         proforma_titulo: 'Escritorio gerencial',

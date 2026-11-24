@@ -429,6 +429,7 @@ export type IdentidadActual = {
   readonly username: string
   readonly display_name: string
   readonly capabilities: Array<string>
+  readonly entorno_evaluacion: boolean
 }
 
 export type IdentificadorGaleria = {
@@ -555,6 +556,7 @@ export type MotorAsistida = {
 export type MovimientoReporteItem = {
   readonly id: number
   readonly fecha: string
+  readonly registrado_en: string | null
   readonly tipo_movimiento: number
   tipo_movimiento_info: ValorCatalogoMovimiento
   readonly cantidad: string
@@ -575,6 +577,7 @@ export type MovimientoReporteItem = {
 export type MovimientoStock = {
   readonly id: number
   readonly fecha: string
+  readonly registrado_en: string | null
   readonly tipo_movimiento: number
   tipo_movimiento_info: ValorCatalogoMovimiento
   readonly cantidad: string
@@ -832,6 +835,8 @@ export type PatchedProforma = {
   readonly fecha?: string
   readonly creado_en?: string | null
   readonly actualizado_en?: string | null
+  readonly ultima_actividad_comercial?: string | null
+  readonly naturaleza?: string
   plazo_entrega?: string | null
   validez_oferta?: number | null
   readonly fecha_vencimiento?: string | null
@@ -861,7 +866,11 @@ export type Pedido = {
   readonly proforma_titulo: string | null
   cliente_resumen: ClienteResumenProforma | null
   vendedor_resumen: UsuarioResumen | null
+  readonly fecha_entrega_programada: string | null
+  readonly nota_entrega_fecha: string | null
+  readonly naturaleza: string
   readonly fecha_confirmacion: string
+  readonly fecha_entrega_efectiva: string | null
   readonly proforma: number
   readonly estado: number
   readonly created_by: number | null
@@ -978,6 +987,8 @@ export type Proforma = {
   readonly fecha: string
   readonly creado_en: string | null
   readonly actualizado_en: string | null
+  readonly ultima_actividad_comercial: string | null
+  readonly naturaleza: string
   plazo_entrega?: string | null
   validez_oferta?: number | null
   readonly fecha_vencimiento: string | null
@@ -1041,6 +1052,8 @@ export type ProformaListado = {
   readonly fecha: string
   readonly creado_en: string | null
   readonly actualizado_en: string | null
+  readonly ultima_actividad_comercial: string | null
+  readonly naturaleza: string
   plazo_entrega?: string | null
   validez_oferta?: number | null
   readonly fecha_vencimiento: string | null
@@ -3448,6 +3461,21 @@ export type V1ProformasListData = {
     fecha_desde?: string
     fecha_hasta?: string
     moneda?: string
+    /**
+     * * `id` - id
+     * * `-id` - -id
+     * * `fecha` - fecha
+     * * `-fecha` - -fecha
+     * * `ultima_actividad_comercial` - ultima_actividad_comercial
+     * * `-ultima_actividad_comercial` - -ultima_actividad_comercial
+     */
+    ordering?:
+      | 'id'
+      | '-id'
+      | 'fecha'
+      | '-fecha'
+      | 'ultima_actividad_comercial'
+      | '-ultima_actividad_comercial'
     /**
      * Un número de página dentro del conjunto de resultados paginado.
      */

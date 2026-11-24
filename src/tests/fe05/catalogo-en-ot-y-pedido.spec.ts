@@ -95,6 +95,10 @@ describe('Flujo de catálogo en Pedidos y Órdenes de Trabajo por rol', () => {
     vi.spyOn(pedidosService, 'get').mockResolvedValue({
       id: 9,
       fecha_confirmacion: '2026-11-22T10:00:00Z',
+      fecha_entrega_efectiva: null,
+      fecha_entrega_programada: null,
+      nota_entrega_fecha: null,
+      naturaleza: 'REAL',
       proforma: 101,
       proforma_numero: 101,
       proforma_titulo: null,

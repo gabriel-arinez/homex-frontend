@@ -40,6 +40,16 @@ onBeforeUnmount(() => {
       @open-alerts="alertsOpen = true"
     />
     <main id="main-content" tabindex="-1">
+      <div
+        v-if="session.entornoEvaluacion"
+        class="eval-banner"
+        role="status"
+        aria-live="polite"
+        data-testid="evaluation-environment-banner"
+      >
+        <strong>Entorno de evaluación</strong>
+        <span>Los registros marcados como simulados no representan operaciones reales.</span>
+      </div>
       <RouterView v-slot="{ Component }"
         ><component :is="Component" @open-menu="drawerOpen = true"
       /></RouterView>
@@ -81,6 +91,18 @@ onBeforeUnmount(() => {
 }
 .shell main:focus {
   outline: 0;
+}
+.eval-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: var(--space-4);
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--color-warning, #d97706);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--color-warning, #d97706) 12%, transparent);
+  font-size: 0.875rem;
 }
 .shell--compact main {
   margin-left: var(--sidebar-compact);

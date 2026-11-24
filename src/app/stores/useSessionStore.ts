@@ -33,6 +33,7 @@ export const useSessionStore = defineStore('session', () => {
   const refreshToken = ref(stored?.refresh ?? null)
   const identity = ref<SessionIdentity | null>(null)
   const capabilities = ref<Capability[]>([])
+  const entornoEvaluacion = ref(false)
   const initialized = ref(false)
   let refreshPromise: Promise<string | null> | null = null
 
@@ -63,6 +64,9 @@ export const useSessionStore = defineStore('session', () => {
       display_name: current.display_name,
     }
     capabilities.value = current.capabilities.filter(isCapability)
+    entornoEvaluacion.value = Boolean(
+      (current as { entorno_evaluacion?: boolean }).entorno_evaluacion,
+    )
   }
 
   function logout() {
@@ -70,6 +74,7 @@ export const useSessionStore = defineStore('session', () => {
     refreshToken.value = null
     identity.value = null
     capabilities.value = []
+    entornoEvaluacion.value = false
     persist()
   }
 
@@ -129,6 +134,7 @@ export const useSessionStore = defineStore('session', () => {
     accessToken,
     identity,
     capabilities,
+    entornoEvaluacion,
     initialized,
     isAuthenticated,
     roleProfile,

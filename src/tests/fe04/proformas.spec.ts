@@ -54,6 +54,8 @@ const quote = (state = 'BORRADOR'): Proforma => ({
   fecha: '2026-09-25',
   creado_en: null,
   actualizado_en: null,
+  ultima_actividad_comercial: null,
+  naturaleza: 'REAL',
   fecha_vencimiento: null,
   plazo_entrega: null,
   validez_oferta: null,

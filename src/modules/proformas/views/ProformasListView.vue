@@ -52,9 +52,16 @@ const session = useSessionStore()
 const ahora = ref(Date.now())
 const filasConCreacion = computed(() =>
   rows.value.map((row) => {
-    const editedAt = row.actualizado_en ?? row.creado_en
+    const esSimulada =
+      (row as { naturaleza?: string }).naturaleza === 'SIMULADO_NO_RESULTADO_MEDIDO'
+    const actividadComercial = (row as { ultima_actividad_comercial?: string | null })
+      .ultima_actividad_comercial
+    const editedAt = esSimulada
+      ? (actividadComercial ?? row.actualizado_en ?? row.creado_en)
+      : (row.actualizado_en ?? row.creado_en)
     return {
       ...row,
+      esSimulada,
       creado_en: editedAt,
       creacion: presentarCreacion(editedAt, row.fecha, ahora.value),
     }
@@ -464,8 +471,12 @@ onBeforeUnmount(() => {
                   </div>
                 </div>
               </td>
-              <td class="date-cell" data-label="Última edición">
+              <td
+                class="date-cell"
+                :data-label="row.esSimulada ? 'Actividad comercial' : 'Última edición'"
+              >
                 <DatePresentation :presentation="row.creacion" :timestamp="row.creado_en" />
+                <Badge v-if="row.esSimulada" tone="warning">Simulado</Badge>
               </td>
               <td class="status-cell" data-label="Estado">
                 <Badge :tone="tone(row.estado_info.codigo)">{{ row.estado_info.nombre }}</Badge>
