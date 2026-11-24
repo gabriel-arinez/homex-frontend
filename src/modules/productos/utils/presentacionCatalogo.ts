@@ -49,13 +49,26 @@ export function catalogoId(value: string): string {
     : ''
 }
 
+export function esBajoPedido(
+  producto?: Pick<Producto, 'modalidad_abastecimiento'> | null,
+): boolean {
+  return producto?.modalidad_abastecimiento === 'BAJO_PEDIDO'
+}
+
 export type DisponibilidadMeta = {
-  tone: 'success' | 'warning' | 'danger'
+  tone: 'success' | 'warning' | 'danger' | 'info'
   label: string
   hint: string
 }
 
-export function disponibilidadMeta(valor: string | number): DisponibilidadMeta {
+export function disponibilidadMeta(valor: string | number, modalidad?: string): DisponibilidadMeta {
+  if (modalidad === 'BAJO_PEDIDO') {
+    return {
+      tone: 'info',
+      label: 'Disponible bajo pedido',
+      hint: 'Se comercializa bajo pedido; no requiere existencias físicas',
+    }
+  }
   const n = Number(valor)
   if (!Number.isFinite(n) || n > 0) {
     return {
@@ -79,12 +92,15 @@ export function disponibilidadMeta(valor: string | number): DisponibilidadMeta {
 }
 
 export type EstadoStockMeta = {
-  tone: 'danger' | 'warning' | 'success' | 'neutral'
+  tone: 'danger' | 'warning' | 'success' | 'neutral' | 'info'
   label: string
   showBadge: boolean
 }
 
-export function estadoStockMeta(estadoStock?: string): EstadoStockMeta {
+export function estadoStockMeta(estadoStock?: string, modalidad?: string): EstadoStockMeta {
+  if (modalidad === 'BAJO_PEDIDO' || estadoStock === 'BAJO_PEDIDO') {
+    return { tone: 'info', label: 'Disponible bajo pedido', showBadge: true }
+  }
   switch (estadoStock) {
     case 'SIN_EXISTENCIAS':
       return { tone: 'danger', label: 'Sin existencias', showBadge: true }

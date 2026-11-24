@@ -405,6 +405,7 @@ function submitQuickQuote() {
   }
   quoteError.value = ''
   const qty = Number(quoteQty.value)
+  const bajoPedido = props.product.modalidad_abastecimiento === 'BAJO_PEDIDO'
   const stock = Number(props.product.stock ?? 0)
   const price = Number(quotePrice.value)
   const disc = quoteDiscount.value === '' ? 0 : Number(quoteDiscount.value)
@@ -417,11 +418,11 @@ function submitQuickQuote() {
     quoteError.value = 'Esta unidad comercial requiere una cantidad entera.'
     return
   }
-  if (stock <= 0) {
+  if (!bajoPedido && stock <= 0) {
     quoteError.value = 'Este producto no tiene stock disponible actualmente.'
     return
   }
-  if (qty > stock) {
+  if (!bajoPedido && qty > stock) {
     quoteError.value = `La cantidad solicitada (${qty}) supera el stock actual (${unidadesProducto(props.product, props.product.stock)}).`
     return
   }
@@ -696,33 +697,47 @@ function submitQuickQuote() {
                   {{ product.promocion.precio_ahora }} (antes {{ product.promocion.precio_antes }})
                 </dd>
               </div>
-              <div>
-                <dt>Stock actual</dt>
-                <dd>
-                  {{ unidadesProducto(product, product.stock) }}
-                  <Badge
-                    v-if="estadoStockMeta(product.estado_stock).showBadge"
-                    :tone="estadoStockMeta(product.estado_stock).tone"
-                  >
-                    {{ estadoStockMeta(product.estado_stock).label }}
-                  </Badge>
-                </dd>
-              </div>
-              <div>
-                <dt>Demanda pendiente</dt>
-                <dd>{{ unidadesProducto(product, product.demanda_pendiente) }}</dd>
-              </div>
-              <div>
-                <dt>Disponibilidad referencial</dt>
-                <dd>
-                  <Badge
-                    :tone="disponibilidadMeta(product.disponibilidad_referencial).tone"
-                    :title="disponibilidadMeta(product.disponibilidad_referencial).hint"
-                  >
-                    {{ unidadesProducto(product, product.disponibilidad_referencial) }}
-                  </Badge>
-                </dd>
-              </div>
+              <template v-if="product.modalidad_abastecimiento === 'BAJO_PEDIDO'">
+                <div>
+                  <dt>Abastecimiento</dt>
+                  <dd>
+                    <Badge tone="info">Disponible bajo pedido</Badge>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Demanda pendiente</dt>
+                  <dd>{{ unidadesProducto(product, product.demanda_pendiente) }}</dd>
+                </div>
+              </template>
+              <template v-else>
+                <div>
+                  <dt>Stock actual</dt>
+                  <dd>
+                    {{ unidadesProducto(product, product.stock) }}
+                    <Badge
+                      v-if="estadoStockMeta(product.estado_stock).showBadge"
+                      :tone="estadoStockMeta(product.estado_stock).tone"
+                    >
+                      {{ estadoStockMeta(product.estado_stock).label }}
+                    </Badge>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Demanda pendiente</dt>
+                  <dd>{{ unidadesProducto(product, product.demanda_pendiente) }}</dd>
+                </div>
+                <div>
+                  <dt>Disponibilidad referencial</dt>
+                  <dd>
+                    <Badge
+                      :tone="disponibilidadMeta(product.disponibilidad_referencial).tone"
+                      :title="disponibilidadMeta(product.disponibilidad_referencial).hint"
+                    >
+                      {{ unidadesProducto(product, product.disponibilidad_referencial) }}
+                    </Badge>
+                  </dd>
+                </div>
+              </template>
             </dl>
           </section>
 
@@ -828,7 +843,11 @@ function submitQuickQuote() {
                   type="number"
                   :min="quoteQtyMin"
                   :step="quoteQtyStep"
-                  :max="Number(product.stock) > 0 ? product.stock : undefined"
+                  :max="
+                    product.modalidad_abastecimiento !== 'BAJO_PEDIDO' && Number(product.stock) > 0
+                      ? product.stock
+                      : undefined
+                  "
                 />
               </label>
               <label class="quote-field">

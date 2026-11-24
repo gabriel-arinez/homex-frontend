@@ -99,10 +99,10 @@ const routeStatus = (): string =>
   ['todos', 'activos', 'inactivos'].includes(routeString('estado'))
     ? routeString('estado')
     : 'activos'
-type StockFilter = '' | 'SIN_EXISTENCIAS' | 'STOCK_BAJO' | 'NORMAL' | 'SIN_MINIMO'
+type StockFilter = '' | 'SIN_EXISTENCIAS' | 'STOCK_BAJO' | 'NORMAL' | 'SIN_MINIMO' | 'BAJO_PEDIDO'
 const routeStockStatus = (): StockFilter => {
   const val = routeString('estado_stock')
-  return ['SIN_EXISTENCIAS', 'STOCK_BAJO', 'NORMAL', 'SIN_MINIMO'].includes(val)
+  return ['SIN_EXISTENCIAS', 'STOCK_BAJO', 'NORMAL', 'SIN_MINIMO', 'BAJO_PEDIDO'].includes(val)
     ? (val as StockFilter)
     : ''
 }
@@ -590,6 +590,7 @@ onBeforeUnmount(() => {
             { label: 'Con stock normal', value: 'NORMAL' },
             { label: 'Stock bajo', value: 'STOCK_BAJO' },
             { label: 'Sin existencias', value: 'SIN_EXISTENCIAS' },
+            { label: 'Disponible bajo pedido', value: 'BAJO_PEDIDO' },
             { label: 'Sin mínimo configurado', value: 'SIN_MINIMO' },
           ]"
         />
@@ -681,7 +682,7 @@ onBeforeUnmount(() => {
                   <Pencil :size="15" aria-hidden="true" /> Editar producto
                 </button>
                 <button
-                  v-if="canAdmin"
+                  v-if="canAdmin && product.modalidad_abastecimiento !== 'BAJO_PEDIDO'"
                   type="button"
                   role="menuitem"
                   class="menu-item--success"
@@ -690,7 +691,7 @@ onBeforeUnmount(() => {
                   <ArrowUpRight :size="15" aria-hidden="true" /> Registrar entrada
                 </button>
                 <button
-                  v-if="canAdmin"
+                  v-if="canAdmin && product.modalidad_abastecimiento !== 'BAJO_PEDIDO'"
                   type="button"
                   role="menuitem"
                   class="menu-item--warning"
@@ -750,19 +751,25 @@ onBeforeUnmount(() => {
                 <Badge v-if="product.promocion?.vigente" tone="info">Promoción</Badge>
               </div>
               <div class="card-stock">
-                <span class="card-stock__label">Stock actual</span>
-                <strong class="card-stock__value">{{
-                  unidadesProducto(product, product.stock)
-                }}</strong>
-                <Badge
-                  v-if="
-                    estadoStockMeta(product.estado_stock).showBadge &&
-                    product.estado_stock !== 'NORMAL'
-                  "
-                  :tone="estadoStockMeta(product.estado_stock).tone"
-                >
-                  {{ estadoStockMeta(product.estado_stock).label }}
-                </Badge>
+                <template v-if="product.modalidad_abastecimiento === 'BAJO_PEDIDO'">
+                  <span class="card-stock__label">Abastecimiento</span>
+                  <Badge tone="info">Disponible bajo pedido</Badge>
+                </template>
+                <template v-else>
+                  <span class="card-stock__label">Stock actual</span>
+                  <strong class="card-stock__value">{{
+                    unidadesProducto(product, product.stock)
+                  }}</strong>
+                  <Badge
+                    v-if="
+                      estadoStockMeta(product.estado_stock).showBadge &&
+                      product.estado_stock !== 'NORMAL'
+                    "
+                    :tone="estadoStockMeta(product.estado_stock).tone"
+                  >
+                    {{ estadoStockMeta(product.estado_stock).label }}
+                  </Badge>
+                </template>
               </div>
             </div>
           </div>
@@ -840,18 +847,25 @@ onBeforeUnmount(() => {
                 </small>
               </td>
               <td class="numeric stock-cell" data-label="Stock actual">
-                <strong>{{ unidadesProducto(product, product.stock) }}</strong>
-                <div
-                  v-if="
-                    estadoStockMeta(product.estado_stock).showBadge &&
-                    product.estado_stock !== 'NORMAL'
-                  "
-                  class="stock-badge-row"
-                >
-                  <Badge :tone="estadoStockMeta(product.estado_stock).tone">
-                    {{ estadoStockMeta(product.estado_stock).label }}
-                  </Badge>
-                </div>
+                <template v-if="product.modalidad_abastecimiento === 'BAJO_PEDIDO'">
+                  <div class="stock-badge-row">
+                    <Badge tone="info">Disponible bajo pedido</Badge>
+                  </div>
+                </template>
+                <template v-else>
+                  <strong>{{ unidadesProducto(product, product.stock) }}</strong>
+                  <div
+                    v-if="
+                      estadoStockMeta(product.estado_stock).showBadge &&
+                      product.estado_stock !== 'NORMAL'
+                    "
+                    class="stock-badge-row"
+                  >
+                    <Badge :tone="estadoStockMeta(product.estado_stock).tone">
+                      {{ estadoStockMeta(product.estado_stock).label }}
+                    </Badge>
+                  </div>
+                </template>
               </td>
               <td class="actions" data-label="Acciones">
                 <div class="action-menu table-action-menu">

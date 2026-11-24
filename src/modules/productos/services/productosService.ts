@@ -18,7 +18,8 @@ type ProductoListQuery = NonNullable<V1CatalogoProductosListData['query']> & {
   acabado?: string | number
   espesor_mm?: string
   unidad_stock?: string | number
-  estado_stock?: 'SIN_EXISTENCIAS' | 'STOCK_BAJO' | 'NORMAL' | 'SIN_MINIMO'
+  modalidad_abastecimiento?: 'CON_STOCK' | 'BAJO_PEDIDO'
+  estado_stock?: 'SIN_EXISTENCIAS' | 'STOCK_BAJO' | 'NORMAL' | 'SIN_MINIMO' | 'BAJO_PEDIDO'
 }
 function queryString(query: ProductoListQuery) {
   const params = new URLSearchParams()

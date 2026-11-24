@@ -13,6 +13,7 @@ import type {
   CamposCatalogo,
   CategoriaEnum,
   FamiliaProducto,
+  ModalidadAbastecimientoEnum,
   Producto,
   ProductoSimilarItem,
   ProductoWritable,
@@ -205,6 +206,9 @@ const form = reactive({
   sku: props.initial?.sku ?? '',
   nombre: props.initial?.nombre ?? '',
   precio_lista: props.initial?.precio_lista ?? '',
+  modalidad_abastecimiento:
+    props.initial?.modalidad_abastecimiento ??
+    (props.preselectCategory === 'PISO_FLOTANTE' ? 'BAJO_PEDIDO' : 'CON_STOCK'),
   unidad_stock: String(props.initial?.unidad_stock ?? ''),
   observaciones: props.initial?.observaciones ?? '',
   activo: props.initial?.activo !== false,
@@ -520,6 +524,7 @@ async function load() {
         const unidadCodigo = cat.codigo === 'PISO_FLOTANTE' ? 'M2' : 'PIEZA'
         const unidad = opciones.UNIDAD_MEDIDA?.find((item) => item.codigo === unidadCodigo)
         if (unidad) form.unidad_stock = String(unidad.id)
+        form.modalidad_abastecimiento = cat.codigo === 'PISO_FLOTANTE' ? 'BAJO_PEDIDO' : 'CON_STOCK'
       }
       if (wasPristine) {
         await nextTick()
@@ -542,6 +547,7 @@ watch(
     const unit = code === 'SILLA' ? 'PIEZA' : code === 'PISO_FLOTANTE' ? 'M2' : ''
     const match = opciones.UNIDAD_MEDIDA?.find((item) => item.codigo === unit)
     form.unidad_stock = match ? String(match.id) : ''
+    form.modalidad_abastecimiento = code === 'PISO_FLOTANTE' ? 'BAJO_PEDIDO' : 'CON_STOCK'
   },
 )
 
@@ -616,6 +622,7 @@ function submit(): boolean {
     sku: form.sku,
     nombre: form.nombre,
     precio_lista: form.precio_lista,
+    modalidad_abastecimiento: form.modalidad_abastecimiento as ModalidadAbastecimientoEnum,
     unidad_stock: Number(form.unidad_stock),
     observaciones: form.observaciones || null,
     activo: form.activo,
@@ -904,6 +911,21 @@ onBeforeUnmount(() => {
               />
               <small v-if="fieldError('unidad_stock')" class="field-error" role="alert">
                 {{ fieldError('unidad_stock') }}
+              </small>
+            </div>
+
+            <div>
+              <Select
+                v-model="form.modalidad_abastecimiento"
+                name="modalidad_abastecimiento"
+                label="Modalidad de abastecimiento *"
+                :options="[
+                  { value: 'CON_STOCK', label: 'Con stock (control de inventario)' },
+                  { value: 'BAJO_PEDIDO', label: 'Bajo pedido (sin necesidad de existencias)' },
+                ]"
+              />
+              <small v-if="fieldError('modalidad_abastecimiento')" class="field-error" role="alert">
+                {{ fieldError('modalidad_abastecimiento') }}
               </small>
             </div>
           </div>
@@ -1319,11 +1341,20 @@ onBeforeUnmount(() => {
             <span class="switch-ui" aria-hidden="true" />
           </label>
           <div class="stock-note">
-            <strong>Control de existencias</strong>
-            <p>
-              El stock inicial es cero. Las existencias se modifican únicamente mediante movimientos
-              autorizados.
-            </p>
+            <template v-if="form.modalidad_abastecimiento === 'BAJO_PEDIDO'">
+              <strong>Abastecimiento bajo pedido</strong>
+              <p>
+                Este producto se cotiza y confirma sin requerir existencias físicas ni movimientos
+                de inventario.
+              </p>
+            </template>
+            <template v-else>
+              <strong>Control de existencias</strong>
+              <p>
+                El stock inicial es cero. Las existencias se modifican únicamente mediante
+                movimientos autorizados.
+              </p>
+            </template>
           </div>
         </section>
       </aside>

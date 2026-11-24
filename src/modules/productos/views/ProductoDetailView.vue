@@ -413,14 +413,18 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           <ArrowLeft :size="17" aria-hidden="true" /> Volver a productos
         </Button>
         <Button
-          v-if="product && !editing && canAdmin"
+          v-if="
+            product && !editing && canAdmin && product.modalidad_abastecimiento !== 'BAJO_PEDIDO'
+          "
           variant="success"
           @click="openAjusteStock('ENTRADA')"
         >
           <ArrowUpRight :size="17" aria-hidden="true" /> Entrada stock
         </Button>
         <Button
-          v-if="product && !editing && canAdmin"
+          v-if="
+            product && !editing && canAdmin && product.modalidad_abastecimiento !== 'BAJO_PEDIDO'
+          "
           variant="warning"
           @click="openAjusteStock('SALIDA')"
         >
@@ -492,7 +496,35 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             </div>
           </div>
 
-          <div class="stat">
+          <div v-if="product.modalidad_abastecimiento === 'BAJO_PEDIDO'" class="stat">
+            <span class="stat__icon stat__icon--success">
+              <PackageCheck :size="18" aria-hidden="true" />
+            </span>
+            <div class="stat__body">
+              <span>Abastecimiento</span>
+              <strong class="stat__value">Disponible bajo pedido</strong>
+              <small>No requiere existencias físicas</small>
+              <div class="stat__badges">
+                <Badge tone="info">Disponible bajo pedido</Badge>
+                <button
+                  v-if="session.can('comercial.operar') && Number(product.stock) > 0"
+                  type="button"
+                  class="stat-action-pill stat-action-pill--info"
+                  @click="
+                    router.push({
+                      path: '/movimientos-stock',
+                      query: { producto: String(product.id), vista: 'reporte' },
+                    })
+                  "
+                >
+                  <BarChart3 :size="13" aria-hidden="true" />
+                  Ver reporte de stock
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div v-else class="stat">
             <span class="stat__icon stat__icon--success">
               <PackageCheck :size="18" aria-hidden="true" />
             </span>
@@ -567,18 +599,30 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             </span>
             <div class="stat__body">
               <span>Disponibilidad referencial</span>
-              <strong class="stat__value">
-                {{ unidadesProducto(product, product.disponibilidad_referencial) }}
-              </strong>
-              <small>{{ disponibilidadMeta(product.disponibilidad_referencial).hint }}</small>
-              <div class="stat__badges">
-                <Badge :tone="disponibilidadMeta(product.disponibilidad_referencial).tone">
-                  {{ disponibilidadMeta(product.disponibilidad_referencial).label }}
-                </Badge>
-                <Badge :tone="product.activo === false ? 'neutral' : 'success'">
-                  {{ product.activo === false ? 'Inactivo' : 'Activo' }}
-                </Badge>
-              </div>
+              <template v-if="product.modalidad_abastecimiento === 'BAJO_PEDIDO'">
+                <strong class="stat__value">Disponible bajo pedido</strong>
+                <small>Se comercializa bajo pedido; no requiere existencias físicas</small>
+                <div class="stat__badges">
+                  <Badge tone="info">Disponible bajo pedido</Badge>
+                  <Badge :tone="product.activo === false ? 'neutral' : 'success'">
+                    {{ product.activo === false ? 'Inactivo' : 'Activo' }}
+                  </Badge>
+                </div>
+              </template>
+              <template v-else>
+                <strong class="stat__value">
+                  {{ unidadesProducto(product, product.disponibilidad_referencial) }}
+                </strong>
+                <small>{{ disponibilidadMeta(product.disponibilidad_referencial).hint }}</small>
+                <div class="stat__badges">
+                  <Badge :tone="disponibilidadMeta(product.disponibilidad_referencial).tone">
+                    {{ disponibilidadMeta(product.disponibilidad_referencial).label }}
+                  </Badge>
+                  <Badge :tone="product.activo === false ? 'neutral' : 'success'">
+                    {{ product.activo === false ? 'Inactivo' : 'Activo' }}
+                  </Badge>
+                </div>
+              </template>
             </div>
           </div>
         </section>

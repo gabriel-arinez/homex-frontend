@@ -499,6 +499,12 @@ export type LineaComercialHitl = {
 }
 
 /**
+ * * `CON_STOCK` - Con stock
+ * * `BAJO_PEDIDO` - Bajo pedido
+ */
+export type ModalidadAbastecimientoEnum = 'CON_STOCK' | 'BAJO_PEDIDO'
+
+/**
  * * `RULES_ONLY` - RULES_ONLY
  * * `HYBRID` - HYBRID
  */
@@ -757,6 +763,7 @@ export type PatchedProducto = {
   nombre?: string
   precio_lista?: string
   readonly precio_vigente?: string
+  modalidad_abastecimiento?: ModalidadAbastecimientoEnum
   readonly stock?: string
   stock_minimo?: string | null
   readonly estado_stock?: string
@@ -881,6 +888,7 @@ export type Producto = {
   nombre: string
   precio_lista?: string
   readonly precio_vigente: string
+  modalidad_abastecimiento?: ModalidadAbastecimientoEnum
   readonly stock: string
   stock_minimo?: string | null
   readonly estado_stock: string
@@ -1483,6 +1491,7 @@ export type PatchedProductoWritable = {
   sku?: string
   nombre?: string
   precio_lista?: string
+  modalidad_abastecimiento?: ModalidadAbastecimientoEnum
   stock_minimo?: string | null
   unidad_stock?: number
   activo?: boolean
@@ -1538,6 +1547,7 @@ export type ProductoWritable = {
   sku: string
   nombre: string
   precio_lista?: string
+  modalidad_abastecimiento?: ModalidadAbastecimientoEnum
   stock_minimo?: string | null
   unidad_stock: number
   activo?: boolean
@@ -2248,11 +2258,17 @@ export type V1CatalogoProductosListData = {
      * * `STOCK_BAJO` - STOCK_BAJO
      * * `NORMAL` - NORMAL
      * * `SIN_MINIMO` - SIN_MINIMO
+     * * `BAJO_PEDIDO` - BAJO_PEDIDO
      */
-    estado_stock?: 'SIN_EXISTENCIAS' | 'STOCK_BAJO' | 'NORMAL' | 'SIN_MINIMO'
+    estado_stock?: 'SIN_EXISTENCIAS' | 'STOCK_BAJO' | 'NORMAL' | 'SIN_MINIMO' | 'BAJO_PEDIDO'
     familia?: number
     marca?: number
     material?: number
+    /**
+     * * `CON_STOCK` - CON_STOCK
+     * * `BAJO_PEDIDO` - BAJO_PEDIDO
+     */
+    modalidad_abastecimiento?: 'CON_STOCK' | 'BAJO_PEDIDO'
     modelo?: string
     /**
      * Un número de página dentro del conjunto de resultados paginado.

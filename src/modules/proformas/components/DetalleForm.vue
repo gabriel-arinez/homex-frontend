@@ -489,25 +489,34 @@ async function submit() {
             <span>Precio referencia</span>
             <strong>{{ dineroProducto(master.precio_vigente) }}</strong>
           </div>
-          <div class="master-kpi">
-            <span>Stock actual</span>
-            <strong>{{ unidadesProducto(master, master.stock) }}</strong>
-            <Badge
-              v-if="
-                estadoStockMeta(master.estado_stock).showBadge && master.estado_stock !== 'NORMAL'
-              "
-              :tone="estadoStockMeta(master.estado_stock).tone"
-            >
-              {{ estadoStockMeta(master.estado_stock).label }}
-            </Badge>
-          </div>
-          <div class="master-kpi">
-            <span>Disponibilidad ref.</span>
-            <strong>{{ unidadesProducto(master, master.disponibilidad_referencial) }}</strong>
-            <Badge :tone="disponibilidadMeta(master.disponibilidad_referencial).tone">
-              {{ disponibilidadMeta(master.disponibilidad_referencial).label }}
-            </Badge>
-          </div>
+          <template v-if="master.modalidad_abastecimiento === 'BAJO_PEDIDO'">
+            <div class="master-kpi">
+              <span>Abastecimiento</span>
+              <strong>Disponible bajo pedido</strong>
+              <Badge tone="info">Disponible bajo pedido</Badge>
+            </div>
+          </template>
+          <template v-else>
+            <div class="master-kpi">
+              <span>Stock actual</span>
+              <strong>{{ unidadesProducto(master, master.stock) }}</strong>
+              <Badge
+                v-if="
+                  estadoStockMeta(master.estado_stock).showBadge && master.estado_stock !== 'NORMAL'
+                "
+                :tone="estadoStockMeta(master.estado_stock).tone"
+              >
+                {{ estadoStockMeta(master.estado_stock).label }}
+              </Badge>
+            </div>
+            <div class="master-kpi">
+              <span>Disponibilidad ref.</span>
+              <strong>{{ unidadesProducto(master, master.disponibilidad_referencial) }}</strong>
+              <Badge :tone="disponibilidadMeta(master.disponibilidad_referencial).tone">
+                {{ disponibilidadMeta(master.disponibilidad_referencial).label }}
+              </Badge>
+            </div>
+          </template>
         </div>
 
         <!-- Especificaciones técnicas legibles (sin JSON crudo) -->

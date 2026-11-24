@@ -66,6 +66,7 @@ export type {
   ItemIa,
   LimitesConfigurador,
   LineaComercialHitl,
+  ModalidadAbastecimientoEnum,
   ModeEnum,
   ModoCalculoEnum,
   MonedaCodigoEnum,

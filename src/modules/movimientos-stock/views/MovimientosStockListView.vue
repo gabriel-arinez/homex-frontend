@@ -457,7 +457,10 @@ onBeforeUnmount(() => {
           <Download :size="16" aria-hidden="true" />
           {{ exportingCsv ? 'Exportando...' : 'Exportar Excel' }}
         </Button>
-        <Button v-if="canAdmin" @click="openAjusteModal('ENTRADA')">
+        <Button
+          v-if="canAdmin && selectedProduct?.modalidad_abastecimiento !== 'BAJO_PEDIDO'"
+          @click="openAjusteModal('ENTRADA')"
+        >
           <Plus :size="16" aria-hidden="true" />
           Registrar movimiento
         </Button>
@@ -533,7 +536,13 @@ onBeforeUnmount(() => {
           </span>
           <div>
             <span>Disponibilidad referencial</span>
-            <Badge :tone="disponibilidadMeta(selectedProduct.disponibilidad_referencial).tone">
+            <Badge v-if="selectedProduct.modalidad_abastecimiento === 'BAJO_PEDIDO'" tone="info">
+              Disponible bajo pedido
+            </Badge>
+            <Badge
+              v-else
+              :tone="disponibilidadMeta(selectedProduct.disponibilidad_referencial).tone"
+            >
               {{ unidadesProducto(selectedProduct, selectedProduct.disponibilidad_referencial) }}
             </Badge>
           </div>

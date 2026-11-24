@@ -121,6 +121,7 @@ function selectProduct(product: Producto) {
   const raw = qtyFor(product).trim()
   const qty = Number(raw)
   const unitCode = product.unidad_stock_info?.codigo ?? 'PIEZA'
+  const bajoPedido = product.modalidad_abastecimiento === 'BAJO_PEDIDO'
   const stock = Number(product.stock ?? 0)
   if (!Number.isFinite(qty) || qty <= 0) {
     errorToast.value = 'Ingresa una cantidad mayor que cero.'
@@ -130,11 +131,11 @@ function selectProduct(product: Producto) {
     errorToast.value = 'Esta unidad comercial requiere una cantidad entera.'
     return
   }
-  if (stock <= 0) {
+  if (!bajoPedido && stock <= 0) {
     errorToast.value = `«${product.nombre}» no tiene stock disponible en este momento.`
     return
   }
-  if (qty > stock) {
+  if (!bajoPedido && qty > stock) {
     errorToast.value = `La cantidad (${qty}) supera el stock actual (${product.stock} ${product.unidad_stock_info?.nombre ?? ''}).`
     return
   }
@@ -504,7 +505,12 @@ onBeforeUnmount(() => {
           <small v-if="producto.promocion?.vigente"
             >Promoción vigente incluida en precio de referencia</small
           >
-          <small>Stock actual: {{ producto.stock }} {{ producto.unidad_stock_info?.nombre }}</small>
+          <small v-if="producto.modalidad_abastecimiento === 'BAJO_PEDIDO'">
+            Disponible bajo pedido
+          </small>
+          <small v-else>
+            Stock actual: {{ producto.stock }} {{ producto.unidad_stock_info?.nombre }}
+          </small>
           <div class="card-quote-controls">
             <Button
               variant="info"
@@ -523,7 +529,11 @@ onBeforeUnmount(() => {
               class="card-qty-input"
               :min="producto.unidad_stock_info?.codigo === 'M2' ? '0.0001' : '1'"
               :step="producto.unidad_stock_info?.codigo === 'M2' ? '0.0001' : '1'"
-              :max="Number(producto.stock) > 0 ? producto.stock : undefined"
+              :max="
+                producto.modalidad_abastecimiento !== 'BAJO_PEDIDO' && Number(producto.stock) > 0
+                  ? producto.stock
+                  : undefined
+              "
               :aria-label="'Cantidad para ' + producto.nombre"
               @input="setQty(producto.id, ($event.target as HTMLInputElement).value)"
             />
@@ -582,7 +592,12 @@ onBeforeUnmount(() => {
               <strong>{{ money(producto.precio_vigente) }}</strong>
             </td>
             <td data-label="Disponibilidad ref.">
-              {{ producto.disponibilidad_referencial }} {{ producto.unidad_stock_info?.nombre }}
+              <template v-if="producto.modalidad_abastecimiento === 'BAJO_PEDIDO'">
+                Disponible bajo pedido
+              </template>
+              <template v-else>
+                {{ producto.disponibilidad_referencial }} {{ producto.unidad_stock_info?.nombre }}
+              </template>
             </td>
             <td data-label="Acciones">
               <div class="table-actions">
@@ -603,7 +618,12 @@ onBeforeUnmount(() => {
                   class="card-qty-input"
                   :min="producto.unidad_stock_info?.codigo === 'M2' ? '0.0001' : '1'"
                   :step="producto.unidad_stock_info?.codigo === 'M2' ? '0.0001' : '1'"
-                  :max="Number(producto.stock) > 0 ? producto.stock : undefined"
+                  :max="
+                    producto.modalidad_abastecimiento !== 'BAJO_PEDIDO' &&
+                    Number(producto.stock) > 0
+                      ? producto.stock
+                      : undefined
+                  "
                   :aria-label="'Cantidad para ' + producto.nombre"
                   @input="setQty(producto.id, ($event.target as HTMLInputElement).value)"
                 />
