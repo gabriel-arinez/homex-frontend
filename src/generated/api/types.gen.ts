@@ -768,7 +768,7 @@ export type PatchedProducto = {
   stock_minimo?: string | null
   readonly estado_stock?: string
   readonly demanda_pendiente?: string
-  readonly disponibilidad_referencial?: string
+  readonly disponibilidad_referencial?: string | null
   unidad_stock?: number
   unidad_stock_info?: ValorCatalogoPublico
   activo?: boolean
@@ -893,7 +893,7 @@ export type Producto = {
   stock_minimo?: string | null
   readonly estado_stock: string
   readonly demanda_pendiente: string
-  readonly disponibilidad_referencial: string
+  readonly disponibilidad_referencial: string | null
   unidad_stock: number
   unidad_stock_info: ValorCatalogoPublico
   activo?: boolean

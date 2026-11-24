@@ -14,15 +14,18 @@ export function dineroProducto(valor: string): string {
   return Number.isFinite(n) ? dineroFormatter.format(n) : 'Precio no disponible'
 }
 
-export function cantidadProducto(valor: string | number): string {
-  if (String(valor).trim() === '') return '—'
+export function cantidadProducto(valor: string | number | null | undefined): string {
+  if (valor === null || valor === undefined || String(valor).trim() === '') return '—'
   const n = Number(valor)
   return Number.isFinite(n) ? cantidadFormatter.format(n) : '—'
 }
 
-export function unidadProducto(producto: Producto, valor: string | number): string {
+export function unidadProducto(
+  producto: Producto,
+  valor: string | number | null | undefined,
+): string {
   const codigo = producto.unidad_stock_info?.codigo
-  const n = Number(valor)
+  const n = Number(valor ?? 0)
   if (codigo === 'M2') return 'm²'
   if (codigo === 'PIEZA') return n === 1 ? 'pieza' : 'piezas'
   if (codigo === 'JUEGO') return n === 1 ? 'juego' : 'juegos'
@@ -30,7 +33,11 @@ export function unidadProducto(producto: Producto, valor: string | number): stri
   return producto.unidad_stock_info?.nombre || 'unidades'
 }
 
-export function unidadesProducto(producto: Producto, valor: string | number): string {
+export function unidadesProducto(
+  producto: Producto,
+  valor: string | number | null | undefined,
+): string {
+  if (valor === null || valor === undefined || String(valor).trim() === '') return '—'
   return cantidadProducto(valor) + ' ' + unidadProducto(producto, valor)
 }
 
@@ -61,8 +68,11 @@ export type DisponibilidadMeta = {
   hint: string
 }
 
-export function disponibilidadMeta(valor: string | number, modalidad?: string): DisponibilidadMeta {
-  if (modalidad === 'BAJO_PEDIDO') {
+export function disponibilidadMeta(
+  valor: string | number | null | undefined,
+  modalidad?: string,
+): DisponibilidadMeta {
+  if (modalidad === 'BAJO_PEDIDO' || valor === null || valor === undefined) {
     return {
       tone: 'info',
       label: 'Disponible bajo pedido',

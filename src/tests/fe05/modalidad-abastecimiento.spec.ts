@@ -30,7 +30,7 @@ const pisoBajoPedido = {
   stock_minimo: null,
   estado_stock: 'BAJO_PEDIDO',
   demanda_pendiente: '20.0000',
-  disponibilidad_referencial: '-20.0000',
+  disponibilidad_referencial: null,
   unidad_stock: 3,
   unidad_stock_info: {
     id: 3,
@@ -98,7 +98,7 @@ describe('Modalidad de abastecimiento en frontend', () => {
       showBadge: true,
     })
 
-    expect(disponibilidadMeta('-20.0000', 'BAJO_PEDIDO').label).toBe('Disponible bajo pedido')
+    expect(disponibilidadMeta(null, 'BAJO_PEDIDO').label).toBe('Disponible bajo pedido')
     expect(estadoStockMeta('SIN_EXISTENCIAS', 'CON_STOCK').label).toBe('Sin existencias')
   })
 

@@ -579,7 +579,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <strong class="stat__value">
                 {{ unidadesProducto(product, product.demanda_pendiente) }}
               </strong>
-              <small>Proformas en revisión o enviadas (no reserva stock)</small>
+              <small>{{
+                product.modalidad_abastecimiento === 'BAJO_PEDIDO'
+                  ? 'Proformas en revisión o enviadas (abastecimiento bajo pedido)'
+                  : 'Proformas en revisión o enviadas (no reserva stock)'
+              }}</small>
               <div class="stat__badges">
                 <button
                   type="button"
