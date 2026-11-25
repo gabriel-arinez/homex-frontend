@@ -252,6 +252,17 @@ export type ClienteResumenProforma = {
   celular: string | null
 }
 
+export type ClientesMayorSaldoMoneda = {
+  moneda: string
+  clientes: Array<ClienteMayorSaldo>
+}
+
+export type CoberturaFormalizacion = {
+  con_marca_temporal: number
+  aproximadas_por_fecha: number
+  anuladas_sin_evidencia_formalizacion: number
+}
+
 export type CobrosPedidosCancelados = {
   moneda: string
   cantidad_recibos: number
@@ -279,6 +290,7 @@ export type ComparacionPeriodoComercial = {
   proformas_formalizadas: VariacionEntero
   borradores: VariacionEntero
   pedidos_generados: VariacionEntero
+  pedidos_confirmados_periodo: VariacionEntero
   pedidos_no_cancelados: VariacionEntero
 }
 
@@ -655,7 +667,7 @@ export type FinanzasAdmin = {
   por_moneda: Array<ResumenFinancieroMoneda>
   cobros_pedidos_cancelados: Array<CobrosPedidosCancelados>
   pedidos_entregados_con_saldo: PaginacionPedidosEntregadosSaldo
-  clientes_mayores_saldos: Array<ClienteMayorSaldo>
+  clientes_mayores_saldos_por_moneda: Array<ClientesMayorSaldoMoneda>
   evolucion_cobros: Array<EvolucionCobrosMoneda>
 }
 
@@ -724,8 +736,12 @@ export type IndicadoresComerciales = {
   borradores: number
   proformas_formalizadas: number
   pedidos_generados: number
+  pedidos_derivados_cohorte: number
+  pedidos_no_cancelados_cohorte: number
+  pedidos_confirmados_periodo: number
   pedidos_no_cancelados: number
   tasa_conversion_cohorte: string | null
+  cobertura_formalizacion: CoberturaFormalizacion
   distribucion_proformas_estado: Array<EstadoConteo>
   distribucion_pedidos_estado: Array<EstadoConteo>
   comparaciones_periodo_anterior: ComparacionPeriodoComercial | null
@@ -745,6 +761,7 @@ export type IndicadoresTaller = {
   ordenes_con_duracion_medible: number
   antiguedad_promedio_activas_dias: number | null
   antiguedad_maxima_activas_dias: number | null
+  ordenes_con_antiguedad_medible: number
   entregas_proximas: number
   entregas_retrasadas: number
   entregas_efectivas: number
@@ -769,6 +786,7 @@ export type InventarioCategoria = {
   bajo_pedido: number
   stock_bajo: number
   agotados: number
+  sin_stock_minimo: number
 }
 
 export type ItemCorregido = {
@@ -1670,6 +1688,7 @@ export type ResultadoEnum =
 export type ResumenConteosAgenda = {
   proformas_proximas_vencer: number
   proformas_pendientes_revision: number
+  proformas_enviadas: number
   pedidos_listos_entrega: number
   pedidos_con_saldo_pendiente: number
   entregas_proximas: number
@@ -1682,6 +1701,7 @@ export type ResumenDisponibilidad = {
   con_stock_bajo: number
   con_stock_agotado: number
   bajo_pedido: number
+  sin_stock_minimo: number
 }
 
 export type ResumenFinancieroMoneda = {
@@ -1704,6 +1724,7 @@ export type ResumenInventario = {
   bajo_pedido: number
   stock_bajo: number
   agotados: number
+  sin_stock_minimo: number
 }
 
 export type RevisionCampoCatalogo = {
@@ -3403,6 +3424,7 @@ export type V1DashboardAdministradorRetrieveData = {
     fecha_hasta?: string
     moneda?: string
     page_size?: number
+    tipo_mueble?: string
     vendedor?: number
   }
   url: '/api/v1/dashboard/administrador/'
@@ -3419,6 +3441,7 @@ export type V1DashboardAdministradorComercialRetrieveData = {
   body?: never
   path?: never
   query?: {
+    categoria?: string
     estado_comercial?: string
     fecha_desde?: string
     fecha_hasta?: string
@@ -3440,6 +3463,7 @@ export type V1DashboardAdministradorFinanzasRetrieveData = {
   body?: never
   path?: never
   query?: {
+    categoria?: string
     fecha_desde?: string
     fecha_hasta?: string
     granularidad?: 'diaria' | 'mensual' | 'semanal'
@@ -3530,6 +3554,7 @@ export type V1DashboardTiendaRetrieveData = {
   body?: never
   path?: never
   query?: {
+    categoria?: string
     estado_comercial?: string
     fecha_desde?: string
     fecha_hasta?: string
