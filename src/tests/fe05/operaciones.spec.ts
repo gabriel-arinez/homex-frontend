@@ -549,7 +549,15 @@ describe('FE05 operaciones', () => {
         }),
       ),
     )
-    const w = await mountAt(OrdenTrabajoDetailView, '/ordenes-trabajo/3')
+    const wCommercial = await mountAt(OrdenTrabajoDetailView, '/ordenes-trabajo/3', [
+      'comercial.operar',
+    ])
+    await flushPromises()
+    expect(
+      wCommercial.findAll('button').some((b) => b.text().trim() === 'Listo para entrega'),
+    ).toBe(false)
+
+    const w = await mountAt(OrdenTrabajoDetailView, '/ordenes-trabajo/3', ['taller.operar'])
     await flushPromises()
     expect(w.text()).toContain('1 mueble a medida')
     expect(w.text()).toContain('Mueble a medida · Ficha técnica reservada a taller')
@@ -623,7 +631,15 @@ describe('FE05 operaciones', () => {
         })
       }),
     )
-    const w = await mountAt(OrdenTrabajoDetailView, '/ordenes-trabajo/3')
+    const wCommercial = await mountAt(OrdenTrabajoDetailView, '/ordenes-trabajo/3', [
+      'comercial.operar',
+    ])
+    await flushPromises()
+    expect(
+      wCommercial.findAll('button').some((b) => b.text().trim() === 'Listo para entrega'),
+    ).toBe(false)
+
+    const w = await mountAt(OrdenTrabajoDetailView, '/ordenes-trabajo/3', ['taller.operar'])
     await flushPromises()
     const readyBtn = w.findAll('button').find((b) => b.text().trim() === 'Listo para entrega')
     expect(readyBtn?.exists()).toBe(true)
