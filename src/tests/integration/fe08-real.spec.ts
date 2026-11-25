@@ -86,7 +86,7 @@ test.describe.serial('FE08 backend real', () => {
 
     await page.goto('/clientes')
     await expect(page.getByText('Cliente Integración FE08', { exact: true })).toBeVisible()
-    await page.goto('/productos')
+    await page.goto('/productos?q=Silla%20integraci%C3%B3n%20FE08')
     await expect(page.getByText('Silla integración FE08', { exact: true }).first()).toBeVisible()
 
     const pedidoId = await createApprovedOrder(page, 'Flujo comercial FE08')

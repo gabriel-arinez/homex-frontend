@@ -59,7 +59,9 @@ for (const [category, file] of samples) {
           const inventory = await inventoryResponse
           const headers = { authorization: inventory.request().headers()['authorization']! }
           const readInventory = async () => {
-            let url: string | null = inventory.url()
+            const baseUrl = new URL(inventory.url())
+            baseUrl.searchParams.delete('categoria')
+            let url: string | null = baseUrl.toString()
             let count = 0
             const stocks: [number, string | number][] = []
             while (url) {

@@ -40,6 +40,7 @@ for (const width of [360, 1280]) {
     await viewer.getByRole('button', { name: 'Cerrar', exact: true }).click()
     await page.getByRole('button', { name: 'Guardar producto', exact: true }).click()
     await expect(page).toHaveURL(/\/productos(?:\?|$)/)
+    await page.getByRole('combobox', { name: 'Categoría', exact: true }).selectOption('')
     await page.getByRole('link', { name, exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Galería de imágenes 2/8' })).toBeVisible()
     await page.reload()
