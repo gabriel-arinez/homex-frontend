@@ -64,6 +64,7 @@ import PageHeader from '@/shared/ui/PageHeader.vue'
 import Toast from '@/shared/ui/Toast.vue'
 import ConfirmDialog from '@/shared/ui/ConfirmDialog.vue'
 import UnsavedChangesDialog from '../components/UnsavedChangesDialog.vue'
+import { diffProformaDetalles } from '../utils/diffProformaDetalles'
 import { diffFormFields, type FormFieldChange } from '@/shared/forms/useFormChanges'
 import TextField from '@/shared/ui/TextField.vue'
 import ClienteSelector from '../components/ClienteSelector.vue'
@@ -1717,9 +1718,8 @@ const proformaChanges = computed<FormFieldChange[]>(() => {
     { key: 'validez_oferta', label: 'Validez de oferta (días)' },
     { key: 'porcentaje_adelanto', label: 'Adelanto (%)' },
     { key: 'observaciones', label: 'Observaciones' },
-    { key: 'detalles', label: 'Líneas de la proforma' },
   ]
-  return diffFormFields(
+  const headerChanges = diffFormFields(
     orig,
     curr,
     labels.map((item, idx) => ({
@@ -1727,13 +1727,12 @@ const proformaChanges = computed<FormFieldChange[]>(() => {
       label: item.label,
       get: (arr) => arr[idx],
       format:
-        item.key === 'detalles'
-          ? (v) => `${Array.isArray(v) ? v.length : 0} ítem(s)`
-          : item.key === 'cliente_nuevo'
-            ? (v) => (v ? 'Datos capturados' : 'Sin valor')
-            : undefined,
+        item.key === 'cliente_nuevo' ? (v) => (v ? 'Datos capturados' : 'Sin valor') : undefined,
     })),
   )
+  const origDetalles = Array.isArray(orig[8]) ? (orig[8] as DetalleIntegralWritable[]) : []
+  const currDetalles = Array.isArray(curr[8]) ? (curr[8] as DetalleIntegralWritable[]) : []
+  return [...headerChanges, ...diffProformaDetalles(origDetalles, currDetalles)]
 })
 const documentNotice = computed(() => {
   if (!hasRealChanges.value && !hasPendingEdits.value) return ''

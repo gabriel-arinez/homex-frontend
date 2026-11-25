@@ -46,9 +46,11 @@ import { buildExportFilename } from '@/shared/download/exportFilename'
 import { galleryService, type GalleryImage } from '@/shared/media/gallery'
 import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
 import { fechaComercial, formatearFechaHora } from '@/shared/date/presentacionFecha'
+import { useFormChanges } from '@/shared/forms/useFormChanges'
 import { workOrderStatusIcon, workOrderTone } from '../utils/workOrderPresentation'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
+import ConfirmDialog from '@/shared/ui/ConfirmDialog.vue'
 import DetailTabs from '@/shared/ui/DetailTabs.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
@@ -499,6 +501,26 @@ async function ensureCatalogDetails(lines: DetalleOrdenTrabajo[]) {
   ])
 }
 
+const confirmDiscardPlan = ref(false)
+const {
+  captureOriginal: capturePlanOriginal,
+  changes: planChanges,
+  hasChanges: planHasChanges,
+} = useFormChanges(
+  () => ({ ...planForm.value }),
+  [
+    { key: 'fecha_inicio', label: 'Inicio de fabricación', get: (s) => s.fecha_inicio },
+    { key: 'fecha_fin', label: 'Fin de fabricación', get: (s) => s.fecha_fin },
+    { key: 'fecha_entrega', label: 'Entrega prevista', get: (s) => s.fecha_entrega },
+    {
+      key: 'responsable_recepcion',
+      label: 'Responsable de recepción',
+      get: (s) => s.responsable_recepcion,
+    },
+    { key: 'lugar_entrega', label: 'Lugar de entrega', get: (s) => s.lugar_entrega },
+  ],
+)
+
 function openPlanModal() {
   if (!item.value) return
   planError.value = ''
@@ -509,7 +531,28 @@ function openPlanModal() {
     lugar_entrega: item.value.lugar_entrega ?? '',
     responsable_recepcion: item.value.responsable_recepcion ?? '',
   }
+  capturePlanOriginal()
+  confirmDiscardPlan.value = false
   planModalOpen.value = true
+}
+
+function closePlanModal() {
+  if (savingPlan.value) return
+  if (!planHasChanges.value) {
+    planModalOpen.value = false
+    return
+  }
+  confirmDiscardPlan.value = true
+}
+
+function discardPlanModal() {
+  confirmDiscardPlan.value = false
+  planModalOpen.value = false
+}
+
+async function savePlanFromConfirm() {
+  confirmDiscardPlan.value = false
+  await savePlanificacion()
 }
 
 async function savePlanificacion() {
@@ -1380,7 +1423,7 @@ const workOrderTabs = computed(() => [
       wide
       title="Editar planificación de taller"
       :description="`Actualiza las fechas de fabricación y datos de entrega para la OT #${item.numero}.`"
-      @close="planModalOpen = false"
+      @close="closePlanModal"
     >
       <template #title-icon>
         <span class="ot-modal-icon">
@@ -1425,7 +1468,7 @@ const workOrderTabs = computed(() => [
         <p v-if="planError" class="notice notice--error" role="alert">{{ planError }}</p>
       </form>
       <template #footer>
-        <Button variant="secondary" :disabled="savingPlan" @click="planModalOpen = false">
+        <Button variant="secondary" :disabled="savingPlan" @click="closePlanModal">
           <X :size="16" aria-hidden="true" />
           Cancelar
         </Button>
@@ -1435,6 +1478,18 @@ const workOrderTabs = computed(() => [
         </Button>
       </template>
     </Modal>
+
+    <ConfirmDialog
+      :open="confirmDiscardPlan"
+      title="Descartar cambios de planificación"
+      description="Hay cambios sin guardar en la planificación de taller."
+      confirm-label="Descartar"
+      save-label="Guardar planificación"
+      :changes="planChanges"
+      @close="confirmDiscardPlan = false"
+      @confirm="discardPlanModal"
+      @save="savePlanFromConfirm"
+    />
 
     <DocumentViewerModal
       v-if="item"

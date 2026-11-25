@@ -32,6 +32,7 @@ import type {
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import { ApiError } from '@/shared/api'
+import { useFormChanges } from '@/shared/forms/useFormChanges'
 import ImageGallery from '@/shared/media/ImageGallery.vue'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
@@ -305,12 +306,43 @@ const stockMinimoOpen = ref(false)
 const stockMinimoInput = ref('')
 const stockMinimoSaving = ref(false)
 const stockMinimoError = ref('')
+const confirmDiscardStockMinimo = ref(false)
+
+const {
+  captureOriginal: captureStockMinimoOriginal,
+  changes: stockMinimoChanges,
+  hasChanges: stockMinimoHasChanges,
+} = useFormChanges(
+  () => ({ stock_minimo: stockMinimoInput.value }),
+  [{ key: 'stock_minimo', label: 'Stock mínimo', get: (s) => s.stock_minimo }],
+)
 
 function openStockMinimoModal() {
   if (!product.value) return
   stockMinimoInput.value = product.value.stock_minimo ?? ''
   stockMinimoError.value = ''
+  captureStockMinimoOriginal()
+  confirmDiscardStockMinimo.value = false
   stockMinimoOpen.value = true
+}
+
+function closeStockMinimoModal() {
+  if (stockMinimoSaving.value) return
+  if (!stockMinimoHasChanges.value) {
+    stockMinimoOpen.value = false
+    return
+  }
+  confirmDiscardStockMinimo.value = true
+}
+
+function discardStockMinimoModal() {
+  confirmDiscardStockMinimo.value = false
+  stockMinimoOpen.value = false
+}
+
+function saveStockMinimoFromConfirm() {
+  confirmDiscardStockMinimo.value = false
+  submitStockMinimo()
 }
 
 async function saveStockMinimo(value: string | null) {
@@ -998,7 +1030,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           ? `Define el umbral de aviso de stock bajo para ${product.nombre} (${product.unidad_stock_info?.nombre || ''}). Deja vacío para quitar el mínimo.`
           : ''
       "
-      @close="stockMinimoOpen = false"
+      @close="closeStockMinimoModal"
     >
       <form id="stock-minimo-form" class="stock-minimo-form" @submit.prevent="submitStockMinimo">
         <TextField
@@ -1021,7 +1053,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         >
           Quitar mínimo
         </Button>
-        <Button variant="secondary" :disabled="stockMinimoSaving" @click="stockMinimoOpen = false">
+        <Button variant="secondary" :disabled="stockMinimoSaving" @click="closeStockMinimoModal">
           Cancelar
         </Button>
         <Button type="submit" form="stock-minimo-form" :disabled="stockMinimoSaving">
@@ -1029,6 +1061,17 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         </Button>
       </template>
     </Modal>
+    <ConfirmDialog
+      :open="confirmDiscardStockMinimo"
+      title="Descartar cambios de stock mínimo"
+      description="Hay cambios sin guardar en el stock mínimo."
+      confirm-label="Descartar"
+      save-label="Guardar mínimo"
+      :changes="stockMinimoChanges"
+      @close="confirmDiscardStockMinimo = false"
+      @confirm="discardStockMinimoModal"
+      @save="saveStockMinimoFromConfirm"
+    />
     <ConfirmDialog
       :open="confirmLeave"
       title="Salir sin guardar"

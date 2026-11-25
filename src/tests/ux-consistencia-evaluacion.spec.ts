@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { useFormChanges } from '@/shared/forms/useFormChanges'
+import { diffProformaDetalles } from '@/modules/proformas/utils/diffProformaDetalles'
 import CreatorTag from '@/shared/ui/CreatorTag.vue'
 import StatusBadge from '@/shared/ui/StatusBadge.vue'
 import { workOrderTone } from '@/modules/ordenes-trabajo/utils/workOrderPresentation'
@@ -176,5 +177,82 @@ describe('HOMEX — Consistencia visual, UX y detección de cambios', () => {
     expect(
       wrapper.get('[aria-label="Vista del catálogo"] button[aria-pressed="true"]').text(),
     ).toContain('Cuadrícula')
+  })
+
+  it('diffProformaDetalles identifica líneas agregadas, eliminadas y campos modificados', () => {
+    const orig = [
+      {
+        id: 10,
+        tipo_item: 1,
+        producto: 5,
+        nombre: 'Silla Ergonómica',
+        cantidad: '2',
+        unidad: 1,
+        precio_unitario: '500.00',
+        descuento: '0.00',
+        modo_calculo: 'POR_UNIDAD' as const,
+        total: '1000.00',
+        descripcion: null,
+        especificacion: null,
+      },
+      {
+        id: 11,
+        tipo_item: 2,
+        producto: null,
+        nombre: 'Escritorio Gerencial',
+        cantidad: '1',
+        unidad: 1,
+        precio_unitario: '1800.00',
+        descuento: '0.00',
+        modo_calculo: 'POR_UNIDAD' as const,
+        total: '1800.00',
+        descripcion: null,
+        especificacion: { medidas: { ancho_cm: 160 } },
+      },
+    ]
+    const curr = [
+      {
+        ...orig[0]!,
+        cantidad: '4',
+        especificacion: null,
+      },
+      {
+        id: undefined,
+        tipo_item: 1,
+        producto: 8,
+        nombre: 'Mesa Auxiliar',
+        cantidad: '1',
+        unidad: 1,
+        precio_unitario: '350.00',
+        descuento: '0.00',
+        modo_calculo: 'POR_UNIDAD' as const,
+        total: '350.00',
+        descripcion: null,
+        especificacion: null,
+      },
+    ]
+
+    const changes = diffProformaDetalles(orig as never, curr as never)
+    expect(changes).toEqual([
+      {
+        key: 'linea-10-cantidad',
+        label: 'Silla Ergonómica · Cantidad',
+        before: '2',
+        after: '4',
+      },
+      {
+        key: 'linea-del-11',
+        label: 'Eliminado: Escritorio Gerencial',
+        before: 'Cant. 1 · P.U. 1800.00',
+        after: 'Eliminado',
+      },
+      {
+        key: 'linea-add-1',
+        label: 'Agregado: Mesa Auxiliar',
+        before: 'No incluido',
+        after: 'Cant. 1 · P.U. 350.00',
+      },
+    ])
+    expect(diffProformaDetalles(orig as never, orig as never)).toEqual([])
   })
 })
