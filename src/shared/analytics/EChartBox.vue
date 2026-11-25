@@ -3,12 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { EChartsType } from 'echarts/core'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
-import {
-  loadECharts,
-  readChartThemeTokens,
-  type ChartThemeTokens,
-  type HomexChartOption,
-} from './echarts'
+import { readChartThemeTokens, type ChartThemeTokens, type HomexChartOption } from './themeTokens'
 
 const props = withDefaults(
   defineProps<{
@@ -49,7 +44,8 @@ async function renderChart() {
   if (typeof probe.getContext !== 'function' || !probe.getContext('2d')) {
     return
   }
-  const echarts = await loadECharts()
+  const { getECharts } = await import('./echarts')
+  const echarts = getECharts()
   if (destroyed || !containerRef.value) return
   if (!chartInstance) {
     chartInstance = echarts.init(containerRef.value, undefined, { renderer: 'canvas' })

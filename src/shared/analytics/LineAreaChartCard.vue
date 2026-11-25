@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import Card from '@/shared/ui/Card.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import EChartBox from './EChartBox.vue'
-import type { ChartThemeTokens, HomexChartOption } from './echarts'
+import type { ChartThemeTokens, HomexChartOption } from './themeTokens'
 
 export interface LineSeriesInput {
   name: string
