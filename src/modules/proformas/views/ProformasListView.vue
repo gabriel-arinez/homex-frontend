@@ -483,7 +483,6 @@ onBeforeUnmount(() => {
                 :data-label="row.esSimulada ? 'Actividad comercial' : 'Última edición'"
               >
                 <DatePresentation :presentation="row.creacion" :timestamp="row.creado_en" />
-                <Badge v-if="row.esSimulada" tone="warning">Simulado</Badge>
               </td>
               <td class="status-cell" data-label="Estado">
                 <Badge :tone="tone(row.estado_info.codigo)">{{ row.estado_info.nombre }}</Badge>

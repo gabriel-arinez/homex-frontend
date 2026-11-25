@@ -15,6 +15,17 @@ export const ordenesTrabajoService = {
     apiRequest<OrdenTrabajo>(`/api/v1/ordenes-trabajo/${id}/marcar-listo-entrega/`, {
       method: 'POST',
     }),
+  cambiarEstado: (
+    id: number,
+    body: {
+      estado_codigo: 'EN_PROCESO' | 'TERMINADA' | 'CANCELADA'
+      observaciones?: string | null
+    },
+  ) =>
+    apiRequest<OrdenTrabajo>(`/api/v1/ordenes-trabajo/${id}/cambiar-estado/`, {
+      method: 'POST',
+      body,
+    }),
   updatePlanificacion: (id: number, body: PatchedPlanificacionOrdenTrabajo) =>
     apiRequest<OrdenTrabajo>(`/api/v1/ordenes-trabajo/${id}/planificacion/`, {
       method: 'PATCH',

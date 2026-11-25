@@ -580,8 +580,38 @@ async function load() {
   }
 }
 
-const canMarkReady = computed(() => {
+const canChangeWorkOrderState = computed(() => {
   if (!item.value) return false
+  if (typeof item.value.puede_cambiar_estado === 'boolean') {
+    return item.value.puede_cambiar_estado
+  }
+  return session.can('taller.operar') && !session.can('comercial.operar')
+})
+
+const changingState = ref(false)
+
+async function changeWorkOrderState(estadoCodigo: 'EN_PROCESO' | 'TERMINADA') {
+  if (!item.value || changingState.value || !canChangeWorkOrderState.value) return
+  changingState.value = true
+  error.value = ''
+  try {
+    item.value = await ordenesTrabajoService.cambiarEstado(item.value.id, {
+      estado_codigo: estadoCodigo,
+    })
+    notice.value =
+      estadoCodigo === 'EN_PROCESO'
+        ? 'Orden de trabajo iniciada en taller.'
+        : 'Orden de trabajo marcada como terminada.'
+  } catch (cause) {
+    error.value =
+      cause instanceof Error ? cause.message : 'No se pudo actualizar el estado de la orden.'
+  } finally {
+    changingState.value = false
+  }
+}
+
+const canMarkReady = computed(() => {
+  if (!item.value || !canChangeWorkOrderState.value) return false
   const otCode = item.value.estado_info.codigo.toUpperCase()
   const pedCode = (item.value.pedido_estado_codigo ?? '').toUpperCase()
   if (['CANCELADA', 'TERMINADA'].includes(otCode)) return false
@@ -752,6 +782,24 @@ const workOrderTabs = computed(() => [
           Descargar PDF
         </Button>
         <Button
+          v-if="canChangeWorkOrderState && item?.estado_info.codigo === 'PENDIENTE'"
+          variant="secondary"
+          :disabled="changingState"
+          @click="changeWorkOrderState('EN_PROCESO')"
+        >
+          <Wrench :size="17" aria-hidden="true" />
+          Iniciar producción
+        </Button>
+        <Button
+          v-if="canChangeWorkOrderState && item?.estado_info.codigo === 'EN_PROCESO'"
+          variant="secondary"
+          :disabled="changingState"
+          @click="changeWorkOrderState('TERMINADA')"
+        >
+          <Check :size="17" aria-hidden="true" />
+          Terminar OT
+        </Button>
+        <Button
           v-if="canMarkReady"
           variant="primary"
           :disabled="markingReady"
@@ -831,6 +879,41 @@ const workOrderTabs = computed(() => [
             </small>
           </div>
         </div>
+      </section>
+
+      <section
+        v-if="item.historial_estados?.length"
+        class="ot-timeline"
+        aria-label="Historial de estados"
+        data-testid="ot-state-timeline"
+      >
+        <div class="ot-timeline__header">
+          <Clock3 :size="16" aria-hidden="true" />
+          <h3>Historial de estados</h3>
+        </div>
+        <ol class="ot-timeline__list">
+          <li v-for="entry in item.historial_estados" :key="entry.id" class="ot-timeline__item">
+            <span class="ot-timeline__dot" aria-hidden="true" />
+            <div class="ot-timeline__content">
+              <div class="ot-timeline__title">
+                <StatusBadge
+                  :status="entry.estado_nuevo_info.codigo"
+                  :label="entry.estado_nuevo_info.nombre"
+                />
+                <span v-if="entry.estado_anterior_info" class="ot-timeline__prev">
+                  desde {{ entry.estado_anterior_info.nombre }}
+                </span>
+              </div>
+              <small class="ot-timeline__meta">
+                {{ formatDateLabel(entry.fecha) ?? entry.fecha }}
+                <template v-if="entry.cambiado_por_resumen?.display_name">
+                  · {{ entry.cambiado_por_resumen.display_name }}
+                </template>
+                <template v-if="entry.observaciones"> · {{ entry.observaciones }}</template>
+              </small>
+            </div>
+          </li>
+        </ol>
       </section>
 
       <DetailTabs
@@ -2151,5 +2234,55 @@ const workOrderTabs = computed(() => [
     justify-items: start;
     text-align: left;
   }
+}
+.ot-timeline {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.ot-timeline__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  color: var(--ink);
+}
+.ot-timeline__header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.ot-timeline__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.ot-timeline__item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.ot-timeline__dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  margin-top: 0.35rem;
+  border-radius: 999px;
+  background: var(--brand);
+  flex-shrink: 0;
+}
+.ot-timeline__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.ot-timeline__prev,
+.ot-timeline__meta {
+  color: var(--ink-muted);
+  font-size: 0.82rem;
 }
 </style>

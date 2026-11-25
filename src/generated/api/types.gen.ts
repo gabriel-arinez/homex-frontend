@@ -45,6 +45,11 @@ export type AtributoMueble = {
   sinonimos?: unknown
 }
 
+export type CambiarEstadoOrdenTrabajo = {
+  estado_codigo: EstadoOrdenTrabajoCodigoEnum
+  observaciones?: string | null
+}
+
 export type CambiarEstadoPedido = {
   estado_codigo: EstadoCodigoEnum
 }
@@ -388,6 +393,13 @@ export type EspecificacionMueble = {
  */
 export type EstadoCodigoEnum = 'EN_PRODUCCION' | 'LISTO_ENTREGA' | 'ENTREGADO'
 
+/**
+ * * `EN_PROCESO` - En proceso
+ * * `TERMINADA` - Terminada
+ * * `CANCELADA` - Cancelada
+ */
+export type EstadoOrdenTrabajoCodigoEnum = 'EN_PROCESO' | 'TERMINADA' | 'CANCELADA'
+
 export type EstadoProformaDemanda = {
   id: number
   codigo: string
@@ -422,6 +434,18 @@ export type FamiliaProductoResumen = {
 export type GaleriaRespuesta = {
   readonly imagenes: Array<ImagenGaleria>
   readonly limite: number
+}
+
+export type HistorialEstadoOrdenTrabajo = {
+  readonly id: number
+  readonly estado_anterior: number | null
+  estado_anterior_info: ValorCatalogoResumen | null
+  readonly estado_nuevo: number
+  estado_nuevo_info: ValorCatalogoResumen
+  readonly cambiado_por: number | null
+  cambiado_por_resumen: UsuarioResumen | null
+  readonly fecha: string
+  readonly observaciones: string | null
 }
 
 export type IdentidadActual = {
@@ -633,7 +657,9 @@ export type OrdenTrabajo = {
   estado_info: ValorCatalogoResumen
   readonly created_by: number | null
   readonly updated_by: number | null
+  readonly puede_cambiar_estado: boolean
   readonly detalles: Array<DetalleOrdenTrabajo>
+  readonly historial_estados: Array<HistorialEstadoOrdenTrabajo>
 }
 
 export type PaginatedClienteList = {
@@ -3264,6 +3290,25 @@ export type V1OrdenesTrabajoRetrieveResponses = {
 
 export type V1OrdenesTrabajoRetrieveResponse =
   V1OrdenesTrabajoRetrieveResponses[keyof V1OrdenesTrabajoRetrieveResponses]
+
+export type V1OrdenesTrabajoCambiarEstadoCreateData = {
+  body: CambiarEstadoOrdenTrabajo
+  path: {
+    /**
+     * Un valor de entero único que identifique este orden trabajo.
+     */
+    id: number
+  }
+  query?: never
+  url: '/api/v1/ordenes-trabajo/{id}/cambiar-estado/'
+}
+
+export type V1OrdenesTrabajoCambiarEstadoCreateResponses = {
+  200: OrdenTrabajo
+}
+
+export type V1OrdenesTrabajoCambiarEstadoCreateResponse =
+  V1OrdenesTrabajoCambiarEstadoCreateResponses[keyof V1OrdenesTrabajoCambiarEstadoCreateResponses]
 
 export type V1OrdenesTrabajoDocumentoRetrieveData = {
   body?: never

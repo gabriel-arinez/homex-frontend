@@ -40,16 +40,6 @@ onBeforeUnmount(() => {
       @open-alerts="alertsOpen = true"
     />
     <main id="main-content" tabindex="-1">
-      <div
-        v-if="session.entornoEvaluacion"
-        class="eval-banner"
-        role="status"
-        aria-live="polite"
-        data-testid="evaluation-environment-banner"
-      >
-        <strong>Entorno de evaluación</strong>
-        <span>Los registros marcados como simulados no representan operaciones reales.</span>
-      </div>
       <RouterView v-slot="{ Component }"
         ><component :is="Component" @open-menu="drawerOpen = true"
       /></RouterView>
