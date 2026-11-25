@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { FileText, ClipboardList, AudioLines, PackageOpen, Hammer, RefreshCw } from '@lucide/vue'
 import type { ConteoEstado, ResumenTaller } from '../services/resumenService'
@@ -12,6 +12,8 @@ import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
 import { useSessionStore } from '@/app/stores/useSessionStore'
+
+const AdminDashboard = defineAsyncComponent(() => import('../components/AdminDashboard.vue'))
 
 const emit = defineEmits<{ 'open-menu': [] }>()
 const session = useSessionStore()
@@ -87,6 +89,10 @@ const workshopBars = computed(() =>
 )
 
 async function load() {
+  if (isAdmin.value) {
+    loading.value = false
+    return
+  }
   loading.value = true
   error.value = ''
   try {
@@ -116,7 +122,8 @@ async function load() {
 onMounted(load)
 </script>
 <template>
-  <div>
+  <AdminDashboard v-if="isAdmin" @open-menu="emit('open-menu')" />
+  <div v-else>
     <PageHeader title="Resumen" :description="scopeDescription" show-menu @menu="emit('open-menu')">
       <template #actions>
         <Button variant="secondary" :disabled="loading" @click="load">

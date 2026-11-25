@@ -69,11 +69,13 @@ export type AlertaSaldoEntregado = {
 }
 
 export type AlertasPrioritariasAdmin = {
+  totales: TotalesAlertasAdmin
   proformas_proximas_vencer: Array<AlertaProformaVencer>
   pedidos_retrasados: Array<AlertaPedidoRetrasado>
   fabricaciones_retrasadas: Array<AlertaFabricacionRetrasada>
-  saldos_pedidos_entregados: Array<AlertaSaldoEntregado>
+  saldos_pedidos_entregados_por_moneda: Array<SaldosEntregadosMoneda>
   productos_stock_bajo: Array<AlertaProductoStockBajo>
+  productos_sin_stock_minimo: Array<AlertaProductoStockBajo>
 }
 
 export type AnalisisFabricacion = {
@@ -1736,6 +1738,11 @@ export type RevisionCampoCatalogo = {
   evidence_ids: Array<string>
 }
 
+export type SaldosEntregadosMoneda = {
+  moneda: string
+  pedidos: Array<AlertaSaldoEntregado>
+}
+
 export type SerieMonetariaComercial = {
   moneda: string
   puntos: Array<PuntoMonetarioComercial>
@@ -1804,6 +1811,15 @@ export type TokenObtainPair = {
 export type TokenRefresh = {
   readonly access: string
   refresh: string
+}
+
+export type TotalesAlertasAdmin = {
+  proformas_proximas_vencer: number
+  pedidos_retrasados: number
+  fabricaciones_retrasadas: number
+  saldos_pedidos_entregados: number
+  productos_stock_bajo: number
+  productos_sin_stock_minimo: number
 }
 
 /**

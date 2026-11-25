@@ -66,12 +66,117 @@ test('FE07 representa cero sin fabricar actividad', async ({ page }) => {
     await expect(bar).toHaveCSS('width', '0px')
   await expect(page.getByText('Revisar proformas')).toBeVisible()
 })
-test('FE07 usa el mismo contrato para vendedor y administrador', async ({ page }) => {
+test('FE07 presenta dashboard analítico para administrador sin alterar tienda/taller', async ({
+  page,
+}) => {
+  await page.route('**/api/v1/dashboard/administrador/**', (r) =>
+    r.fulfill({
+      json: {
+        fecha_referencia: '2026-11-27',
+        comercial: {
+          total_proformas: 10,
+          borradores: 2,
+          proformas_formalizadas: 8,
+          pedidos_generados: 2,
+          pedidos_derivados_cohorte: 2,
+          pedidos_no_cancelados_cohorte: 2,
+          pedidos_confirmados_periodo: 2,
+          pedidos_no_cancelados: 2,
+          tasa_conversion_cohorte: '25.00',
+          cobertura_formalizacion: {
+            con_marca_temporal: 8,
+            aproximadas_por_fecha: 0,
+            anuladas_sin_evidencia_formalizacion: 0,
+          },
+          distribucion_proformas_estado: [],
+          distribucion_pedidos_estado: [],
+          comparaciones_periodo_anterior: null,
+          limitaciones: [],
+        },
+        finanzas: { por_moneda: [], cobros_pedidos_cancelados: [] },
+        produccion: {
+          ordenes_fabricacion_total: 0,
+          ordenes_fabricacion_por_estado: [],
+          ordenes_tecnicas_total: 0,
+          ordenes_tecnicas_por_estado: [],
+          fabricaciones_activas: 0,
+          entregas_proximas: 0,
+          entregas_retrasadas: 0,
+          entregas_efectivas: 0,
+          entregas_evaluables_plazo: 0,
+          entregas_en_plazo: 0,
+          cumplimiento_entregas_porcentaje: null,
+        },
+        inventario: {
+          total_activos: 0,
+          con_stock: 0,
+          bajo_pedido: 0,
+          stock_bajo: 0,
+          agotados: 0,
+          sin_stock_minimo: 0,
+        },
+        alertas: {
+          totales: {
+            proformas_proximas_vencer: 0,
+            pedidos_retrasados: 0,
+            fabricaciones_retrasadas: 0,
+            saldos_pedidos_entregados: 0,
+            productos_stock_bajo: 0,
+            productos_sin_stock_minimo: 0,
+          },
+          proformas_proximas_vencer: [],
+          pedidos_retrasados: [],
+          fabricaciones_retrasadas: [],
+          saldos_pedidos_entregados_por_moneda: [],
+          productos_stock_bajo: [],
+          productos_sin_stock_minimo: [],
+        },
+        indicadores: {
+          total_proformas: 10,
+          borradores: 2,
+          proformas_formalizadas: 8,
+          pedidos_generados: 2,
+          pedidos_derivados_cohorte: 2,
+          pedidos_no_cancelados_cohorte: 2,
+          pedidos_confirmados_periodo: 2,
+          pedidos_no_cancelados: 2,
+          tasa_conversion_cohorte: '25.00',
+          cobertura_formalizacion: {
+            con_marca_temporal: 8,
+            aproximadas_por_fecha: 0,
+            anuladas_sin_evidencia_formalizacion: 0,
+          },
+          distribucion_proformas_estado: [],
+          distribucion_pedidos_estado: [],
+          comparaciones_periodo_anterior: null,
+          limitaciones: [],
+        },
+        evolucion: { granularidad: 'mensual', puntos_conteo: [], series_monetarias: [] },
+        vendedores: [],
+        por_moneda: [],
+        cobros_pedidos_cancelados: [],
+        pedidos_entregados_con_saldo: { total: 0, page: 1, page_size: 10, results: [] },
+        clientes_mayores_saldos_por_moneda: [],
+        evolucion_cobros: [],
+        resumen: {
+          total_activos: 0,
+          con_stock: 0,
+          bajo_pedido: 0,
+          stock_bajo: 0,
+          agotados: 0,
+          sin_stock_minimo: 0,
+        },
+        por_categoria: [],
+        existencias_por_unidad: [],
+        movimientos_por_unidad: [],
+        mas_vendidos: { total: 0, page: 1, page_size: 20, results: [] },
+      },
+    }),
+  )
   await mock(page, { capabilities: ['comercial.operar', 'comercial.administrar'] })
   await page.goto('/resumen')
-  await expect(page.getByRole('heading', { name: 'Resumen' })).toBeVisible()
-  await expect(page.getByText('Vista operativa de María HOMEX.')).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Administrar catálogo' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Resumen general' })).toBeVisible()
+  await expect(page.getByText('Supervisión administrativa global de María HOMEX.')).toBeVisible()
 })
 test('FE07 presenta visión operativa de taller para JEFE_TALLER', async ({ page }) => {
   await mock(page, { capabilities: ['taller.operar'] })
