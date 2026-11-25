@@ -186,7 +186,8 @@ test('@a11y FE03 nueva bandeja de productos muestra lista, categorías y precios
   page,
 }) => {
   await mockBackend(page)
-  await page.goto('/productos')
+  await page.goto('/productos?vista=lista')
+  await page.getByRole('combobox', { name: 'Categoría', exact: true }).selectOption('')
   await expect(page.getByRole('heading', { name: 'Productos' })).toBeVisible()
   await expect(page.getByRole('columnheader', { name: 'Producto y estado' })).toBeVisible()
   await expect(page.getByRole('columnheader', { name: 'Precio vigente' })).toBeVisible()
@@ -242,13 +243,10 @@ test('FE03 filtros por categoría y familia conservan búsqueda y vista en URL',
   await expect(page.getByRole('button', { name: 'Más filtros' })).toHaveCount(0)
   await expect(page.getByRole('combobox', { name: 'Familia', exact: true })).toBeVisible()
   await page.getByRole('combobox', { name: 'Categoría', exact: true }).selectOption('2')
-  await page.getByRole('button', { name: 'Cuadrícula' }).click()
-  await expect(page).toHaveURL(/vista=grid/)
+  await page.getByRole('button', { name: 'Lista' }).click()
+  await expect(page).toHaveURL(/vista=lista/)
   await page.reload()
-  await expect(page.getByRole('button', { name: 'Cuadrícula' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  )
+  await expect(page.getByRole('button', { name: 'Lista' })).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByRole('combobox', { name: 'Categoría', exact: true })).toHaveValue('2')
 })
 
@@ -268,7 +266,8 @@ for (const width of [390, 768, 1440]) {
     async ({ page }) => {
       await mockBackend(page)
       await page.setViewportSize({ width, height: 900 })
-      await page.goto('/productos')
+      await page.goto('/productos?vista=lista')
+      await page.getByRole('combobox', { name: 'Categoría', exact: true }).selectOption('')
       if (width >= 768)
         await expect(page.getByRole('columnheader', { name: 'Producto y estado' })).toBeVisible()
       else await expect(page.locator('td[data-label="Producto y estado"]').first()).toBeVisible()

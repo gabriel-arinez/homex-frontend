@@ -194,7 +194,7 @@ for (const width of [360, 390, 768, 1024, 1440])
     await expect(page.getByText('12 clientes')).toBeVisible()
     await noOverflow(page)
 
-    await page.goto('/productos')
+    await page.goto('/productos?vista=lista')
     await expect(page.getByRole('heading', { name: 'Productos' })).toBeVisible()
     await expect(page.getByText('8 productos encontrados')).toBeVisible()
     await expect(page.getByText('Categoría #1').first()).toBeVisible()

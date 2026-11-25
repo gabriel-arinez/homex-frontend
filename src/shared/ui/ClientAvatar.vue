@@ -53,6 +53,7 @@ const paletteIndex = computed(() => {
 <template>
   <div
     class="client-avatar"
+    role="img"
     :class="paletteIndex >= 0 ? `client-avatar--palette-${paletteIndex}` : 'client-avatar--neutral'"
     :style="{ width: `${size}px`, height: `${size}px`, fontSize: `${Math.round(size * 0.38)}px` }"
     :aria-label="props.name || 'Cliente sin nombre'"

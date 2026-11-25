@@ -338,7 +338,6 @@ async function loadCategories(applyDefaultChair = false) {
         category.value = String(silla.id)
         await nextTick()
         restoring = false
-        syncRoute()
       }
     }
     if (category.value || applyDefaultChair) scheduleLoad()

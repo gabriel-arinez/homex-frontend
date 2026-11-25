@@ -130,15 +130,15 @@ describe('Bandeja administrativa de productos', () => {
     try {
       expect(wrapper.find('.more-filters').exists()).toBe(false)
       expect(wrapper.find('#familia-producto-filtro').exists()).toBe(true)
-      await wrapper.get('#categoria-producto-filtro').setValue('1')
-      await flushPromises()
       expect(list).toHaveBeenLastCalledWith(
         expect.objectContaining({ categoria: 1, activo: true, page: 1 }),
       )
-      expect(router.currentRoute.value.query.categoria).toBe('1')
       await wrapper.get('#categoria-producto-filtro').setValue('2')
       await flushPromises()
       expect(router.currentRoute.value.query.categoria).toBe('2')
+      await wrapper.get('#categoria-producto-filtro').setValue('1')
+      await flushPromises()
+      expect(router.currentRoute.value.query.categoria).toBe('1')
     } finally {
       wrapper.unmount()
     }
