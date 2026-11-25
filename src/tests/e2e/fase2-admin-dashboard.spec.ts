@@ -216,6 +216,7 @@ async function setupAdminRoutes(page: Page) {
       sessionStorage.setItem('homex.session.v1', JSON.stringify({ access, refresh: 'refresh' })),
     { access },
   )
+  await page.route('**/api/v1/**', (r) => r.fulfill({ json: {} }))
   await page.route('**/api/v1/auth/token/refresh/', (r) =>
     r.fulfill({ json: { access, refresh: 'refresh' } }),
   )
@@ -228,6 +229,19 @@ async function setupAdminRoutes(page: Page) {
         capabilities: ['comercial.operar', 'comercial.administrar', 'taller.operar'],
         entorno_evaluacion: true,
       },
+    }),
+  )
+  await page.route('**/api/v1/catalogo/opciones/**', (r) =>
+    r.fulfill({
+      json: [
+        { id: 12, codigo: 'SILLA', nombre: 'Silla', concepto_codigo: 'CATEGORIA_PRODUCTO' },
+        {
+          id: 13,
+          codigo: 'PISO_FLOTANTE',
+          nombre: 'Piso flotante',
+          concepto_codigo: 'CATEGORIA_PRODUCTO',
+        },
+      ],
     }),
   )
   await page.route('**/api/v1/dashboard/administrador/comercial/**', (r) =>
@@ -244,16 +258,44 @@ async function setupAdminRoutes(page: Page) {
   )
 }
 
-test('@a11y Fase 2 AdminDashboard cumple accesibilidad en claro, oscuro y responsive', async ({
+async function assertAllVisibleChartsRendered(page: Page, expectedCount: number) {
+  const charts = page.locator('.echart-box__canvas')
+  await expect(charts).toHaveCount(expectedCount)
+  for (let i = 0; i < expectedCount; i += 1) {
+    const chart = charts.nth(i)
+    await expect(chart).toHaveAttribute('data-rendered', 'true', { timeout: 10000 })
+    await expect(chart).toHaveAttribute('data-finished', 'true', { timeout: 10000 })
+    const seriesCount = Number(await chart.getAttribute('data-series-count'))
+    expect(seriesCount).toBeGreaterThan(0)
+    const hasDrawnPixels = await chart.evaluate((el) => {
+      const canvas = el.querySelector('canvas')
+      if (!canvas || canvas.width === 0 || canvas.height === 0) return false
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return false
+      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data
+      for (let p = 3; p < data.length; p += 16) {
+        if ((data[p] ?? 0) > 0) return true
+      }
+      return false
+    })
+    expect(hasDrawnPixels).toBe(true)
+  }
+}
+
+test('@a11y Fase 2 AdminDashboard cumple accesibilidad, renderiza gráficos reales y responsive', async ({
   page,
 }) => {
+  const consoleErrors: string[] = []
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') consoleErrors.push(msg.text())
+  })
   await setupAdminRoutes(page)
-  for (const width of [1440, 1024, 768, 390]) {
+  for (const width of [1920, 1440, 1024, 768, 390]) {
     await page.setViewportSize({ width, height: 900 })
     await page.goto('/resumen')
     await expect(page.getByRole('heading', { name: 'Resumen general' })).toBeVisible()
     await expect(page.getByTestId('demo-mode-indicator')).toBeVisible()
-    await expect(page.getByText('Empresa Ejemplo SRL')).toBeVisible()
+    await assertAllVisibleChartsRendered(page, 4)
     const noOverflow = await page.evaluate(
       () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
     )
@@ -263,11 +305,34 @@ test('@a11y Fase 2 AdminDashboard cumple accesibilidad en claro, oscuro y respon
     }
   }
 
-  await page.addInitScript(() => localStorage.setItem('homex.theme', 'dark'))
+  // Verificar pestañas y sus gráficos reales
   await page.setViewportSize({ width: 1440, height: 900 })
+  await page.getByRole('tab', { name: /Comercial/i }).click()
+  await assertAllVisibleChartsRendered(page, 1)
+  await expect(
+    page
+      .getByRole('region', { name: 'Tabla comparativa por vendedor' })
+      .getByText('Alvaro Huallpa'),
+  ).toBeVisible()
+
+  await page.getByRole('tab', { name: /Finanzas/i }).click()
+  await assertAllVisibleChartsRendered(page, 2)
+  await expect(page.getByText('Empresa Ejemplo SRL')).toBeVisible()
+
+  await page.getByRole('tab', { name: /Operaciones/i }).click()
+  await expect(page.getByText('Producción, taller y entregas')).toBeVisible()
+
+  await page.getByRole('tab', { name: /Inventario/i }).click()
+  await assertAllVisibleChartsRendered(page, 2)
+  await expect(page.getByText('Silla Ejecutiva').first()).toBeVisible()
+
+  // Tema oscuro
+  await page.addInitScript(() => localStorage.setItem('homex.theme', 'dark'))
   await page.goto('/resumen')
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+  await assertAllVisibleChartsRendered(page, 4)
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
+  expect(consoleErrors).toEqual([])
 })
 
 test('Fase 2 AdminDashboard actualiza filtros y permite alternar tabla accesible', async ({
@@ -283,6 +348,7 @@ test('Fase 2 AdminDashboard actualiza filtros y permite alternar tabla accesible
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/resumen')
   await expect(page.getByRole('heading', { name: 'Resumen general' })).toBeVisible()
+  await assertAllVisibleChartsRendered(page, 4)
 
   await page.getByLabel('Selector de período').selectOption('este_mes')
   await expect

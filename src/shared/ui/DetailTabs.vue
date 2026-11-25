@@ -45,7 +45,7 @@ defineEmits<{
 <style scoped>
 .detail-tabs {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr));
   gap: 0.65rem;
 }
 .detail-tabs button {

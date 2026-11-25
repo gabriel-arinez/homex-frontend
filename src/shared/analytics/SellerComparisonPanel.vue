@@ -260,10 +260,12 @@ function chartValueFormatter(val: number): string {
 
 .seller-panel__table-wrap {
   overflow-x: auto;
+  max-width: 100%;
 }
 
 .seller-table {
   width: 100%;
+  min-width: 44rem;
   border-collapse: collapse;
   font-size: 0.85rem;
 }
@@ -282,17 +284,20 @@ function chartValueFormatter(val: number): string {
   color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  white-space: nowrap;
 }
 
 .seller-table td.num,
 .seller-table th.num {
   text-align: right;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .seller-cell {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  min-width: 11rem;
 }
 </style>

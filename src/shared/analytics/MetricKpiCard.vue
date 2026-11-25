@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Component } from 'vue'
 import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import TrendBadge from './TrendBadge.vue'
 
@@ -6,6 +7,7 @@ withDefaults(
   defineProps<{
     label: string
     value: string
+    icon?: Component
     scopeNote?: string
     detail?: string
     approximate?: boolean
@@ -15,6 +17,7 @@ withDefaults(
     tone?: 'default' | 'primary' | 'success' | 'warning' | 'danger'
   }>(),
   {
+    icon: undefined,
     scopeNote: '',
     detail: '',
     approximate: false,
@@ -34,7 +37,10 @@ withDefaults(
     :class="[`metric-kpi--${tone}`, { 'metric-kpi--link': Boolean(to) }]"
   >
     <div class="metric-kpi__top">
-      <span class="metric-kpi__label">{{ label }}</span>
+      <span class="metric-kpi__label">
+        <component :is="icon" v-if="icon" :size="15" class="metric-kpi__icon" aria-hidden="true" />
+        {{ label }}
+      </span>
       <span
         v-if="approximate"
         class="metric-kpi__approx"
@@ -54,14 +60,14 @@ withDefaults(
 .metric-kpi {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-5);
+  gap: 0.35rem;
+  padding: var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
   color: inherit;
   text-decoration: none;
-  min-height: 8.5rem;
+  min-height: 7.75rem;
   transition:
     border-color var(--transition-fast),
     background-color var(--transition-fast);
@@ -96,8 +102,16 @@ withDefaults(
 }
 
 .metric-kpi__label {
-  font-size: 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8125rem;
   font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.metric-kpi__icon {
+  flex: none;
   color: var(--color-text-secondary);
 }
 

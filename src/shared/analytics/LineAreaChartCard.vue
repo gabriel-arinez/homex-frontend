@@ -51,6 +51,7 @@ const optionBuilder = computed(() => {
       warning: tokens.warning,
       neutral: tokens.neutral,
     }
+    const singlePoint = labels.length === 1
     return {
       tooltip: {
         trigger: 'axis',
@@ -65,10 +66,10 @@ const optionBuilder = computed(() => {
       grid: { left: 12, right: 16, top: 34, bottom: 12, containLabel: true },
       xAxis: {
         type: 'category',
-        boundaryGap: false,
+        boundaryGap: singlePoint,
         data: labels,
         axisLine: { lineStyle: { color: tokens.border } },
-        axisLabel: { color: tokens.textSecondary, fontSize: 11 },
+        axisLabel: { color: tokens.textSecondary, fontSize: 11, hideOverlap: true },
       },
       yAxis: {
         type: 'value',
@@ -81,6 +82,15 @@ const optionBuilder = computed(() => {
       },
       series: series.map((s) => {
         const color = palette[s.colorKey ?? 'primary'] ?? tokens.primary
+        if (singlePoint) {
+          return {
+            name: s.name,
+            type: 'bar',
+            data: s.data,
+            barMaxWidth: 36,
+            itemStyle: { color, borderRadius: [4, 4, 0, 0] },
+          }
+        }
         return {
           name: s.name,
           type: 'line',

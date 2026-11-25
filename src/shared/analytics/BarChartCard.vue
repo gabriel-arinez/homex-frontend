@@ -56,7 +56,13 @@ const optionBuilder = computed(() => {
       type: 'category' as const,
       data: labels,
       axisLine: { lineStyle: { color: tokens.border } },
-      axisLabel: { color: tokens.textSecondary, fontSize: 11 },
+      axisLabel: {
+        color: tokens.textSecondary,
+        fontSize: 11,
+        width: horizontal ? 132 : undefined,
+        overflow: horizontal ? ('truncate' as const) : undefined,
+        hideOverlap: true,
+      },
     }
     const valueAxis = {
       type: 'value' as const,

@@ -16,6 +16,8 @@ const props = withDefaults(
     title: string
     description?: string
     slices: DonutSlice[]
+    centerLabel?: string
+    centerSublabel?: string
     height?: number
     loading?: boolean
     error?: string
@@ -25,6 +27,8 @@ const props = withDefaults(
   }>(),
   {
     description: '',
+    centerLabel: '',
+    centerSublabel: '',
     height: 260,
     loading: false,
     error: '',
@@ -37,7 +41,7 @@ const props = withDefaults(
 const emit = defineEmits<{ retry: [] }>()
 
 const optionBuilder = computed(() => {
-  const { slices, valueFormatter } = props
+  const { slices, valueFormatter, centerLabel, centerSublabel } = props
   return (tokens: ChartThemeTokens): HomexChartOption | null => {
     const total = slices.reduce((sum, s) => sum + s.value, 0)
     if (!slices.length || total <= 0) return null
@@ -49,6 +53,12 @@ const optionBuilder = computed(() => {
       danger: tokens.danger,
       neutral: tokens.neutral,
     }
+    const valueMap = new Map(slices.map((s) => [s.name, s.value]))
+    const centerText = centerLabel
+      ? centerSublabel
+        ? `${centerLabel}\n${centerSublabel}`
+        : centerLabel
+      : ''
     return {
       tooltip: {
         trigger: 'item',
@@ -63,14 +73,28 @@ const optionBuilder = computed(() => {
       legend: {
         bottom: 0,
         textStyle: { color: tokens.textSecondary, fontSize: 12 },
+        formatter: (name: string) => {
+          const val = valueMap.get(name)
+          return val !== undefined ? `${name}: ${valueFormatter(val)}` : name
+        },
       },
       series: [
         {
           type: 'pie',
-          radius: ['50%', '74%'],
-          center: ['50%', '45%'],
+          radius: ['52%', '74%'],
+          center: ['50%', '43%'],
           avoidLabelOverlap: true,
-          label: { show: false },
+          label: centerText
+            ? {
+                show: true,
+                position: 'center',
+                formatter: () => centerText,
+                fontSize: 15,
+                fontWeight: 'bold',
+                lineHeight: 20,
+                color: tokens.text,
+              }
+            : { show: false },
           itemStyle: { borderColor: tokens.surface, borderWidth: 2 },
           data: slices.map((s) => ({
             name: s.name,

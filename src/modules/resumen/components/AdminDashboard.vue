@@ -1,41 +1,66 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { AlertTriangle, Boxes, ClipboardCheck, ShieldCheck } from '@lucide/vue'
+import {
+  AlertTriangle,
+  Banknote,
+  BarChart3,
+  Boxes,
+  ClipboardCheck,
+  Clock,
+  FileText,
+  LayoutDashboard,
+  ShieldCheck,
+  ShoppingBag,
+  TrendingUp,
+  Wallet,
+  Wrench,
+} from '@lucide/vue'
 import type {
   DashboardAdminComercial,
   DashboardAdminResumen,
   FinanzasAdmin,
   InventarioAdmin,
+  ValorCatalogoPublico,
 } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
-import PageHeader from '@/shared/ui/PageHeader.vue'
+import { proformasService } from '@/modules/proformas/services/proformasService'
 import Badge from '@/shared/ui/Badge.vue'
 import Card from '@/shared/ui/Card.vue'
+import DetailTabs, { type DetailTabItem } from '@/shared/ui/DetailTabs.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
+import PageHeader from '@/shared/ui/PageHeader.vue'
+import type { AlertRowItem } from '@/shared/analytics/AlertListCard.vue'
+import AnalyticsTableCard from '@/shared/analytics/AnalyticsTableCard.vue'
+import BarChartCard from '@/shared/analytics/BarChartCard.vue'
+import DonutChartCard from '@/shared/analytics/DonutChartCard.vue'
+import LineAreaChartCard from '@/shared/analytics/LineAreaChartCard.vue'
 import MetricKpiCard from '@/shared/analytics/MetricKpiCard.vue'
 import PeriodFilterBar, { type SellerOption } from '@/shared/analytics/PeriodFilterBar.vue'
-import BarChartCard from '@/shared/analytics/BarChartCard.vue'
-import LineAreaChartCard from '@/shared/analytics/LineAreaChartCard.vue'
-import DonutChartCard from '@/shared/analytics/DonutChartCard.vue'
-import StateDistributionCard from '@/shared/analytics/StateDistributionCard.vue'
+import PriorityAlertsPanel, {
+  type PriorityAlertCategory,
+} from '@/shared/analytics/PriorityAlertsPanel.vue'
 import SellerComparisonPanel from '@/shared/analytics/SellerComparisonPanel.vue'
-import AnalyticsTableCard from '@/shared/analytics/AnalyticsTableCard.vue'
-import AlertListCard, { type AlertRowItem } from '@/shared/analytics/AlertListCard.vue'
+import StateDistributionCard from '@/shared/analytics/StateDistributionCard.vue'
 import {
   formatDateLaPaz,
   formatInteger,
   formatMoney,
   formatPercent,
+  formatPeriodLabel,
   formatQuantity,
   formatTimeLaPaz,
   toNumber,
 } from '@/shared/analytics/formatters'
 import { adminDashboardService } from '../services/adminDashboardService'
 
+type AdminTabId = 'general' | 'comercial' | 'finanzas' | 'operaciones' | 'inventario'
+
 const emit = defineEmits<{ 'open-menu': [] }>()
 const session = useSessionStore()
+
+const activeTab = ref<AdminTabId>('general')
 
 const fechaDesde = ref<string | null>(null)
 const fechaHasta = ref<string | null>(null)
@@ -62,11 +87,19 @@ const errorInventario = ref('')
 
 const lastUpdatedText = ref('')
 const vendedoresCache = ref<SellerOption[]>([])
+const catalogCategories = ref<ValorCatalogoPublico[]>([])
 const activeMoneyChartCurrency = ref<string>('BOB')
 const activeDonutCurrency = ref<string>('BOB')
 const activeSoldUnitKey = ref<string>('')
 
-let activeController: AbortController | null = null
+let resumenCtrl: AbortController | null = null
+let comercialCtrl: AbortController | null = null
+let finanzasCtrl: AbortController | null = null
+let inventarioCtrl: AbortController | null = null
+let resumenSeq = 0
+let comercialSeq = 0
+let finanzasSeq = 0
+let inventarioSeq = 0
 
 const scopeDescription = computed(() => {
   const actor = session.identity?.display_name ?? 'Administrador'
@@ -83,7 +116,7 @@ const periodScopeLabel = computed(() => {
   if (fechaDesde.value && fechaHasta.value) {
     return `${formatDateLaPaz(fechaDesde.value)} – ${formatDateLaPaz(fechaHasta.value)}`
   }
-  return 'Todo el histórico disponible'
+  return 'Todo el histórico'
 })
 
 const anyLoading = computed(
@@ -93,6 +126,46 @@ const anyLoading = computed(
     loadingFinanzas.value ||
     loadingInventario.value,
 )
+
+const availableCurrencies = computed(() => {
+  const set = new Set<string>(['BOB', 'USD'])
+  for (const m of finanzas.value?.por_moneda ?? []) set.add(m.moneda)
+  for (const s of comercial.value?.evolucion.series_monetarias ?? []) set.add(s.moneda)
+  return Array.from(set)
+})
+
+const categoryOptions = computed(() => {
+  if (catalogCategories.value.length) {
+    return catalogCategories.value.map((c) => ({
+      id: c.id,
+      codigo: c.codigo,
+      nombre: c.nombre,
+    }))
+  }
+  return (inventario.value?.por_categoria ?? []).map((c) => ({
+    id: null as number | null,
+    codigo: c.categoria_codigo,
+    nombre: c.categoria_nombre,
+  }))
+})
+
+const productosTargetRoute = computed(() => {
+  if (!categoriaLocal.value) return '/productos'
+  const match = catalogCategories.value.find((c) => c.codigo === categoriaLocal.value)
+  if (match) {
+    return { path: '/productos', query: { categoria: String(match.id) } }
+  }
+  return '/productos'
+})
+
+const staleBlocks = computed(() => {
+  const items: string[] = []
+  if (errorResumen.value && resumen.value) items.push(`Resumen (${errorResumen.value})`)
+  if (errorComercial.value && comercial.value) items.push(`Comercial (${errorComercial.value})`)
+  if (errorFinanzas.value && finanzas.value) items.push(`Finanzas (${errorFinanzas.value})`)
+  if (errorInventario.value && inventario.value) items.push(`Inventario (${errorInventario.value})`)
+  return items
+})
 
 function buildBaseParams() {
   return {
@@ -104,32 +177,42 @@ function buildBaseParams() {
   }
 }
 
-async function fetchResumen(signal?: AbortSignal) {
+async function fetchResumen() {
+  const seq = ++resumenSeq
+  resumenCtrl?.abort()
+  const controller = new AbortController()
+  resumenCtrl = controller
   loadingResumen.value = true
   errorResumen.value = ''
   try {
-    resumen.value = await adminDashboardService.getResumen(
+    const data = await adminDashboardService.getResumen(
       {
         ...buildBaseParams(),
-        categoria: categoriaLocal.value || null,
         estado_fabricacion: estadoFabricacionLocal.value || null,
         page_size: 10,
       },
-      signal,
+      controller.signal,
     )
+    if (seq !== resumenSeq) return
+    resumen.value = data
   } catch (err) {
-    if ((err as { name?: string })?.name === 'AbortError') return
+    if (seq !== resumenSeq || (err as { name?: string })?.name === 'AbortError') return
     errorResumen.value = err instanceof Error ? err.message : 'No se pudo cargar el resumen.'
   } finally {
-    loadingResumen.value = false
+    if (seq === resumenSeq) loadingResumen.value = false
   }
 }
 
-async function fetchComercial(signal?: AbortSignal) {
+async function fetchComercial() {
+  const seq = ++comercialSeq
+  comercialCtrl?.abort()
+  const controller = new AbortController()
+  comercialCtrl = controller
   loadingComercial.value = true
   errorComercial.value = ''
   try {
-    const data = await adminDashboardService.getComercial(buildBaseParams(), signal)
+    const data = await adminDashboardService.getComercial(buildBaseParams(), controller.signal)
+    if (seq !== comercialSeq) return
     comercial.value = data
     if (!vendedorId.value && data.vendedores.length) {
       vendedoresCache.value = data.vendedores.map((v) => ({
@@ -138,37 +221,46 @@ async function fetchComercial(signal?: AbortSignal) {
       }))
     }
   } catch (err) {
-    if ((err as { name?: string })?.name === 'AbortError') return
+    if (seq !== comercialSeq || (err as { name?: string })?.name === 'AbortError') return
     errorComercial.value =
       err instanceof Error ? err.message : 'No se pudo cargar el bloque comercial.'
   } finally {
-    loadingComercial.value = false
+    if (seq === comercialSeq) loadingComercial.value = false
   }
 }
 
-async function fetchFinanzas(signal?: AbortSignal) {
+async function fetchFinanzas() {
+  const seq = ++finanzasSeq
+  finanzasCtrl?.abort()
+  const controller = new AbortController()
+  finanzasCtrl = controller
   loadingFinanzas.value = true
   errorFinanzas.value = ''
   try {
     const data = await adminDashboardService.getFinanzas(
       { ...buildBaseParams(), page_size: 10 },
-      signal,
+      controller.signal,
     )
+    if (seq !== finanzasSeq) return
     finanzas.value = data
     const firstCurrency = data.por_moneda[0]?.moneda
     if (firstCurrency && !data.por_moneda.some((m) => m.moneda === activeDonutCurrency.value)) {
       activeDonutCurrency.value = firstCurrency
     }
   } catch (err) {
-    if ((err as { name?: string })?.name === 'AbortError') return
+    if (seq !== finanzasSeq || (err as { name?: string })?.name === 'AbortError') return
     errorFinanzas.value =
       err instanceof Error ? err.message : 'No se pudo cargar el bloque financiero.'
   } finally {
-    loadingFinanzas.value = false
+    if (seq === finanzasSeq) loadingFinanzas.value = false
   }
 }
 
-async function fetchInventario(signal?: AbortSignal) {
+async function fetchInventario() {
+  const seq = ++inventarioSeq
+  inventarioCtrl?.abort()
+  const controller = new AbortController()
+  inventarioCtrl = controller
   loadingInventario.value = true
   errorInventario.value = ''
   try {
@@ -180,14 +272,24 @@ async function fetchInventario(signal?: AbortSignal) {
         categoria: categoriaLocal.value || null,
         page_size: 20,
       },
-      signal,
+      controller.signal,
     )
+    if (seq !== inventarioSeq) return
     inventario.value = data
   } catch (err) {
-    if ((err as { name?: string })?.name === 'AbortError') return
+    if (seq !== inventarioSeq || (err as { name?: string })?.name === 'AbortError') return
     errorInventario.value = err instanceof Error ? err.message : 'No se pudo cargar el inventario.'
   } finally {
-    loadingInventario.value = false
+    if (seq === inventarioSeq) loadingInventario.value = false
+  }
+}
+
+async function loadCatalogCategories() {
+  try {
+    const items = await proformasService.options('CATEGORIA_PRODUCTO')
+    catalogCategories.value = items.filter((item) => item.concepto_codigo === 'CATEGORIA_PRODUCTO')
+  } catch {
+    // Fallback to categories returned by inventario endpoint
   }
 }
 
@@ -195,34 +297,34 @@ async function loadAll() {
   if (fechaDesde.value && fechaHasta.value && fechaDesde.value > fechaHasta.value) {
     return
   }
-  activeController?.abort()
-  const controller = new AbortController()
-  activeController = controller
-  await Promise.all([
-    fetchResumen(controller.signal),
-    fetchComercial(controller.signal),
-    fetchFinanzas(controller.signal),
-    fetchInventario(controller.signal),
-  ])
-  if (!controller.signal.aborted) {
+  await Promise.all([fetchResumen(), fetchComercial(), fetchFinanzas(), fetchInventario()])
+  if (
+    !errorResumen.value ||
+    !errorComercial.value ||
+    !errorFinanzas.value ||
+    !errorInventario.value
+  ) {
     lastUpdatedText.value = formatTimeLaPaz(new Date())
   }
 }
 
 function onCategoryChange() {
   void fetchInventario()
-  void fetchResumen()
 }
 
 onMounted(() => {
+  void loadCatalogCategories()
   void loadAll()
 })
 
 onBeforeUnmount(() => {
-  activeController?.abort()
+  resumenCtrl?.abort()
+  comercialCtrl?.abort()
+  finanzasCtrl?.abort()
+  inventarioCtrl?.abort()
 })
 
-// Indicadores principales
+// Indicadores principales (aislados de categoriaLocal)
 const indComercial = computed(
   () => resumen.value?.comercial ?? comercial.value?.indicadores ?? null,
 )
@@ -252,7 +354,10 @@ const secondaryFinSummary = computed(() => {
 
 // Evolución comercial
 const evoConteoLabels = computed(
-  () => comercial.value?.evolucion.puntos_conteo.map((p) => p.periodo) ?? [],
+  () =>
+    comercial.value?.evolucion.puntos_conteo.map((p) =>
+      formatPeriodLabel(p.periodo, granularidad.value),
+    ) ?? [],
 )
 const evoConteoSeries = computed(() => {
   const pts = comercial.value?.evolucion.puntos_conteo ?? []
@@ -287,7 +392,11 @@ const evoMonetariaSerie = computed(() =>
   comercial.value?.evolucion.series_monetarias.find((s) => s.moneda === selectedEvoCurrency.value),
 )
 
-const evoMoneyLabels = computed(() => evoMonetariaSerie.value?.puntos.map((p) => p.periodo) ?? [])
+const evoMoneyLabels = computed(
+  () =>
+    evoMonetariaSerie.value?.puntos.map((p) => formatPeriodLabel(p.periodo, granularidad.value)) ??
+    [],
+)
 const evoMoneySeries = computed(() => {
   const pts = evoMonetariaSerie.value?.puntos ?? []
   if (!pts.length) return []
@@ -333,7 +442,10 @@ const cobrosEvoSerie = computed(
     finanzas.value?.evolucion_cobros[0] ??
     null,
 )
-const cobrosEvoLabels = computed(() => cobrosEvoSerie.value?.puntos.map((p) => p.periodo) ?? [])
+const cobrosEvoLabels = computed(
+  () =>
+    cobrosEvoSerie.value?.puntos.map((p) => formatPeriodLabel(p.periodo, granularidad.value)) ?? [],
+)
 const cobrosEvoSeries = computed(() => {
   const pts = cobrosEvoSerie.value?.puntos ?? []
   if (!pts.length) return []
@@ -373,9 +485,13 @@ const soldUnits = computed(() => {
   const list = inventario.value?.mas_vendidos.results ?? []
   const map = new Map<string, string>()
   for (const item of list) {
-    const key = `${item.categoria_codigo}::${item.unidad_codigo}`
+    const catCode = item.categoria_codigo || 'SIN_CAT'
+    const unitCode = item.unidad_codigo || 'UND'
+    const catLabel = item.categoria_nombre || catCode
+    const unitLabel = item.unidad_nombre || unitCode
+    const key = `${catCode}::${unitCode}`
     if (!map.has(key)) {
-      map.set(key, `${item.categoria_nombre} (${item.unidad_nombre})`)
+      map.set(key, `${catLabel} (${unitLabel})`)
     }
   }
   return Array.from(map.entries()).map(([key, label]) => ({ key, label }))
@@ -392,9 +508,11 @@ const filteredMasVendidos = computed(() => {
   const list = inventario.value?.mas_vendidos.results ?? []
   if (!selectedSoldUnitKey.value) return list.slice(0, 8)
   return list
-    .filter(
-      (item) => `${item.categoria_codigo}::${item.unidad_codigo}` === selectedSoldUnitKey.value,
-    )
+    .filter((item) => {
+      const catCode = item.categoria_codigo || 'SIN_CAT'
+      const unitCode = item.unidad_codigo || 'UND'
+      return `${catCode}::${unitCode}` === selectedSoldUnitKey.value
+    })
     .slice(0, 8)
 })
 
@@ -405,12 +523,12 @@ const masVendidosSeries = computed(() => {
     {
       name: 'Cantidad vendida',
       data: filteredMasVendidos.value.map((p) => toNumber(p.cantidad_vendida) ?? 0),
-      colorKey: 'primary' as const,
+      colorKey: 'info' as const,
     },
   ]
 })
 
-// Alertas prioritarias
+// Alertas prioritarias consolidadas
 const alertas = computed(() => resumen.value?.alertas ?? null)
 const alertProformas = computed<AlertRowItem[]>(() =>
   (alertas.value?.proformas_proximas_vencer ?? []).map((p) => ({
@@ -478,6 +596,87 @@ const alertSinMinimo = computed<AlertRowItem[]>(() =>
     to: `/productos/${p.producto_id}`,
   })),
 )
+
+const totalAlertsCount = computed(() => {
+  if (!alertas.value) return null
+  const t = alertas.value.totales
+  return (
+    t.proformas_proximas_vencer +
+    t.pedidos_retrasados +
+    t.fabricaciones_retrasadas +
+    t.saldos_pedidos_entregados +
+    t.productos_stock_bajo +
+    t.productos_sin_stock_minimo
+  )
+})
+
+const alertCategories = computed<PriorityAlertCategory[]>(() => {
+  if (!alertas.value) return []
+  const t = alertas.value.totales
+  return [
+    {
+      key: 'proformas',
+      label: 'Proformas por vencer',
+      totalCount: t.proformas_proximas_vencer,
+      items: alertProformas.value,
+      viewAllTo: '/proformas',
+      viewAllLabel: 'Ver proformas',
+    },
+    {
+      key: 'pedidos_retrasados',
+      label: 'Pedidos retrasados',
+      totalCount: t.pedidos_retrasados,
+      items: alertPedidosRetrasados.value,
+      viewAllTo: '/pedidos',
+      viewAllLabel: 'Ver pedidos',
+    },
+    {
+      key: 'fabricaciones_retrasadas',
+      label: 'Fabricaciones retrasadas',
+      totalCount: t.fabricaciones_retrasadas,
+      items: alertFabricacionesRetrasadas.value,
+      viewAllTo: '/ordenes-trabajo',
+      viewAllLabel: 'Ver órdenes',
+    },
+    {
+      key: 'saldos_entregados',
+      label: 'Entregados con saldo',
+      totalCount: t.saldos_pedidos_entregados,
+      items: alertSaldosEntregados.value,
+      viewAllTo: '/pedidos',
+      viewAllLabel: 'Ver pedidos',
+    },
+    {
+      key: 'stock_bajo',
+      label: 'Stock bajo / agotado',
+      totalCount: t.productos_stock_bajo,
+      items: alertStockBajo.value,
+      viewAllTo: '/productos',
+      viewAllLabel: 'Ver productos',
+    },
+    {
+      key: 'sin_minimo',
+      label: 'Sin mínimo configurado',
+      totalCount: t.productos_sin_stock_minimo,
+      items: alertSinMinimo.value,
+      viewAllTo: '/productos',
+      viewAllLabel: 'Configurar en productos',
+    },
+  ]
+})
+
+const tabs = computed<DetailTabItem[]>(() => [
+  {
+    id: 'general',
+    label: 'General',
+    icon: LayoutDashboard,
+    badge: totalAlertsCount.value !== null ? totalAlertsCount.value : undefined,
+  },
+  { id: 'comercial', label: 'Comercial', icon: BarChart3 },
+  { id: 'finanzas', label: 'Finanzas', icon: Wallet },
+  { id: 'operaciones', label: 'Operaciones', icon: Wrench },
+  { id: 'inventario', label: 'Inventario', icon: Boxes },
+])
 </script>
 
 <template>
@@ -489,7 +688,6 @@ const alertSinMinimo = computed<AlertRowItem[]>(() =>
       @menu="emit('open-menu')"
     >
       <template #actions>
-        <Badge v-if="session.entornoEvaluacion" tone="info">Modo demostración</Badge>
         <Badge tone="neutral">
           <ShieldCheck :size="13" aria-hidden="true" />
           Supervisión administrativa
@@ -505,13 +703,19 @@ const alertSinMinimo = computed<AlertRowItem[]>(() =>
       v-model:moneda="moneda"
       :fecha-referencia="fechaReferencia"
       :vendedores="vendedoresCache"
+      :monedas="availableCurrencies"
       :loading="anyLoading"
       :last-updated-text="lastUpdatedText"
       @apply="loadAll"
       @refresh="loadAll"
     />
 
-    <!-- Indicadores principales (6 tarjetas) -->
+    <div v-if="staleBlocks.length" class="stale-banner" role="status">
+      <AlertTriangle :size="15" aria-hidden="true" />
+      <span> Mostrando datos anteriores desactualizados en: {{ staleBlocks.join(' · ') }}. </span>
+    </div>
+
+    <!-- Indicadores principales (6 tarjetas, independientes de categoriaLocal) -->
     <section aria-label="Indicadores principales">
       <LoadingSkeleton v-if="loadingResumen && !resumen" :lines="4" />
       <ErrorState v-else-if="errorResumen && !resumen" :description="errorResumen">
@@ -520,6 +724,7 @@ const alertSinMinimo = computed<AlertRowItem[]>(() =>
       <div v-else class="kpi-grid">
         <MetricKpiCard
           label="Proformas formalizadas"
+          :icon="FileText"
           :value="formatInteger(indComercial?.proformas_formalizadas)"
           :scope-note="periodScopeLabel"
           :approximate="hasApproximateCohort"
@@ -530,9 +735,10 @@ const alertSinMinimo = computed<AlertRowItem[]>(() =>
           tone="primary"
         />
         <MetricKpiCard
-          label="Pedidos confirmados en el período"
+          label="Pedidos confirmados"
+          :icon="ShoppingBag"
           :value="formatInteger(indComercial?.pedidos_confirmados_periodo)"
-          :scope-note="`Confirmados (${periodScopeLabel})`"
+          :scope-note="periodScopeLabel"
           :show-variation="hasPeriodFilter && Boolean(compAnterior)"
           :variation-pct="compAnterior?.pedidos_confirmados_periodo.variacion_porcentaje"
           :detail="`Vigentes no cancelados: ${formatInteger(indComercial?.pedidos_no_cancelados)}`"
@@ -540,33 +746,40 @@ const alertSinMinimo = computed<AlertRowItem[]>(() =>
         />
         <MetricKpiCard
           label="Conversión por cohorte"
+          :icon="TrendingUp"
           :value="formatPercent(indComercial?.tasa_conversion_cohorte)"
           :scope-note="periodScopeLabel"
           :approximate="hasApproximateCohort"
-          :detail="`${formatInteger(indComercial?.pedidos_derivados_cohorte)} pedidos derivados de ${formatInteger(indComercial?.proformas_formalizadas)} formalizadas`"
+          :detail="`${formatInteger(indComercial?.pedidos_derivados_cohorte)} derivados de ${formatInteger(indComercial?.proformas_formalizadas)}`"
         />
         <MetricKpiCard
-          label="Importe de pedidos no cancelados"
+          label="Importe vigente"
+          :icon="Wallet"
           :value="
-            primaryFin
-              ? formatMoney(primaryFin.importe_pedidos_no_cancelados, primaryFin.moneda)
-              : 'Sin datos'
+            errorFinanzas && !finanzas
+              ? 'No disponible'
+              : primaryFin
+                ? formatMoney(primaryFin.importe_pedidos_no_cancelados, primaryFin.moneda)
+                : 'Sin datos'
           "
-          :scope-note="`Confirmados (${periodScopeLabel})`"
+          :scope-note="`${primaryFin?.moneda ?? 'BOB'} · ${periodScopeLabel}`"
           :detail="secondaryFinSummary || `Cartera vigente ${primaryFin?.moneda ?? ''}`"
           to="/pedidos"
         />
         <MetricKpiCard
-          label="Cobros acumulados (cartera)"
+          label="Cobros acumulados"
+          :icon="Banknote"
           :value="
-            primaryFin
-              ? formatMoney(primaryFin.cobros_acumulados_cartera_vigente, primaryFin.moneda)
-              : 'Sin datos'
+            errorFinanzas && !finanzas
+              ? 'No disponible'
+              : primaryFin
+                ? formatMoney(primaryFin.cobros_acumulados_cartera_vigente, primaryFin.moneda)
+                : 'Sin datos'
           "
           :scope-note="`Avance: ${formatPercent(primaryFin?.porcentaje_cobrado)}`"
           :detail="
             primaryFin
-              ? `Cobros realizados en el período: ${formatMoney(primaryFin.cobros_validos_periodo, primaryFin.moneda)}`
+              ? `En período: ${formatMoney(primaryFin.cobros_validos_periodo, primaryFin.moneda)}`
               : ''
           "
           to="/recibos"
@@ -574,14 +787,19 @@ const alertSinMinimo = computed<AlertRowItem[]>(() =>
         />
         <MetricKpiCard
           label="Saldo pendiente"
+          :icon="Clock"
           :value="
-            primaryFin ? formatMoney(primaryFin.saldo_pendiente, primaryFin.moneda) : 'Sin datos'
+            errorFinanzas && !finanzas
+              ? 'No disponible'
+              : primaryFin
+                ? formatMoney(primaryFin.saldo_pendiente, primaryFin.moneda)
+                : 'Sin datos'
           "
-          :scope-note="`Cartera vigente (${periodScopeLabel})`"
+          :scope-note="`Cartera ${primaryFin?.moneda ?? 'BOB'} (${periodScopeLabel})`"
           :detail="
             finanzas?.cobros_pedidos_cancelados.length
-              ? `Cobros en pedidos cancelados (separados): ${finanzas.cobros_pedidos_cancelados.map((c) => formatMoney(c.importe, c.moneda)).join(', ')}`
-              : 'Sin cobros asociados a pedidos cancelados'
+              ? `En cancelados: ${finanzas.cobros_pedidos_cancelados.map((c) => formatMoney(c.importe, c.moneda)).join(', ')}`
+              : 'Sin cobros en pedidos cancelados'
           "
           to="/pedidos"
           tone="warning"
@@ -589,480 +807,560 @@ const alertSinMinimo = computed<AlertRowItem[]>(() =>
       </div>
     </section>
 
-    <!-- Evolución comercial -->
-    <section class="section-block" aria-label="Evolución comercial">
-      <div class="section-block__head">
-        <h2>Evolución comercial</h2>
-        <p>Conteos e importes monetarios presentados en escalas independientes.</p>
-      </div>
-      <div class="two-col">
-        <BarChartCard
-          title="Proformas formalizadas vs. pedidos confirmados"
-          :description="`Serie ${granularidad} de actividad comercial.`"
-          :labels="evoConteoLabels"
-          :series="evoConteoSeries"
-          :loading="loadingComercial"
-          :error="errorComercial"
-          :value-formatter="formatInteger"
-          @retry="fetchComercial()"
-        />
-        <LineAreaChartCard
-          title="Importes vigentes y cobros registrados"
-          :description="`Serie monetaria ${granularidad} en ${selectedEvoCurrency}.`"
-          :labels="evoMoneyLabels"
-          :series="evoMoneySeries"
-          :loading="loadingComercial"
-          :error="errorComercial"
-          :value-formatter="(v) => formatMoney(v, selectedEvoCurrency)"
-          @retry="fetchComercial()"
-        >
-          <template v-if="availableEvoCurrencies.length > 1 && !moneda" #controls>
-            <select
-              v-model="activeMoneyChartCurrency"
-              class="inline-select"
-              aria-label="Moneda de evolución comercial"
-            >
-              <option v-for="c in availableEvoCurrencies" :key="c" :value="c">{{ c }}</option>
-            </select>
-          </template>
-        </LineAreaChartCard>
-      </div>
-    </section>
+    <DetailTabs
+      :model-value="activeTab"
+      :tabs="tabs"
+      aria-label="Secciones del dashboard administrativo"
+      @update:model-value="activeTab = $event as AdminTabId"
+    />
 
-    <!-- Desempeño de vendedores -->
-    <section class="section-block" aria-label="Desempeño de vendedores">
-      <div class="section-block__head">
-        <h2>Desempeño de vendedores</h2>
-        <p>Comparativa por vendedor sin mezclar monedas ni establecer rankings de productividad.</p>
-      </div>
-      <SellerComparisonPanel
-        :sellers="comercial?.vendedores ?? []"
-        :selected-currency="moneda"
-        :loading="loadingComercial"
-        :error="errorComercial"
-        @retry="fetchComercial()"
-      />
-    </section>
-
-    <!-- Finanzas -->
-    <section class="section-block" aria-label="Finanzas">
-      <div class="section-block__head">
-        <h2>Finanzas y conciliación de cartera</h2>
-        <p>Estado de cobros acumulados, saldos pendientes por moneda y evolución de recaudación.</p>
-      </div>
-      <div class="two-col">
-        <DonutChartCard
-          :title="`Cobros acumulados vs. saldo pendiente (${donutCurrency})`"
-          description="Conciliación de la cartera vigente filtrada."
-          :slices="donutSlices"
-          :loading="loadingFinanzas"
-          :error="errorFinanzas"
-          :value-formatter="(v) => formatMoney(v, donutCurrency)"
-          @retry="fetchFinanzas()"
-        >
-          <template v-if="finMonedas.length > 1 && !moneda" #controls>
-            <select
-              v-model="activeDonutCurrency"
-              class="inline-select"
-              aria-label="Moneda de composición financiera"
-            >
-              <option v-for="m in finMonedas" :key="m.moneda" :value="m.moneda">
-                {{ m.moneda }}
-              </option>
-            </select>
-          </template>
-        </DonutChartCard>
-
-        <LineAreaChartCard
-          :title="`Evolución temporal de cobros (${cobrosEvoSerie?.moneda ?? donutCurrency})`"
-          description="Recibos emitidos válidos sobre pedidos no cancelados."
-          :labels="cobrosEvoLabels"
-          :series="cobrosEvoSeries"
-          :loading="loadingFinanzas"
-          :error="errorFinanzas"
-          :value-formatter="(v) => formatMoney(v, cobrosEvoSerie?.moneda ?? donutCurrency)"
-          @retry="fetchFinanzas()"
-        />
-      </div>
-
-      <div class="two-col">
-        <AnalyticsTableCard
-          title="Clientes con mayores saldos pendientes"
-          description="Agrupados por cliente y moneda sin sumar divisas distintas."
-          :loading="loadingFinanzas"
-          :error="errorFinanzas"
-          :is-empty="!finanzas?.clientes_mayores_saldos_por_moneda.length"
-          @retry="fetchFinanzas()"
-        >
-          <div class="currency-rankings">
-            <div
-              v-for="group in finanzas?.clientes_mayores_saldos_por_moneda ?? []"
-              :key="group.moneda"
-              class="currency-rankings__group"
-            >
-              <h4>Moneda {{ group.moneda }}</h4>
-              <table class="compact-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Cliente</th>
-                    <th scope="col">Pedidos</th>
-                    <th scope="col" class="num">Saldo pendiente</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="cli in group.clientes"
-                    :key="`${group.moneda}-${cli.cliente_id ?? cli.cliente_nombre}`"
-                  >
-                    <td>
-                      <RouterLink
-                        v-if="cli.cliente_id"
-                        :to="`/clientes/${cli.cliente_id}`"
-                        class="table-link"
-                      >
-                        {{ cli.cliente_nombre }}
-                      </RouterLink>
-                      <span v-else>{{ cli.cliente_nombre }}</span>
-                    </td>
-                    <td>{{ formatInteger(cli.cantidad_pedidos) }}</td>
-                    <td class="num">{{ formatMoney(cli.saldo_pendiente, group.moneda) }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </AnalyticsTableCard>
-
-        <AnalyticsTableCard
-          title="Pedidos entregados que mantienen saldo"
-          description="Seguimiento de pedidos entregados con saldo por cobrar."
-          :loading="loadingFinanzas"
-          :error="errorFinanzas"
-          :is-empty="!finanzas?.pedidos_entregados_con_saldo.results.length"
-          empty-title="Sin saldos en pedidos entregados"
-          empty-description="Todos los pedidos entregados del filtro están saldados."
-          @retry="fetchFinanzas()"
-        >
-          <table class="compact-table">
-            <thead>
-              <tr>
-                <th scope="col">Proforma</th>
-                <th scope="col">Cliente</th>
-                <th scope="col">Entrega</th>
-                <th scope="col" class="num">Saldo</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="ped in finanzas?.pedidos_entregados_con_saldo.results ?? []"
-                :key="ped.pedido_id"
-              >
-                <td>
-                  <RouterLink :to="`/pedidos/${ped.pedido_id}`" class="table-link">
-                    #{{ ped.proforma_numero }}
-                  </RouterLink>
-                </td>
-                <td>{{ ped.cliente_nombre }}</td>
-                <td>{{ formatDateLaPaz(ped.fecha_entrega_efectiva) }}</td>
-                <td class="num">{{ formatMoney(ped.saldo_pendiente, ped.moneda) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </AnalyticsTableCard>
-      </div>
-    </section>
-
-    <!-- Supervisión comercial y productiva -->
-    <section class="section-block" aria-label="Supervisión comercial y productiva">
-      <div class="section-block__head-row">
+    <!-- TAB 1: GENERAL -->
+    <div v-if="activeTab === 'general'" class="tab-panel" role="tabpanel" aria-label="General">
+      <section class="section-block" aria-label="Evolución comercial">
         <div class="section-block__head">
-          <h2>Supervisión comercial y productiva</h2>
-          <p>
-            Distribuciones actuales de proformas, pedidos y órdenes de trabajo (fabricación vs.
-            catálogo).
-          </p>
+          <h2>Evolución comercial</h2>
+          <p>Conteos e importes monetarios presentados en escalas independientes.</p>
         </div>
-        <label class="local-filter">
-          <span>Estado de fabricación</span>
-          <select
-            v-model="estadoFabricacionLocal"
-            aria-label="Filtrar estado de fabricación"
-            @change="fetchResumen()"
+        <div class="two-col">
+          <BarChartCard
+            title="Proformas formalizadas vs. pedidos confirmados"
+            :description="`Serie ${granularidad} de actividad comercial.`"
+            :labels="evoConteoLabels"
+            :series="evoConteoSeries"
+            :loading="loadingComercial"
+            :error="errorComercial"
+            :value-formatter="formatInteger"
+            @retry="fetchComercial()"
+          />
+          <LineAreaChartCard
+            title="Importes vigentes y cobros registrados"
+            :description="`Serie monetaria ${granularidad} en ${selectedEvoCurrency}.`"
+            :labels="evoMoneyLabels"
+            :series="evoMoneySeries"
+            :loading="loadingComercial"
+            :error="errorComercial"
+            :value-formatter="(v) => formatMoney(v, selectedEvoCurrency)"
+            @retry="fetchComercial()"
           >
-            <option value="">Todos</option>
-            <option value="PENDIENTE">Pendiente</option>
-            <option value="EN_PROCESO">En proceso</option>
-            <option value="TERMINADA">Terminada</option>
-            <option value="CANCELADA">Cancelada</option>
-          </select>
-        </label>
-      </div>
+            <template v-if="availableEvoCurrencies.length > 1 && !moneda" #controls>
+              <select
+                v-model="activeMoneyChartCurrency"
+                class="inline-select"
+                aria-label="Moneda de evolución comercial"
+              >
+                <option v-for="c in availableEvoCurrencies" :key="c" :value="c">{{ c }}</option>
+              </select>
+            </template>
+          </LineAreaChartCard>
+        </div>
+      </section>
 
-      <div class="kpi-grid kpi-grid--compact">
-        <MetricKpiCard
-          label="Fabricaciones pendientes"
-          :value="formatInteger(fabricacionesPendientes)"
-          detail="Órdenes a medida sin iniciar"
-          to="/ordenes-trabajo"
-        />
-        <MetricKpiCard
-          label="Fabricaciones activas"
-          :value="formatInteger(prod?.fabricaciones_activas)"
-          detail="Órdenes a medida en proceso"
-          to="/ordenes-trabajo"
-        />
-        <MetricKpiCard
-          label="Entregas próximas (7 días)"
-          :value="formatInteger(prod?.entregas_proximas)"
-          detail="Catálogo y fabricación pendientes"
-          to="/ordenes-trabajo"
-        />
-        <MetricKpiCard
-          label="Entregas efectivas"
-          :value="formatInteger(prod?.entregas_efectivas)"
-          :scope-note="periodScopeLabel"
-          :detail="`Retrasadas: ${formatInteger(prod?.entregas_retrasadas)}`"
-          :tone="(prod?.entregas_retrasadas ?? 0) > 0 ? 'danger' : 'default'"
-        />
-        <MetricKpiCard
-          label="Cumplimiento de entregas"
-          :value="formatPercent(prod?.cumplimiento_entregas_porcentaje)"
-          scope-note="Respecto a fecha programada disponible"
-          :detail="`${formatInteger(prod?.entregas_en_plazo)} en plazo de ${formatInteger(prod?.entregas_evaluables_plazo)} evaluables`"
-          tone="success"
-        />
-      </div>
-
-      <div class="two-col">
-        <StateDistributionCard
-          title="Distribución actual de proformas"
-          description="Conteo según estado actual."
-          :items="indComercial?.distribucion_proformas_estado ?? []"
-        />
-        <StateDistributionCard
-          title="Distribución actual de pedidos"
-          description="Conteo según estado actual."
-          :items="indComercial?.distribucion_pedidos_estado ?? []"
-        />
-        <StateDistributionCard
-          title="Órdenes funcionales de fabricación"
-          description="Exclusivamente ítems de fabricación a medida."
-          :items="prod?.ordenes_fabricacion_por_estado ?? []"
-        />
-        <StateDistributionCard
-          title="Órdenes técnicas de catálogo"
-          description="Contabilizadas por separado de taller."
-          :items="prod?.ordenes_tecnicas_por_estado ?? []"
-        />
-      </div>
-    </section>
-
-    <!-- Inventario -->
-    <section class="section-block" aria-label="Inventario">
-      <div class="section-block__head-row">
+      <section class="section-block" aria-label="Situación financiera resumida">
         <div class="section-block__head">
-          <h2>Inventario y productos</h2>
+          <h2>Situación financiera resumida</h2>
+          <p>Conciliación de cartera vigente y evolución de cobros válidos del período.</p>
+        </div>
+        <div class="two-col">
+          <DonutChartCard
+            :title="`Cobros acumulados vs. saldo pendiente (${donutCurrency})`"
+            description="Conciliación de la cartera vigente filtrada."
+            :slices="donutSlices"
+            :center-label="formatPercent(donutMonedaRow?.porcentaje_cobrado)"
+            center-sublabel="Cobrado"
+            :loading="loadingFinanzas"
+            :error="errorFinanzas"
+            :value-formatter="(v) => formatMoney(v, donutCurrency)"
+            @retry="fetchFinanzas()"
+          >
+            <template v-if="finMonedas.length > 1 && !moneda" #controls>
+              <select
+                v-model="activeDonutCurrency"
+                class="inline-select"
+                aria-label="Moneda de composición financiera"
+              >
+                <option v-for="m in finMonedas" :key="m.moneda" :value="m.moneda">
+                  {{ m.moneda }}
+                </option>
+              </select>
+            </template>
+          </DonutChartCard>
+
+          <LineAreaChartCard
+            :title="`Evolución temporal de cobros (${cobrosEvoSerie?.moneda ?? donutCurrency})`"
+            description="Recibos emitidos válidos sobre pedidos no cancelados."
+            :labels="cobrosEvoLabels"
+            :series="cobrosEvoSeries"
+            :loading="loadingFinanzas"
+            :error="errorFinanzas"
+            :value-formatter="(v) => formatMoney(v, cobrosEvoSerie?.moneda ?? donutCurrency)"
+            @retry="fetchFinanzas()"
+          />
+        </div>
+      </section>
+
+      <section class="section-block" aria-label="Alertas prioritarias">
+        <PriorityAlertsPanel
+          :categories="alertCategories"
+          :loading="loadingResumen && !resumen"
+          :error="errorResumen"
+          @retry="fetchResumen()"
+        />
+      </section>
+    </div>
+
+    <!-- TAB 2: COMERCIAL -->
+    <div v-if="activeTab === 'comercial'" class="tab-panel" role="tabpanel" aria-label="Comercial">
+      <section class="section-block" aria-label="Desempeño de vendedores">
+        <div class="section-block__head">
+          <h2>Desempeño de vendedores</h2>
           <p>
-            Disponibilidad comercial, umbrales configurados y productos más vendidos por unidad.
+            Comparativa por vendedor sin mezclar monedas ni establecer rankings de productividad.
           </p>
         </div>
-        <div class="inventory-controls">
+        <SellerComparisonPanel
+          :sellers="comercial?.vendedores ?? []"
+          :selected-currency="moneda"
+          :loading="loadingComercial"
+          :error="errorComercial"
+          @retry="fetchComercial()"
+        />
+      </section>
+
+      <section class="section-block" aria-label="Distribuciones comerciales">
+        <div class="section-block__head">
+          <h2>Estado actual de documentos comerciales</h2>
+          <p>Fotografía actual de proformas y pedidos según los filtros aplicados.</p>
+        </div>
+        <div class="two-col">
+          <StateDistributionCard
+            title="Distribución actual de proformas"
+            description="Conteo según estado actual."
+            :items="indComercial?.distribucion_proformas_estado ?? []"
+          />
+          <StateDistributionCard
+            title="Distribución actual de pedidos"
+            description="Conteo según estado actual."
+            :items="indComercial?.distribucion_pedidos_estado ?? []"
+          />
+        </div>
+      </section>
+
+      <Card v-if="indComercial?.limitaciones.length">
+        <div class="notes-foot">
+          <div class="notes-foot__title">
+            <AlertTriangle :size="15" aria-hidden="true" />
+            <strong>Notas metodológicas del escenario</strong>
+          </div>
+          <ul>
+            <li v-for="note in indComercial.limitaciones" :key="note">{{ note }}</li>
+          </ul>
+          <p class="notes-foot__coverage">
+            <ClipboardCheck :size="14" aria-hidden="true" />
+            Cobertura de formalización:
+            {{ formatInteger(indComercial.cobertura_formalizacion.con_marca_temporal) }} con marca
+            temporal,
+            {{ formatInteger(indComercial.cobertura_formalizacion.aproximadas_por_fecha) }}
+            aproximadas por fecha comercial,
+            {{
+              formatInteger(
+                indComercial.cobertura_formalizacion.anuladas_sin_evidencia_formalizacion,
+              )
+            }}
+            anuladas sin evidencia persistida.
+          </p>
+        </div>
+      </Card>
+    </div>
+
+    <!-- TAB 3: FINANZAS -->
+    <div v-if="activeTab === 'finanzas'" class="tab-panel" role="tabpanel" aria-label="Finanzas">
+      <section class="section-block" aria-label="Finanzas">
+        <div class="section-block__head">
+          <h2>Finanzas y conciliación de cartera</h2>
+          <p>
+            Estado de cobros acumulados, saldos pendientes por moneda y evolución de recaudación.
+          </p>
+        </div>
+        <div class="two-col">
+          <DonutChartCard
+            :title="`Cobros acumulados vs. saldo pendiente (${donutCurrency})`"
+            description="Conciliación de la cartera vigente filtrada."
+            :slices="donutSlices"
+            :center-label="formatPercent(donutMonedaRow?.porcentaje_cobrado)"
+            center-sublabel="Cobrado"
+            :loading="loadingFinanzas"
+            :error="errorFinanzas"
+            :value-formatter="(v) => formatMoney(v, donutCurrency)"
+            @retry="fetchFinanzas()"
+          >
+            <template v-if="finMonedas.length > 1 && !moneda" #controls>
+              <select
+                v-model="activeDonutCurrency"
+                class="inline-select"
+                aria-label="Moneda de composición financiera (finanzas)"
+              >
+                <option v-for="m in finMonedas" :key="m.moneda" :value="m.moneda">
+                  {{ m.moneda }}
+                </option>
+              </select>
+            </template>
+          </DonutChartCard>
+
+          <LineAreaChartCard
+            :title="`Evolución temporal de cobros (${cobrosEvoSerie?.moneda ?? donutCurrency})`"
+            description="Recibos emitidos válidos sobre pedidos no cancelados."
+            :labels="cobrosEvoLabels"
+            :series="cobrosEvoSeries"
+            :loading="loadingFinanzas"
+            :error="errorFinanzas"
+            :value-formatter="(v) => formatMoney(v, cobrosEvoSerie?.moneda ?? donutCurrency)"
+            @retry="fetchFinanzas()"
+          />
+        </div>
+
+        <div class="two-col">
+          <AnalyticsTableCard
+            title="Clientes con mayores saldos pendientes"
+            description="Agrupados por cliente y moneda sin sumar divisas distintas."
+            :loading="loadingFinanzas"
+            :error="errorFinanzas"
+            :is-empty="!finanzas?.clientes_mayores_saldos_por_moneda.length"
+            @retry="fetchFinanzas()"
+          >
+            <div class="currency-rankings">
+              <div
+                v-for="group in finanzas?.clientes_mayores_saldos_por_moneda ?? []"
+                :key="group.moneda"
+                class="currency-rankings__group"
+              >
+                <h4>Moneda {{ group.moneda }}</h4>
+                <table class="compact-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Cliente</th>
+                      <th scope="col">Pedidos</th>
+                      <th scope="col" class="num">Saldo pendiente</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="cli in group.clientes"
+                      :key="`${group.moneda}-${cli.cliente_id ?? cli.cliente_nombre}`"
+                    >
+                      <td>
+                        <RouterLink
+                          v-if="cli.cliente_id"
+                          :to="`/clientes/${cli.cliente_id}`"
+                          class="table-link"
+                        >
+                          {{ cli.cliente_nombre }}
+                        </RouterLink>
+                        <span v-else>{{ cli.cliente_nombre }}</span>
+                      </td>
+                      <td>{{ formatInteger(cli.cantidad_pedidos) }}</td>
+                      <td class="num">{{ formatMoney(cli.saldo_pendiente, group.moneda) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </AnalyticsTableCard>
+
+          <AnalyticsTableCard
+            title="Pedidos entregados que mantienen saldo"
+            description="Seguimiento de pedidos entregados con saldo por cobrar."
+            :loading="loadingFinanzas"
+            :error="errorFinanzas"
+            :is-empty="!finanzas?.pedidos_entregados_con_saldo.results.length"
+            empty-title="Sin saldos en pedidos entregados"
+            empty-description="Todos los pedidos entregados del filtro están saldados."
+            @retry="fetchFinanzas()"
+          >
+            <table class="compact-table">
+              <thead>
+                <tr>
+                  <th scope="col">Proforma</th>
+                  <th scope="col">Cliente</th>
+                  <th scope="col">Entrega</th>
+                  <th scope="col" class="num">Saldo</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="ped in finanzas?.pedidos_entregados_con_saldo.results ?? []"
+                  :key="ped.pedido_id"
+                >
+                  <td>
+                    <RouterLink :to="`/pedidos/${ped.pedido_id}`" class="table-link">
+                      #{{ ped.proforma_numero }}
+                    </RouterLink>
+                  </td>
+                  <td>{{ ped.cliente_nombre }}</td>
+                  <td>{{ formatDateLaPaz(ped.fecha_entrega_efectiva) }}</td>
+                  <td class="num">{{ formatMoney(ped.saldo_pendiente, ped.moneda) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </AnalyticsTableCard>
+        </div>
+      </section>
+    </div>
+
+    <!-- TAB 4: OPERACIONES -->
+    <div
+      v-if="activeTab === 'operaciones'"
+      class="tab-panel"
+      role="tabpanel"
+      aria-label="Operaciones"
+    >
+      <section class="section-block" aria-label="Supervisión productiva y logística">
+        <div class="section-block__head-row">
+          <div class="section-block__head">
+            <h2>Producción, taller y entregas</h2>
+            <p>Órdenes de fabricación a medida separadas de órdenes técnicas de catálogo.</p>
+          </div>
           <label class="local-filter">
-            <span>Categoría</span>
+            <span>Estado de fabricación</span>
             <select
-              v-model="categoriaLocal"
-              aria-label="Filtrar categoría de inventario"
-              @change="onCategoryChange"
+              v-model="estadoFabricacionLocal"
+              aria-label="Filtrar estado de fabricación"
+              @change="fetchResumen()"
             >
-              <option value="">Todas las categorías</option>
-              <option value="SILLA">Silla</option>
-              <option value="PISO_FLOTANTE">Piso flotante</option>
-              <option value="OTRO">Otro</option>
+              <option value="">Todos</option>
+              <option value="PENDIENTE">Pendiente</option>
+              <option value="EN_PROCESO">En proceso</option>
+              <option value="TERMINADA">Terminada</option>
+              <option value="CANCELADA">Cancelada</option>
             </select>
           </label>
-          <RouterLink
-            :to="categoriaLocal ? `/productos?categoria=${categoriaLocal}` : '/productos'"
-            class="shortcut-link"
+        </div>
+
+        <div class="kpi-grid kpi-grid--compact">
+          <MetricKpiCard
+            label="Fabricaciones pendientes"
+            :value="formatInteger(fabricacionesPendientes)"
+            detail="Órdenes a medida sin iniciar"
+            to="/ordenes-trabajo"
+          />
+          <MetricKpiCard
+            label="Fabricaciones activas"
+            :value="formatInteger(prod?.fabricaciones_activas)"
+            detail="Órdenes a medida en proceso"
+            to="/ordenes-trabajo"
+          />
+          <MetricKpiCard
+            label="Entregas próximas (7 días)"
+            :value="formatInteger(prod?.entregas_proximas)"
+            detail="Catálogo y fabricación pendientes"
+            to="/ordenes-trabajo"
+          />
+          <MetricKpiCard
+            label="Entregas efectivas"
+            :value="formatInteger(prod?.entregas_efectivas)"
+            :scope-note="periodScopeLabel"
+            :detail="`Retrasadas: ${formatInteger(prod?.entregas_retrasadas)}`"
+            :tone="(prod?.entregas_retrasadas ?? 0) > 0 ? 'danger' : 'default'"
+          />
+          <MetricKpiCard
+            label="Cumplimiento de entregas"
+            :value="formatPercent(prod?.cumplimiento_entregas_porcentaje)"
+            scope-note="Respecto a fecha programada disponible"
+            :detail="`${formatInteger(prod?.entregas_en_plazo)} en plazo de ${formatInteger(prod?.entregas_evaluables_plazo)} evaluables`"
+            tone="success"
+          />
+        </div>
+
+        <div class="two-col">
+          <StateDistributionCard
+            title="Órdenes funcionales de fabricación"
+            description="Exclusivamente ítems de fabricación a medida."
+            :items="prod?.ordenes_fabricacion_por_estado ?? []"
+          />
+          <StateDistributionCard
+            title="Órdenes técnicas de catálogo"
+            description="Contabilizadas por separado de taller."
+            :items="prod?.ordenes_tecnicas_por_estado ?? []"
+          />
+        </div>
+      </section>
+    </div>
+
+    <!-- TAB 5: INVENTARIO -->
+    <div
+      v-if="activeTab === 'inventario'"
+      class="tab-panel"
+      role="tabpanel"
+      aria-label="Inventario"
+    >
+      <section class="section-block" aria-label="Inventario">
+        <div class="section-block__head-row">
+          <div class="section-block__head">
+            <h2>Inventario y productos</h2>
+            <p>
+              Disponibilidad comercial, umbrales configurados y productos más vendidos por unidad.
+            </p>
+          </div>
+          <div class="inventory-controls">
+            <label class="local-filter">
+              <span>Categoría</span>
+              <select
+                v-model="categoriaLocal"
+                aria-label="Filtrar categoría de inventario"
+                @change="onCategoryChange"
+              >
+                <option value="">Todas las categorías</option>
+                <option v-for="cat in categoryOptions" :key="cat.codigo" :value="cat.codigo">
+                  {{ cat.nombre }}
+                </option>
+              </select>
+            </label>
+            <RouterLink :to="productosTargetRoute" class="shortcut-link">
+              <Boxes :size="15" aria-hidden="true" />
+              Ir a productos
+            </RouterLink>
+          </div>
+        </div>
+
+        <div class="kpi-grid kpi-grid--compact">
+          <MetricKpiCard
+            label="Productos activos"
+            :value="formatInteger(invResumen?.total_activos)"
+            :detail="`Con stock: ${formatInteger(invResumen?.con_stock)} · Bajo pedido: ${formatInteger(invResumen?.bajo_pedido)}`"
+            to="/productos"
+          />
+          <MetricKpiCard
+            label="Agotados"
+            :value="formatInteger(invResumen?.agotados)"
+            detail="Productos CON_STOCK en cero"
+            :tone="(invResumen?.agotados ?? 0) > 0 ? 'danger' : 'default'"
+            to="/productos"
+          />
+          <MetricKpiCard
+            label="Stock bajo"
+            :value="
+              (invResumen?.sin_stock_minimo ?? 0) > 0 && (invResumen?.stock_bajo ?? 0) === 0
+                ? 'No evaluable'
+                : formatInteger(invResumen?.stock_bajo)
+            "
+            :detail="
+              (invResumen?.sin_stock_minimo ?? 0) > 0
+                ? `${formatInteger(invResumen?.sin_stock_minimo)} productos CON_STOCK sin mínimo configurado`
+                : 'Según stock mínimo configurado'
+            "
+            :tone="(invResumen?.stock_bajo ?? 0) > 0 ? 'warning' : 'default'"
+          />
+          <MetricKpiCard
+            label="CON_STOCK sin mínimo"
+            :value="formatInteger(invResumen?.sin_stock_minimo)"
+            detail="Requieren umbral mínimo para alertas"
+            :tone="(invResumen?.sin_stock_minimo ?? 0) > 0 ? 'warning' : 'success'"
+            to="/productos"
+          />
+        </div>
+
+        <div class="two-col">
+          <BarChartCard
+            title="Productos por categoría"
+            description="Distribución por modalidad de abastecimiento y agotados."
+            :labels="invCatLabels"
+            :series="invCatSeries"
+            horizontal
+            :height="260"
+            :loading="loadingInventario"
+            :error="errorInventario"
+            :value-formatter="formatInteger"
+            @retry="fetchInventario()"
+          />
+
+          <BarChartCard
+            title="Productos más vendidos"
+            description="Separados por categoría y unidad de medida para evitar mezclar escalas."
+            :labels="masVendidosLabels"
+            :series="masVendidosSeries"
+            horizontal
+            :height="260"
+            :loading="loadingInventario"
+            :error="errorInventario"
+            :value-formatter="formatQuantity"
+            @retry="fetchInventario()"
           >
-            <Boxes :size="15" aria-hidden="true" />
-            Ir a productos
-          </RouterLink>
+            <template v-if="soldUnits.length > 1" #controls>
+              <select
+                :value="selectedSoldUnitKey"
+                class="inline-select"
+                aria-label="Categoría y unidad de productos más vendidos"
+                @change="activeSoldUnitKey = ($event.target as HTMLSelectElement).value"
+              >
+                <option v-for="u in soldUnits" :key="u.key" :value="u.key">{{ u.label }}</option>
+              </select>
+            </template>
+          </BarChartCard>
         </div>
-      </div>
-
-      <div class="kpi-grid kpi-grid--compact">
-        <MetricKpiCard
-          label="Productos activos"
-          :value="formatInteger(invResumen?.total_activos)"
-          :detail="`Con stock: ${formatInteger(invResumen?.con_stock)} · Bajo pedido: ${formatInteger(invResumen?.bajo_pedido)}`"
-          to="/productos"
-        />
-        <MetricKpiCard
-          label="Agotados"
-          :value="formatInteger(invResumen?.agotados)"
-          detail="Productos CON_STOCK en cero"
-          :tone="(invResumen?.agotados ?? 0) > 0 ? 'danger' : 'default'"
-          to="/productos"
-        />
-        <MetricKpiCard
-          label="Stock bajo"
-          :value="
-            (invResumen?.sin_stock_minimo ?? 0) > 0 && (invResumen?.stock_bajo ?? 0) === 0
-              ? 'No evaluable'
-              : formatInteger(invResumen?.stock_bajo)
-          "
-          :detail="
-            (invResumen?.sin_stock_minimo ?? 0) > 0
-              ? `${formatInteger(invResumen?.sin_stock_minimo)} productos CON_STOCK sin mínimo configurado`
-              : 'Según stock mínimo configurado'
-          "
-          :tone="(invResumen?.stock_bajo ?? 0) > 0 ? 'warning' : 'default'"
-        />
-        <MetricKpiCard
-          label="CON_STOCK sin mínimo"
-          :value="formatInteger(invResumen?.sin_stock_minimo)"
-          detail="Requieren umbral mínimo para alertas"
-          :tone="(invResumen?.sin_stock_minimo ?? 0) > 0 ? 'warning' : 'success'"
-          to="/productos"
-        />
-      </div>
-
-      <div class="two-col">
-        <BarChartCard
-          title="Productos por categoría"
-          description="Distribución por modalidad de abastecimiento y agotados."
-          :labels="invCatLabels"
-          :series="invCatSeries"
-          horizontal
-          :height="260"
-          :loading="loadingInventario"
-          :error="errorInventario"
-          :value-formatter="formatInteger"
-          @retry="fetchInventario()"
-        />
-
-        <BarChartCard
-          title="Productos más vendidos"
-          description="Separados por categoría y unidad de medida para evitar mezclar escalas."
-          :labels="masVendidosLabels"
-          :series="masVendidosSeries"
-          horizontal
-          :height="260"
-          :loading="loadingInventario"
-          :error="errorInventario"
-          :value-formatter="formatQuantity"
-          @retry="fetchInventario()"
-        >
-          <template v-if="soldUnits.length > 1" #controls>
-            <select
-              v-model="activeSoldUnitKey"
-              class="inline-select"
-              aria-label="Categoría y unidad de productos más vendidos"
-            >
-              <option v-for="u in soldUnits" :key="u.key" :value="u.key">{{ u.label }}</option>
-            </select>
-          </template>
-        </BarChartCard>
-      </div>
-    </section>
-
-    <!-- Alertas prioritarias -->
-    <section class="section-block" aria-label="Alertas prioritarias">
-      <div class="section-block__head">
-        <h2>Alertas prioritarias</h2>
-        <p>Registros concretos que requieren atención operativa y seguimiento directo.</p>
-      </div>
-      <div class="alerts-grid">
-        <AlertListCard
-          title="Proformas próximas a vencer"
-          :total-count="alertas?.totales.proformas_proximas_vencer ?? 0"
-          :items="alertProformas"
-          view-all-to="/proformas"
-          view-all-label="Ver proformas"
-        />
-        <AlertListCard
-          title="Pedidos retrasados"
-          :total-count="alertas?.totales.pedidos_retrasados ?? 0"
-          :items="alertPedidosRetrasados"
-          view-all-to="/pedidos"
-          view-all-label="Ver pedidos"
-        />
-        <AlertListCard
-          title="Fabricaciones retrasadas"
-          :total-count="alertas?.totales.fabricaciones_retrasadas ?? 0"
-          :items="alertFabricacionesRetrasadas"
-          view-all-to="/ordenes-trabajo"
-          view-all-label="Ver órdenes"
-        />
-        <AlertListCard
-          title="Pedidos entregados con saldo"
-          :total-count="alertas?.totales.saldos_pedidos_entregados ?? 0"
-          :items="alertSaldosEntregados"
-          view-all-to="/pedidos"
-          view-all-label="Ver pedidos"
-        />
-        <AlertListCard
-          title="Productos agotados o stock bajo"
-          :total-count="alertas?.totales.productos_stock_bajo ?? 0"
-          :items="alertStockBajo"
-          view-all-to="/productos"
-          view-all-label="Ver productos"
-        />
-        <AlertListCard
-          title="Productos sin mínimo configurado"
-          :total-count="alertas?.totales.productos_sin_stock_minimo ?? 0"
-          :items="alertSinMinimo"
-          view-all-to="/productos"
-          view-all-label="Configurar en productos"
-        />
-      </div>
-    </section>
-
-    <Card v-if="indComercial?.limitaciones.length">
-      <div class="notes-foot">
-        <div class="notes-foot__title">
-          <AlertTriangle :size="15" aria-hidden="true" />
-          <strong>Notas metodológicas del escenario</strong>
-        </div>
-        <ul>
-          <li v-for="note in indComercial.limitaciones" :key="note">{{ note }}</li>
-        </ul>
-        <p class="notes-foot__coverage">
-          <ClipboardCheck :size="14" aria-hidden="true" />
-          Cobertura de formalización:
-          {{ formatInteger(indComercial.cobertura_formalizacion.con_marca_temporal) }} con marca
-          temporal,
-          {{ formatInteger(indComercial.cobertura_formalizacion.aproximadas_por_fecha) }}
-          aproximadas por fecha comercial,
-          {{
-            formatInteger(indComercial.cobertura_formalizacion.anuladas_sin_evidencia_formalizacion)
-          }}
-          anuladas sin evidencia persistida.
-        </p>
-      </div>
-    </Card>
+      </section>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .admin-dash {
   display: grid;
-  gap: var(--space-6);
+  gap: var(--space-5);
   min-width: 0;
   max-width: 100%;
   overflow-x: clip;
 }
 
 .admin-dash > *,
-.two-col > *,
-.alerts-grid > * {
+.tab-panel > *,
+.two-col > * {
   min-width: 0;
+}
+
+.tab-panel {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.stale-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-warning);
+  background: var(--badge-warning-bg);
+  color: var(--badge-warning-text);
+  font-size: 0.825rem;
+  font-weight: 500;
 }
 
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
+}
+
+@media (min-width: 600px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1720px) {
+  .kpi-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .kpi-grid--compact {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
 }
 
 .kpi-grid--compact {
@@ -1077,14 +1375,14 @@ const alertSinMinimo = computed<AlertRowItem[]>(() =>
 
 .section-block__head h2 {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: var(--color-text);
 }
 
 .section-block__head p {
   margin: 0.2rem 0 0;
-  font-size: 0.85rem;
+  font-size: 0.84rem;
   color: var(--color-text-secondary);
 }
 
@@ -1099,12 +1397,6 @@ const alertSinMinimo = computed<AlertRowItem[]>(() =>
 .two-col {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr));
-  gap: var(--space-4);
-}
-
-.alerts-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
   gap: var(--space-4);
 }
 

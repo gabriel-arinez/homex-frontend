@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { EChartsType } from 'echarts/core'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
+import ErrorState from '@/shared/ui/ErrorState.vue'
 import { readChartThemeTokens, type ChartThemeTokens, type HomexChartOption } from './themeTokens'
 
 const props = withDefaults(
@@ -25,42 +26,141 @@ const props = withDefaults(
 const containerRef = ref<HTMLElement | null>(null)
 const showTable = ref(false)
 const chartReady = ref(false)
+const chartFinished = ref(false)
+const seriesCount = ref(0)
+const renderError = ref('')
+
 let chartInstance: EChartsType | null = null
 let resizeObserver: ResizeObserver | null = null
 let themeObserver: MutationObserver | null = null
 let destroyed = false
+let renderSeq = 0
 
 const isEmpty = computed(() => props.optionBuilder(readChartThemeTokens()) === null)
 
+function cleanupChart() {
+  resizeObserver?.disconnect()
+  resizeObserver = null
+  if (chartInstance) {
+    chartInstance.dispose()
+    chartInstance = null
+  }
+  chartReady.value = false
+  chartFinished.value = false
+  seriesCount.value = 0
+}
+
+function attachResizeObserver(el: HTMLElement) {
+  resizeObserver?.disconnect()
+  resizeObserver = null
+  if (typeof ResizeObserver === 'undefined') return
+  resizeObserver = new ResizeObserver((entries) => {
+    const rect = entries[0]?.contentRect
+    if (rect && rect.width > 0 && rect.height > 0) {
+      if (!chartInstance) {
+        void renderChart()
+      } else {
+        chartInstance.resize()
+      }
+    }
+  })
+  resizeObserver.observe(el)
+}
+
 async function renderChart() {
+  const seq = ++renderSeq
   if (destroyed || props.loading || !containerRef.value) return
-  const tokens = readChartThemeTokens()
-  const option = props.optionBuilder(tokens)
-  if (!option) {
-    chartInstance?.clear()
+  renderError.value = ''
+
+  let option: HomexChartOption | null = null
+  try {
+    const tokens = readChartThemeTokens()
+    option = props.optionBuilder(tokens)
+  } catch (err) {
+    renderError.value = err instanceof Error ? err.message : 'No se pudo construir el gráfico.'
+    cleanupChart()
     return
   }
+
+  if (!option) {
+    cleanupChart()
+    return
+  }
+
   const probe = document.createElement('canvas')
   if (typeof probe.getContext !== 'function' || !probe.getContext('2d')) {
     return
   }
-  const { getECharts } = await import('./echarts')
-  const echarts = getECharts()
-  if (destroyed || !containerRef.value) return
-  if (!chartInstance) {
-    chartInstance = echarts.init(containerRef.value, undefined, { renderer: 'canvas' })
+
+  try {
+    const { getECharts } = await import('./echarts')
+    const echarts = getECharts()
+    if (destroyed || seq !== renderSeq || props.loading || !containerRef.value) return
+
+    if (chartInstance && chartInstance.getDom() !== containerRef.value) {
+      chartInstance.dispose()
+      chartInstance = null
+    }
+    if (!chartInstance) {
+      chartInstance = echarts.init(containerRef.value, undefined, { renderer: 'canvas' })
+      chartInstance.on('finished', () => {
+        if (!destroyed) chartFinished.value = true
+      })
+    }
+
+    chartFinished.value = false
+    const rawSeries = Array.isArray(option.series)
+      ? option.series
+      : option.series
+        ? [option.series]
+        : []
+    seriesCount.value = rawSeries.length
+    chartInstance.setOption(
+      {
+        animationDuration: 240,
+        ...option,
+      },
+      { notMerge: true },
+    )
+    chartInstance.resize()
     chartReady.value = true
+  } catch (err) {
+    if (seq === renderSeq && !destroyed) {
+      renderError.value = err instanceof Error ? err.message : 'No se pudo renderizar el gráfico.'
+      cleanupChart()
+    }
   }
-  chartInstance.setOption(option, { notMerge: true })
 }
 
+watch(
+  containerRef,
+  (el) => {
+    if (!el) {
+      cleanupChart()
+      return
+    }
+    attachResizeObserver(el)
+    void renderChart()
+  },
+  { flush: 'post' },
+)
+
+watch(
+  () => [props.loading, props.optionBuilder],
+  () => {
+    if (props.loading) {
+      cleanupChart()
+      return
+    }
+    void renderChart()
+  },
+  { flush: 'post' },
+)
+
 onMounted(() => {
-  void renderChart()
-  if (typeof ResizeObserver !== 'undefined' && containerRef.value) {
-    resizeObserver = new ResizeObserver(() => {
-      chartInstance?.resize()
-    })
-    resizeObserver.observe(containerRef.value)
+  if (containerRef.value) {
+    attachResizeObserver(containerRef.value)
+    void renderChart()
   }
   if (typeof MutationObserver !== 'undefined') {
     themeObserver = new MutationObserver(() => {
@@ -73,25 +173,20 @@ onMounted(() => {
   }
 })
 
-watch(
-  () => [props.loading, props.optionBuilder],
-  () => {
-    void renderChart()
-  },
-)
-
 onBeforeUnmount(() => {
   destroyed = true
-  resizeObserver?.disconnect()
   themeObserver?.disconnect()
-  chartInstance?.dispose()
-  chartInstance = null
+  themeObserver = null
+  cleanupChart()
 })
 </script>
 
 <template>
   <div class="echart-box">
-    <div v-if="$slots.accessible && !loading && !isEmpty" class="echart-box__toolbar">
+    <div
+      v-if="$slots.accessible && !loading && !isEmpty && !renderError"
+      class="echart-box__toolbar"
+    >
       <button
         type="button"
         class="echart-box__toggle"
@@ -103,6 +198,9 @@ onBeforeUnmount(() => {
     </div>
 
     <LoadingSkeleton v-if="loading" :lines="5" />
+    <ErrorState v-else-if="renderError" :description="renderError">
+      <button type="button" @click="renderChart()">Reintentar</button>
+    </ErrorState>
     <EmptyState v-else-if="isEmpty" :title="emptyTitle" :description="emptyDescription" />
     <template v-else>
       <div
@@ -111,6 +209,9 @@ onBeforeUnmount(() => {
         :style="{ height: `${height}px` }"
         role="img"
         :aria-label="chartLabel"
+        :data-rendered="chartReady ? 'true' : 'false'"
+        :data-finished="chartFinished ? 'true' : 'false'"
+        :data-series-count="seriesCount"
       />
       <div v-if="$slots.accessible" :class="showTable ? 'echart-box__table' : 'sr-only'">
         <slot name="accessible" />

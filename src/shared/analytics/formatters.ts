@@ -77,6 +77,29 @@ export function formatTimeLaPaz(date: Date): string {
   }).format(date)
 }
 
+export function formatPeriodLabel(
+  iso: string | null | undefined,
+  granularidad: 'diaria' | 'semanal' | 'mensual' = 'mensual',
+): string {
+  if (!iso) return ''
+  const pureDate = /^\d{4}-\d{2}-\d{2}$/.test(iso)
+  const date = pureDate ? new Date(`${iso}T12:00:00-04:00`) : new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso
+  if (granularidad === 'mensual') {
+    return new Intl.DateTimeFormat('es-BO', {
+      timeZone: 'America/La_Paz',
+      month: 'short',
+      year: 'numeric',
+    }).format(date)
+  }
+  const dayMonth = new Intl.DateTimeFormat('es-BO', {
+    timeZone: 'America/La_Paz',
+    day: '2-digit',
+    month: 'short',
+  }).format(date)
+  return granularidad === 'semanal' ? `Sem. ${dayMonth}` : dayMonth
+}
+
 function addDays(isoDate: string, days: number): string {
   const [y, m, d] = isoDate.split('-').map(Number)
   const dt = new Date(Date.UTC(y!, m! - 1, d! + days))

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { Calendar, RefreshCw } from '@lucide/vue'
+import { Calendar, RefreshCw, SlidersHorizontal } from '@lucide/vue'
 import Button from '@/shared/ui/Button.vue'
 import { buildPeriodPreset, formatDateLaPaz, type PeriodPresetKey } from './formatters'
 
@@ -47,6 +47,7 @@ const emit = defineEmits<{
 }>()
 
 const preset = ref<PeriodPresetKey>('todo')
+const mobileExpanded = ref(false)
 
 const presets: Array<{ key: PeriodPresetKey; label: string }> = [
   { key: 'todo', label: 'Todo el período' },
@@ -56,6 +57,13 @@ const presets: Array<{ key: PeriodPresetKey; label: string }> = [
   { key: 'ultimos_7_dias', label: 'Últimos 7 días' },
   { key: 'personalizado', label: 'Personalizado' },
 ]
+
+const activePeriodSummary = computed(() => {
+  if (props.fechaDesde && props.fechaHasta) {
+    return `${formatDateLaPaz(props.fechaDesde)} – ${formatDateLaPaz(props.fechaHasta)}`
+  }
+  return presets.find((p) => p.key === preset.value)?.label ?? 'Todo el período'
+})
 
 const invalidRange = computed(() =>
   Boolean(props.fechaDesde && props.fechaHasta && props.fechaDesde > props.fechaHasta),
@@ -106,7 +114,30 @@ function onGranularityChange(value: string) {
 
 <template>
   <section class="period-bar" aria-label="Filtros analíticos del dashboard">
-    <div class="period-bar__controls">
+    <div class="period-bar__mobile-summary">
+      <div class="period-bar__mobile-period">
+        <Calendar :size="14" aria-hidden="true" />
+        <span
+          >Período: <strong>{{ activePeriodSummary }}</strong></span
+        >
+      </div>
+      <button
+        type="button"
+        class="period-bar__toggle"
+        :aria-expanded="mobileExpanded"
+        aria-controls="admin-period-filters"
+        @click="mobileExpanded = !mobileExpanded"
+      >
+        <SlidersHorizontal :size="14" aria-hidden="true" />
+        {{ mobileExpanded ? 'Ocultar filtros' : 'Filtros' }}
+      </button>
+    </div>
+
+    <div
+      id="admin-period-filters"
+      class="period-bar__controls"
+      :class="{ 'is-expanded': mobileExpanded }"
+    >
       <label class="period-bar__field">
         <span>Período</span>
         <select
@@ -209,10 +240,58 @@ function onGranularityChange(value: string) {
   background: var(--color-surface);
 }
 
+.period-bar__mobile-summary {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.period-bar__mobile-period {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+.period-bar__mobile-period strong {
+  color: var(--color-text);
+}
+
+.period-bar__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-soft);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .period-bar__controls {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(10rem, 100%), 1fr));
   gap: var(--space-3);
+}
+
+@media (max-width: 767px) {
+  .period-bar__mobile-summary {
+    display: flex;
+  }
+
+  .period-bar__controls {
+    display: none;
+  }
+
+  .period-bar__controls.is-expanded {
+    display: grid;
+  }
 }
 
 .period-bar__field {

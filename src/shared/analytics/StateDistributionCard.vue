@@ -27,11 +27,42 @@ const props = withDefaults(
 const total = computed(() => props.items.reduce((sum, x) => sum + x.cantidad, 0))
 const max = computed(() => Math.max(1, ...props.items.map((x) => x.cantidad)))
 
+function barTone(codigo: string): string {
+  const code = codigo.toUpperCase()
+  if (
+    code.includes('CANCEL') ||
+    code.includes('ANUL') ||
+    code.includes('RECHAZ') ||
+    code.includes('VENCID')
+  ) {
+    return 'var(--color-danger)'
+  }
+  if (
+    code.includes('ENTREG') ||
+    code.includes('PAGAD') ||
+    code.includes('TERMIN') ||
+    code.includes('APROB') ||
+    code.includes('CONVERT')
+  ) {
+    return 'var(--color-success)'
+  }
+  if (
+    code.includes('PEND') ||
+    code.includes('PROCESO') ||
+    code.includes('REVISION') ||
+    code.includes('PARCIAL')
+  ) {
+    return 'var(--color-warning)'
+  }
+  return 'var(--color-info)'
+}
+
 const rows = computed(() =>
   props.items.map((item) => ({
     ...item,
     width: item.cantidad === 0 ? 0 : Math.max(4, Math.round((item.cantidad / max.value) * 100)),
     share: total.value > 0 ? ((item.cantidad / total.value) * 100).toFixed(1) : '0.0',
+    fillColor: barTone(item.codigo),
   })),
 )
 </script>
@@ -57,7 +88,10 @@ const rows = computed(() =>
           </span>
         </div>
         <div class="state-dist__track" aria-hidden="true">
-          <div class="state-dist__fill" :style="{ width: `${row.width}%` }" />
+          <div
+            class="state-dist__fill"
+            :style="{ width: `${row.width}%`, background: row.fillColor }"
+          />
         </div>
       </li>
     </ul>

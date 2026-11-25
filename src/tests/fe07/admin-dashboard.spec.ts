@@ -181,7 +181,14 @@ async function mountAdminResumen() {
   })
   await router.push('/resumen')
   await router.isReady()
-  return mount(ResumenView, { global: { plugins: [pinia, router] } })
+  const wrapper = mount(ResumenView, { global: { plugins: [pinia, router] } })
+  await vi.waitFor(
+    () => {
+      expect(wrapper.find('select[aria-label="Selector de período"]').exists()).toBe(true)
+    },
+    { timeout: 5000 },
+  )
+  return wrapper
 }
 
 beforeEach(() => setActivePinia(createPinia()))
@@ -200,7 +207,7 @@ describe('Fase 2 AdminDashboard y formateadores analíticos', () => {
     expect(formatPercent(null)).toBe('No aplicable')
   })
 
-  it('renderiza el dashboard administrativo con KPIs, inventario sin umbral y alertas', async () => {
+  it('renderiza el dashboard administrativo con KPIs, pestañas, alertas consolidadas e inventario', async () => {
     server.use(
       http.get('http://localhost:8000/api/v1/dashboard/administrador/', () =>
         HttpResponse.json(resumenPayload),
@@ -214,6 +221,11 @@ describe('Fase 2 AdminDashboard y formateadores analíticos', () => {
       http.get('http://localhost:8000/api/v1/dashboard/administrador/inventario/', () =>
         HttpResponse.json(inventarioPayload),
       ),
+      http.get('http://localhost:8000/api/v1/catalogo/opciones/', () =>
+        HttpResponse.json([
+          { id: 12, codigo: 'SILLA', nombre: 'Silla', concepto_codigo: 'CATEGORIA_PRODUCTO' },
+        ]),
+      ),
     )
 
     const wrapper = await mountAdminResumen()
@@ -221,17 +233,105 @@ describe('Fase 2 AdminDashboard y formateadores analíticos', () => {
       expect(wrapper.text()).toContain('Proformas formalizadas')
     })
 
-    const text = wrapper.text()
-    expect(text).toContain('Resumen general')
-    expect(text).toContain('Modo demostración')
-    expect(text).toContain('248')
-    expect(text).toContain('20,97 %')
-    expect(text).toContain('No evaluable')
-    expect(text).toContain('Alvaro Huallpa')
-    expect(text).toContain('Proforma #101')
+    expect(wrapper.text()).toContain('Resumen general')
+    expect(wrapper.text()).not.toContain('Modo demostración')
+    expect(wrapper.text()).toContain('248')
+    expect(wrapper.text()).toContain('20,97 %')
+    expect(wrapper.text()).toContain('Alertas prioritarias')
+    expect(wrapper.text()).toContain('Proforma #101')
+
+    await wrapper.get('button[role="tab"]:nth-of-type(2)').trigger('click')
+    expect(wrapper.text()).toContain('Alvaro Huallpa')
+
+    await wrapper.get('button[role="tab"]:nth-of-type(5)').trigger('click')
+    expect(wrapper.text()).toContain('Productos activos')
+    expect(wrapper.text()).toContain('No evaluable')
   })
 
-  it('aisla fallos parciales sin ocultar los bloques exitosos', async () => {
+  it('aísla el filtro de categoría de inventario sin alterar KPIs ni disparar resumen', async () => {
+    let resumenCalls = 0
+    let inventarioCalls = 0
+    server.use(
+      http.get('http://localhost:8000/api/v1/dashboard/administrador/', () => {
+        resumenCalls += 1
+        return HttpResponse.json(resumenPayload)
+      }),
+      http.get('http://localhost:8000/api/v1/dashboard/administrador/comercial/', () =>
+        HttpResponse.json(comercialPayload),
+      ),
+      http.get('http://localhost:8000/api/v1/dashboard/administrador/finanzas/', () =>
+        HttpResponse.json(finanzasPayload),
+      ),
+      http.get('http://localhost:8000/api/v1/dashboard/administrador/inventario/', () => {
+        inventarioCalls += 1
+        return HttpResponse.json(inventarioPayload)
+      }),
+      http.get('http://localhost:8000/api/v1/catalogo/opciones/', () =>
+        HttpResponse.json([
+          { id: 12, codigo: 'SILLA', nombre: 'Silla', concepto_codigo: 'CATEGORIA_PRODUCTO' },
+        ]),
+      ),
+    )
+
+    const wrapper = await mountAdminResumen()
+    await vi.waitFor(() => {
+      expect(wrapper.text()).toContain('Proformas formalizadas')
+    })
+
+    const initialResumenCalls = resumenCalls
+    const initialInventarioCalls = inventarioCalls
+
+    await wrapper.get('button[role="tab"]:nth-of-type(5)').trigger('click')
+    const select = wrapper.get('select[aria-label="Filtrar categoría de inventario"]')
+    await select.setValue('SILLA')
+
+    await vi.waitFor(() => {
+      expect(inventarioCalls).toBe(initialInventarioCalls + 1)
+      expect(wrapper.get('a.shortcut-link').attributes('href')).toContain('/productos?categoria=12')
+    })
+    expect(resumenCalls).toBe(initialResumenCalls)
+    expect(wrapper.text()).toContain('248')
+  })
+
+  it('ignora respuestas asíncronas obsoletas que llegan fuera de orden', async () => {
+    let callIdx = 0
+    server.use(
+      http.get('http://localhost:8000/api/v1/dashboard/administrador/', async () => {
+        callIdx += 1
+        if (callIdx === 1) {
+          await new Promise((r) => setTimeout(r, 60))
+          return HttpResponse.json({
+            ...resumenPayload,
+            comercial: { ...resumenPayload.comercial, proformas_formalizadas: 999 },
+          })
+        }
+        return HttpResponse.json({
+          ...resumenPayload,
+          comercial: { ...resumenPayload.comercial, proformas_formalizadas: 123 },
+        })
+      }),
+      http.get('http://localhost:8000/api/v1/dashboard/administrador/comercial/', () =>
+        HttpResponse.json(comercialPayload),
+      ),
+      http.get('http://localhost:8000/api/v1/dashboard/administrador/finanzas/', () =>
+        HttpResponse.json(finanzasPayload),
+      ),
+      http.get('http://localhost:8000/api/v1/dashboard/administrador/inventario/', () =>
+        HttpResponse.json(inventarioPayload),
+      ),
+    )
+
+    const wrapper = await mountAdminResumen()
+    await wrapper.get('select[aria-label="Selector de período"]').setValue('este_mes')
+    await vi.waitFor(() => {
+      expect(wrapper.text()).toContain('123')
+    })
+    await new Promise((r) => setTimeout(r, 80))
+    expect(wrapper.text()).toContain('123')
+    expect(wrapper.text()).not.toContain('999')
+  })
+
+  it('aisla fallos parciales sin ocultar bloques exitosos ni mostrar alertas en cero', async () => {
     server.use(
       http.get('http://localhost:8000/api/v1/dashboard/administrador/', () =>
         HttpResponse.json(resumenPayload),
@@ -254,7 +354,6 @@ describe('Fase 2 AdminDashboard y formateadores analíticos', () => {
 
     const text = wrapper.text()
     expect(text).toContain('Proformas formalizadas')
-    expect(text).toContain('Alvaro Huallpa')
-    expect(text).toContain('Productos activos')
+    expect(text).toContain('No disponible')
   })
 })
