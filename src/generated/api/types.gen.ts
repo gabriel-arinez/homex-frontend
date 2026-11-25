@@ -4,6 +4,11 @@ export type ClientOptions = {
   baseUrl: `${string}://${string}` | (string & {})
 }
 
+export type AgendaComercial = {
+  resumen_conteos: ResumenConteosAgenda
+  elementos: PaginacionAgendaComercial
+}
+
 export type AjusteStockCrear = {
   producto: number
   tipo_operacion: TipoOperacionEnum
@@ -11,6 +16,74 @@ export type AjusteStockCrear = {
   motivo: MotivoEnum
   observaciones?: string
   clave_idempotencia?: string | null
+}
+
+export type AlertaFabricacionRetrasada = {
+  orden_trabajo_id: number
+  numero_ot: number
+  cliente_nombre: string
+  estado_codigo: string
+  fecha_entrega_prevista: string
+  dias_retraso: number
+}
+
+export type AlertaPedidoRetrasado = {
+  pedido_id: number
+  proforma_numero: number
+  cliente_nombre: string
+  vendedor_nombre: string
+  estado_codigo: string
+  fecha_entrega_prevista: string
+  dias_retraso: number
+}
+
+export type AlertaProductoStockBajo = {
+  producto_id: number
+  sku: string | null
+  nombre: string
+  categoria_codigo: string
+  stock: string
+  stock_minimo: string | null
+  unidad_codigo: string
+  estado_stock: string
+}
+
+export type AlertaProformaVencer = {
+  proforma_id: number
+  numero: number
+  cliente_nombre: string
+  vendedor_nombre: string
+  fecha_vencimiento: string
+  dias_restantes: number
+  moneda: string
+  total: string
+}
+
+export type AlertaSaldoEntregado = {
+  pedido_id: number
+  proforma_numero: number
+  cliente_nombre: string
+  moneda: string
+  saldo_pendiente: string
+  fecha_entrega_efectiva: string | null
+}
+
+export type AlertasPrioritariasAdmin = {
+  proformas_proximas_vencer: Array<AlertaProformaVencer>
+  pedidos_retrasados: Array<AlertaPedidoRetrasado>
+  fabricaciones_retrasadas: Array<AlertaFabricacionRetrasada>
+  saldos_pedidos_entregados: Array<AlertaSaldoEntregado>
+  productos_stock_bajo: Array<AlertaProductoStockBajo>
+}
+
+export type AnalisisFabricacion = {
+  granularidad: GranularidadEnum
+  evolucion_fabricaciones: Array<PuntoEvolucionFabricacion>
+  duracion_promedio_horas: number | null
+  duracion_promedio_dias: number | null
+  ordenes_con_duracion_medible: number
+  muebles_fabricados_por_tipo: Array<MuebleFabricadoTipo>
+  distribucion_ordenes_estado: Array<EstadoConteo>
 }
 
 export type AprobarProformaRespuesta = {
@@ -154,6 +227,14 @@ export type Cliente = {
   readonly updated_by: number | null
 }
 
+export type ClienteMayorSaldo = {
+  cliente_id: number | null
+  cliente_nombre: string
+  moneda: string
+  cantidad_pedidos: number
+  saldo_pendiente: string
+}
+
 export type ClienteNuevoProforma = {
   tipo_cliente: number
   nombres?: string | null
@@ -171,6 +252,12 @@ export type ClienteResumenProforma = {
   celular: string | null
 }
 
+export type CobrosPedidosCancelados = {
+  moneda: string
+  cantidad_recibos: number
+  importe: string
+}
+
 /**
  * * `SKU_EXACTO` - SKU_EXACTO
  * * `NOMBRE_EXACTO` - NOMBRE_EXACTO
@@ -185,6 +272,26 @@ export type ComercialAsistida = {
   unidad_codigo: UnidadCodigoEnum | NullEnum | null
   precio_unitario: string | null
   descuento: string | null
+}
+
+export type ComparacionPeriodoComercial = {
+  periodo_anterior: RangoPeriodo
+  proformas_formalizadas: VariacionEntero
+  borradores: VariacionEntero
+  pedidos_generados: VariacionEntero
+  pedidos_no_cancelados: VariacionEntero
+}
+
+export type ComparacionVendedor = {
+  vendedor_id: number
+  vendedor_nombre: string
+  proformas_formalizadas: number
+  pedidos_generados: number
+  conversion_comercial: string | null
+  vencidas_no_concretadas: number
+  vencidas: number
+  no_concretadas: number
+  montos_por_moneda: Array<MontoMonedaVendedor>
 }
 
 export type ConfirmacionHitlRespuesta = {
@@ -265,6 +372,49 @@ export type CrearProforma = {
   prospecto_empresa?: string | null
   prospecto_celular?: string | null
   prospecto_direccion?: string | null
+}
+
+export type DashboardAdminComercial = {
+  fecha_referencia: string
+  indicadores: IndicadoresComerciales
+  evolucion: EvolucionComercial
+  vendedores: Array<ComparacionVendedor>
+}
+
+export type DashboardAdminResumen = {
+  fecha_referencia: string
+  comercial: IndicadoresComerciales
+  finanzas: ResumenFinancieroVendedor
+  produccion: ProduccionAdmin
+  inventario: ResumenInventario
+  alertas: AlertasPrioritariasAdmin
+}
+
+export type DashboardTallerPlanificacion = {
+  fecha_referencia: string
+  calendario_eventos: PaginacionCalendarioTaller
+  analisis_fabricacion: AnalisisFabricacion
+}
+
+export type DashboardTallerResumen = {
+  fecha_referencia: string
+  indicadores: IndicadoresTaller
+  cola_prioridades: PaginacionColaPrioridadTaller
+}
+
+export type DashboardTiendaResumen = {
+  fecha_referencia: string
+  vendedor_id: number
+  indicadores: IndicadoresComerciales
+  finanzas: ResumenFinancieroVendedor
+  evolucion: EvolucionComercial
+}
+
+export type DashboardTiendaSeguimiento = {
+  fecha_referencia: string
+  vendedor_id: number
+  agenda: AgendaComercial
+  disponibilidad: DisponibilidadComercial
 }
 
 /**
@@ -366,6 +516,42 @@ export type DetalleProforma = {
   readonly galeria_id: string | null
 }
 
+export type DisponibilidadComercial = {
+  resumen: ResumenDisponibilidad
+  productos: PaginacionDisponibilidadProductos
+}
+
+export type ElementoAgendaComercial = {
+  tipo_documento: TipoDocumentoEnum
+  documento_id: number
+  proforma_id: number
+  pedido_id: number | null
+  numero_documento: number
+  cliente_nombre: string
+  fecha: string
+  estado_codigo: string
+  estado_nombre: string
+  prioridad: PrioridadEnum
+  categoria_agenda: string
+  dias_diferencia: number | null
+  moneda?: string
+  saldo_pendiente?: string
+}
+
+export type ElementoColaPrioridadTaller = {
+  orden_trabajo_id: number
+  numero_ot: number
+  cliente_nombre: string
+  vendedor_nombre: string
+  muebles_solicitados: Array<MuebleSolicitadoTaller>
+  estado_codigo: string
+  estado_nombre: string
+  pedido_estado_codigo: string
+  fecha_prevista: string | null
+  dias_diferencia: number | null
+  categoria_prioridad: string
+}
+
 export type EmitirRecibo = {
   nombre_completo: string
   monto_en_letras: string
@@ -399,10 +585,27 @@ export type EspecificacionMueble = {
  */
 export type EstadoCodigoEnum = 'EN_PRODUCCION' | 'LISTO_ENTREGA' | 'ENTREGADO'
 
+export type EstadoConteo = {
+  codigo: string
+  nombre: string
+  cantidad: number
+}
+
 export type EstadoProformaDemanda = {
   id: number
   codigo: string
   nombre: string
+}
+
+export type EventoCalendarioTaller = {
+  orden_trabajo_id: number
+  numero_ot: number
+  tipo_evento: TipoEventoEnum
+  naturaleza: NaturalezaEnum
+  fecha: string
+  fecha_hora: string | null
+  cliente_nombre: string
+  estado_codigo: string
 }
 
 export type EvidenciaCatalogo = {
@@ -414,6 +617,24 @@ export type EvidenciaCatalogo = {
   decision: DecisionEnum
   normalized_value: unknown
   reason: string | null
+}
+
+export type EvolucionCobrosMoneda = {
+  moneda: string
+  puntos: Array<PuntoCobro>
+}
+
+export type EvolucionComercial = {
+  granularidad: GranularidadEnum
+  puntos_conteo: Array<PuntoConteoComercial>
+  series_monetarias: Array<SerieMonetariaComercial>
+}
+
+export type ExistenciaUnidad = {
+  unidad_codigo: string
+  unidad_nombre: string
+  cantidad_productos: number
+  stock_total: string
 }
 
 export type FamiliaProducto = {
@@ -430,10 +651,25 @@ export type FamiliaProductoResumen = {
   readonly nombre: string
 }
 
+export type FinanzasAdmin = {
+  por_moneda: Array<ResumenFinancieroMoneda>
+  cobros_pedidos_cancelados: Array<CobrosPedidosCancelados>
+  pedidos_entregados_con_saldo: PaginacionPedidosEntregadosSaldo
+  clientes_mayores_saldos: Array<ClienteMayorSaldo>
+  evolucion_cobros: Array<EvolucionCobrosMoneda>
+}
+
 export type GaleriaRespuesta = {
   readonly imagenes: Array<ImagenGaleria>
   readonly limite: number
 }
+
+/**
+ * * `diaria` - diaria
+ * * `semanal` - semanal
+ * * `mensual` - mensual
+ */
+export type GranularidadEnum = 'diaria' | 'semanal' | 'mensual'
 
 export type HistorialEstadoOrdenTrabajo = {
   readonly id: number
@@ -481,6 +717,58 @@ export type ImagenPrincipal = {
   variantes: {
     [key: string]: string
   }
+}
+
+export type IndicadoresComerciales = {
+  total_proformas: number
+  borradores: number
+  proformas_formalizadas: number
+  pedidos_generados: number
+  pedidos_no_cancelados: number
+  tasa_conversion_cohorte: string | null
+  distribucion_proformas_estado: Array<EstadoConteo>
+  distribucion_pedidos_estado: Array<EstadoConteo>
+  comparaciones_periodo_anterior: ComparacionPeriodoComercial | null
+  limitaciones: Array<string>
+}
+
+export type IndicadoresTaller = {
+  pendientes: number
+  en_proceso: number
+  terminadas: number
+  canceladas: number
+  carga_activa_fabricacion: number
+  fabricaciones_iniciadas_periodo: number
+  fabricaciones_terminadas_periodo: number
+  tiempo_promedio_fabricacion_horas: number | null
+  tiempo_promedio_fabricacion_dias: number | null
+  ordenes_con_duracion_medible: number
+  antiguedad_promedio_activas_dias: number | null
+  antiguedad_maxima_activas_dias: number | null
+  entregas_proximas: number
+  entregas_retrasadas: number
+  entregas_efectivas: number
+  entregas_evaluables_plazo: number
+  entregas_en_plazo: number
+  cumplimiento_entregas_porcentaje: string | null
+}
+
+export type InventarioAdmin = {
+  resumen: ResumenInventario
+  por_categoria: Array<InventarioCategoria>
+  existencias_por_unidad: Array<ExistenciaUnidad>
+  movimientos_por_unidad: Array<MovimientoStockUnidad>
+  mas_vendidos: PaginacionMasVendidos
+}
+
+export type InventarioCategoria = {
+  categoria_codigo: string
+  categoria_nombre: string
+  total_activos: number
+  con_stock: number
+  bajo_pedido: number
+  stock_bajo: number
+  agotados: number
 }
 
 export type ItemCorregido = {
@@ -544,6 +832,13 @@ export type ModoCalculoEnum = 'PRECIO_UNITARIO'
  * * `USD` - USD
  */
 export type MonedaCodigoEnum = 'BOB' | 'USD'
+
+export type MontoMonedaVendedor = {
+  moneda: string
+  importe_pedidos_no_cancelados: string
+  cobros_validos: string
+  saldo_pendiente: string
+}
 
 export type MotivoAjusteItem = {
   codigo: string
@@ -616,6 +911,37 @@ export type MovimientoStock = {
   responsable: UsuarioResumenMovimiento | null
 }
 
+export type MovimientoStockUnidad = {
+  unidad_codigo: string
+  unidad_nombre: string
+  total_movimientos: number
+  entradas_conteo: number
+  entradas_cantidad: string
+  salidas_conteo: number
+  salidas_cantidad_absoluta: string
+  reversiones_conteo: number
+  reversiones_cantidad: string
+}
+
+export type MuebleFabricadoTipo = {
+  tipo_mueble_codigo: string
+  tipo_mueble_nombre: string
+  cantidad_fabricada: string
+  ordenes_count: number
+}
+
+export type MuebleSolicitadoTaller = {
+  nombre: string
+  tipo_mueble: string | null
+  cantidad: string
+}
+
+/**
+ * * `EFECTIVA` - EFECTIVA
+ * * `PLANIFICADA` - PLANIFICADA
+ */
+export type NaturalezaEnum = 'EFECTIVA' | 'PLANIFICADA'
+
 export type NotaEntrega = {
   readonly id: number
   readonly pedido: number
@@ -661,6 +987,48 @@ export type OrdenTrabajo = {
   readonly puede_cambiar_estado: boolean
   readonly detalles: Array<DetalleOrdenTrabajo>
   readonly historial_estados: Array<HistorialEstadoOrdenTrabajo>
+}
+
+export type PaginacionAgendaComercial = {
+  total: number
+  page: number
+  page_size: number
+  results: Array<ElementoAgendaComercial>
+}
+
+export type PaginacionCalendarioTaller = {
+  total: number
+  page: number
+  page_size: number
+  results: Array<EventoCalendarioTaller>
+}
+
+export type PaginacionColaPrioridadTaller = {
+  total: number
+  page: number
+  page_size: number
+  results: Array<ElementoColaPrioridadTaller>
+}
+
+export type PaginacionDisponibilidadProductos = {
+  total: number
+  page: number
+  page_size: number
+  results: Array<ProductoDisponibilidad>
+}
+
+export type PaginacionMasVendidos = {
+  total: number
+  page: number
+  page_size: number
+  results: Array<ProductoMasVendido>
+}
+
+export type PaginacionPedidosEntregadosSaldo = {
+  total: number
+  page: number
+  page_size: number
+  results: Array<PedidoEntregadoSaldo>
 }
 
 export type PaginatedClienteList = {
@@ -904,6 +1272,19 @@ export type Pedido = {
   readonly updated_by: number | null
 }
 
+export type PedidoEntregadoSaldo = {
+  pedido_id: number
+  proforma_id: number
+  proforma_numero: number
+  cliente_id: number | null
+  cliente_nombre: string
+  moneda: string
+  total_pedido: string
+  cobrado: string
+  saldo_pendiente: string
+  fecha_entrega_efectiva: string | null
+}
+
 export type PendienteAsistida = {
   resolucion?: ResolucionPendiente | null
   codigo: string
@@ -911,6 +1292,27 @@ export type PendienteAsistida = {
   mensaje: string
   total_negociado?: string
   moneda_codigo?: MonedaCodigoEnum
+}
+
+/**
+ * * `CRITICA` - CRITICA
+ * * `ALTA` - ALTA
+ * * `MEDIA` - MEDIA
+ */
+export type PrioridadEnum = 'CRITICA' | 'ALTA' | 'MEDIA'
+
+export type ProduccionAdmin = {
+  ordenes_fabricacion_total: number
+  ordenes_fabricacion_por_estado: Array<EstadoConteo>
+  ordenes_tecnicas_total: number
+  ordenes_tecnicas_por_estado: Array<EstadoConteo>
+  fabricaciones_activas: number
+  entregas_proximas: number
+  entregas_retrasadas: number
+  entregas_efectivas: number
+  entregas_evaluables_plazo: number
+  entregas_en_plazo: number
+  cumplimiento_entregas_porcentaje: string | null
 }
 
 export type Producto = {
@@ -942,6 +1344,34 @@ export type Producto = {
   readonly created_by: number | null
   creado_por_resumen: UsuarioResumen | null
   readonly updated_by: number | null
+}
+
+export type ProductoDisponibilidad = {
+  producto_id: number
+  sku: string | null
+  nombre: string
+  categoria_codigo: string
+  categoria_nombre: string
+  modalidad_abastecimiento: string
+  stock: string
+  stock_minimo: string | null
+  unidad_codigo: string
+  unidad_nombre: string
+  estado_disponibilidad: string
+}
+
+export type ProductoMasVendido = {
+  producto_id: number
+  sku: string | null
+  nombre: string
+  categoria_codigo: string
+  categoria_nombre: string
+  unidad_codigo: string
+  unidad_nombre: string
+  moneda: string
+  cantidad_vendida: string
+  importe_total: string
+  pedidos_count: number
 }
 
 export type ProductoPiso = {
@@ -1109,6 +1539,35 @@ export type PropuestaConfigurador = {
   pendientes: Array<PendienteAsistida>
 }
 
+export type PuntoCobro = {
+  periodo: string
+  cantidad_recibos: number
+  monto_cobrado: string
+}
+
+export type PuntoConteoComercial = {
+  periodo: string
+  proformas_formalizadas: number
+  pedidos_generados: number
+}
+
+export type PuntoEvolucionFabricacion = {
+  periodo: string
+  iniciadas: number
+  terminadas: number
+}
+
+export type PuntoMonetarioComercial = {
+  periodo: string
+  importe_pedidos_no_cancelados: string
+  cobros_registrados: string
+}
+
+export type RangoPeriodo = {
+  fecha_desde: string
+  fecha_hasta: string
+}
+
 export type Recibo = {
   readonly id: number
   readonly moneda_codigo: string
@@ -1208,6 +1667,45 @@ export type ResultadoCatalogo = {
 export type ResultadoEnum =
   'PROCESSING' | 'TRANSCRIBED' | 'REQUIRES_REVIEW' | 'NO_PROPOSAL' | 'ERROR'
 
+export type ResumenConteosAgenda = {
+  proformas_proximas_vencer: number
+  proformas_pendientes_revision: number
+  pedidos_listos_entrega: number
+  pedidos_con_saldo_pendiente: number
+  entregas_proximas: number
+  entregas_retrasadas: number
+}
+
+export type ResumenDisponibilidad = {
+  total_activos: number
+  con_stock_disponible: number
+  con_stock_bajo: number
+  con_stock_agotado: number
+  bajo_pedido: number
+}
+
+export type ResumenFinancieroMoneda = {
+  moneda: string
+  importe_pedidos_no_cancelados: string
+  cobros_validos_periodo: string
+  cobros_acumulados_cartera_vigente: string
+  saldo_pendiente: string
+  porcentaje_cobrado: string | null
+}
+
+export type ResumenFinancieroVendedor = {
+  por_moneda: Array<ResumenFinancieroMoneda>
+  cobros_pedidos_cancelados: Array<CobrosPedidosCancelados>
+}
+
+export type ResumenInventario = {
+  total_activos: number
+  con_stock: number
+  bajo_pedido: number
+  stock_bajo: number
+  agotados: number
+}
+
 export type RevisionCampoCatalogo = {
   review_id: string
   code: string
@@ -1215,6 +1713,11 @@ export type RevisionCampoCatalogo = {
   message: string
   field: string
   evidence_ids: Array<string>
+}
+
+export type SerieMonetariaComercial = {
+  moneda: string
+  puntos: Array<PuntoMonetarioComercial>
 }
 
 /**
@@ -1225,6 +1728,12 @@ export type RevisionCampoCatalogo = {
 export type SeverityEnum = 'INFO' | 'REVIEW' | 'CRITICAL'
 
 /**
+ * * `PROFORMA` - PROFORMA
+ * * `PEDIDO` - PEDIDO
+ */
+export type TipoDocumentoEnum = 'PROFORMA' | 'PEDIDO'
+
+/**
  * * `DIMENSION` - DIMENSION
  * * `DIMENSIONES_NUEVAS` - DIMENSIONES_NUEVAS
  * * `COMPONENTE` - COMPONENTE
@@ -1233,6 +1742,15 @@ export type SeverityEnum = 'INFO' | 'REVIEW' | 'CRITICAL'
  */
 export type TipoEnum =
   'DIMENSION' | 'DIMENSIONES_NUEVAS' | 'COMPONENTE' | 'ATRIBUTO_GENERAL' | 'ESPESOR_SIN_COMPONENTE'
+
+/**
+ * * `INICIO_FABRICACION` - INICIO_FABRICACION
+ * * `FIN_FABRICACION` - FIN_FABRICACION
+ * * `ENTREGA_PREVISTA` - ENTREGA_PREVISTA
+ * * `ENTREGA_EFECTIVA` - ENTREGA_EFECTIVA
+ */
+export type TipoEventoEnum =
+  'INICIO_FABRICACION' | 'FIN_FABRICACION' | 'ENTREGA_PREVISTA' | 'ENTREGA_EFECTIVA'
 
 export type TipoMuebleConflicto = {
   codigo: string
@@ -1302,6 +1820,13 @@ export type ValorCatalogoResumen = {
   readonly id: number
   readonly codigo: string
   readonly nombre: string
+}
+
+export type VariacionEntero = {
+  actual: number
+  anterior: number | null
+  diferencia: number | null
+  variacion_porcentaje: string | null
 }
 
 export type CapturaRevisionWritable = {
@@ -2864,6 +3389,181 @@ export type V1ClientesUpdateResponses = {
 }
 
 export type V1ClientesUpdateResponse = V1ClientesUpdateResponses[keyof V1ClientesUpdateResponses]
+
+export type V1DashboardAdministradorRetrieveData = {
+  body?: never
+  path?: never
+  query?: {
+    categoria?: string
+    entrega_desde?: string
+    entrega_hasta?: string
+    estado_comercial?: string
+    estado_fabricacion?: string
+    fecha_desde?: string
+    fecha_hasta?: string
+    moneda?: string
+    page_size?: number
+    vendedor?: number
+  }
+  url: '/api/v1/dashboard/administrador/'
+}
+
+export type V1DashboardAdministradorRetrieveResponses = {
+  200: DashboardAdminResumen
+}
+
+export type V1DashboardAdministradorRetrieveResponse =
+  V1DashboardAdministradorRetrieveResponses[keyof V1DashboardAdministradorRetrieveResponses]
+
+export type V1DashboardAdministradorComercialRetrieveData = {
+  body?: never
+  path?: never
+  query?: {
+    estado_comercial?: string
+    fecha_desde?: string
+    fecha_hasta?: string
+    granularidad?: 'diaria' | 'mensual' | 'semanal'
+    moneda?: string
+    vendedor?: number
+  }
+  url: '/api/v1/dashboard/administrador/comercial/'
+}
+
+export type V1DashboardAdministradorComercialRetrieveResponses = {
+  200: DashboardAdminComercial
+}
+
+export type V1DashboardAdministradorComercialRetrieveResponse =
+  V1DashboardAdministradorComercialRetrieveResponses[keyof V1DashboardAdministradorComercialRetrieveResponses]
+
+export type V1DashboardAdministradorFinanzasRetrieveData = {
+  body?: never
+  path?: never
+  query?: {
+    fecha_desde?: string
+    fecha_hasta?: string
+    granularidad?: 'diaria' | 'mensual' | 'semanal'
+    moneda?: string
+    page?: number
+    page_size?: number
+    vendedor?: number
+  }
+  url: '/api/v1/dashboard/administrador/finanzas/'
+}
+
+export type V1DashboardAdministradorFinanzasRetrieveResponses = {
+  200: FinanzasAdmin
+}
+
+export type V1DashboardAdministradorFinanzasRetrieveResponse =
+  V1DashboardAdministradorFinanzasRetrieveResponses[keyof V1DashboardAdministradorFinanzasRetrieveResponses]
+
+export type V1DashboardAdministradorInventarioRetrieveData = {
+  body?: never
+  path?: never
+  query?: {
+    categoria?: string
+    fecha_desde?: string
+    fecha_hasta?: string
+    moneda?: string
+    page?: number
+    page_size?: number
+  }
+  url: '/api/v1/dashboard/administrador/inventario/'
+}
+
+export type V1DashboardAdministradorInventarioRetrieveResponses = {
+  200: InventarioAdmin
+}
+
+export type V1DashboardAdministradorInventarioRetrieveResponse =
+  V1DashboardAdministradorInventarioRetrieveResponses[keyof V1DashboardAdministradorInventarioRetrieveResponses]
+
+export type V1DashboardTallerRetrieveData = {
+  body?: never
+  path?: never
+  query?: {
+    entrega_desde?: string
+    entrega_hasta?: string
+    estado_fabricacion?: string
+    fecha_desde?: string
+    fecha_hasta?: string
+    page?: number
+    page_size?: number
+    tipo_mueble?: string
+  }
+  url: '/api/v1/dashboard/taller/'
+}
+
+export type V1DashboardTallerRetrieveResponses = {
+  200: DashboardTallerResumen
+}
+
+export type V1DashboardTallerRetrieveResponse =
+  V1DashboardTallerRetrieveResponses[keyof V1DashboardTallerRetrieveResponses]
+
+export type V1DashboardTallerPlanificacionRetrieveData = {
+  body?: never
+  path?: never
+  query?: {
+    entrega_desde?: string
+    entrega_hasta?: string
+    estado_fabricacion?: string
+    fecha_desde?: string
+    fecha_hasta?: string
+    granularidad?: 'diaria' | 'mensual' | 'semanal'
+    page?: number
+    page_size?: number
+    tipo_mueble?: string
+  }
+  url: '/api/v1/dashboard/taller/planificacion/'
+}
+
+export type V1DashboardTallerPlanificacionRetrieveResponses = {
+  200: DashboardTallerPlanificacion
+}
+
+export type V1DashboardTallerPlanificacionRetrieveResponse =
+  V1DashboardTallerPlanificacionRetrieveResponses[keyof V1DashboardTallerPlanificacionRetrieveResponses]
+
+export type V1DashboardTiendaRetrieveData = {
+  body?: never
+  path?: never
+  query?: {
+    estado_comercial?: string
+    fecha_desde?: string
+    fecha_hasta?: string
+    granularidad?: 'diaria' | 'mensual' | 'semanal'
+    moneda?: string
+  }
+  url: '/api/v1/dashboard/tienda/'
+}
+
+export type V1DashboardTiendaRetrieveResponses = {
+  200: DashboardTiendaResumen
+}
+
+export type V1DashboardTiendaRetrieveResponse =
+  V1DashboardTiendaRetrieveResponses[keyof V1DashboardTiendaRetrieveResponses]
+
+export type V1DashboardTiendaSeguimientoRetrieveData = {
+  body?: never
+  path?: never
+  query?: {
+    categoria?: string
+    moneda?: string
+    page?: number
+    page_size?: number
+  }
+  url: '/api/v1/dashboard/tienda/seguimiento/'
+}
+
+export type V1DashboardTiendaSeguimientoRetrieveResponses = {
+  200: DashboardTiendaSeguimiento
+}
+
+export type V1DashboardTiendaSeguimientoRetrieveResponse =
+  V1DashboardTiendaSeguimientoRetrieveResponses[keyof V1DashboardTiendaSeguimientoRetrieveResponses]
 
 export type V1GaleriasCreateData = {
   body: CrearGaleria
