@@ -622,6 +622,7 @@ export type NotaEntrega = {
   readonly vendedor: number
   readonly numero: number
   readonly fecha: string
+  readonly fecha_hora: string | null
   readonly created_by: number | null
   readonly updated_by: number | null
   readonly proforma_numero: number
@@ -645,6 +646,7 @@ export type OrdenTrabajo = {
   readonly jefe_taller: number | null
   readonly numero: number
   readonly fecha: string
+  readonly fecha_hora: string | null
   readonly fecha_inicio: string | null
   readonly fecha_fin: string | null
   readonly responsable_recepcion: string | null
@@ -1112,6 +1114,7 @@ export type Recibo = {
   readonly moneda_codigo: string
   readonly tipo_pago_nombre: string
   vendedor_resumen: UsuarioResumen | null
+  readonly fecha_hora: string | null
   readonly numero: number
   readonly nombre_completo: string
   readonly monto_en_letras: string

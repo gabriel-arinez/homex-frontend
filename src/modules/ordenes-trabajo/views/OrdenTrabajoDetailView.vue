@@ -45,6 +45,8 @@ import { downloadBlob } from '@/shared/download/downloadBlob'
 import { buildExportFilename } from '@/shared/download/exportFilename'
 import { galleryService, type GalleryImage } from '@/shared/media/gallery'
 import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
+import { fechaComercial, formatearFechaHora } from '@/shared/date/presentacionFecha'
+import { workOrderStatusIcon, workOrderTone } from '../utils/workOrderPresentation'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
 import DetailTabs from '@/shared/ui/DetailTabs.vue'
@@ -101,18 +103,8 @@ const {
 
 function formatDateLabel(value: string | null | undefined): string | null {
   if (!value) return null
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    const date = new Date(`${value}T12:00:00Z`)
-    if (!Number.isNaN(date.getTime())) {
-      return new Intl.DateTimeFormat('es-BO', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        timeZone: 'UTC',
-      }).format(date)
-    }
-  }
-  return value
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return fechaComercial(value)
+  return formatearFechaHora(value)
 }
 
 function formatQuantity(value: string | number): string {
@@ -121,26 +113,11 @@ function formatQuantity(value: string | number): string {
   return text
 }
 
-function workOrderTone(code: string): 'info' | 'warning' | 'success' | 'danger' | 'neutral' {
-  const normalized = code.toUpperCase()
-  if (normalized.includes('CANCEL') || normalized.includes('ANUL')) return 'danger'
-  if (
-    normalized.includes('ENTREGAD') ||
-    normalized.includes('FINALIZAD') ||
-    normalized.includes('LISTO')
-  ) {
-    return 'success'
-  }
-  if (
-    normalized.includes('PRODUCCION') ||
-    normalized.includes('TALLER') ||
-    normalized.includes('PROCESO')
-  ) {
-    return 'warning'
-  }
-  if (normalized.includes('PENDIENTE')) return 'info'
-  return 'neutral'
-}
+const sortedTimeline = computed(() =>
+  [...(item.value?.historial_estados ?? [])].sort(
+    (a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime() || b.id - a.id,
+  ),
+)
 
 interface PieceGroup {
   id: string
@@ -783,7 +760,7 @@ const workOrderTabs = computed(() => [
         </Button>
         <Button
           v-if="canChangeWorkOrderState && item?.estado_info.codigo === 'PENDIENTE'"
-          variant="secondary"
+          variant="warning"
           :disabled="changingState"
           @click="changeWorkOrderState('EN_PROCESO')"
         >
@@ -792,7 +769,7 @@ const workOrderTabs = computed(() => [
         </Button>
         <Button
           v-if="canChangeWorkOrderState && item?.estado_info.codigo === 'EN_PROCESO'"
-          variant="secondary"
+          variant="success"
           :disabled="changingState"
           @click="changeWorkOrderState('TERMINADA')"
         >
@@ -801,7 +778,7 @@ const workOrderTabs = computed(() => [
         </Button>
         <Button
           v-if="canMarkReady"
-          variant="primary"
+          variant="info"
           :disabled="markingReady"
           @click="readyModalOpen = true"
         >
@@ -882,7 +859,7 @@ const workOrderTabs = computed(() => [
       </section>
 
       <section
-        v-if="item.historial_estados?.length"
+        v-if="sortedTimeline.length"
         class="ot-timeline"
         aria-label="Historial de estados"
         data-testid="ot-state-timeline"
@@ -892,25 +869,53 @@ const workOrderTabs = computed(() => [
           <h3>Historial de estados</h3>
         </div>
         <ol class="ot-timeline__list">
-          <li v-for="entry in item.historial_estados" :key="entry.id" class="ot-timeline__item">
-            <span class="ot-timeline__dot" aria-hidden="true" />
+          <li
+            v-for="(entry, index) in sortedTimeline"
+            :key="entry.id"
+            class="ot-timeline__item"
+            :class="{
+              'ot-timeline__item--current':
+                index === 0 && entry.estado_nuevo_info.codigo === item.estado_info.codigo,
+            }"
+          >
+            <span
+              class="ot-timeline__marker"
+              :class="`ot-timeline__marker--${workOrderTone(entry.estado_nuevo_info.codigo)}`"
+              aria-hidden="true"
+            >
+              <component
+                :is="workOrderStatusIcon(entry.estado_nuevo_info.codigo)"
+                :size="14"
+                aria-hidden="true"
+              />
+            </span>
             <div class="ot-timeline__content">
               <div class="ot-timeline__title">
                 <StatusBadge
                   :status="entry.estado_nuevo_info.codigo"
                   :label="entry.estado_nuevo_info.nombre"
                 />
+                <Badge
+                  v-if="index === 0 && entry.estado_nuevo_info.codigo === item.estado_info.codigo"
+                  :tone="workOrderTone(entry.estado_nuevo_info.codigo)"
+                  :dot="false"
+                >
+                  Estado actual
+                </Badge>
                 <span v-if="entry.estado_anterior_info" class="ot-timeline__prev">
                   desde {{ entry.estado_anterior_info.nombre }}
                 </span>
               </div>
-              <small class="ot-timeline__meta">
-                {{ formatDateLabel(entry.fecha) ?? entry.fecha }}
-                <template v-if="entry.cambiado_por_resumen?.display_name">
-                  · {{ entry.cambiado_por_resumen.display_name }}
-                </template>
-                <template v-if="entry.observaciones"> · {{ entry.observaciones }}</template>
-              </small>
+              <div class="ot-timeline__meta">
+                <span>{{ formatearFechaHora(entry.fecha) }}</span>
+                <span v-if="entry.cambiado_por_resumen?.display_name" class="ot-timeline__actor">
+                  · <UserCheck :size="13" aria-hidden="true" />
+                  {{ entry.cambiado_por_resumen.display_name }}
+                </span>
+              </div>
+              <p v-if="entry.observaciones" class="ot-timeline__obs">
+                {{ entry.observaciones }}
+              </p>
             </div>
           </li>
         </ol>
@@ -1247,7 +1252,7 @@ const workOrderTabs = computed(() => [
             <div class="ot-field-card__body">
               <span class="ot-field-card__label">Fecha de emisión</span>
               <strong class="ot-field-card__value">
-                {{ formatDateLabel(item.fecha) ?? item.fecha }}
+                {{ formatDateLabel(item.fecha_hora ?? item.fecha) ?? 'Fecha no disponible' }}
               </strong>
             </div>
           </div>
@@ -2259,20 +2264,65 @@ const workOrderTabs = computed(() => [
   margin: 0;
   padding: 0;
   display: grid;
-  gap: var(--space-3);
+  gap: 0;
 }
 .ot-timeline__item {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
+  padding-bottom: var(--space-4);
 }
-.ot-timeline__dot {
-  width: 0.6rem;
-  height: 0.6rem;
-  margin-top: 0.35rem;
+.ot-timeline__item:last-child {
+  padding-bottom: 0;
+}
+.ot-timeline__item:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 0.9rem;
+  top: 2rem;
+  bottom: 0.25rem;
+  width: 2px;
+  background: var(--border);
+}
+.ot-timeline__marker {
+  position: relative;
+  z-index: 1;
+  width: 1.85rem;
+  height: 1.85rem;
   border-radius: 999px;
-  background: var(--brand);
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-muted);
+}
+.ot-timeline__marker--info {
+  background: var(--color-info-soft);
+  color: var(--badge-info-text);
+  border-color: color-mix(in srgb, var(--color-info) 35%, transparent);
+}
+.ot-timeline__marker--warning {
+  background: var(--color-warning-soft);
+  color: var(--badge-warning-text);
+  border-color: color-mix(in srgb, var(--color-warning) 35%, transparent);
+}
+.ot-timeline__marker--success {
+  background: var(--color-success-soft);
+  color: var(--badge-success-text);
+  border-color: color-mix(in srgb, var(--color-success) 35%, transparent);
+}
+.ot-timeline__marker--danger {
+  background: var(--color-danger-soft);
+  color: var(--badge-danger-text);
+  border-color: color-mix(in srgb, var(--color-danger) 35%, transparent);
+}
+.ot-timeline__content {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+  padding-top: 0.1rem;
 }
 .ot-timeline__title {
   display: flex;
@@ -2282,7 +2332,23 @@ const workOrderTabs = computed(() => [
 }
 .ot-timeline__prev,
 .ot-timeline__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
   color: var(--ink-muted);
   font-size: 0.82rem;
+}
+.ot-timeline__actor {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.ot-timeline__obs {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  color: var(--ink);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 </style>

@@ -23,6 +23,7 @@ import ProductImage from '@/modules/productos/components/ProductImage.vue'
 import { downloadBlob } from '@/shared/download/downloadBlob'
 import { buildExportFilename } from '@/shared/download/exportFilename'
 import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
+import { fechaComercial, formatearFechaHora } from '@/shared/date/presentacionFecha'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
 import DetailTabs from '@/shared/ui/DetailTabs.vue'
@@ -59,19 +60,9 @@ const {
 } = usePdfDocument((noteId) => notasEntregaService.documentPdf(noteId))
 
 function formatDateLabel(value: string | null | undefined): string {
-  if (!value) return 'Sin fecha'
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    const date = new Date(`${value}T12:00:00Z`)
-    if (!Number.isNaN(date.getTime())) {
-      return new Intl.DateTimeFormat('es-BO', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        timeZone: 'UTC',
-      }).format(date)
-    }
-  }
-  return value
+  if (!value) return 'Fecha no disponible'
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return fechaComercial(value)
+  return formatearFechaHora(value)
 }
 
 function formatQuantity(value: string | number): string {
@@ -281,7 +272,9 @@ onMounted(load)
           </span>
           <div class="stat__body">
             <span>Fecha de emisión</span>
-            <strong class="stat__value">{{ formatDateLabel(item.fecha) }}</strong>
+            <strong class="stat__value">{{
+              formatDateLabel(item.fecha_hora ?? item.fecha)
+            }}</strong>
           </div>
         </div>
 

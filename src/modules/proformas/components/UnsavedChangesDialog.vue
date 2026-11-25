@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useId } from 'vue'
 import { AlertTriangle, CircleAlert, Save, ArrowLeft, LogOut } from '@lucide/vue'
+import type { FormFieldChange } from '@/shared/forms/useFormChanges'
+import ChangeSummaryList from '@/shared/ui/ChangeSummaryList.vue'
 import Modal from '@/shared/ui/Modal.vue'
 import Button from '@/shared/ui/Button.vue'
 
@@ -10,8 +12,9 @@ withDefaults(
     saving?: boolean
     error?: string
     inReview?: boolean
+    changes?: FormFieldChange[]
   }>(),
-  { saving: false, error: '', inReview: false },
+  { saving: false, error: '', inReview: false, changes: undefined },
 )
 const emit = defineEmits<{ cancel: []; discard: []; save: [] }>()
 const titleId = useId()
@@ -37,6 +40,7 @@ const titleId = useId()
         </p>
       </div>
     </div>
+    <ChangeSummaryList :changes="changes" />
     <div v-if="error" class="save-error" role="alert">
       <CircleAlert :size="18" aria-hidden="true" />
       <p>{{ error }} Permanecerás en la proforma hasta confirmar cómo continuar.</p>

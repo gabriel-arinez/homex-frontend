@@ -8,6 +8,7 @@ const props = defineProps<{
   timestamp?: string | null
   date?: string
   now?: number
+  hideMissingHour?: boolean
 }>()
 
 const resolved = computed<PresentacionFecha>(() => {
@@ -39,7 +40,9 @@ const resolved = computed<PresentacionFecha>(() => {
       <Clock3 :size="13" aria-hidden="true" />
       <time :datetime="timestamp ?? undefined">{{ resolved.hora }}</time>
     </div>
-    <span v-else class="date-pres__meta creation-hour">Hora no registrada</span>
+    <span v-else-if="!hideMissingHour" class="date-pres__meta creation-hour"
+      >Hora no registrada</span
+    >
 
     <div v-if="resolved.mostrarFechaSeparada" class="date-pres__date creation-date">
       <Calendar :size="13" aria-hidden="true" />

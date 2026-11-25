@@ -45,7 +45,7 @@ import { recibosService } from '@/modules/recibos/services/recibosService'
 import { montoEnLetras } from '@/modules/recibos/utils/montoEnLetras'
 import { tipoPagoIcon } from '@/modules/recibos/utils/tipoPagoIcon'
 import { ApiError } from '@/shared/api'
-import { fechaComercial, formatearFechaHora } from '@/shared/date/presentacionFecha'
+import { formatearFechaHora } from '@/shared/date/presentacionFecha'
 import { downloadBlob } from '@/shared/download/downloadBlob'
 import { buildExportFilename } from '@/shared/download/exportFilename'
 import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
@@ -909,7 +909,7 @@ watch(() => route.params.id, load)
                   </Badge>
                   <span class="doc-row__date">
                     <Calendar :size="13" aria-hidden="true" />
-                    {{ fechaComercial(String(rec.fecha)) }}
+                    {{ formatearFechaHora(rec.fecha_hora ?? rec.fecha) }}
                   </span>
                 </div>
                 <p class="doc-row__concept">{{ rec.concepto }}</p>
@@ -969,7 +969,7 @@ watch(() => route.params.id, load)
                 <strong>Nota de entrega #{{ nota.id }}</strong>
                 <span class="doc-row__date">
                   <Calendar :size="13" aria-hidden="true" />
-                  Emitida el {{ formatearFechaHora(nota.fecha) }}
+                  Emitida el {{ formatearFechaHora(nota.fecha_hora ?? nota.fecha) }}
                 </span>
               </div>
             </div>

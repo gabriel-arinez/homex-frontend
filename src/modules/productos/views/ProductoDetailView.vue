@@ -922,8 +922,16 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       title="Descartar cambios"
       description="Los cambios del producto no se guardarán."
       confirm-label="Descartar"
+      save-label="Guardar cambios"
+      :changes="productForm?.fieldChanges ?? []"
       @close="confirmCancel = false"
       @confirm="discardEdit"
+      @save="
+        () => {
+          confirmCancel = false
+          productForm?.submit()
+        }
+      "
     />
 
     <Modal
@@ -1026,6 +1034,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       title="Salir sin guardar"
       description="Hay cambios sin guardar en este producto. Si sales, se descartarán."
       confirm-label="Salir sin guardar"
+      :changes="productForm?.fieldChanges ?? []"
       @close="answerLeave(false)"
       @confirm="answerLeave(true)"
     />

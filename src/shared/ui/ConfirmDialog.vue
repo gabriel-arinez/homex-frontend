@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useId } from 'vue'
 import { AlertTriangle, ArrowLeft, Trash2, Check, Save } from '@lucide/vue'
+import type { FormFieldChange } from '@/shared/forms/useFormChanges'
+import ChangeSummaryList from './ChangeSummaryList.vue'
 import Modal from './Modal.vue'
 import Button from './Button.vue'
 defineProps<{
@@ -11,6 +13,7 @@ defineProps<{
   saveLabel?: string
   danger?: boolean
   variant?: 'danger' | 'success' | 'info' | 'primary'
+  changes?: FormFieldChange[]
 }>()
 const emit = defineEmits<{ close: []; confirm: []; save: [] }>()
 const titleId = useId()
@@ -22,6 +25,7 @@ const titleId = useId()
       <span class="confirm-icon"><AlertTriangle :size="24" aria-hidden="true" /></span>
       <p>{{ description }}</p>
     </div>
+    <ChangeSummaryList :changes="changes" />
     <template #footer>
       <div class="confirm-actions" :class="{ 'confirm-actions--with-save': Boolean(saveLabel) }">
         <Button variant="secondary" @click="emit('close')">

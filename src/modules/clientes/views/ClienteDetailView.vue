@@ -14,6 +14,7 @@ import { validateClient } from '@/shared/validation/commercialFields'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import ClienteFormFields, { type ClienteFormModel } from '../components/ClienteFormFields.vue'
 import { clientesService, nombreCliente } from '../services/clientesService'
+import { useFormChanges } from '@/shared/forms/useFormChanges'
 import {
   ArrowLeft,
   Ban,
@@ -58,7 +59,6 @@ const confirmDiscard = ref(false)
 const confirmStatus = ref(false)
 const fields = ref<Record<string, string[]>>({})
 const validationAttempted = ref(false)
-const dirty = ref(false)
 const conflicted = ref(false)
 let requestId = 0
 const allowLeave = ref(false)
@@ -119,6 +119,33 @@ function money(value: string, code: string) {
   }
 }
 
+const {
+  captureOriginal: captureClientOriginal,
+  changes: formChanges,
+  hasChanges: dirty,
+} = useFormChanges(
+  () => ({ ...form }),
+  [
+    {
+      key: 'tipo_cliente',
+      label: 'Tipo de cliente',
+      get: (s) => s.tipo_cliente,
+      format: (v) =>
+        String(v) === String(client.value?.tipo_cliente)
+          ? typeInfo.value.nombre
+          : String(v)
+            ? `Tipo #${v}`
+            : 'Sin valor',
+    },
+    { key: 'nombres', label: 'Nombres', get: (s) => s.nombres },
+    { key: 'apellidos', label: 'Apellidos', get: (s) => s.apellidos },
+    { key: 'empresa', label: 'Empresa', get: (s) => s.empresa },
+    { key: 'celular', label: 'Celular', get: (s) => s.celular },
+    { key: 'direccion', label: 'Dirección', get: (s) => s.direccion },
+    { key: 'observaciones', label: 'Observaciones', get: (s) => s.observaciones },
+  ],
+)
+
 function fill(value: Cliente) {
   form.tipo_cliente = String(value.tipo_cliente)
   form.nombres = value.nombres ?? ''
@@ -127,16 +154,9 @@ function fill(value: Cliente) {
   form.celular = value.celular ?? ''
   form.direccion = value.direccion ?? ''
   form.observaciones = value.observaciones ?? ''
-  dirty.value = false
+  captureClientOriginal()
   validationAttempted.value = false
 }
-watch(
-  form,
-  () => {
-    if (editing.value) dirty.value = true
-  },
-  { deep: true },
-)
 function beforeUnload(event: BeforeUnloadEvent) {
   if (editing.value && dirty.value && !allowLeave.value) event.preventDefault()
 }
@@ -200,7 +220,6 @@ async function load() {
   quotesCount.value = 0
   quotesError.value = ''
   editing.value = false
-  dirty.value = false
   allowLeave.value = false
   try {
     const value = await clientesService.get(id)
@@ -270,6 +289,15 @@ function updateForm(field: keyof ClienteFormModel, value: string) {
 function cancelEdit() {
   if (dirty.value) confirmDiscard.value = true
   else editing.value = false
+}
+async function saveAndConfirmDiscard() {
+  confirmDiscard.value = false
+  await save()
+  if (!editing.value && pendingNavigation) {
+    allowLeave.value = true
+    pendingNavigation(true)
+    pendingNavigation = null
+  }
 }
 async function changeStatus() {
   if (!client.value || saving.value) return
@@ -644,8 +672,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       title="Descartar cambios"
       description="Los cambios del cliente no se guardarán."
       confirm-label="Descartar"
+      save-label="Guardar cambios"
+      :changes="formChanges"
       @close="closeDiscard"
       @confirm="discardEdit"
+      @save="saveAndConfirmDiscard"
     />
     <ConfirmDialog
       :open="confirmStatus"

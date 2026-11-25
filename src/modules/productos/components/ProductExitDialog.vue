@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useId } from 'vue'
 import { AlertTriangle, ArrowLeft, CircleAlert, LogOut, Save } from '@lucide/vue'
+import type { FormFieldChange } from '@/shared/forms/useFormChanges'
+import ChangeSummaryList from '@/shared/ui/ChangeSummaryList.vue'
 import Modal from '@/shared/ui/Modal.vue'
 import Button from '@/shared/ui/Button.vue'
 
@@ -10,8 +12,9 @@ withDefaults(
     saving?: boolean
     existingProductId?: number | null
     error?: string
+    changes?: FormFieldChange[]
   }>(),
-  { saving: false, existingProductId: null, error: '' },
+  { saving: false, existingProductId: null, error: '', changes: undefined },
 )
 const emit = defineEmits<{ stay: []; discard: []; save: [] }>()
 const titleId = useId()
@@ -43,6 +46,7 @@ const titleId = useId()
         </p>
       </div>
     </div>
+    <ChangeSummaryList v-if="!existingProductId" :changes="changes" />
     <p v-if="error" class="exit-error" role="alert">
       <CircleAlert :size="18" aria-hidden="true" /> {{ error }}
     </p>

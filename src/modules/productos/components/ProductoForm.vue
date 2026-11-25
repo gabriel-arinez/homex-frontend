@@ -8,6 +8,7 @@ import {
 } from '@/modules/capturas/fieldVoiceReview'
 import type { VoiceEvidence } from '@/modules/capturas/voiceEvidence'
 import { dateRangeError } from '@/shared/validation/dateRange'
+import { diffFormFields, type FormFieldChange } from '@/shared/forms/useFormChanges'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import type {
   CamposCatalogo,
@@ -495,6 +496,85 @@ const hasRealChanges = computed(
   () => Boolean(initialSnapshot.value) && currentSnapshot() !== initialSnapshot.value,
 )
 
+type ProductSnapshot = {
+  form: typeof form
+  camposSilla: Array<{ clave: string; valor: string }>
+  images: Array<{ digest: string; principal: boolean }>
+}
+
+const fieldChanges = computed<FormFieldChange[]>(() => {
+  if (!initialSnapshot.value) return []
+  const orig = JSON.parse(initialSnapshot.value) as ProductSnapshot
+  const curr: ProductSnapshot = {
+    form: { ...form },
+    camposSilla: camposSilla.value.map((c) => ({ ...c })),
+    images: images.value.map((i) => ({ digest: i.digest, principal: i.principal })),
+  }
+  const optionName = (key: keyof typeof opciones, val: unknown) =>
+    opciones[key]?.find((o) => String(o.id) === String(val))?.nombre ||
+    (String(val) ? `#${val}` : 'Sin valor')
+
+  return diffFormFields(orig, curr, [
+    { key: 'nombre', label: 'Nombre', get: (s) => s.form.nombre },
+    { key: 'sku', label: 'SKU', get: (s) => s.form.sku },
+    {
+      key: 'categoria',
+      label: 'Categoría',
+      get: (s) => s.form.categoria,
+      format: (v) => optionName('CATEGORIA_PRODUCTO', v),
+    },
+    {
+      key: 'familia',
+      label: 'Familia',
+      get: (s) => s.form.familia,
+      format: (v) =>
+        familias.value.find((f) => String(f.id) === String(v))?.nombre || 'Sin familia',
+    },
+    { key: 'precio_lista', label: 'Precio de lista', get: (s) => s.form.precio_lista },
+    {
+      key: 'modalidad_abastecimiento',
+      label: 'Modalidad',
+      get: (s) => s.form.modalidad_abastecimiento,
+      format: (v) => (v === 'BAJO_PEDIDO' ? 'Bajo pedido' : 'Con stock'),
+    },
+    {
+      key: 'unidad_stock',
+      label: 'Unidad',
+      get: (s) => s.form.unidad_stock,
+      format: (v) => optionName('UNIDAD_MEDIDA', v),
+    },
+    { key: 'activo', label: 'Estado activo', get: (s) => s.form.activo },
+    { key: 'observaciones', label: 'Observaciones', get: (s) => s.form.observaciones },
+    {
+      key: 'marca',
+      label: 'Marca',
+      get: (s) => s.form.marca,
+      format: (v) => optionName('MARCA', v),
+    },
+    { key: 'modelo', label: 'Modelo', get: (s) => s.form.modelo },
+    {
+      key: 'color_primario',
+      label: 'Color primario',
+      get: (s) => s.form.color_primario,
+      format: (v) => optionName('COLOR', v),
+    },
+    { key: 'promo_activa', label: 'Promoción', get: (s) => s.form.promo_activa },
+    { key: 'precio_ahora', label: 'Precio promocional', get: (s) => s.form.precio_ahora },
+    {
+      key: 'camposSilla',
+      label: 'Especificaciones',
+      get: (s) => s.camposSilla,
+      format: (_v, s) => `${s.camposSilla.filter((c) => c.clave.trim()).length} atributo(s)`,
+    },
+    {
+      key: 'images',
+      label: 'Imágenes',
+      get: (s) => s.images,
+      format: (_v, s) => `${s.images.length} imagen(es)`,
+    },
+  ])
+})
+
 async function load() {
   loading.value = true
   try {
@@ -700,7 +780,7 @@ function submit(): boolean {
   return true
 }
 
-defineExpose({ submit, hasRecording: () => recordingActive.value, hasRealChanges })
+defineExpose({ submit, hasRecording: () => recordingActive.value, hasRealChanges, fieldChanges })
 watch(
   [
     () => form.sku,

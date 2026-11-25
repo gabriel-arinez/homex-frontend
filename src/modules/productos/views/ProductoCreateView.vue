@@ -233,6 +233,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       :saving="saving"
       :existing-product-id="createdId"
       :error="exitError"
+      :changes="productForm?.fieldChanges ?? []"
       @stay="stay"
       @discard="discard"
       @save="submitAndLeave"

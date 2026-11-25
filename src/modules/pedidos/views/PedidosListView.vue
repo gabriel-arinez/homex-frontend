@@ -192,7 +192,9 @@ async function load() {
     rows.value = pedidos
     states.value = estados
     if (page.value > totalPages.value) page.value = totalPages.value
-    void loadQuoteContext()
+    if (pedidos.some((p) => p.cliente_resumen === undefined && p.proforma_titulo === undefined)) {
+      void loadQuoteContext()
+    }
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'No se pudieron cargar los pedidos.'
   } finally {
@@ -331,11 +333,12 @@ onMounted(load)
               </td>
               <td class="client-cell" data-label="Cliente y proforma">
                 <div class="client-content">
-                  <ClientAvatar v-if="clientName(row)" :name="clientName(row)" :size="34" />
+                  <ClientAvatar :name="clientName(row)" :size="34" />
                   <div class="client-info">
                     <strong v-if="clientName(row)" :title="clientName(row)">
                       {{ clientName(row) }}
                     </strong>
+                    <span v-else class="origin-client-empty">Cliente sin especificar</span>
                     <RouterLink :to="`/proformas/${row.proforma}/editar`" class="proforma-chip">
                       <FileText :size="13" aria-hidden="true" />
                       Proforma #{{ row.proforma }}

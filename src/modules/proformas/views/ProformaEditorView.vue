@@ -64,6 +64,7 @@ import PageHeader from '@/shared/ui/PageHeader.vue'
 import Toast from '@/shared/ui/Toast.vue'
 import ConfirmDialog from '@/shared/ui/ConfirmDialog.vue'
 import UnsavedChangesDialog from '../components/UnsavedChangesDialog.vue'
+import { diffFormFields, type FormFieldChange } from '@/shared/forms/useFormChanges'
 import TextField from '@/shared/ui/TextField.vue'
 import ClienteSelector from '../components/ClienteSelector.vue'
 import { clientesService } from '@/modules/clientes/services/clientesService'
@@ -817,7 +818,7 @@ const canEmit = computed(
 )
 
 function markDirty() {
-  dirty.value = true
+  dirty.value = savedContent.value ? hasRealChanges.value : true
 }
 watch(
   header,
@@ -1288,8 +1289,9 @@ function openSpec(
   specLine.value = index
 }
 async function closeSpec() {
+  const specHasChanges = studioRef.value?.hasRealChanges ?? specModalDirty.value
   if (
-    specModalDirty.value &&
+    specHasChanges &&
     !(await askConfirmation(
       'Hay cambios sin guardar en la ficha técnica. ¿Deseas guardarlos o descartarlos?',
       'Descartar ficha técnica',
@@ -1521,8 +1523,9 @@ async function copyCommercialSummary() {
 }
 
 async function closeLineModal() {
+  const lineHasChanges = lineFormRef.value?.hasRealChanges ?? lineModalDirty.value
   if (
-    lineModalDirty.value &&
+    lineHasChanges &&
     !(await askConfirmation(
       'Hay cambios sin agregar en esta línea. ¿Deseas descartarlos?',
       'Descartar línea',
@@ -1701,6 +1704,37 @@ const hasPendingEdits = computed(
       ? (studioRef.value?.hasRealChanges ?? specModalDirty.value)
       : specModalDirty.value),
 )
+const proformaChanges = computed<FormFieldChange[]>(() => {
+  if (!savedContent.value) return []
+  const orig = JSON.parse(savedContent.value) as unknown[]
+  const curr = JSON.parse(currentContent()) as unknown[]
+  const labels = [
+    { key: 'cliente', label: 'Cliente' },
+    { key: 'cliente_nuevo', label: 'Nuevo cliente' },
+    { key: 'titulo', label: 'Título' },
+    { key: 'moneda_codigo', label: 'Moneda' },
+    { key: 'plazo_entrega', label: 'Plazo de entrega' },
+    { key: 'validez_oferta', label: 'Validez de oferta (días)' },
+    { key: 'porcentaje_adelanto', label: 'Adelanto (%)' },
+    { key: 'observaciones', label: 'Observaciones' },
+    { key: 'detalles', label: 'Líneas de la proforma' },
+  ]
+  return diffFormFields(
+    orig,
+    curr,
+    labels.map((item, idx) => ({
+      key: item.key,
+      label: item.label,
+      get: (arr) => arr[idx],
+      format:
+        item.key === 'detalles'
+          ? (v) => `${Array.isArray(v) ? v.length : 0} ítem(s)`
+          : item.key === 'cliente_nuevo'
+            ? (v) => (v ? 'Datos capturados' : 'Sin valor')
+            : undefined,
+    })),
+  )
+})
 const documentNotice = computed(() => {
   if (!hasRealChanges.value && !hasPendingEdits.value) return ''
   const saveAction = isReview.value ? 'Guardar cambios' : 'Guardar borrador'
@@ -1818,17 +1852,15 @@ async function persist(emitir: boolean, skipNavigation = false): Promise<boolean
   return completed
 }
 function beforeUnload(event: BeforeUnloadEvent) {
-  if (!dirty.value && !lineModalDirty.value && !specModalDirty.value) return
+  const realDirty = savedContent.value ? hasRealChanges.value : dirty.value
+  if (!realDirty && !hasPendingEdits.value) return
   event.preventDefault()
 }
 onBeforeRouteLeave(async () => {
   if (allowNavigationAfterSave) return true
   if (saving.value) return false
-  if (
-    contextualNavigation.value ||
-    (!dirty.value && !lineModalDirty.value && !specModalDirty.value)
-  )
-    return true
+  const realDirty = savedContent.value ? hasRealChanges.value : dirty.value
+  if (contextualNavigation.value || (!realDirty && !hasPendingEdits.value)) return true
   return askLeaveConfirmation()
 })
 onMounted(async () => {
@@ -1902,6 +1934,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       :saving="leaveSaving"
       :error="leaveSaveError"
       :in-review="isReview"
+      :changes="proformaChanges"
       @cancel="answerLeave(false)"
       @discard="discardLeave"
       @save="saveAndLeave"
@@ -2158,6 +2191,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   v-if="isEditable"
                   type="button"
                   role="menuitem"
+                  class="menu-action--warning"
                   :disabled="line.modo_calculo === 'TOTAL_NEGOCIADO'"
                   @click="selectMenuAction('edit', index)"
                 >
@@ -2167,6 +2201,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   v-if="tipos.find((x) => x.id === line.tipo_item)?.codigo === 'MUEBLE_MEDIDA'"
                   type="button"
                   role="menuitem"
+                  class="menu-action--info"
                   @click="selectMenuAction('spec', index)"
                 >
                   <ClipboardCheck :size="16" aria-hidden="true" /> Revisar
@@ -2178,6 +2213,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   "
                   type="button"
                   role="menuitem"
+                  class="menu-action--success"
                   @click="selectMenuAction('duplicate', index)"
                 >
                   <Copy :size="16" aria-hidden="true" /> Duplicar mueble
@@ -2186,6 +2222,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                   v-if="isEditable"
                   type="button"
                   role="menuitem"
+                  class="menu-action--danger"
                   @click="selectMenuAction('remove', index)"
                 >
                   <Trash2 :size="16" aria-hidden="true" /> Eliminar
@@ -3558,6 +3595,34 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 .menu-panel button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+.menu-panel button.menu-action--warning {
+  color: var(--badge-warning-text);
+}
+.menu-panel button.menu-action--warning:hover:not(:disabled),
+.menu-panel button.menu-action--warning:focus-visible {
+  background: var(--color-warning-soft);
+}
+.menu-panel button.menu-action--info {
+  color: var(--badge-info-text);
+}
+.menu-panel button.menu-action--info:hover:not(:disabled),
+.menu-panel button.menu-action--info:focus-visible {
+  background: var(--color-info-soft);
+}
+.menu-panel button.menu-action--success {
+  color: var(--badge-success-text);
+}
+.menu-panel button.menu-action--success:hover:not(:disabled),
+.menu-panel button.menu-action--success:focus-visible {
+  background: var(--color-success-soft);
+}
+.menu-panel button.menu-action--danger {
+  color: var(--badge-danger-text);
+}
+.menu-panel button.menu-action--danger:hover:not(:disabled),
+.menu-panel button.menu-action--danger:focus-visible {
+  background: var(--color-danger-soft);
 }
 .undo,
 .context-note {

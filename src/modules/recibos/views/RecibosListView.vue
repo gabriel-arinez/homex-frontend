@@ -1,18 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import {
-  Ban,
-  Calendar,
-  ChevronLeft,
-  ChevronRight,
-  ClipboardList,
-  Receipt,
-  RotateCcw,
-} from '@lucide/vue'
+import { Ban, ChevronLeft, ChevronRight, ClipboardList, Receipt, RotateCcw } from '@lucide/vue'
 import type { Recibo, ValorCatalogoPublico } from '@/generated/api'
 import DocumentViewerModal from '@/modules/proformas/components/DocumentViewerModal.vue'
-import { fechaComercial } from '@/shared/date/presentacionFecha'
+import DatePresentation from '@/shared/ui/DatePresentation.vue'
 import { downloadBlob } from '@/shared/download/downloadBlob'
 import { buildExportFilename } from '@/shared/download/exportFilename'
 import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
@@ -416,12 +408,11 @@ onMounted(load)
               </td>
 
               <td class="date-cell" data-label="Emisión">
-                <div class="date-pres">
-                  <div class="date-pres__primary">
-                    <Calendar :size="15" aria-hidden="true" />
-                    <strong>{{ fechaComercial(String(row.fecha)) }}</strong>
-                  </div>
-                </div>
+                <DatePresentation
+                  :timestamp="row.fecha_hora ?? null"
+                  :date="String(row.fecha)"
+                  hide-missing-hour
+                />
               </td>
 
               <td class="amounts-cell numeric" data-label="Importes">

@@ -39,11 +39,7 @@ import {
   readCatalogImagesVisible,
   writeCatalogImagesVisible,
 } from '@/shared/media/catalogImageVisibility'
-import {
-  readCatalogViewMode,
-  writeCatalogViewMode,
-  type CatalogViewMode,
-} from '@/shared/media/catalogViewPreference'
+import type { CatalogViewMode } from '@/shared/media/catalogViewPreference'
 import { ApiError } from '@/shared/api'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
@@ -108,9 +104,16 @@ const routeStockStatus = (): StockFilter => {
 }
 const routeInitialView = (): CatalogViewMode => {
   const qView = routeString('vista')
-  if (qView === 'grid' || qView === 'lista') return qView
-  return readCatalogViewMode()
+  return qView === 'lista' ? 'lista' : 'grid'
 }
+const hasExplicitEntryFilters = (): boolean =>
+  Boolean(
+    routeString('q') ||
+    routeString('categoria') ||
+    routeString('estado') ||
+    routeString('estado_stock') ||
+    extraKeys.some((key) => Boolean(routeString(key))),
+  )
 
 const search = ref(routeString('q'))
 const status = ref(routeStatus())
@@ -226,7 +229,7 @@ function queryFromFilters() {
     estado: status.value === 'activos' ? undefined : status.value,
     estado_stock: stockStatus.value || undefined,
     categoria: category.value || undefined,
-    vista: view.value === 'lista' ? undefined : 'grid',
+    vista: view.value === 'grid' ? undefined : 'lista',
     pagina: page.value > 1 ? String(page.value) : undefined,
   }
   for (const key of availableExtra.value) query[key] = extras[key] || undefined
@@ -313,9 +316,8 @@ function clearFilters() {
 }
 function setViewMode(next: CatalogViewMode) {
   view.value = next
-  writeCatalogViewMode(next)
 }
-async function loadCategories() {
+async function loadCategories(applyDefaultChair = false) {
   categoryLoading.value = true
   categoryError.value = ''
   try {
@@ -329,11 +331,21 @@ async function loadCategories() {
       changeCategory('')
       notice.value =
         'La categoría seleccionada ya no está disponible. Se mostrará el catálogo general.'
+    } else if (applyDefaultChair && !category.value) {
+      const silla = categories.value.find((x) => x.codigo === 'SILLA')
+      if (silla) {
+        restoring = true
+        category.value = String(silla.id)
+        await nextTick()
+        restoring = false
+        syncRoute()
+      }
     }
-    if (category.value) scheduleLoad()
+    if (category.value || applyDefaultChair) scheduleLoad()
   } catch {
     categoryError.value =
       'No se pudieron cargar las categorías. Reintenta para filtrar o crear productos.'
+    if (applyDefaultChair) scheduleLoad()
   } finally {
     categoryLoading.value = false
   }
@@ -452,8 +464,7 @@ watch(page, () => {
   syncRoute()
   scheduleLoad()
 })
-watch(view, (next) => {
-  writeCatalogViewMode(next)
+watch(view, () => {
   if (!restoring) syncRoute()
 })
 watch(
@@ -466,8 +477,9 @@ onMounted(() => {
   mounted = true
   document.addEventListener('click', onDocumentClick)
   document.addEventListener('keydown', onDocumentKeydown)
-  void load()
-  void loadCategories()
+  const shouldDefaultChair = !hasExplicitEntryFilters()
+  if (!shouldDefaultChair) void load()
+  void loadCategories(shouldDefaultChair)
   void loadFamilies()
 })
 onBeforeUnmount(() => {
@@ -609,7 +621,7 @@ onBeforeUnmount(() => {
     </section>
 
     <p v-if="categoryError" class="options-warning" role="status">
-      {{ categoryError }} <button type="button" @click="loadCategories">Reintentar</button>
+      {{ categoryError }} <button type="button" @click="loadCategories()">Reintentar</button>
     </p>
     <p v-if="notice" role="status" class="options-warning">{{ notice }}</p>
 

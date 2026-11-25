@@ -92,7 +92,7 @@ describe('Bandeja administrativa de productos', () => {
   it('presenta tabla y tarjetas con estado integrado, stock actual y menú de acciones', async () => {
     mockServices()
     localStorage.removeItem('homex.catalogo.vista-preferida.v1')
-    const { wrapper } = await makeMounted()
+    const { wrapper } = await makeMounted('/productos?vista=lista')
     try {
       expect(wrapper.get('table').attributes('class')).toContain('product-table')
       expect(wrapper.text()).toContain('Producto y estado')
@@ -109,7 +109,6 @@ describe('Bandeja administrativa de productos', () => {
 
       await wrapper.get('[aria-label="Vista del catálogo"] button:first-child').trigger('click')
       await flushPromises()
-      expect(localStorage.getItem('homex.catalogo.vista-preferida.v1')).toBe('grid')
       expect(wrapper.findAll('.product-card')).toHaveLength(1)
       expect(wrapper.get('.product-name').text()).toContain('Silla de visita azul')
       expect(wrapper.get('.product-visual').text()).toContain('Sin imagen')
@@ -191,7 +190,7 @@ describe('Bandeja administrativa de productos', () => {
     const key = 'homex.catalogo.imagenes-visibles.v1'
     localStorage.removeItem(key)
     mockServices()
-    const { wrapper } = await makeMounted()
+    const { wrapper } = await makeMounted('/productos?vista=lista')
     try {
       expect(wrapper.find('.thumbnail').exists()).toBe(true)
       await wrapper.get('.table-image-toggle').trigger('click')

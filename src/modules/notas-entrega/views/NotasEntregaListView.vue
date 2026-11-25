@@ -9,10 +9,8 @@ import {
   PackageCheck,
   RotateCcw,
 } from '@lucide/vue'
-import type { NotaEntrega, Pedido, ProformaListado } from '@/generated/api'
-import { pedidosService } from '@/modules/pedidos/services/pedidosService'
+import type { NotaEntrega } from '@/generated/api'
 import DocumentViewerModal from '@/modules/proformas/components/DocumentViewerModal.vue'
-import { proformasService } from '@/modules/proformas/services/proformasService'
 import { downloadBlob } from '@/shared/download/downloadBlob'
 import { buildExportFilename } from '@/shared/download/exportFilename'
 import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
@@ -42,8 +40,6 @@ const routeDate = (key: string) => {
 }
 
 const rows = ref<NotaEntrega[]>([])
-const pedidosById = ref<Record<number, Pedido>>({})
-const proformasById = ref<Record<number, ProformaListado>>({})
 const loading = ref(true)
 const error = ref('')
 const toastMessage = ref('')
@@ -56,23 +52,16 @@ const page = ref(Math.max(1, Number(route.query.pagina) || 1))
 const pageSize = 10
 const dateError = computed(() => dateRangeError(dateFrom.value, dateTo.value, today))
 
-function proformaOf(nota: NotaEntrega): ProformaListado | undefined {
-  const pedido = pedidosById.value[nota.pedido]
-  if (!pedido) return undefined
-  return proformasById.value[pedido.proforma]
-}
-
 function clientName(nota: NotaEntrega): string {
-  const prof = proformaOf(nota)
-  return prof?.cliente_resumen?.empresa?.trim() || prof?.cliente_resumen?.nombre?.trim() || ''
+  return nota.cliente_resumen?.empresa?.trim() || nota.cliente_resumen?.nombre?.trim() || ''
 }
 
 function quoteTitle(nota: NotaEntrega): string {
-  return proformaOf(nota)?.titulo?.trim() || 'Entrega de pedido completo'
+  return nota.proforma_titulo?.trim() || 'Entrega de pedido completo'
 }
 
 function proformaNumero(nota: NotaEntrega): number | null {
-  return proformaOf(nota)?.numero ?? pedidosById.value[nota.pedido]?.proforma ?? null
+  return nota.proforma_numero ?? null
 }
 
 function toIsoDate(value: string): string {
@@ -145,27 +134,6 @@ watch(page, () => {
   syncRoute()
 })
 
-async function loadOrderContext() {
-  const [pedidosRes, proformasRes] = await Promise.allSettled([
-    pedidosService.list(),
-    proformasService.list({ page_size: 100 }),
-  ])
-  if (pedidosRes.status === 'fulfilled') {
-    const pMap: Record<number, Pedido> = {}
-    for (const item of pedidosRes.value) pMap[item.id] = item
-    pedidosById.value = pMap
-  } else {
-    pedidosById.value = {}
-  }
-  if (proformasRes.status === 'fulfilled') {
-    const qMap: Record<number, ProformaListado> = {}
-    for (const item of proformasRes.value.results) qMap[item.id] = item
-    proformasById.value = qMap
-  } else {
-    proformasById.value = {}
-  }
-}
-
 const previewModalOpen = ref(false)
 const previewTarget = ref<NotaEntrega | null>(null)
 const downloadingPdf = ref(false)
@@ -231,7 +199,6 @@ async function load() {
   try {
     rows.value = await notasEntregaService.list()
     if (page.value > totalPages.value) page.value = totalPages.value
-    void loadOrderContext()
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : 'No se pudieron cargar las notas.'
   } finally {
@@ -358,11 +325,12 @@ onMounted(load)
               </td>
               <td class="origin-cell" data-label="Cliente y origen">
                 <div class="origin-content">
-                  <ClientAvatar v-if="clientName(row)" :name="clientName(row)" :size="34" />
+                  <ClientAvatar :name="clientName(row)" :size="34" />
                   <div class="origin-info">
                     <strong v-if="clientName(row)" :title="clientName(row)">
                       {{ clientName(row) }}
                     </strong>
+                    <span v-else class="origin-client-empty">Cliente sin especificar</span>
                     <div class="origin-links">
                       <RouterLink :to="`/pedidos/${row.pedido}`" class="origin-chip">
                         <ClipboardList :size="13" aria-hidden="true" />
@@ -381,7 +349,7 @@ onMounted(load)
                 </div>
               </td>
               <td class="date-cell" data-label="Emisión">
-                <DatePresentation :timestamp="String(row.fecha)" :date="String(row.fecha)" />
+                <DatePresentation :timestamp="row.fecha_hora ?? null" :date="String(row.fecha)" />
               </td>
               <td class="coverage-cell" data-label="Cobertura">
                 <Badge tone="info">Pedido completo</Badge>

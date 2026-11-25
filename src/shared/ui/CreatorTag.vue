@@ -18,7 +18,7 @@ defineProps<{
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  color: var(--color-text-secondary);
+  color: var(--badge-warning-text);
   font-size: 0.75rem;
   font-weight: 600;
   line-height: 1.3;
@@ -28,7 +28,7 @@ defineProps<{
 
 .creator-tag svg {
   flex: none;
-  color: var(--color-text-secondary);
+  color: var(--badge-warning-text);
 }
 
 .creator-tag span {

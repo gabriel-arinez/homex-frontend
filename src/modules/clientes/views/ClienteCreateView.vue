@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import type { ClienteWritable, ValorCatalogoPublico } from '@/generated/api'
 import { ApiError } from '@/shared/api'
@@ -7,6 +7,7 @@ import { validateClient } from '@/shared/validation/commercialFields'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import ClienteFormFields, { type ClienteFormModel } from '../components/ClienteFormFields.vue'
 import { clientesService } from '../services/clientesService'
+import { useFormChanges } from '@/shared/forms/useFormChanges'
 import { ArrowLeft, Info, Phone, UserPlus } from '@lucide/vue'
 import Button from '@/shared/ui/Button.vue'
 import ClientAvatar from '@/shared/ui/ClientAvatar.vue'
@@ -23,7 +24,6 @@ const saving = ref(false)
 const error = ref('')
 const fields = ref<Record<string, string[]>>({})
 const validationAttempted = ref(false)
-const dirty = ref(false)
 const allowLeave = ref(false)
 const confirmLeave = ref(false)
 let pendingLeave: ((allow?: boolean) => void) | null = null
@@ -63,7 +63,30 @@ const creationStatus = computed(() => {
   return 'Nuevo registro sin guardar'
 })
 
-watch(form, () => (dirty.value = true), { deep: true })
+const {
+  captureOriginal: captureClientOriginal,
+  changes: formChanges,
+  hasChanges: dirty,
+} = useFormChanges(
+  () => ({ ...form }),
+  [
+    {
+      key: 'tipo_cliente',
+      label: 'Tipo de cliente',
+      get: (s) => s.tipo_cliente,
+      format: (v) =>
+        tipos.value.find((t) => String(t.id) === String(v))?.nombre ||
+        (String(v) ? `Tipo #${v}` : 'Sin valor'),
+    },
+    { key: 'nombres', label: 'Nombres', get: (s) => s.nombres },
+    { key: 'apellidos', label: 'Apellidos', get: (s) => s.apellidos },
+    { key: 'empresa', label: 'Empresa', get: (s) => s.empresa },
+    { key: 'celular', label: 'Celular', get: (s) => s.celular },
+    { key: 'direccion', label: 'Dirección', get: (s) => s.direccion },
+    { key: 'observaciones', label: 'Observaciones', get: (s) => s.observaciones },
+  ],
+)
+
 function beforeUnload(event: BeforeUnloadEvent) {
   if (!dirty.value || allowLeave.value) return
   event.preventDefault()
@@ -90,7 +113,7 @@ async function loadTypes() {
   try {
     tipos.value = await proformasService.options('TIPO_CLIENTE')
     form.tipo_cliente = tipos.value[0] ? String(tipos.value[0].id) : ''
-    dirty.value = false
+    captureClientOriginal()
   } catch (cause) {
     error.value =
       cause instanceof Error ? cause.message : 'No se pudieron cargar los tipos de cliente.'
@@ -130,7 +153,7 @@ async function save() {
   try {
     const client = await clientesService.create(body)
     allowLeave.value = true
-    dirty.value = false
+    captureClientOriginal()
     await router.push(`/clientes/${client.id}`)
   } catch (cause) {
     if (cause instanceof ApiError) fields.value = cause.fields
@@ -236,6 +259,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       title="Descartar cliente"
       description="Los datos ingresados no se guardarán."
       confirm-label="Descartar"
+      :changes="formChanges"
       @close="stay"
       @confirm="discardAndLeave"
     />

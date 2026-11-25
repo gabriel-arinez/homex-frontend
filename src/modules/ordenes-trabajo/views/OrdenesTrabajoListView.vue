@@ -2,15 +2,11 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
-  Clock3,
   FileText,
-  Hammer,
   MapPin,
-  PackageCheck,
   RotateCcw,
   Truck,
 } from '@lucide/vue'
@@ -22,6 +18,7 @@ import { downloadBlob } from '@/shared/download/downloadBlob'
 import { buildExportFilename } from '@/shared/download/exportFilename'
 import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
 import { ordenesTrabajoService } from '../services/ordenesTrabajoService'
+import { workOrderStatusIcon, workOrderTone } from '../utils/workOrderPresentation'
 import WorkOrderActionsMenu from '../components/WorkOrderActionsMenu.vue'
 import Button from '@/shared/ui/Button.vue'
 import ClientAvatar from '@/shared/ui/ClientAvatar.vue'
@@ -109,48 +106,6 @@ function clientName(ot: OrdenTrabajo): string {
 
 function quoteTitle(ot: OrdenTrabajo): string {
   return ot.proforma_titulo?.trim() || proformaOf(ot)?.titulo?.trim() || workSummary(ot)
-}
-
-function workOrderStatusIcon(code: string) {
-  const normalized = code.toUpperCase()
-  if (normalized.includes('PENDIENTE')) return Clock3
-  if (
-    normalized.includes('PRODUCCION') ||
-    normalized.includes('TALLER') ||
-    normalized.includes('PROCESO')
-  ) {
-    return Hammer
-  }
-  if (
-    normalized.includes('LISTO') ||
-    normalized.includes('TERMINAD') ||
-    normalized.includes('FINALIZAD')
-  ) {
-    return PackageCheck
-  }
-  if (normalized.includes('ENTREGAD') || normalized.includes('COMPLETAD')) return CheckCircle2
-  return ClipboardList
-}
-
-function workOrderTone(code: string): 'info' | 'warning' | 'success' | 'danger' | 'neutral' {
-  const normalized = code.toUpperCase()
-  if (normalized.includes('CANCEL') || normalized.includes('ANUL')) return 'danger'
-  if (
-    normalized.includes('ENTREGAD') ||
-    normalized.includes('FINALIZAD') ||
-    normalized.includes('LISTO')
-  ) {
-    return 'success'
-  }
-  if (
-    normalized.includes('PRODUCCION') ||
-    normalized.includes('TALLER') ||
-    normalized.includes('PROCESO')
-  ) {
-    return 'warning'
-  }
-  if (normalized.includes('PENDIENTE')) return 'info'
-  return 'neutral'
 }
 
 function toIsoDate(value: string): string {
@@ -491,11 +446,12 @@ onMounted(load)
               </td>
               <td class="origin-cell" data-label="Cliente y origen">
                 <div class="origin-content">
-                  <ClientAvatar v-if="clientName(row)" :name="clientName(row)" :size="34" />
+                  <ClientAvatar :name="clientName(row)" :size="34" />
                   <div class="origin-info">
                     <strong v-if="clientName(row)" :title="clientName(row)">
                       {{ clientName(row) }}
                     </strong>
+                    <span v-else class="origin-client-empty">Cliente sin especificar</span>
                     <div class="origin-links">
                       <RouterLink
                         v-if="canOperateCommercial"
@@ -523,7 +479,7 @@ onMounted(load)
               </td>
               <td class="date-cell" data-label="Fecha y entrega">
                 <div class="schedule-stack">
-                  <DatePresentation :timestamp="String(row.fecha)" :date="String(row.fecha)" />
+                  <DatePresentation :timestamp="row.fecha_hora ?? null" :date="String(row.fecha)" />
                   <span v-if="row.fecha_entrega || row.lugar_entrega" class="schedule-meta">
                     <Truck v-if="row.fecha_entrega" :size="12" aria-hidden="true" />
                     <MapPin v-else :size="12" aria-hidden="true" />
