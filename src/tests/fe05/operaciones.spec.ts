@@ -20,6 +20,7 @@ import { movimientosStockService } from '@/modules/movimientos-stock/services/mo
 import { server } from '@/tests/msw/server'
 const states = [
   { id: 1, codigo: 'CONFIRMADO', nombre: 'Confirmado', concepto_codigo: 'ESTADO_PEDIDO' },
+  { id: 4, codigo: 'EN_PRODUCCION', nombre: 'En producción', concepto_codigo: 'ESTADO_PEDIDO' },
   {
     id: 2,
     codigo: 'LISTO_ENTREGA',
@@ -279,7 +280,7 @@ describe('FE05 operaciones', () => {
   it('lista recibos emitidos vinculados en la ficha del pedido', async () => {
     options()
     server.use(
-      http.get('http://localhost:8000/api/v1/pedidos/9/', () => HttpResponse.json(pedido(1))),
+      http.get('http://localhost:8000/api/v1/pedidos/9/', () => HttpResponse.json(pedido(4))),
       http.get('http://localhost:8000/api/v1/recibos/', () => HttpResponse.json([recibo()])),
       http.get('http://localhost:8000/api/v1/notas-entrega/', () => HttpResponse.json([])),
     )
@@ -293,7 +294,7 @@ describe('FE05 operaciones', () => {
     options()
     let postedBody: unknown = null
     server.use(
-      http.get('http://localhost:8000/api/v1/pedidos/9/', () => HttpResponse.json(pedido(1))),
+      http.get('http://localhost:8000/api/v1/pedidos/9/', () => HttpResponse.json(pedido(4))),
       http.post('http://localhost:8000/api/v1/pedidos/9/cambiar-estado/', async ({ request }) => {
         postedBody = (await request.json()) as Record<string, unknown>
         return HttpResponse.json(pedido(2))
@@ -304,14 +305,16 @@ describe('FE05 operaciones', () => {
     expect(w.text().toLowerCase()).not.toContain('backend')
     const mainAdvanceBtn = w.find('button.split-action__main')
     expect(mainAdvanceBtn.exists()).toBe(true)
-    expect(mainAdvanceBtn.text()).toContain('En producción')
+    expect(mainAdvanceBtn.text()).toContain('Listo para entrega')
     await mainAdvanceBtn.trigger('click')
     await flushPromises()
-    expect(w.text()).toContain('Enviar pedido a producción')
-    const confirmBtn = w.findAll('button').find((b) => b.text().includes('Enviar a producción'))!
+    expect(w.text()).toContain('Marcar pedido listo para entrega')
+    const confirmBtn = w
+      .findAll('button')
+      .find((b) => b.text().includes('Confirmar listo para entrega'))!
     await confirmBtn.trigger('click')
     await flushPromises()
-    expect(postedBody).toEqual({ estado_codigo: 'EN_PRODUCCION' })
+    expect(postedBody).toEqual({ estado_codigo: 'LISTO_ENTREGA' })
   })
 
   it('muestra bandeja de órdenes de trabajo con contexto de cliente y menú de acciones', async () => {
@@ -550,6 +553,89 @@ describe('FE05 operaciones', () => {
     await flushPromises()
     expect(w.text()).toContain('1 mueble a medida')
     expect(w.text()).toContain('Mueble a medida · Ficha técnica reservada a taller')
+    expect(w.findAll('button').some((b) => b.text().trim() === 'Listo para entrega')).toBe(false)
+  })
+
+  it('muestra Marcar listo para entrega solo cuando la OT está TERMINADA', async () => {
+    let called = false
+    server.use(
+      http.get('http://localhost:8000/api/v1/ordenes-trabajo/3/', () =>
+        HttpResponse.json({
+          id: 3,
+          pedido: 9,
+          proforma_numero: 4,
+          proforma_titulo: 'Escritorio gerencial',
+          cliente_resumen: { id: 10, nombre: 'Ana Pérez', empresa: null, celular: '71234567' },
+          jefe_taller: 5,
+          numero: 40,
+          fecha: '2026-11-10',
+          fecha_inicio: '2026-11-11',
+          fecha_fin: '2026-11-12',
+          responsable_recepcion: 'Carlos Méndez',
+          fecha_entrega: '2026-11-20',
+          lugar_entrega: 'Av. Banzer Km 6',
+          estado_saldo: null,
+          estado_saldo_info: null,
+          estado: 22,
+          estado_info: { id: 22, codigo: 'TERMINADA', nombre: 'Terminada' },
+          pedido_estado_codigo: 'EN_PRODUCCION',
+          created_by: 2,
+          updated_by: 5,
+          detalles: [
+            {
+              id: 88,
+              tipo_item_info: { id: 9, codigo: 'MUEBLE_MEDIDA', nombre: 'A medida' },
+              producto: null,
+              familia_producto: null,
+              nombre: 'Escritorio a medida',
+              descripcion: null,
+              cantidad: '1.0000',
+              unidad_info: { id: 2, codigo: 'PIEZA', nombre: 'Pieza' },
+              especificacion: null,
+            },
+          ],
+        }),
+      ),
+      http.post('http://localhost:8000/api/v1/ordenes-trabajo/3/marcar-listo-entrega/', () => {
+        called = true
+        return HttpResponse.json({
+          id: 3,
+          pedido: 9,
+          proforma_numero: 4,
+          proforma_titulo: 'Escritorio gerencial',
+          cliente_resumen: { id: 10, nombre: 'Ana Pérez', empresa: null, celular: '71234567' },
+          jefe_taller: 5,
+          numero: 40,
+          fecha: '2026-11-10',
+          fecha_inicio: '2026-11-11',
+          fecha_fin: '2026-11-12',
+          responsable_recepcion: 'Carlos Méndez',
+          fecha_entrega: '2026-11-20',
+          lugar_entrega: 'Av. Banzer Km 6',
+          estado_saldo: null,
+          estado_saldo_info: null,
+          estado: 22,
+          estado_info: { id: 22, codigo: 'TERMINADA', nombre: 'Terminada' },
+          pedido_estado_codigo: 'LISTO_ENTREGA',
+          created_by: 2,
+          updated_by: 5,
+          detalles: [],
+        })
+      }),
+    )
+    const w = await mountAt(OrdenTrabajoDetailView, '/ordenes-trabajo/3')
+    await flushPromises()
+    const readyBtn = w.findAll('button').find((b) => b.text().trim() === 'Listo para entrega')
+    expect(readyBtn?.exists()).toBe(true)
+    await readyBtn!.trigger('click')
+    await flushPromises()
+    const confirmBtn = w
+      .findAll('button')
+      .find((b) => b.text().includes('Confirmar listo para entrega'))
+    expect(confirmBtn?.exists()).toBe(true)
+    await confirmBtn!.trigger('click')
+    await flushPromises()
+    expect(called).toBe(true)
   })
 
   it('muestra bandeja de notas de entrega con contexto de cliente y menú de acciones', async () => {

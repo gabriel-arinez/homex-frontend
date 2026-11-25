@@ -300,6 +300,7 @@ const currentStepIndex = computed(() =>
 
 const nextLogicalStep = computed(() => {
   if (isCancelled.value) return null
+  if (hasCustomFurniture.value && currentCode.value === 'CONFIRMADO') return null
   const idx = currentStepIndex.value
   if (idx >= 0 && idx < workflowSteps.value.length - 1) return workflowSteps.value[idx + 1] ?? null
   return null
@@ -372,9 +373,7 @@ const transitionMeta = computed(() => {
 
 const alternativeTransitions = computed(() => {
   if (isCancelled.value) return []
-  const allowedCodes: EstadoCodigoEnum[] = hasCustomFurniture.value
-    ? ['EN_PRODUCCION', 'LISTO_ENTREGA', 'ENTREGADO']
-    : ['LISTO_ENTREGA', 'ENTREGADO']
+  const allowedCodes: EstadoCodigoEnum[] = ['LISTO_ENTREGA', 'ENTREGADO']
   return workflowSteps.value.filter(
     (step) =>
       allowedCodes.includes(step.codigo as EstadoCodigoEnum) &&

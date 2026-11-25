@@ -40,6 +40,15 @@ onBeforeUnmount(() => {
       @open-alerts="alertsOpen = true"
     />
     <main id="main-content" tabindex="-1">
+      <div
+        v-if="session.entornoEvaluacion"
+        class="demo-mode-chip"
+        role="status"
+        aria-live="polite"
+        data-testid="demo-mode-indicator"
+      >
+        Modo demostración
+      </div>
       <RouterView v-slot="{ Component }"
         ><component :is="Component" @open-menu="drawerOpen = true"
       /></RouterView>
@@ -82,17 +91,19 @@ onBeforeUnmount(() => {
 .shell main:focus {
   outline: 0;
 }
-.eval-banner {
-  display: flex;
-  flex-wrap: wrap;
+.demo-mode-chip {
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: var(--space-4);
-  padding: 0.55rem 0.9rem;
-  border: 1px solid var(--color-warning, #d97706);
-  border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--color-warning, #d97706) 12%, transparent);
-  font-size: 0.875rem;
+  width: fit-content;
+  margin-left: auto;
+  margin-bottom: var(--space-3);
+  padding: 0.25rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
 }
 .shell--compact main {
   margin-left: var(--sidebar-compact);

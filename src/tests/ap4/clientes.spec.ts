@@ -49,6 +49,8 @@ describe('AP4 clientes consolidados', () => {
     await wrapper.get('input[name="nuevo-cliente-nombres"]').setValue('María')
     await wrapper.get('input[name="nuevo-cliente-apellidos"]').setValue('Flores')
     await wrapper.get('input[name="nuevo-cliente-empresa"]').setValue('Muebles Flores')
+    await wrapper.get('input[name="nuevo-cliente-celular"]').setValue('71234567')
+    await wrapper.get('input[name="nuevo-cliente-direccion"]').setValue('Av. Arce 100')
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
@@ -57,6 +59,8 @@ describe('AP4 clientes consolidados', () => {
       nombres: 'María',
       apellidos: 'Flores',
       empresa: 'Muebles Flores',
+      celular: '71234567',
+      direccion: 'Av. Arce 100',
     })
     expect(router.currentRoute.value.fullPath).toBe('/clientes/41')
   })
@@ -237,6 +241,8 @@ describe('AP4 clientes consolidados', () => {
           nombres: 'María',
           apellidos: 'Flores',
           empresa: 'Muebles Flores',
+          celular: '71234567',
+          direccion: 'Av. Arce 100',
           revision: 'a'.repeat(64),
           activo: true,
         }),

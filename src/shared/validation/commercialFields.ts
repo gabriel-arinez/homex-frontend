@@ -53,9 +53,11 @@ export function validateClientField(
     if (!namePattern.test(text)) return 'Utiliza letras, tildes, espacios, apóstrofes o guiones.'
   }
   if (field === 'empresa' && company && !text) return 'Ingresa la razón social o empresa.'
-  if (field === 'celular' && text && !/^\d{8}$/.test(text)) {
-    return 'El celular debe tener exactamente 8 dígitos.'
+  if (field === 'celular') {
+    if (!text) return 'Ingresa un celular de 8 dígitos.'
+    if (!/^\d{8}$/.test(text)) return 'El celular debe tener exactamente 8 dígitos.'
   }
+  if (field === 'direccion' && !text) return 'Ingresa la dirección del cliente.'
   return ''
 }
 

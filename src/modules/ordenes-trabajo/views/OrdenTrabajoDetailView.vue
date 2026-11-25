@@ -611,12 +611,12 @@ async function changeWorkOrderState(estadoCodigo: 'EN_PROCESO' | 'TERMINADA') {
 }
 
 const canMarkReady = computed(() => {
-  if (!item.value || !canChangeWorkOrderState.value) return false
+  if (!item.value) return false
   const otCode = item.value.estado_info.codigo.toUpperCase()
   const pedCode = (item.value.pedido_estado_codigo ?? '').toUpperCase()
-  if (['CANCELADA', 'TERMINADA'].includes(otCode)) return false
   if (['LISTO_ENTREGA', 'ENTREGADO', 'CANCELADO'].includes(pedCode)) return false
-  return true
+  if (otCode === 'TERMINADA') return true
+  return detailRows.value.length === 0 && otCode !== 'CANCELADA'
 })
 
 async function confirmMarkReady() {

@@ -137,7 +137,7 @@ function changeType(value: string) {
       input-rule="digits"
       :max-length="CLIENT_LIMITS.celular"
       :error="errorFor('celular')"
-      hint="Opcional; si se registra, debe tener 8 dígitos."
+      hint="Obligatorio; 8 dígitos."
       @blur="touched.celular = true"
       @update:model-value="emit('change', 'celular', $event)"
     />
@@ -148,7 +148,7 @@ function changeType(value: string) {
       autocomplete="street-address"
       :max-length="CLIENT_LIMITS.direccion"
       :error="errorFor('direccion')"
-      hint="Máximo 100 caracteres."
+      hint="Obligatoria; máximo 100 caracteres."
       @blur="touched.direccion = true"
       @update:model-value="emit('change', 'direccion', $event)"
     />
