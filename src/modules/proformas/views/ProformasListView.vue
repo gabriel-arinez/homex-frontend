@@ -212,6 +212,7 @@ async function load() {
       cliente: customer.value ? Number(customer.value) : undefined,
       fecha_desde: dateFrom.value || undefined,
       fecha_hasta: dateTo.value || undefined,
+      ordering: '-ultima_actividad_comercial',
       page: page.value,
       page_size: size,
     })
@@ -433,7 +434,13 @@ onBeforeUnmount(() => {
             <tr>
               <th scope="col">Proforma</th>
               <th scope="col">Cliente</th>
-              <th scope="col">Última edición</th>
+              <th scope="col">
+                {{
+                  rows.some((r) => r.naturaleza === 'SIMULADO_NO_RESULTADO_MEDIDO')
+                    ? 'Actividad comercial'
+                    : 'Última edición'
+                }}
+              </th>
               <th scope="col">Estado</th>
               <th scope="col" class="numeric">Total</th>
               <th scope="col" class="actions-heading">Acciones</th>
