@@ -241,6 +241,8 @@ test('AP4 registra una empresa desde móvil y llega a su ficha', async ({ page }
         nombres: 'María',
         apellidos: 'Flores',
         empresa: 'Muebles Flores',
+        celular: '71234567',
+        direccion: 'Av. Arce 100',
         activo: true,
         created_by: 7,
         updated_by: 7,
@@ -252,6 +254,8 @@ test('AP4 registra una empresa desde móvil y llega a su ficha', async ({ page }
   await page.getByLabel('Nombres del contacto').fill('María')
   await page.getByLabel('Apellidos del contacto').fill('Flores')
   await page.getByLabel('Razón social o empresa').fill('Muebles Flores')
+  await page.getByLabel('Celular').fill('71234567')
+  await page.getByLabel('Dirección').fill('Av. Arce 100')
   await page.getByRole('button', { name: 'Registrar cliente' }).click()
   await expect(page).toHaveURL(/\/clientes\/21$/)
   await expect(page.getByRole('heading', { name: 'Muebles Flores' })).toBeVisible()

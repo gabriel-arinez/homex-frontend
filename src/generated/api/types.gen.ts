@@ -46,9 +46,15 @@ export type AtributoMueble = {
 }
 
 export type CambiarEstadoOrdenTrabajo = {
-  estado_codigo: EstadoOrdenTrabajoCodigoEnum
+  estado_codigo: CambiarEstadoOrdenTrabajoEstadoCodigoEnum
   observaciones?: string | null
 }
+
+/**
+ * * `EN_PROCESO` - En proceso
+ * * `TERMINADA` - Terminada
+ */
+export type CambiarEstadoOrdenTrabajoEstadoCodigoEnum = 'EN_PROCESO' | 'TERMINADA'
 
 export type CambiarEstadoPedido = {
   estado_codigo: EstadoCodigoEnum
@@ -392,13 +398,6 @@ export type EspecificacionMueble = {
  * * `ENTREGADO` - ENTREGADO
  */
 export type EstadoCodigoEnum = 'EN_PRODUCCION' | 'LISTO_ENTREGA' | 'ENTREGADO'
-
-/**
- * * `EN_PROCESO` - En proceso
- * * `TERMINADA` - Terminada
- * * `CANCELADA` - Cancelada
- */
-export type EstadoOrdenTrabajoCodigoEnum = 'EN_PROCESO' | 'TERMINADA' | 'CANCELADA'
 
 export type EstadoProformaDemanda = {
   id: number
