@@ -3,7 +3,7 @@ import { onBeforeUnmount, ref, watch } from 'vue'
 import { AlertTriangle, RotateCcw, Trash2, Volume2 } from '@lucide/vue'
 import Button from '@/shared/ui/Button.vue'
 const props = defineProps<{ audio: Blob; disabled?: boolean; retry?: boolean }>()
-const emit = defineEmits<{ retry: []; discard: [] }>()
+const emit = defineEmits<{ retry: []; discard: []; duration: [seconds: number] }>()
 const url = ref('')
 const warning = ref('')
 let generation = 0
@@ -20,6 +20,9 @@ watch(
     try {
       context = new AudioContext()
       const decoded = await context.decodeAudioData(await blob.arrayBuffer())
+      if (current === generation && Number.isFinite(decoded.duration) && decoded.duration > 0) {
+        emit('duration', decoded.duration)
+      }
       let peak = 0
       for (let channel = 0; channel < decoded.numberOfChannels; channel++) {
         const samples = decoded.getChannelData(channel)
@@ -53,7 +56,17 @@ onBeforeUnmount(() => {
         <small>Puedes escucharla antes de procesar o volver a grabarla.</small>
       </div>
     </header>
-    <audio :src="url" controls aria-label="Escuchar audio capturado" />
+    <audio
+      :src="url"
+      controls
+      aria-label="Escuchar audio capturado"
+      @loadedmetadata="
+        (e) => {
+          const d = (e.target as HTMLAudioElement).duration
+          if (Number.isFinite(d) && d > 0) emit('duration', d)
+        }
+      "
+    />
     <p v-if="warning" class="audio-review-card__warning" role="status">
       <AlertTriangle :size="15" aria-hidden="true" />
       <span>{{ warning }}</span>

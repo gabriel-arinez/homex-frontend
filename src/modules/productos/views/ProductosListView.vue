@@ -92,13 +92,32 @@ async function exportExcel() {
       const value = extras[key]
       if (value) query[key] = value
     }
+    const statusLabel =
+      status.value === 'activos' ? 'Activos' : status.value === 'inactivos' ? 'Inactivos' : ''
+    const stockLabels: Record<string, string> = {
+      BAJO_PEDIDO: 'Bajo pedido',
+      SIN_EXISTENCIAS: 'Sin existencias',
+      STOCK_BAJO: 'Stock bajo',
+      NORMAL: 'Normal',
+      SIN_MINIMO: 'Sin mínimo',
+    }
+    const categoryLabel =
+      categories.value.find((c) => String(c.id) === category.value)?.nombre || category.value
+    const familyLabel =
+      families.value.find((f) => String(f.id) === extras.familia)?.nombre || extras.familia
+    const extraSegments = availableExtra.value
+      .filter((key) => key !== 'familia' && Boolean(extras[key]))
+      .map((key) => (key === 'espesor_mm' ? `${extras[key]}mm` : extras[key]))
     await exportTrayExcel({
       endpoint: '/api/v1/catalogo/productos/exportar-excel/',
       query,
       prefix: 'productos',
       filenameSegments: [
-        status.value !== 'todos' ? status.value : '',
-        stockStatus.value,
+        statusLabel,
+        stockStatus.value ? stockLabels[stockStatus.value] || stockStatus.value : '',
+        categoryLabel,
+        familyLabel,
+        ...extraSegments,
         search.value.trim(),
       ],
     })

@@ -56,6 +56,56 @@ const result = ref<ResultadoCatalogo | ResultadoAsistida | null>(null)
 const asrCaptureId = ref<number | null>(null)
 const lastInterpretationId = ref<number | null>(null)
 const originCaptureId = computed(() => asrCaptureId.value ?? lastInterpretationId.value)
+const transcriptionStartedAt = ref<number | null>(null)
+const transcriptionElapsedMs = ref<number>(0)
+const asrLatencyMs = ref<number | null>(null)
+const audioDurationSeconds = ref<number | null>(null)
+let transcriptionTimer: number | null = null
+
+function formatClockMs(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000))
+  const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0')
+  const seconds = String(totalSeconds % 60).padStart(2, '0')
+  return `${minutes}:${seconds}`
+}
+
+function formatDurationSeconds(sec: number): string {
+  return formatClockMs(Math.round(Math.max(0, sec) * 1000))
+}
+
+function formatLatencySeconds(ms: number): string {
+  const secs = Math.max(0, ms) / 1000
+  return secs < 10 ? `${secs.toFixed(1)} s` : formatClockMs(ms)
+}
+
+function stopTranscriptionTimer(captureElapsed = true) {
+  if (transcriptionTimer !== null) {
+    window.clearInterval(transcriptionTimer)
+    transcriptionTimer = null
+  }
+  if (captureElapsed && transcriptionStartedAt.value !== null) {
+    transcriptionElapsedMs.value = Math.max(
+      0,
+      Math.round(performance.now() - transcriptionStartedAt.value),
+    )
+  }
+  transcriptionStartedAt.value = null
+}
+
+function startTranscriptionTimer() {
+  stopTranscriptionTimer(false)
+  transcriptionElapsedMs.value = 0
+  asrLatencyMs.value = null
+  transcriptionStartedAt.value = performance.now()
+  transcriptionTimer = window.setInterval(() => {
+    if (transcriptionStartedAt.value !== null) {
+      transcriptionElapsedMs.value = Math.max(
+        0,
+        Math.round(performance.now() - transcriptionStartedAt.value),
+      )
+    }
+  }, 250)
+}
 const busy = computed(
   () => processing.value || recording.value || requesting.value || preparingAudio.value,
 )
@@ -109,6 +159,7 @@ let generation = 0,
 function cancel() {
   generation++
   controller?.abort()
+  stopTranscriptionTimer()
   result.value = null
   processing.value = false
   preparingAudio.value = false
@@ -141,6 +192,9 @@ watch(
     original.value = ''
     asrCaptureId.value = null
     lastInterpretationId.value = null
+    transcriptionElapsedMs.value = 0
+    asrLatencyMs.value = null
+    audioDurationSeconds.value = null
     applied.value = false
     appliedWarnings.value = []
   },
@@ -152,10 +206,16 @@ function resetAll() {
   original.value = ''
   asrCaptureId.value = null
   lastInterpretationId.value = null
+  transcriptionElapsedMs.value = 0
+  asrLatencyMs.value = null
+  audioDurationSeconds.value = null
   applied.value = false
   appliedWarnings.value = []
 }
-onBeforeUnmount(discard)
+onBeforeUnmount(() => {
+  stopTranscriptionTimer(false)
+  discard()
+})
 async function start() {
   if (processing.value || requesting.value) return
   discard()
@@ -181,6 +241,9 @@ async function start() {
 }
 function status(state: string, seconds: number) {
   paused.value = state === 'PAUSED'
+  if (recording.value && Number.isFinite(seconds) && seconds > 0) {
+    audioDurationSeconds.value = seconds
+  }
   if (['ERROR', 'DENIED', 'UNSUPPORTED'].includes(state) && recording.value) {
     recording.value = false
     paused.value = false
@@ -266,6 +329,7 @@ async function process(useAudio = false) {
     settingAsrText = false
   }
   processing.value = true
+  if (useAudio) startTranscriptionTimer()
   emit('processing', true)
   try {
     const common = {
@@ -296,6 +360,12 @@ async function process(useAudio = false) {
           : await asistidasService.get(created.id, abort.signal)
       if (current !== generation) return
       if (['COMPLETADA', 'ERROR'].includes(response.estado)) {
+        if (useAudio) {
+          stopTranscriptionTimer()
+          if (typeof response.latencia_asr_ms === 'number' && response.latencia_asr_ms >= 0) {
+            asrLatencyMs.value = response.latencia_asr_ms
+          }
+        }
         if (
           useAudio &&
           (response.estado === 'COMPLETADA' || response.texto_transcrito_original?.trim())
@@ -359,6 +429,7 @@ async function process(useAudio = false) {
       error.value = cause instanceof Error ? cause.message : 'No fue posible procesar la captura.'
   } finally {
     if (current === generation) {
+      if (useAudio) stopTranscriptionTimer()
       processing.value = false
       emit('processing', false)
     }
@@ -450,7 +521,7 @@ function pasteTranscript(event: ClipboardEvent) {
         <Sparkles v-else :size="22" />
       </div>
       <div class="voice-processing-card__copy">
-        <strong>
+        <strong class="voice-processing-card__title">
           {{
             preparingAudio
               ? 'Validando audio…'
@@ -458,6 +529,13 @@ function pasteTranscript(event: ClipboardEvent) {
                 ? 'Transcribiendo audio…'
                 : 'Procesando con NLP y aplicando…'
           }}
+          <span
+            v-if="processing && audio && !preparingAudio"
+            class="voice-stopwatch"
+            aria-label="Tiempo transcurrido de transcripción"
+          >
+            {{ formatClockMs(transcriptionElapsedMs) }}
+          </span>
         </strong>
         <span>
           {{
@@ -481,6 +559,11 @@ function pasteTranscript(event: ClipboardEvent) {
       :audio="previewAudio"
       :disabled="processing"
       :retry="Boolean(audio) && !processing"
+      @duration="
+        (seconds) => {
+          audioDurationSeconds = seconds
+        }
+      "
       @retry="process(true)"
       @discard="resetAll"
     />
@@ -550,6 +633,27 @@ function pasteTranscript(event: ClipboardEvent) {
           "
         >
           {{ transcriptCharacters }} / {{ MAX_TRANSCRIPT_CHARACTERS }} caracteres máx.
+        </span>
+        <span
+          v-if="audioDurationSeconds !== null"
+          class="constraint-pill constraint-pill--neutral"
+          data-testid="voice-audio-duration"
+        >
+          Audio: {{ formatDurationSeconds(audioDurationSeconds) }}
+        </span>
+        <span
+          v-if="asrLatencyMs !== null"
+          class="constraint-pill constraint-pill--neutral"
+          data-testid="voice-asr-latency"
+        >
+          ASR: {{ formatLatencySeconds(asrLatencyMs) }}
+        </span>
+        <span
+          v-if="transcriptionElapsedMs > 0"
+          class="constraint-pill constraint-pill--neutral"
+          data-testid="voice-total-wait"
+        >
+          Espera total: {{ formatClockMs(transcriptionElapsedMs) }}
         </span>
       </div>
 
@@ -900,5 +1004,23 @@ p {
   width: 1px;
   height: 1px;
   clip-path: inset(50%);
+}
+.voice-processing-card__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.voice-stopwatch {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 </style>

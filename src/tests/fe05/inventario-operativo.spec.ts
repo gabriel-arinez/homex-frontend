@@ -297,7 +297,8 @@ describe('Inventario operativo (P1, P2, P4, P5, P6)', () => {
     expect(wrapperAdmin.text()).toContain('Volver al producto')
     expect(reporteSpy).toHaveBeenCalled()
     expect(wrapperAdmin.text()).toContain('Entradas del período')
-    expect(wrapperAdmin.text()).toContain('5.0000 Pieza')
+    expect(wrapperAdmin.text()).toContain('5 Pieza')
+    expect(wrapperAdmin.text()).not.toContain('5.0000')
 
     await wrapperAdmin
       .findAll('button')
@@ -457,10 +458,11 @@ describe('Inventario operativo (P1, P2, P4, P5, P6)', () => {
     expect(wrapper.text()).toContain('Sin coincidencias')
     expect(wrapper.text()).toContain('Saldo inicial del período')
     expect(wrapper.text()).toContain('Saldo final del período')
-    expect(wrapper.text()).toContain('5.0000 Pieza')
+    expect(wrapper.text()).toContain('5 Pieza')
+    expect(wrapper.text()).not.toContain('5.0000')
   })
 
-  it('selecciona producto desde el buscador del modal y exige rango de fechas al exportar Excel', async () => {
+  it('selecciona producto desde el buscador del modal y permite exportar Excel sin exigir fechas', async () => {
     const session = useSessionStore()
     session.capabilities = ['comercial.operar', 'comercial.administrar']
 
@@ -494,14 +496,19 @@ describe('Inventario operativo (P1, P2, P4, P5, P6)', () => {
     })
     await flushPromises()
 
-    // Sin rango de fechas no debe llamar a exportarExcel y debe avisar
+    // Permite exportar la bandeja ordinaria sin exigir ambas fechas
     const exportBtn = wrapper.findAll('button').find((b) => b.text().includes('Exportar Excel'))!
     await exportBtn.trigger('click')
     await flushPromises()
-    expect(excelSpy).not.toHaveBeenCalled()
-    expect(wrapper.text()).toContain('Debes seleccionar un rango de fechas')
+    expect(excelSpy).toHaveBeenCalledTimes(1)
+    expect(excelSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fecha_desde: undefined,
+        fecha_hasta: undefined,
+      }),
+    )
 
-    // Con rango de fechas en ruta sí llama a exportarExcel
+    // Con rango de fechas en ruta también llama a exportarExcel con el período
     await router.push('/movimientos-stock?desde=2026-11-01&hasta=2026-11-22')
     await flushPromises()
     await exportBtn.trigger('click')

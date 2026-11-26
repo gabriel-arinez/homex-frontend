@@ -56,9 +56,17 @@ const toastMessage = ref('')
 const toastTone = ref<'success' | 'danger'>('success')
 const exportingExcel = ref(false)
 async function exportExcel() {
-  if (exportingExcel.value) return
+  if (exportingExcel.value || dateError.value) return
   exportingExcel.value = true
   try {
+    const stateLabel =
+      availableStates.value.find((s) => s.codigo === stateFilter.value)?.nombre || stateFilter.value
+    const workTypeLabel =
+      workTypeFilter.value === 'MUEBLE_MEDIDA'
+        ? 'Muebles a medida'
+        : workTypeFilter.value === 'CATALOGO'
+          ? 'Catálogo'
+          : workTypeFilter.value
     await exportTrayExcel({
       endpoint: '/api/v1/ordenes-trabajo/exportar-excel/',
       query: {
@@ -70,8 +78,8 @@ async function exportExcel() {
       },
       prefix: 'ordenes-trabajo',
       filenameSegments: [
-        stateFilter.value,
-        workTypeFilter.value,
+        stateLabel,
+        workTypeLabel,
         search.value.trim(),
         dateFrom.value,
         dateTo.value,
@@ -349,7 +357,8 @@ onMounted(load)
         <Button
           variant="secondary"
           :processing="exportingExcel"
-          :disabled="exportingExcel"
+          :disabled="exportingExcel || Boolean(dateError)"
+          :title="dateError || undefined"
           @click="exportExcel"
         >
           <FileSpreadsheet :size="16" aria-hidden="true" />

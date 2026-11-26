@@ -51,9 +51,19 @@ const toastMessage = ref('')
 const toastTone = ref<'success' | 'danger'>('success')
 const exportingExcel = ref(false)
 async function exportExcel() {
-  if (exportingExcel.value) return
+  if (exportingExcel.value || dateError.value) return
   exportingExcel.value = true
   try {
+    const stateLabel =
+      stateFilter.value.toUpperCase() === 'EMITIDO'
+        ? 'Emitido'
+        : stateFilter.value.toUpperCase() === 'ANULADO'
+          ? 'Anulado'
+          : stateFilter.value
+    const paymentLabel =
+      paymentTypes.value.find(
+        (t) => String(t.id) === paymentFilter.value || t.codigo === paymentFilter.value,
+      )?.nombre || paymentFilter.value
     await exportTrayExcel({
       endpoint: '/api/v1/recibos/exportar-excel/',
       query: {
@@ -65,8 +75,8 @@ async function exportExcel() {
       },
       prefix: 'recibos',
       filenameSegments: [
-        stateFilter.value,
-        paymentFilter.value,
+        stateLabel,
+        paymentLabel,
         search.value.trim(),
         dateFrom.value,
         dateTo.value,
@@ -297,7 +307,8 @@ onMounted(load)
         <Button
           variant="secondary"
           :processing="exportingExcel"
-          :disabled="exportingExcel"
+          :disabled="exportingExcel || Boolean(dateError)"
+          :title="dateError || undefined"
           @click="exportExcel"
         >
           <FileSpreadsheet :size="16" aria-hidden="true" />

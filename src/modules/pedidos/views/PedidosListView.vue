@@ -49,19 +49,27 @@ const loading = ref(true)
 const error = ref('')
 const exportingExcel = ref(false)
 async function exportExcel() {
-  if (exportingExcel.value) return
+  if (exportingExcel.value || dateError.value) return
   exportingExcel.value = true
   try {
+    const selectedState = states.value.find(
+      (x) => String(x.id) === stateFilter.value || x.codigo === stateFilter.value,
+    )
     await exportTrayExcel({
       endpoint: '/api/v1/pedidos/exportar-excel/',
       query: {
         search: search.value.trim() || undefined,
-        estado: stateFilter.value || undefined,
+        estado: selectedState?.codigo || stateFilter.value || undefined,
         fecha_desde: dateFrom.value || undefined,
         fecha_hasta: dateTo.value || undefined,
       },
       prefix: 'pedidos',
-      filenameSegments: [stateFilter.value, search.value.trim(), dateFrom.value, dateTo.value],
+      filenameSegments: [
+        selectedState?.nombre || stateFilter.value,
+        search.value.trim(),
+        dateFrom.value,
+        dateTo.value,
+      ],
     })
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'No pudimos exportar el Excel.'
@@ -241,7 +249,8 @@ onMounted(load)
         <Button
           variant="secondary"
           :processing="exportingExcel"
-          :disabled="exportingExcel"
+          :disabled="exportingExcel || Boolean(dateError)"
+          :title="dateError || undefined"
           @click="exportExcel"
         >
           <FileSpreadsheet :size="16" aria-hidden="true" />

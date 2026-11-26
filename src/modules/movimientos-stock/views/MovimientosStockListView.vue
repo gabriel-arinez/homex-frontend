@@ -19,7 +19,6 @@ import {
   RotateCcw,
   SlidersHorizontal,
   Tag,
-  UserCheck,
 } from '@lucide/vue'
 import type {
   MovimientoReporteItem,
@@ -33,6 +32,7 @@ import ProductImage from '@/modules/productos/components/ProductImage.vue'
 import ProductoStockAjusteModal from '@/modules/productos/components/ProductoStockAjusteModal.vue'
 import { productosService } from '@/modules/productos/services/productosService'
 import {
+  cantidadProducto,
   disponibilidadMeta,
   estadoStockMeta,
   unidadesProducto,
@@ -43,6 +43,7 @@ import { buildExportFilename } from '@/shared/download/exportFilename'
 import { movimientosStockService } from '../services/movimientosStockService'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
+import CreatorTag from '@/shared/ui/CreatorTag.vue'
 import DatePresentation from '@/shared/ui/DatePresentation.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
@@ -215,6 +216,30 @@ async function loadSelectedProduct() {
   }
 }
 
+function formatSignedQuantity(value: string | number | null | undefined): string {
+  if (value === null || value === undefined || String(value).trim() === '') return '—'
+  const num = Number(value)
+  const formatted = cantidadProducto(value)
+  if (formatted === '—') return formatted
+  return Number.isFinite(num) && num > 0 ? `+${formatted}` : formatted
+}
+
+function formatMovementObservation(row: {
+  observaciones?: string | null
+  pedido_relacionado?: number | null
+  tipo_movimiento_info?: { codigo?: string } | null
+}): string {
+  const obs = (row.observaciones ?? '').trim()
+  if (!obs) return '—'
+  if (row.pedido_relacionado) {
+    const cleaned = obs
+      .replace(new RegExp(`\\s*/\\s*pedido\\s*#?${row.pedido_relacionado}\\b`, 'i'), '')
+      .trim()
+    if (cleaned) return cleaned
+  }
+  return obs
+}
+
 async function load() {
   const currentRequest = ++requestId
   if (dateError.value) {
@@ -274,11 +299,6 @@ async function load() {
 
 async function exportExcel() {
   if (dateError.value || exportingCsv.value) return
-  if (!fechaDesde.value || !fechaHasta.value) {
-    toastTone.value = 'danger'
-    toastMessage.value = 'Debes seleccionar un rango de fechas (Desde y Hasta) para exportar.'
-    return
-  }
   exportingCsv.value = true
   try {
     const blob = await movimientosStockService.exportarExcel({
@@ -287,18 +307,28 @@ async function exportExcel() {
       direccion: direccion.value || undefined,
       pedido: pedido.value ? Number(pedido.value) : undefined,
       producto: producto.value ? Number(producto.value) : undefined,
-      fecha_desde: fechaDesde.value,
-      fecha_hasta: fechaHasta.value,
+      fecha_desde: fechaDesde.value || undefined,
+      fecha_hasta: fechaHasta.value || undefined,
     })
+    const hasFullRange = Boolean(fechaDesde.value && fechaHasta.value)
+    const tipoLabel = types.value.find((t) => t.codigo === type.value)?.nombre || type.value
+    const dateSegment = hasFullRange
+      ? `${fechaDesde.value}_a_${fechaHasta.value}`
+      : fechaDesde.value
+        ? `desde-${fechaDesde.value}`
+        : fechaHasta.value
+          ? `hasta-${fechaHasta.value}`
+          : ''
     const filename = buildExportFilename(
-      'reporte-stock',
+      producto.value || hasFullRange ? 'reporte-stock' : 'movimientos-stock',
       [
         selectedProduct.value?.sku || (producto.value ? `prod-${producto.value}` : ''),
+        selectedProduct.value?.sku ? selectedProduct.value?.nombre : '',
         pedido.value ? `pedido-${pedido.value}` : '',
-        type.value,
+        tipoLabel,
         direccion.value,
         search.value.trim(),
-        `${fechaDesde.value}_a_${fechaHasta.value}`,
+        dateSegment,
       ],
       'xlsx',
     )
@@ -636,32 +666,36 @@ onBeforeUnmount(() => {
         <div>
           <span>Entradas del período</span>
           <strong class="variation-qty--in"
-            >+{{ reporteResumen.total_entradas }} {{ reporteResumen.unidad_nombre }}</strong
+            >+{{ cantidadProducto(reporteResumen.total_entradas) }}
+            {{ reporteResumen.unidad_nombre }}</strong
           >
         </div>
         <div>
           <span>Salidas del período</span>
           <strong class="variation-qty--out"
-            >-{{ reporteResumen.total_salidas }} {{ reporteResumen.unidad_nombre }}</strong
+            >-{{ cantidadProducto(reporteResumen.total_salidas) }}
+            {{ reporteResumen.unidad_nombre }}</strong
           >
         </div>
         <div>
           <span>Variación neta</span>
           <strong
-            >{{ Number(reporteResumen.variacion_neta) > 0 ? '+' : ''
-            }}{{ reporteResumen.variacion_neta }} {{ reporteResumen.unidad_nombre }}</strong
+            >{{ formatSignedQuantity(reporteResumen.variacion_neta) }}
+            {{ reporteResumen.unidad_nombre }}</strong
           >
         </div>
         <div v-if="reporteResumen.saldo_inicial_periodo != null">
           <span>Saldo inicial del período</span>
           <strong
-            >{{ reporteResumen.saldo_inicial_periodo }} {{ reporteResumen.unidad_nombre }}</strong
+            >{{ cantidadProducto(reporteResumen.saldo_inicial_periodo) }}
+            {{ reporteResumen.unidad_nombre }}</strong
           >
         </div>
         <div v-if="reporteResumen.saldo_final_periodo != null">
           <span>Saldo final del período</span>
           <strong
-            >{{ reporteResumen.saldo_final_periodo }} {{ reporteResumen.unidad_nombre }}</strong
+            >{{ cantidadProducto(reporteResumen.saldo_final_periodo) }}
+            {{ reporteResumen.unidad_nombre }}</strong
           >
         </div>
       </section>
@@ -773,7 +807,7 @@ onBeforeUnmount(() => {
                           Number(row.cantidad) < 0 ? 'variation-qty--out' : 'variation-qty--in'
                         "
                       >
-                        {{ Number(row.cantidad) > 0 ? '+' : '' }}{{ row.cantidad }}
+                        {{ formatSignedQuantity(row.cantidad) }}
                       </strong>
                       <span class="variation-unit">
                         {{ row.producto_resumen.unidad_stock_info.nombre }}
@@ -789,10 +823,10 @@ onBeforeUnmount(() => {
                     class="balance-stack"
                   >
                     <strong
-                      >{{ row.saldo_posterior }}
+                      >{{ cantidadProducto(row.saldo_posterior) }}
                       {{ row.producto_resumen.unidad_stock_info.nombre }}</strong
                     >
-                    <small>Ant.: {{ row.saldo_anterior }}</small>
+                    <small>Ant.: {{ cantidadProducto(row.saldo_anterior) }}</small>
                   </div>
                   <span v-else>—</span>
                 </td>
@@ -818,17 +852,16 @@ onBeforeUnmount(() => {
 
                 <td class="actor-cell" data-label="Responsable y observación">
                   <div class="actor-stack">
-                    <span class="actor-name">
-                      <UserCheck
-                        v-if="row.responsable?.display_name"
-                        :size="14"
-                        aria-hidden="true"
-                      />
-                      <Cpu v-else :size="14" aria-hidden="true" />
-                      <strong>{{ row.responsable?.display_name || 'Sistema' }}</strong>
+                    <CreatorTag
+                      v-if="row.responsable?.display_name"
+                      :name="row.responsable.display_name"
+                    />
+                    <span v-else class="actor-name">
+                      <Cpu :size="14" aria-hidden="true" />
+                      <strong>Sistema</strong>
                     </span>
                     <span class="actor-obs" :title="row.observaciones || 'Sin observaciones'">
-                      {{ row.observaciones || '—' }}
+                      {{ formatMovementObservation(row) }}
                     </span>
                   </div>
                 </td>

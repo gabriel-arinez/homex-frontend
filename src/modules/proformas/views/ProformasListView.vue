@@ -77,6 +77,9 @@ async function exportExcel() {
   if (exportingExcel.value || dateError.value) return
   exportingExcel.value = true
   try {
+    const stateLabel = states.value.find((s) => s.codigo === state.value)?.nombre || state.value
+    const clientLabel =
+      customerName.value.trim() || (customer.value ? `cliente-${customer.value}` : '')
     await exportTrayExcel({
       endpoint: '/api/v1/proformas/exportar-excel/',
       query: {
@@ -88,7 +91,13 @@ async function exportExcel() {
         ordering: '-ultima_actividad_comercial',
       },
       prefix: 'proformas',
-      filenameSegments: [state.value, search.value.trim(), dateFrom.value, dateTo.value],
+      filenameSegments: [
+        stateLabel,
+        clientLabel,
+        search.value.trim(),
+        dateFrom.value,
+        dateTo.value,
+      ],
     })
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'No pudimos exportar el Excel.'
@@ -889,7 +898,7 @@ onBeforeUnmount(() => {
   color: var(--color-text-secondary);
   font-size: 0.78rem;
 }
-.client-cell span {
+.client-cell span:not(.creator-tag):not(.creator-tag span) {
   display: block;
   color: var(--color-text-secondary);
   font-size: 0.75rem;

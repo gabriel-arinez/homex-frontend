@@ -1710,6 +1710,7 @@ export type ResultadoAsistida = {
   advertencias: Array<unknown>
   motor: MotorAsistida | null
   error_codigo: string | null
+  latencia_asr_ms?: number | null
 }
 
 export type ResultadoCatalogo = {
@@ -1723,6 +1724,7 @@ export type ResultadoCatalogo = {
   texto_transcrito_original: string | null
   propuesta: PropuestaCatalogo | null
   error_codigo: string | null
+  latencia_asr_ms?: number | null
 }
 
 /**

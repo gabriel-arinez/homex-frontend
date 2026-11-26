@@ -45,6 +45,13 @@ async function exportExcel() {
   if (exportingExcel.value) return
   exportingExcel.value = true
   try {
+    const statusLabel =
+      status.value === 'activos' ? 'Activos' : status.value === 'inactivos' ? 'Inactivos' : ''
+    const typeLabel =
+      type.value === 'todos'
+        ? ''
+        : types.value.find((t) => String(t.id) === type.value || t.codigo === type.value)?.nombre ||
+          type.value
     await exportTrayExcel({
       endpoint: '/api/v1/clientes/exportar-excel/',
       query: {
@@ -53,11 +60,7 @@ async function exportExcel() {
         tipo_cliente: type.value === 'todos' ? undefined : type.value,
       },
       prefix: 'clientes',
-      filenameSegments: [
-        status.value !== 'todos' ? status.value : '',
-        type.value !== 'todos' ? type.value : '',
-        search.value.trim(),
-      ],
+      filenameSegments: [statusLabel, typeLabel, search.value.trim()],
     })
   } catch (err) {
     toastMessage.value = err instanceof Error ? err.message : 'No pudimos exportar el Excel.'
