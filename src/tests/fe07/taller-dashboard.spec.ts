@@ -248,7 +248,9 @@ describe('Fase 4 TallerDashboard', () => {
 
     await clickTab('Planificación y entregas')
     expect(wrapper.text()).toContain('Noviembre 2026')
-    expect(wrapper.text()).toContain('OT #25')
+    await vi.waitFor(() => {
+      expect(wrapper.text()).toContain('OT #25')
+    })
 
     // Navegación a diciembre y cambio a vista alternativa Listado de eventos
     await wrapper.get('button[aria-label="Mes siguiente"]').trigger('click')
