@@ -99,6 +99,7 @@ import {
 import { totalEstimadoCompleto, totalEstimadoLinea } from '../services/presentacionComercial'
 import { downloadBlob } from '@/shared/download/downloadBlob'
 import { buildExportFilename } from '@/shared/download/exportFilename'
+import { cantidadProducto } from '@/modules/productos/utils/presentacionCatalogo'
 import DocumentViewerModal from '../components/DocumentViewerModal.vue'
 import { useProformaPdf } from '../composables/useProformaPdf'
 
@@ -869,11 +870,8 @@ function unitName(unitId: number) {
 }
 function formatQuantity(val: string | number | null | undefined): string {
   if (val == null || val === '') return ''
-  const str = String(val).trim()
-  const num = Number.parseFloat(str)
-  if (!Number.isFinite(num)) return str
-  if (num === Math.trunc(num)) return String(Math.trunc(num))
-  return String(Number(num.toFixed(4)))
+  const formatted = cantidadProducto(val)
+  return formatted === '—' ? String(val).trim() : formatted
 }
 function itemTypeLabel(line: LineaLocal): string {
   if (line.tipo_item) {
@@ -913,6 +911,9 @@ function normalizeLine(line: Proforma['detalles'][number]): LineaLocal {
 
 const documentModalOpen = ref(false)
 const downloadingDocument = ref(false)
+const savingViewerDocument = ref(false)
+const viewerSaveError = ref('')
+const viewerSaveSuccess = ref('')
 
 const {
   blob: documentBlob,
@@ -923,6 +924,8 @@ const {
   clear: clearDocument,
 } = useProformaPdf()
 watch(documentModalOpen, (open) => {
+  viewerSaveError.value = ''
+  viewerSaveSuccess.value = ''
   if (open && persisted.value?.id) void loadDocument(persisted.value.id)
   else clearDocument()
 })
@@ -1736,13 +1739,34 @@ const proformaChanges = computed<FormFieldChange[]>(() => {
 })
 const documentNotice = computed(() => {
   if (!hasRealChanges.value && !hasPendingEdits.value) return ''
-  const saveAction = isReview.value ? 'Guardar cambios' : 'Guardar borrador'
-  return (
-    'Hay cambios sin guardar o ediciones pendientes. El PDF refleja los datos guardados en el servidor, no los cambios pendientes. ' +
-    'Cierra el visor, incorpora las ediciones pendientes con Guardar línea o desde la ficha del mueble, ' +
-    `pulsa «${saveAction}» y vuelve a abrir Ver Proforma para generar el documento actualizado.`
-  )
+  if (hasPendingEdits.value) {
+    return 'Hay ediciones pendientes en una línea o ficha técnica que deben incorporarse antes de guardar.'
+  }
+  return 'Hay cambios sin guardar. El PDF muestra los datos guardados en el servidor.'
 })
+async function saveAndRefreshPdf() {
+  if (savingViewerDocument.value || saving.value) return
+  savingViewerDocument.value = true
+  viewerSaveError.value = ''
+  viewerSaveSuccess.value = ''
+  try {
+    const ok = await persist(false, true)
+    if (!ok) {
+      viewerSaveError.value = error.value || 'No se pudieron guardar los cambios.'
+      return
+    }
+    if (persisted.value?.id) {
+      await loadDocument(persisted.value.id)
+      if (documentError.value) {
+        viewerSaveError.value = documentError.value
+        return
+      }
+    }
+    viewerSaveSuccess.value = 'Cambios guardados y PDF actualizado.'
+  } finally {
+    savingViewerDocument.value = false
+  }
+}
 async function requestReview() {
   if (saving.value) return
   if (!canEmit.value) {
@@ -3092,6 +3116,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       :title="persisted?.numero ? `Proforma #${persisted.numero}` : 'Cotización HOMEX'"
       :subtitle="`PDF de la versión guardada · Tamaño Carta · ${persisted?.estado_info?.nombre ?? 'Borrador'}`"
       :notice="documentNotice"
+      :can-save-and-refresh="isEditable"
+      :has-pending-changes="hasRealChanges || hasPendingEdits"
+      :saving-and-refreshing="savingViewerDocument"
+      :save-error="viewerSaveError"
+      :save-success="viewerSaveSuccess"
       :downloading="downloadingDocument"
       :can-download-pdf="true"
       :pdf-url="documentUrl"
@@ -3100,6 +3129,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       @close="documentModalOpen = false"
       @retry="persisted?.id && loadDocument(persisted.id)"
       @download="downloadDocumentPdf"
+      @save-and-refresh="saveAndRefreshPdf"
     />
   </div>
 </template>

@@ -47,7 +47,7 @@ import { galleryService, type GalleryImage } from '@/shared/media/gallery'
 import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
 import { fechaComercial, formatearFechaHora } from '@/shared/date/presentacionFecha'
 import { useFormChanges } from '@/shared/forms/useFormChanges'
-import { workOrderStatusIcon, workOrderTone } from '../utils/workOrderPresentation'
+import { workOrderTone } from '../utils/workOrderPresentation'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
 import ConfirmDialog from '@/shared/ui/ConfirmDialog.vue'
@@ -57,6 +57,7 @@ import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
 import Modal from '@/shared/ui/Modal.vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
+import StateHistoryTimeline from '@/shared/ui/StateHistoryTimeline.vue'
 import StatusBadge from '@/shared/ui/StatusBadge.vue'
 import TextField from '@/shared/ui/TextField.vue'
 import Toast from '@/shared/ui/Toast.vue'
@@ -109,10 +110,10 @@ function formatDateLabel(value: string | null | undefined): string | null {
   return formatearFechaHora(value)
 }
 
+import { cantidadProducto } from '@/modules/productos/utils/presentacionCatalogo'
+
 function formatQuantity(value: string | number): string {
-  const text = String(value).trim()
-  if (/^\d+\.0+$/.test(text)) return text.split('.')[0] ?? text
-  return text
+  return cantidadProducto(value)
 }
 
 const sortedTimeline = computed(() =>
@@ -901,68 +902,12 @@ const workOrderTabs = computed(() => [
         </div>
       </section>
 
-      <section
+      <StateHistoryTimeline
         v-if="sortedTimeline.length"
-        class="ot-timeline"
-        aria-label="Historial de estados"
-        data-testid="ot-state-timeline"
-      >
-        <div class="ot-timeline__header">
-          <Clock3 :size="16" aria-hidden="true" />
-          <h3>Historial de estados</h3>
-        </div>
-        <ol class="ot-timeline__list">
-          <li
-            v-for="(entry, index) in sortedTimeline"
-            :key="entry.id"
-            class="ot-timeline__item"
-            :class="{
-              'ot-timeline__item--current':
-                index === 0 && entry.estado_nuevo_info.codigo === item.estado_info.codigo,
-            }"
-          >
-            <span
-              class="ot-timeline__marker"
-              :class="`ot-timeline__marker--${workOrderTone(entry.estado_nuevo_info.codigo)}`"
-              aria-hidden="true"
-            >
-              <component
-                :is="workOrderStatusIcon(entry.estado_nuevo_info.codigo)"
-                :size="14"
-                aria-hidden="true"
-              />
-            </span>
-            <div class="ot-timeline__content">
-              <div class="ot-timeline__title">
-                <StatusBadge
-                  :status="entry.estado_nuevo_info.codigo"
-                  :label="entry.estado_nuevo_info.nombre"
-                />
-                <Badge
-                  v-if="index === 0 && entry.estado_nuevo_info.codigo === item.estado_info.codigo"
-                  :tone="workOrderTone(entry.estado_nuevo_info.codigo)"
-                  :dot="false"
-                >
-                  Estado actual
-                </Badge>
-                <span v-if="entry.estado_anterior_info" class="ot-timeline__prev">
-                  desde {{ entry.estado_anterior_info.nombre }}
-                </span>
-              </div>
-              <div class="ot-timeline__meta">
-                <span>{{ formatearFechaHora(entry.fecha) }}</span>
-                <span v-if="entry.cambiado_por_resumen?.display_name" class="ot-timeline__actor">
-                  · <UserCheck :size="13" aria-hidden="true" />
-                  {{ entry.cambiado_por_resumen.display_name }}
-                </span>
-              </div>
-              <p v-if="entry.observaciones" class="ot-timeline__obs">
-                {{ entry.observaciones }}
-              </p>
-            </div>
-          </li>
-        </ol>
-      </section>
+        :entries="item.historial_estados ?? []"
+        :current-status-code="item.estado_info.codigo"
+        test-id="ot-state-timeline"
+      />
 
       <DetailTabs
         :model-value="activeTab"

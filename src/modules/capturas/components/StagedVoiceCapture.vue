@@ -22,6 +22,7 @@ import Button from '@/shared/ui/Button.vue'
 import {
   buildFurnitureTranscriptEvidence,
   categorizeEvidenceLabel,
+  type NlpCandidateLike,
   type VoiceEvidence,
 } from '../voiceEvidence'
 const props = defineProps<{
@@ -67,7 +68,12 @@ const appliedEvidence = computed<VoiceEvidence[]>(() => {
   const transcript = text.value.trim()
   if (!res || !transcript) return []
   if ('propuesta_configurador' in res) {
-    return buildFurnitureTranscriptEvidence(transcript, res.propuesta_configurador, res.pendientes)
+    return buildFurnitureTranscriptEvidence(
+      transcript,
+      res.propuesta_configurador,
+      res.pendientes,
+      (res.candidatos ?? []) as NlpCandidateLike[],
+    )
   }
   const ev = res.propuesta?.evidence ?? []
   return ev.map((item) => ({

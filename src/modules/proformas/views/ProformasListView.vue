@@ -8,6 +8,7 @@ import {
   FileCheck,
   FileClock,
   FileEdit,
+  FileSpreadsheet,
   FileText,
   FileX,
   Plus,
@@ -22,6 +23,7 @@ import ProformaActionsMenu from '../components/ProformaActionsMenu.vue'
 import DocumentViewerModal from '../components/DocumentViewerModal.vue'
 import { useProformaPdf } from '../composables/useProformaPdf'
 import { downloadBlob } from '@/shared/download/downloadBlob'
+import { exportTrayExcel } from '@/shared/download/exportExcel'
 import { buildExportFilename } from '@/shared/download/exportFilename'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
@@ -70,6 +72,30 @@ const filasConCreacion = computed(() =>
 const states = ref<ValorCatalogoPublico[]>([])
 const loading = ref(true)
 const error = ref('')
+const exportingExcel = ref(false)
+async function exportExcel() {
+  if (exportingExcel.value || dateError.value) return
+  exportingExcel.value = true
+  try {
+    await exportTrayExcel({
+      endpoint: '/api/v1/proformas/exportar-excel/',
+      query: {
+        search: search.value.trim() || undefined,
+        estado: state.value || undefined,
+        cliente: customer.value || undefined,
+        fecha_desde: dateFrom.value || undefined,
+        fecha_hasta: dateTo.value || undefined,
+        ordering: '-ultima_actividad_comercial',
+      },
+      prefix: 'proformas',
+      filenameSegments: [state.value, search.value.trim(), dateFrom.value, dateTo.value],
+    })
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'No pudimos exportar el Excel.'
+  } finally {
+    exportingExcel.value = false
+  }
+}
 const search = ref(queryString('q'))
 const state = ref(queryString('estado'))
 const customer = ref(
@@ -329,6 +355,15 @@ onBeforeUnmount(() => {
       @menu="emit('openMenu')"
     >
       <template #actions>
+        <Button
+          variant="secondary"
+          :processing="exportingExcel"
+          :disabled="exportingExcel || Boolean(dateError)"
+          @click="exportExcel"
+        >
+          <FileSpreadsheet :size="16" aria-hidden="true" />
+          {{ exportingExcel ? 'Exportando…' : 'Exportar Excel' }}
+        </Button>
         <Button
           @click="
             router.push(

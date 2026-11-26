@@ -36,6 +36,11 @@ const props = withDefaults(
     loading?: boolean
     error?: string
     notice?: string
+    canSaveAndRefresh?: boolean
+    hasPendingChanges?: boolean
+    savingAndRefreshing?: boolean
+    saveError?: string
+    saveSuccess?: string
   }>(),
   {
     title: 'Documento comercial',
@@ -46,9 +51,14 @@ const props = withDefaults(
     loading: false,
     error: '',
     notice: '',
+    canSaveAndRefresh: false,
+    hasPendingChanges: false,
+    savingAndRefreshing: false,
+    saveError: '',
+    saveSuccess: '',
   },
 )
-const emit = defineEmits<{ close: []; download: []; retry: [] }>()
+const emit = defineEmits<{ close: []; download: []; retry: []; saveAndRefresh: [] }>()
 const zoom = ref(1)
 const mode = ref<'page' | 'width' | 'custom'>('page')
 const viewportRef = ref<HTMLElement | null>(null)
@@ -164,7 +174,7 @@ function onKeydown(event: KeyboardEvent) {
   }
 }
 function printDocument() {
-  if (!props.pdfUrl || props.loading || !pdf.value) return
+  if (!props.pdfUrl || props.loading || props.savingAndRefreshing || !pdf.value) return
   printError.value = ''
   try {
     const frame = printRef.value?.contentWindow
@@ -366,7 +376,7 @@ onBeforeUnmount(() => {
           <Button
             type="button"
             variant="secondary"
-            :disabled="loading || !pdfUrl || !pdf"
+            :disabled="loading || savingAndRefreshing || !pdfUrl || !pdf"
             @click="printDocument"
             ><Printer :size="17" aria-hidden="true" /> Imprimir</Button
           >
@@ -375,7 +385,7 @@ onBeforeUnmount(() => {
             type="button"
             variant="secondary"
             :processing="downloading"
-            :disabled="loading || !pdfUrl"
+            :disabled="loading || savingAndRefreshing || !pdfUrl"
             @click="emit('download')"
             ><Download :size="17" aria-hidden="true" /> Descargar PDF</Button
           >
@@ -391,7 +401,25 @@ onBeforeUnmount(() => {
         </div>
       </header>
 
-      <p v-if="notice" class="doc-viewer-notice" role="status">{{ notice }}</p>
+      <div
+        v-if="notice || (canSaveAndRefresh && hasPendingChanges)"
+        class="doc-viewer-notice"
+        role="status"
+      >
+        <span>{{ notice }}</span>
+        <Button
+          v-if="canSaveAndRefresh && hasPendingChanges"
+          type="button"
+          variant="primary"
+          size="sm"
+          :processing="savingAndRefreshing"
+          :disabled="savingAndRefreshing || loading"
+          @click="emit('saveAndRefresh')"
+          >Guardar y actualizar PDF</Button
+        >
+      </div>
+      <p v-if="saveSuccess" class="doc-viewer-success" role="status">{{ saveSuccess }}</p>
+      <p v-if="saveError" class="doc-viewer-error" role="alert">{{ saveError }}</p>
       <p v-if="printError" class="doc-viewer-error" role="alert">{{ printError }}</p>
       <main
         ref="viewportRef"
@@ -617,8 +645,21 @@ onBeforeUnmount(() => {
 .doc-viewer-notice {
   margin: 0;
   padding: 10px 20px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   font-size: 13px;
   background: #713f12;
+  color: #fff;
+}
+.doc-viewer-success {
+  margin: 0;
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  background: #166534;
   color: #fff;
 }
 .doc-viewer-error {

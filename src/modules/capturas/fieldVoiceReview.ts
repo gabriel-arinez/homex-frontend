@@ -64,6 +64,13 @@ function render(root: HTMLElement, value: Binding) {
     marked.push(input)
     const rowCard = input.closest<HTMLElement>('.measure-row, .studio-attribute-row')
     const hasDimensionPending = Boolean(rowCard?.querySelector('.dimension-pending'))
+    const existingRowStatus = rowCard?.querySelector<HTMLElement>('.voice-field-status')
+    if (rowCard && existingRowStatus && review.state !== 'pending') {
+      continue
+    }
+    if (rowCard && existingRowStatus && review.state === 'pending') {
+      existingRowStatus.remove()
+    }
     const note = document.createElement('span')
     note.className = 'voice-field-status'
     note.id = `voice-status-${review.field}`

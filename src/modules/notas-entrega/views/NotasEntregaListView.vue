@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  FileSpreadsheet,
   FileText,
   PackageCheck,
   RotateCcw,
@@ -12,6 +13,7 @@ import {
 import type { NotaEntrega } from '@/generated/api'
 import DocumentViewerModal from '@/modules/proformas/components/DocumentViewerModal.vue'
 import { downloadBlob } from '@/shared/download/downloadBlob'
+import { exportTrayExcel } from '@/shared/download/exportExcel'
 import { buildExportFilename } from '@/shared/download/exportFilename'
 import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
 import { notasEntregaService } from '../services/notasEntregaService'
@@ -44,6 +46,28 @@ const loading = ref(true)
 const error = ref('')
 const toastMessage = ref('')
 const toastTone = ref<'success' | 'danger'>('success')
+const exportingExcel = ref(false)
+async function exportExcel() {
+  if (exportingExcel.value) return
+  exportingExcel.value = true
+  try {
+    await exportTrayExcel({
+      endpoint: '/api/v1/notas-entrega/exportar-excel/',
+      query: {
+        search: search.value.trim() || undefined,
+        fecha_desde: dateFrom.value || undefined,
+        fecha_hasta: dateTo.value || undefined,
+      },
+      prefix: 'notas-entrega',
+      filenameSegments: [search.value.trim(), dateFrom.value, dateTo.value],
+    })
+  } catch (err) {
+    toastTone.value = 'danger'
+    toastMessage.value = err instanceof Error ? err.message : 'No pudimos exportar el Excel.'
+  } finally {
+    exportingExcel.value = false
+  }
+}
 
 const search = ref(typeof route.query.q === 'string' ? route.query.q : '')
 const dateFrom = ref(routeDate('desde'))
@@ -223,7 +247,19 @@ onMounted(load)
       description="Notas emitidas cuando el pedido está listo para entrega."
       show-menu
       @menu="emit('openMenu')"
-    />
+    >
+      <template #actions>
+        <Button
+          variant="secondary"
+          :processing="exportingExcel"
+          :disabled="exportingExcel"
+          @click="exportExcel"
+        >
+          <FileSpreadsheet :size="16" aria-hidden="true" />
+          {{ exportingExcel ? 'Exportando…' : 'Exportar Excel' }}
+        </Button>
+      </template>
+    </PageHeader>
 
     <section class="delivery-filters" aria-label="Buscar y filtrar notas de entrega">
       <div class="delivery-filters__main">

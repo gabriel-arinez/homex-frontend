@@ -77,6 +77,8 @@ const quote = (state = 'BORRADOR'): Proforma => ({
   created_by: 7,
   updated_by: 7,
   detalles: [detail],
+  historial_estados: [],
+  historial_incompleto: false,
 })
 const options = {
   TIPO_ITEM: [option(1, 'MUEBLE_MEDIDA', 'Mueble a medida')],

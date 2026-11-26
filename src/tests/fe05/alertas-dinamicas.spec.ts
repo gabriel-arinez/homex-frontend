@@ -117,6 +117,8 @@ describe('Alertas dinámicas entre roles', () => {
         estado: 10,
         created_by: 12,
         updated_by: 12,
+        historial_estados: [],
+        historial_incompleto: false,
       },
     ])
     vi.spyOn(pedidosService, 'options').mockResolvedValue([

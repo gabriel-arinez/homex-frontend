@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
+  FileSpreadsheet,
   LayoutGrid,
   Layers,
   List,
@@ -20,6 +21,7 @@ import {
   RotateCcw,
   Tag,
 } from '@lucide/vue'
+import { exportTrayExcel } from '@/shared/download/exportExcel'
 import type { FamiliaProducto, Producto, ValorCatalogoPublico } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { proformasService } from '@/modules/proformas/services/proformasService'
@@ -75,6 +77,38 @@ const error = ref('')
 const notice = ref('')
 const toastMessage = ref('')
 const toastTone = ref<'success' | 'danger'>('success')
+const exportingExcel = ref(false)
+async function exportExcel() {
+  if (exportingExcel.value) return
+  exportingExcel.value = true
+  try {
+    const query: Record<string, string | number | boolean | undefined> = {
+      search: search.value.trim() || undefined,
+      activo: status.value === 'todos' ? undefined : status.value === 'activos',
+      estado_stock: stockStatus.value || undefined,
+      categoria: numberId(category.value),
+    }
+    for (const key of availableExtra.value) {
+      const value = extras[key]
+      if (value) query[key] = value
+    }
+    await exportTrayExcel({
+      endpoint: '/api/v1/catalogo/productos/exportar-excel/',
+      query,
+      prefix: 'productos',
+      filenameSegments: [
+        status.value !== 'todos' ? status.value : '',
+        stockStatus.value,
+        search.value.trim(),
+      ],
+    })
+  } catch (err) {
+    toastTone.value = 'danger'
+    toastMessage.value = err instanceof Error ? err.message : 'No pudimos exportar el Excel.'
+  } finally {
+    exportingExcel.value = false
+  }
+}
 const categoryError = ref('')
 const categoryLoading = ref(true)
 const categories = ref<ValorCatalogoPublico[]>([])
@@ -506,6 +540,15 @@ onBeforeUnmount(() => {
       @menu="emit('openMenu')"
     >
       <template #actions>
+        <Button
+          variant="secondary"
+          :processing="exportingExcel"
+          :disabled="exportingExcel"
+          @click="exportExcel"
+        >
+          <FileSpreadsheet :size="16" aria-hidden="true" />
+          {{ exportingExcel ? 'Exportando…' : 'Exportar Excel' }}
+        </Button>
         <div
           v-if="canCreate"
           class="create-shortcuts"

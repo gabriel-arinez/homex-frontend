@@ -5,12 +5,14 @@ import {
   Building2,
   ChevronLeft,
   ChevronRight,
+  FileSpreadsheet,
   MapPin,
   Phone,
   Plus,
   RotateCcw,
   UserRound,
 } from '@lucide/vue'
+import { exportTrayExcel } from '@/shared/download/exportExcel'
 import type { Cliente, ValorCatalogoPublico } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { proformasService } from '@/modules/proformas/services/proformasService'
@@ -38,6 +40,31 @@ const total = ref(0)
 const loading = ref(true)
 const error = ref('')
 const toastMessage = ref('')
+const exportingExcel = ref(false)
+async function exportExcel() {
+  if (exportingExcel.value) return
+  exportingExcel.value = true
+  try {
+    await exportTrayExcel({
+      endpoint: '/api/v1/clientes/exportar-excel/',
+      query: {
+        search: search.value.trim() || undefined,
+        activo: status.value === 'todos' ? undefined : status.value === 'activos',
+        tipo_cliente: type.value === 'todos' ? undefined : type.value,
+      },
+      prefix: 'clientes',
+      filenameSegments: [
+        status.value !== 'todos' ? status.value : '',
+        type.value !== 'todos' ? type.value : '',
+        search.value.trim(),
+      ],
+    })
+  } catch (err) {
+    toastMessage.value = err instanceof Error ? err.message : 'No pudimos exportar el Excel.'
+  } finally {
+    exportingExcel.value = false
+  }
+}
 const clientToToggle = ref<Cliente | null>(null)
 const statusUpdating = ref(false)
 const search = ref(typeof route.query.q === 'string' ? route.query.q : '')
@@ -229,6 +256,15 @@ onBeforeUnmount(() => {
       @menu="emit('openMenu')"
     >
       <template #actions>
+        <Button
+          variant="secondary"
+          :processing="exportingExcel"
+          :disabled="exportingExcel"
+          @click="exportExcel"
+        >
+          <FileSpreadsheet :size="16" aria-hidden="true" />
+          {{ exportingExcel ? 'Exportando…' : 'Exportar Excel' }}
+        </Button>
         <Button @click="router.push('/clientes/nuevo')">
           <Plus :size="18" aria-hidden="true" /> Nuevo cliente
         </Button>

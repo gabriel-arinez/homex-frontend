@@ -67,15 +67,20 @@ const groups: Array<{
     ],
   },
   {
-    label: 'Comercial',
+    label: 'Comercial e inventario',
     items: [
-      { label: 'Clientes', to: '/clientes', icon: Users, capabilities: ['comercial.operar'] },
       { label: 'Proformas', to: '/proformas', icon: FileText, capabilities: ['comercial.operar'] },
       {
         label: 'Productos',
         to: '/productos',
         icon: PackageOpen,
         capabilities: ['comercial.operar', 'catalogo.crear_producto'],
+      },
+      {
+        label: 'Movimientos de stock',
+        to: '/movimientos-stock',
+        icon: History,
+        capabilities: ['comercial.operar'],
       },
     ],
   },
@@ -95,18 +100,13 @@ const groups: Array<{
         icon: Truck,
         capabilities: ['comercial.operar'],
       },
-      {
-        label: 'Movimientos de stock',
-        to: '/movimientos-stock',
-        icon: History,
-        capabilities: ['comercial.operar'],
-      },
     ],
   },
   {
-    label: 'Finanzas',
+    label: 'Finanzas y clientes',
     items: [
       { label: 'Recibos', to: '/recibos', icon: ReceiptText, capabilities: ['comercial.operar'] },
+      { label: 'Clientes', to: '/clientes', icon: Users, capabilities: ['comercial.operar'] },
     ],
   },
 ]
@@ -527,20 +527,21 @@ nav a.router-link-active::before {
   flex: 0 0 auto;
   place-items: center;
   padding: 0;
-  border: 1px solid transparent;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 28%, transparent);
   border-radius: var(--radius-control);
-  background: transparent;
-  color: var(--color-text-secondary);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
   cursor: pointer;
   transition:
     background-color var(--transition-fast),
     color var(--transition-fast),
     border-color var(--transition-fast);
 }
-.user__logout:hover {
+.user__logout:hover,
+.user__logout:focus-visible {
   color: var(--color-danger);
-  background: var(--color-danger-soft);
-  border-color: color-mix(in srgb, var(--color-danger) 25%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 20%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-danger) 50%, transparent);
 }
 .sidebar__utils {
   display: flex;

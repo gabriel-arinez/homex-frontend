@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { AlertCircle, Ban, Layers3, Ruler, Wallet } from '@lucide/vue'
+import { AlertCircle, Layers3, Ruler, Wallet } from '@lucide/vue'
 import {
   categorizeEvidenceLabel,
   evidenceSegments,
@@ -24,9 +24,16 @@ const categoryMeta: Record<
 > = {
   commercial: { label: 'Comercial y precio', short: 'Comercial', icon: Wallet },
   dimensions: { label: 'Dimensiones', short: 'Medidas', icon: Ruler },
-  structure: { label: 'Estructura y material', short: 'Material / Comp.', icon: Layers3 },
-  pending: { label: 'Requiere revisión', short: 'Pendiente', icon: AlertCircle },
-  unidentified: { label: 'No identificado', short: 'Sin asignar', icon: Ban },
+  structure: {
+    label: 'Materiales, componentes y características',
+    short: 'Material / Comp.',
+    icon: Layers3,
+  },
+  conflict: {
+    label: 'Conflicto o requiere revisión',
+    short: 'Conflicto / Revisión',
+    icon: AlertCircle,
+  },
 }
 
 const activeCategories = computed(() => {
@@ -34,13 +41,7 @@ const activeCategories = computed(() => {
   for (const part of parts.value) {
     if (part.decision && part.category) seen.add(part.category)
   }
-  const order: EvidenceCategory[] = [
-    'commercial',
-    'dimensions',
-    'structure',
-    'pending',
-    'unidentified',
-  ]
+  const order: EvidenceCategory[] = ['commercial', 'dimensions', 'structure', 'conflict']
   return order.filter((cat) => seen.has(cat))
 })
 </script>
@@ -65,7 +66,11 @@ const activeCategories = computed(() => {
       <template v-for="(part, index) in parts" :key="index">
         <mark
           v-if="part.decision"
-          :class="[part.decision, part.category ? `cat--${part.category}` : '']"
+          :class="[
+            part.decision,
+            part.category ? `cat--${part.category}` : '',
+            part.resolved ? 'is-resolved' : '',
+          ]"
           :title="`${part.fieldLabel || categoryMeta[part.category ?? 'structure'].label}${part.reason ? ': ' + part.reason : ''}`"
           >{{ part.text }}</mark
         ><template v-else>{{ part.text }}</template>
@@ -105,24 +110,19 @@ const activeCategories = computed(() => {
   border-color: rgba(22, 163, 74, 0.35);
 }
 .legend-pill--dimensions {
-  color: #38bdf8;
-  background: rgba(56, 189, 248, 0.12);
-  border-color: rgba(56, 189, 248, 0.35);
+  color: #0284c7;
+  background: rgba(56, 189, 248, 0.14);
+  border-color: rgba(56, 189, 248, 0.4);
 }
 .legend-pill--structure {
-  color: #a78bfa;
+  color: #8b5cf6;
   background: rgba(167, 139, 250, 0.14);
   border-color: rgba(167, 139, 250, 0.35);
 }
-.legend-pill--pending {
-  color: #f59e0b;
-  background: rgba(245, 158, 11, 0.14);
-  border-color: rgba(245, 158, 11, 0.4);
-}
-.legend-pill--unidentified {
-  color: #f87171;
-  background: rgba(248, 113, 113, 0.12);
-  border-color: rgba(248, 113, 113, 0.35);
+.legend-pill--conflict {
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.38);
 }
 .transcript {
   margin: 0;
@@ -147,22 +147,20 @@ mark.cat--commercial {
   border-bottom: 2px solid #16a34a;
 }
 mark.cat--dimensions {
-  background: rgba(56, 189, 248, 0.14);
-  border-bottom: 2px solid #38bdf8;
+  background: rgba(56, 189, 248, 0.16);
+  border-bottom: 2px solid #0284c7;
 }
 mark.cat--structure {
-  background: rgba(167, 139, 250, 0.15);
-  border-bottom: 2px solid #a78bfa;
+  background: rgba(167, 139, 250, 0.16);
+  border-bottom: 2px solid #8b5cf6;
 }
-mark.cat--pending,
-mark.UNRESOLVED {
-  background: rgba(245, 158, 11, 0.18);
-  border-bottom: 2px dashed #f59e0b;
-}
-mark.cat--unidentified,
+mark.cat--conflict,
+mark.UNRESOLVED,
 mark.REJECTED {
-  background: rgba(248, 113, 113, 0.12);
-  border-bottom: 2px dotted #f87171;
-  color: var(--color-text-secondary);
+  background: rgba(239, 68, 68, 0.14);
+  border-bottom: 2px dashed #dc2626;
+}
+mark.is-resolved {
+  border-bottom-style: solid;
 }
 </style>

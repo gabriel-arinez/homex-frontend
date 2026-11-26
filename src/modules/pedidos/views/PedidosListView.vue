@@ -7,12 +7,14 @@ import {
   ChevronRight,
   ClipboardCheck,
   ClipboardList,
+  FileSpreadsheet,
   FileText,
   Hammer,
   PackageCheck,
   RotateCcw,
   Truck,
 } from '@lucide/vue'
+import { exportTrayExcel } from '@/shared/download/exportExcel'
 import type { Pedido, ProformaListado, ValorCatalogoPublico } from '@/generated/api'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import { pedidosService } from '../services/pedidosService'
@@ -45,6 +47,28 @@ const states = ref<ValorCatalogoPublico[]>([])
 const proformasById = ref<Record<number, ProformaListado>>({})
 const loading = ref(true)
 const error = ref('')
+const exportingExcel = ref(false)
+async function exportExcel() {
+  if (exportingExcel.value) return
+  exportingExcel.value = true
+  try {
+    await exportTrayExcel({
+      endpoint: '/api/v1/pedidos/exportar-excel/',
+      query: {
+        search: search.value.trim() || undefined,
+        estado: stateFilter.value || undefined,
+        fecha_desde: dateFrom.value || undefined,
+        fecha_hasta: dateTo.value || undefined,
+      },
+      prefix: 'pedidos',
+      filenameSegments: [stateFilter.value, search.value.trim(), dateFrom.value, dateTo.value],
+    })
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'No pudimos exportar el Excel.'
+  } finally {
+    exportingExcel.value = false
+  }
+}
 
 const search = ref(typeof route.query.q === 'string' ? route.query.q : '')
 const stateFilter = ref(typeof route.query.estado === 'string' ? route.query.estado : '')
@@ -212,7 +236,19 @@ onMounted(load)
       description="Pedidos confirmados y su estado operativo real."
       show-menu
       @menu="emit('openMenu')"
-    />
+    >
+      <template #actions>
+        <Button
+          variant="secondary"
+          :processing="exportingExcel"
+          :disabled="exportingExcel"
+          @click="exportExcel"
+        >
+          <FileSpreadsheet :size="16" aria-hidden="true" />
+          {{ exportingExcel ? 'Exportando…' : 'Exportar Excel' }}
+        </Button>
+      </template>
+    </PageHeader>
 
     <section class="order-filters" aria-label="Buscar y filtrar pedidos">
       <div class="order-filters__main">

@@ -107,6 +107,8 @@ describe('Flujo de catálogo en Pedidos y Órdenes de Trabajo por rol', () => {
       estado: 1,
       created_by: 1,
       updated_by: 1,
+      historial_estados: [],
+      historial_incompleto: false,
     })
     vi.spyOn(pedidosService, 'options').mockImplementation(async (concepto) => {
       if (concepto === 'ESTADO_PEDIDO') {

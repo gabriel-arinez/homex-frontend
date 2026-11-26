@@ -13,7 +13,6 @@ import {
   LayoutDashboard,
   RefreshCw,
   ShoppingBag,
-  Store,
   TrendingUp,
   UserPlus,
   Wallet,
@@ -737,10 +736,6 @@ const tabs = computed<DetailTabItem[]>(() => [
           <Button variant="secondary" :disabled="anyLoading" @click="loadAll">
             <RefreshCw :size="15" aria-hidden="true" />Actualizar
           </Button>
-          <Badge tone="neutral">
-            <Store :size="13" aria-hidden="true" />
-            {{ vendorName }}
-          </Badge>
         </div>
       </template>
     </PageHeader>

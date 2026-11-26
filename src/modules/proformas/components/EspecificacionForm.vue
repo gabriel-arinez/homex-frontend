@@ -106,6 +106,7 @@ const emit = defineEmits<{
       'pending' | 'issues' | 'complete'
     >,
   ]
+  voiceReviewChange: [fields: FieldVoiceReview[]]
 }>()
 const base = leerDatosTecnicos(props.especificacion?.datos_tecnicos)
 const catalogo = ref<AtributoMueble[]>([])
@@ -307,9 +308,37 @@ const reviewedVoiceFields = ref<
 >({})
 function voiceIdentity(field: string): string {
   const match = /^componente-(.+)-(\d+)$/.exec(field)
-  if (!match) return field
-  const uid = componentes[Number(match[2])]?.uid
-  return uid ? `componentes.${uid}.${match[1]}` : field
+  if (match) {
+    const uid = componentes[Number(match[2])]?.uid
+    return uid ? `componentes.${uid}.${match[1]}` : field
+  }
+  const qtyMatch = /^componente-(\d+)-cantidad$/.exec(field)
+  if (qtyMatch) {
+    const uid = componentes[Number(qtyMatch[1])]?.uid
+    return uid ? `componentes.${uid}.cantidad_interna` : field
+  }
+  const grpMatch = /^componente-(\d+)-grupo$/.exec(field)
+  if (grpMatch) {
+    const uid = componentes[Number(grpMatch[1])]?.uid
+    return uid ? `componentes.${uid}.conjunto_uid` : field
+  }
+  const attrMatch = /^atributo-(\d+)-(\d+)$/.exec(field)
+  if (attrMatch) {
+    const c = componentes[Number(attrMatch[1])]
+    const a = c?.atributos?.[Number(attrMatch[2])]
+    if (c?.uid && a) return `componentes.${c.uid}.atributos.${normalized(a.codigo ?? a.nombre)}`
+  }
+  const genMatch = /^general-(\d+)$/.exec(field)
+  if (genMatch) {
+    const a = atributosGenerales[Number(genMatch[1])]
+    if (a) return `general.atributos.${normalized(a.codigo ?? a.nombre)}`
+  }
+  const setMatch = /^grupo-(\d+)$/.exec(field)
+  if (setMatch) {
+    const g = conjuntos[Number(setMatch[1])]
+    if (g?.uid) return `conjuntos.${g.uid}.nombre`
+  }
+  return field
 }
 function rawSuggestedValue(
   field: string,
@@ -385,6 +414,64 @@ function voiceResolution(field: string) {
   return resolution
 }
 function suggestedField(field: string): string | null {
+  if (field.startsWith('dim:')) {
+    const clave = field.slice(4)
+    return medidas.some((m) => m.clave === clave) ? clave : null
+  }
+  if (field.startsWith('general:attr:')) {
+    const target = normalized(field.slice('general:attr:'.length))
+    const index = atributosGenerales.findIndex(
+      (a) => normalized(a.codigo ?? '') === target || normalized(a.nombre) === target,
+    )
+    return index >= 0 ? `general-${index}` : null
+  }
+  if (field.startsWith('conjunto:') && field.endsWith(':nombre')) {
+    const uid = field.slice('conjunto:'.length, -':nombre'.length)
+    const gi = conjuntos.findIndex((g) => g.uid === uid)
+    return gi >= 0 ? `grupo-${gi}` : null
+  }
+  if (field.startsWith('comp:')) {
+    const rest = field.slice('comp:'.length)
+    const attrIdx = rest.indexOf(':attr:')
+    if (attrIdx >= 0) {
+      const uid = rest.slice(0, attrIdx)
+      const attrTarget = normalized(rest.slice(attrIdx + ':attr:'.length))
+      const index = componentes.findIndex((c) => c.uid === uid)
+      if (index < 0) return null
+      const ai = (componentes[index]!.atributos ?? []).findIndex(
+        (a) => normalized(a.codigo ?? '') === attrTarget || normalized(a.nombre) === attrTarget,
+      )
+      return ai >= 0 ? `atributo-${index}-${ai}` : null
+    }
+    const colon = rest.lastIndexOf(':')
+    if (colon >= 0) {
+      const uid = rest.slice(0, colon)
+      const campo = rest.slice(colon + 1)
+      const index = componentes.findIndex((c) => c.uid === uid)
+      if (index < 0) return null
+      if (campo === 'cantidad_interna') return `componente-${index}-cantidad`
+      if (campo === 'conjunto_uid') return `componente-${index}-grupo`
+      return `componente-${campo}-${index}`
+    }
+  }
+  if (field.startsWith('accesorio:')) {
+    const parts = field.split(':')
+    const idxHint = Number(parts[1])
+    const expectedText = parts.slice(2).join(':').trim().toLowerCase()
+    if (
+      Number.isInteger(idxHint) &&
+      idxHint >= 0 &&
+      idxHint < accesorios.length &&
+      (!expectedText || accesorios[idxHint]!.trim().toLowerCase() === expectedText)
+    ) {
+      return `accesorio-${idxHint}`
+    }
+    if (expectedText) {
+      const found = accesorios.findIndex((a) => a.trim().toLowerCase() === expectedText)
+      return found >= 0 ? `accesorio-${found}` : null
+    }
+    return null
+  }
   const match = /^componente-(.+)-(\d+)$/.exec(field)
   if (!match) return field
   const original = (base.componentes as ComponenteTecnico[] | undefined)?.[Number(match[2])]
@@ -1691,6 +1778,13 @@ const initialContent = clonarTecnica(currentDraft())
 const hasRealChanges = computed(() => !tecnicaIgual(currentDraft(), initialContent))
 defineExpose({ submit, hasRealChanges })
 onMounted(loadCatalog)
+watch(
+  () => voiceReview.value.fields,
+  (fields) => {
+    emit('voiceReviewChange', fields)
+  },
+  { immediate: true, deep: true },
+)
 </script>
 
 <template>

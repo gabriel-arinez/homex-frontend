@@ -24,6 +24,7 @@ import EmptyState from '@/shared/ui/EmptyState.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
+import StateHistoryTimeline, { type StateHistoryEntry } from '@/shared/ui/StateHistoryTimeline.vue'
 import AdjuntosDetalle from '../components/AdjuntosDetalle.vue'
 import ProductImage from '@/modules/productos/components/ProductImage.vue'
 import GalleryPhoto from '@/shared/media/GalleryPhoto.vue'
@@ -31,6 +32,7 @@ import { useQuoteFurnitureCovers } from '../composables/useQuoteFurnitureCovers'
 import Toast from '@/shared/ui/Toast.vue'
 import { useQuoteProductImages } from '../composables/useQuoteProductImages'
 import { proformasService } from '../services/proformasService'
+import { cantidadProducto } from '@/modules/productos/utils/presentacionCatalogo'
 import { retornoAProformas } from '../utils/navegacionProformas'
 import DocumentViewerModal from '../components/DocumentViewerModal.vue'
 import { useProformaPdf } from '../composables/useProformaPdf'
@@ -345,6 +347,17 @@ onMounted(() => void load())
         </div>
       </section>
 
+      <StateHistoryTimeline
+        :entries="
+          (quote as Proforma & { historial_estados?: StateHistoryEntry[] }).historial_estados ?? []
+        "
+        :current-status-code="quote.estado_info.codigo"
+        :incomplete="
+          Boolean((quote as Proforma & { historial_incompleto?: boolean }).historial_incompleto)
+        "
+        test-id="proforma-state-timeline"
+      />
+
       <section class="panel" aria-labelledby="conditions-title">
         <div class="section-heading">
           <div>
@@ -420,7 +433,7 @@ onMounted(() => void load())
                 <h3>{{ line.nombre }}</h3>
                 <p v-if="line.descripcion">{{ line.descripcion }}</p>
                 <p class="secondary">
-                  {{ line.cantidad }} ×
+                  {{ cantidadProducto(line.cantidad) }} ×
                   {{
                     line.modo_calculo === 'TOTAL_NEGOCIADO'
                       ? 'total negociado'

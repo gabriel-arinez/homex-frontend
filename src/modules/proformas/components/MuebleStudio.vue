@@ -15,7 +15,11 @@ import {
   FileText,
 } from '@lucide/vue'
 import TranscriptEvidence from '@/modules/capturas/components/TranscriptEvidence.vue'
-import { buildFurnitureTranscriptEvidence } from '@/modules/capturas/voiceEvidence'
+import {
+  buildFurnitureTranscriptEvidence,
+  type HumanReviewStatus,
+  type NlpCandidateLike,
+} from '@/modules/capturas/voiceEvidence'
 import type {
   EspecificacionMueble,
   EspecificacionMuebleWritable,
@@ -79,6 +83,7 @@ const emit = defineEmits<{
 }>()
 const voiceOpen = ref(false)
 const voiceSuggestedFields = ref<string[]>([])
+const voiceReviewStatuses = ref<HumanReviewStatus[]>([])
 const lastCaptureResult = ref<ResultadoAsistida | null>(null)
 const reviewTranscriptText = computed(() => {
   const res = lastCaptureResult.value
@@ -95,6 +100,8 @@ const reviewTranscriptEvidence = computed(() => {
     reviewTranscriptText.value,
     lastCaptureResult.value.propuesta_configurador,
     lastCaptureResult.value.pendientes,
+    (lastCaptureResult.value.candidatos ?? []) as NlpCandidateLike[],
+    voiceReviewStatuses.value,
   )
 })
 const leaveVoiceConfirm = ref(false)
@@ -227,28 +234,120 @@ function recibirCaptura(result: ResultadoAsistida) {
   lastCaptureResult.value = result
   const proposal = result.propuesta_configurador
   if (proposal) {
+    const tokens: string[] = []
     const commercialFields: Record<string, string> = {
       nombre: 'mueble-nombre-comercial',
       cantidad: 'mueble-cantidad',
       precio_unitario: 'mueble-precio',
       descuento: 'mueble-descuento',
       unidad_codigo: 'mueble-unidad',
+      descripcion: 'mueble-descripcion',
     }
-    voiceSuggestedFields.value = Object.entries(proposal.comercial)
-      .filter(([, value]) => value != null)
-      .flatMap(([key]) => (commercialFields[key] ? [commercialFields[key]!] : []))
+    for (const [key, value] of Object.entries(proposal.comercial)) {
+      if (value == null || String(value).trim() === '') continue
+      if (key === 'descuento' && !(Number(value) > 0)) continue
+      if (commercialFields[key]) tokens.push(commercialFields[key]!)
+    }
+    if (proposal.especificacion.tipo_mueble != null) {
+      tokens.push('tipo-mueble')
+    }
+    const rawTranscript = (
+      result.texto_corregido ||
+      result.texto_transcrito_original ||
+      result.texto_asr_original ||
+      ''
+    )
+      .trim()
+      .toLowerCase()
+    const obs = proposal.especificacion.observaciones?.trim()
+    if (obs && obs.toLowerCase() !== rawTranscript) {
+      tokens.push('observaciones-especificacion')
+    }
     const technical = proposal.especificacion.datos_tecnicos as Record<string, unknown>
     const general = technical.caracteristicas_generales as
-      { dimensiones?: Record<string, unknown> } | undefined
-    for (const key of Object.keys(general?.dimensiones ?? {}))
-      voiceSuggestedFields.value.push(key, `unidad-${key}`)
+      | {
+          dimensiones?: Record<string, unknown>
+          atributos?:
+            Array<{ codigo?: string; nombre?: string; valor?: unknown }> | Record<string, unknown>
+        }
+      | undefined
+    for (const key of Object.keys(general?.dimensiones ?? {})) {
+      tokens.push(`dim:${key}`)
+    }
+    if (Array.isArray(general?.atributos)) {
+      for (const attr of general.atributos) {
+        if (!attr || typeof attr !== 'object' || attr.valor == null || !String(attr.valor).trim())
+          continue
+        const key = String(attr.codigo || attr.nombre || '').trim()
+        if (key) tokens.push(`general:attr:${key}`)
+      }
+    } else if (general?.atributos && typeof general.atributos === 'object') {
+      for (const [key, entry] of Object.entries(general.atributos)) {
+        const val =
+          entry && typeof entry === 'object' && 'valor' in entry
+            ? (entry as { valor?: unknown }).valor
+            : entry
+        if (val != null && String(val).trim()) tokens.push(`general:attr:${key}`)
+      }
+    }
+    const sets = technical.conjuntos
+    if (Array.isArray(sets)) {
+      for (const setItem of sets) {
+        if (!setItem || typeof setItem !== 'object') continue
+        const s = setItem as Record<string, unknown>
+        if (s.uid && s.nombre != null && String(s.nombre).trim()) {
+          tokens.push(`conjunto:${String(s.uid)}:nombre`)
+        }
+      }
+    }
     const pieces = technical.componentes
-    if (Array.isArray(pieces))
+    if (Array.isArray(pieces)) {
       pieces.forEach((piece, index) => {
         if (!piece || typeof piece !== 'object') return
-        for (const key of ['nombre', 'material', 'espesor', 'color', 'dimensiones'])
-          if (piece[key] != null) voiceSuggestedFields.value.push(`componente-${key}-${index}`)
+        const p = piece as Record<string, unknown>
+        const ref = p.uid ? String(p.uid) : String(index)
+        for (const key of [
+          'nombre',
+          'material',
+          'espesor',
+          'color',
+          'acabado',
+          'dimensiones',
+          'cantidad_interna',
+          'conjunto_uid',
+        ]) {
+          if (p[key] != null && String(p[key]).trim() !== '') {
+            tokens.push(p.uid ? `comp:${ref}:${key}` : `componente-${key}-${index}`)
+          }
+        }
+        if (Array.isArray(p.atributos)) {
+          for (const attr of p.atributos) {
+            if (
+              !attr ||
+              typeof attr !== 'object' ||
+              (attr as { valor?: unknown }).valor == null ||
+              !String((attr as { valor?: unknown }).valor).trim()
+            )
+              continue
+            const attrKey = String(
+              (attr as { codigo?: string; nombre?: string }).codigo ||
+                (attr as { nombre?: string }).nombre ||
+                '',
+            ).trim()
+            if (attrKey && p.uid) tokens.push(`comp:${ref}:attr:${attrKey}`)
+          }
+        }
       })
+    }
+    const accessories = technical.accesorios
+    if (Array.isArray(accessories)) {
+      accessories.forEach((acc, index) => {
+        if (typeof acc === 'string' && acc.trim()) {
+          tokens.push(`accesorio:${index}:${acc.trim()}`)
+        }
+      })
+    }
+    voiceSuggestedFields.value = [...new Set(tokens)]
   }
 
   voiceOpen.value = false
@@ -475,6 +574,7 @@ defineExpose({ save: guardarDesdeEstudio, hasRealChanges })
           @cancel="requestCloseStudio"
           @request-section="editarDesdeRevision($event)"
           @section-status="estadoApartados = { ...$event, imagenes: imageStepStatus }"
+          @voice-review-change="voiceReviewStatuses = $event"
           @type-created="emit('typeCreated', $event)"
         />
       </fieldset>

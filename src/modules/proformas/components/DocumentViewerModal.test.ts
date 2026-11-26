@@ -93,4 +93,44 @@ describe('DocumentViewerModal — PDF.js', () => {
     expect(wrapper.emitted('retry')).toHaveLength(1)
     wrapper.unmount()
   })
+
+  it('muestra Guardar y actualizar PDF cuando hay cambios pendientes y bloquea descarga/impresión mientras guarda', async () => {
+    const wrapper = mountViewer({
+      pdfUrl: 'blob:http://localhost/proforma',
+      notice: 'Hay cambios sin guardar.',
+      canSaveAndRefresh: true,
+      hasPendingChanges: true,
+      savingAndRefreshing: false,
+    })
+    await flushPromises()
+    const saveBtn = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Guardar y actualizar PDF'))
+    expect(saveBtn?.exists()).toBe(true)
+    await saveBtn?.trigger('click')
+    expect(wrapper.emitted('saveAndRefresh')).toHaveLength(1)
+
+    await wrapper.setProps({ savingAndRefreshing: true })
+    const printBtn = wrapper.findAll('button').find((button) => button.text().includes('Imprimir'))
+    const downloadBtn = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Descargar PDF'))
+    expect(printBtn?.attributes('disabled')).toBeDefined()
+    expect(downloadBtn?.attributes('disabled')).toBeDefined()
+    wrapper.unmount()
+  })
+
+  it('no muestra Guardar y actualizar PDF en visores de solo lectura', async () => {
+    const wrapper = mountViewer({
+      pdfUrl: 'blob:http://localhost/proforma',
+      canSaveAndRefresh: false,
+      hasPendingChanges: true,
+    })
+    await flushPromises()
+    const saveBtn = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Guardar y actualizar PDF'))
+    expect(saveBtn).toBeUndefined()
+    wrapper.unmount()
+  })
 })

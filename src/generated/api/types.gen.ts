@@ -708,6 +708,34 @@ export type HistorialEstadoOrdenTrabajo = {
   readonly observaciones: string | null
 }
 
+export type HistorialEstadoPedido = {
+  readonly id: number
+  readonly estado_anterior: number | null
+  estado_anterior_info: ValorCatalogoResumen | null
+  readonly estado_nuevo: number
+  estado_nuevo_info: ValorCatalogoResumen
+  readonly cambiado_por: number | null
+  cambiado_por_resumen: UsuarioResumen | null
+  readonly es_automatico: boolean
+  readonly origen: string
+  readonly fecha: string
+  readonly observaciones: string | null
+}
+
+export type HistorialEstadoProforma = {
+  readonly id: number
+  readonly estado_anterior: number | null
+  estado_anterior_info: ValorCatalogoResumen | null
+  readonly estado_nuevo: number
+  estado_nuevo_info: ValorCatalogoResumen
+  readonly cambiado_por: number | null
+  cambiado_por_resumen: UsuarioResumen | null
+  readonly es_automatico: boolean
+  readonly origen: string
+  readonly fecha: string
+  readonly observaciones: string | null
+}
+
 export type IdentidadActual = {
   readonly id: number
   readonly username: string
@@ -1286,6 +1314,8 @@ export type PatchedProforma = {
   readonly created_by?: number | null
   readonly updated_by?: number | null
   readonly detalles?: Array<DetalleProforma>
+  readonly historial_estados?: Array<HistorialEstadoProforma>
+  readonly historial_incompleto?: boolean
 }
 
 export type Pedido = {
@@ -1297,6 +1327,8 @@ export type Pedido = {
   readonly fecha_entrega_programada: string | null
   readonly nota_entrega_fecha: string | null
   readonly naturaleza: string
+  readonly historial_estados: Array<HistorialEstadoPedido>
+  readonly historial_incompleto: boolean
   readonly fecha_confirmacion: string
   readonly fecha_entrega_efectiva: string | null
   readonly proforma: number
@@ -1501,6 +1533,8 @@ export type Proforma = {
   readonly created_by: number | null
   readonly updated_by: number | null
   readonly detalles: Array<DetalleProforma>
+  readonly historial_estados: Array<HistorialEstadoProforma>
+  readonly historial_incompleto: boolean
 }
 
 export type ProformaDemandaItem = {
@@ -3164,6 +3198,20 @@ export type V1CatalogoProductosStockMinimoPartialUpdateResponses = {
 export type V1CatalogoProductosStockMinimoPartialUpdateResponse =
   V1CatalogoProductosStockMinimoPartialUpdateResponses[keyof V1CatalogoProductosStockMinimoPartialUpdateResponses]
 
+export type V1CatalogoProductosExportarExcelRetrieveData = {
+  body?: never
+  path?: never
+  query?: never
+  url: '/api/v1/catalogo/productos/exportar-excel/'
+}
+
+export type V1CatalogoProductosExportarExcelRetrieveResponses = {
+  200: Blob | File
+}
+
+export type V1CatalogoProductosExportarExcelRetrieveResponse =
+  V1CatalogoProductosExportarExcelRetrieveResponses[keyof V1CatalogoProductosExportarExcelRetrieveResponses]
+
 export type V1CatalogoProductosVerificarSimilaresRetrieveData = {
   body?: never
   path?: never
@@ -3454,6 +3502,20 @@ export type V1ClientesUpdateResponses = {
 }
 
 export type V1ClientesUpdateResponse = V1ClientesUpdateResponses[keyof V1ClientesUpdateResponses]
+
+export type V1ClientesExportarExcelRetrieveData = {
+  body?: never
+  path?: never
+  query?: never
+  url: '/api/v1/clientes/exportar-excel/'
+}
+
+export type V1ClientesExportarExcelRetrieveResponses = {
+  200: Blob | File
+}
+
+export type V1ClientesExportarExcelRetrieveResponse =
+  V1ClientesExportarExcelRetrieveResponses[keyof V1ClientesExportarExcelRetrieveResponses]
 
 export type V1DashboardAdministradorRetrieveData = {
   body?: never
@@ -4045,6 +4107,20 @@ export type V1NotasEntregaDocumentoPdfRetrieveResponses = {
 export type V1NotasEntregaDocumentoPdfRetrieveResponse =
   V1NotasEntregaDocumentoPdfRetrieveResponses[keyof V1NotasEntregaDocumentoPdfRetrieveResponses]
 
+export type V1NotasEntregaExportarExcelRetrieveData = {
+  body?: never
+  path?: never
+  query?: never
+  url: '/api/v1/notas-entrega/exportar-excel/'
+}
+
+export type V1NotasEntregaExportarExcelRetrieveResponses = {
+  200: Blob | File
+}
+
+export type V1NotasEntregaExportarExcelRetrieveResponse =
+  V1NotasEntregaExportarExcelRetrieveResponses[keyof V1NotasEntregaExportarExcelRetrieveResponses]
+
 export type V1OrdenesTrabajoListData = {
   body?: never
   path?: never
@@ -4173,6 +4249,20 @@ export type V1OrdenesTrabajoPlanificacionPartialUpdateResponses = {
 export type V1OrdenesTrabajoPlanificacionPartialUpdateResponse =
   V1OrdenesTrabajoPlanificacionPartialUpdateResponses[keyof V1OrdenesTrabajoPlanificacionPartialUpdateResponses]
 
+export type V1OrdenesTrabajoExportarExcelRetrieveData = {
+  body?: never
+  path?: never
+  query?: never
+  url: '/api/v1/ordenes-trabajo/exportar-excel/'
+}
+
+export type V1OrdenesTrabajoExportarExcelRetrieveResponses = {
+  200: Blob | File
+}
+
+export type V1OrdenesTrabajoExportarExcelRetrieveResponse =
+  V1OrdenesTrabajoExportarExcelRetrieveResponses[keyof V1OrdenesTrabajoExportarExcelRetrieveResponses]
+
 export type V1PedidosListData = {
   body?: never
   path?: never
@@ -4283,6 +4373,20 @@ export type V1PedidosEmitirReciboCreateResponses = {
 
 export type V1PedidosEmitirReciboCreateResponse =
   V1PedidosEmitirReciboCreateResponses[keyof V1PedidosEmitirReciboCreateResponses]
+
+export type V1PedidosExportarExcelRetrieveData = {
+  body?: never
+  path?: never
+  query?: never
+  url: '/api/v1/pedidos/exportar-excel/'
+}
+
+export type V1PedidosExportarExcelRetrieveResponses = {
+  200: Blob | File
+}
+
+export type V1PedidosExportarExcelRetrieveResponse =
+  V1PedidosExportarExcelRetrieveResponses[keyof V1PedidosExportarExcelRetrieveResponses]
 
 export type V1ProformasListData = {
   body?: never
@@ -4838,6 +4942,20 @@ export type V1ProformasReabrirCreateResponses = {
 export type V1ProformasReabrirCreateResponse =
   V1ProformasReabrirCreateResponses[keyof V1ProformasReabrirCreateResponses]
 
+export type V1ProformasExportarExcelRetrieveData = {
+  body?: never
+  path?: never
+  query?: never
+  url: '/api/v1/proformas/exportar-excel/'
+}
+
+export type V1ProformasExportarExcelRetrieveResponses = {
+  200: Blob | File
+}
+
+export type V1ProformasExportarExcelRetrieveResponse =
+  V1ProformasExportarExcelRetrieveResponses[keyof V1ProformasExportarExcelRetrieveResponses]
+
 export type V1ProformasIntegralCreateData = {
   body: ProformaIntegralWritable
   path?: never
@@ -4947,3 +5065,17 @@ export type V1RecibosDocumentoPdfRetrieveResponses = {
 
 export type V1RecibosDocumentoPdfRetrieveResponse =
   V1RecibosDocumentoPdfRetrieveResponses[keyof V1RecibosDocumentoPdfRetrieveResponses]
+
+export type V1RecibosExportarExcelRetrieveData = {
+  body?: never
+  path?: never
+  query?: never
+  url: '/api/v1/recibos/exportar-excel/'
+}
+
+export type V1RecibosExportarExcelRetrieveResponses = {
+  200: Blob | File
+}
+
+export type V1RecibosExportarExcelRetrieveResponse =
+  V1RecibosExportarExcelRetrieveResponses[keyof V1RecibosExportarExcelRetrieveResponses]

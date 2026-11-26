@@ -1,11 +1,20 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { Ban, ChevronLeft, ChevronRight, ClipboardList, Receipt, RotateCcw } from '@lucide/vue'
+import {
+  Ban,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  FileSpreadsheet,
+  Receipt,
+  RotateCcw,
+} from '@lucide/vue'
 import type { Recibo, ValorCatalogoPublico } from '@/generated/api'
 import DocumentViewerModal from '@/modules/proformas/components/DocumentViewerModal.vue'
 import DatePresentation from '@/shared/ui/DatePresentation.vue'
 import { downloadBlob } from '@/shared/download/downloadBlob'
+import { exportTrayExcel } from '@/shared/download/exportExcel'
 import { buildExportFilename } from '@/shared/download/exportFilename'
 import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
 import { recibosService } from '../services/recibosService'
@@ -40,6 +49,36 @@ const loading = ref(true)
 const error = ref('')
 const toastMessage = ref('')
 const toastTone = ref<'success' | 'danger'>('success')
+const exportingExcel = ref(false)
+async function exportExcel() {
+  if (exportingExcel.value) return
+  exportingExcel.value = true
+  try {
+    await exportTrayExcel({
+      endpoint: '/api/v1/recibos/exportar-excel/',
+      query: {
+        search: search.value.trim() || undefined,
+        estado: stateFilter.value || undefined,
+        tipo_pago: paymentFilter.value || undefined,
+        fecha_desde: dateFrom.value || undefined,
+        fecha_hasta: dateTo.value || undefined,
+      },
+      prefix: 'recibos',
+      filenameSegments: [
+        stateFilter.value,
+        paymentFilter.value,
+        search.value.trim(),
+        dateFrom.value,
+        dateTo.value,
+      ],
+    })
+  } catch (err) {
+    toastTone.value = 'danger'
+    toastMessage.value = err instanceof Error ? err.message : 'No pudimos exportar el Excel.'
+  } finally {
+    exportingExcel.value = false
+  }
+}
 
 const search = ref(typeof route.query.q === 'string' ? route.query.q : '')
 const stateFilter = ref(typeof route.query.estado === 'string' ? route.query.estado : '')
@@ -253,7 +292,19 @@ onMounted(load)
       description="Historial inmutable de cobros registrados."
       show-menu
       @menu="emit('openMenu')"
-    />
+    >
+      <template #actions>
+        <Button
+          variant="secondary"
+          :processing="exportingExcel"
+          :disabled="exportingExcel"
+          @click="exportExcel"
+        >
+          <FileSpreadsheet :size="16" aria-hidden="true" />
+          {{ exportingExcel ? 'Exportando…' : 'Exportar Excel' }}
+        </Button>
+      </template>
+    </PageHeader>
 
     <section class="receipt-filters" aria-label="Buscar y filtrar recibos">
       <div class="receipt-filters__main">

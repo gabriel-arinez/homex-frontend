@@ -65,10 +65,10 @@ function formatDateLabel(value: string | null | undefined): string {
   return formatearFechaHora(value)
 }
 
+import { cantidadProducto } from '@/modules/productos/utils/presentacionCatalogo'
+
 function formatQuantity(value: string | number): string {
-  const text = String(value).trim()
-  if (/^\d+\.0+$/.test(text)) return text.split('.')[0] ?? text
-  return text
+  return cantidadProducto(value)
 }
 
 const isCompany = computed(() =>

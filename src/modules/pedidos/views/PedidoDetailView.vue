@@ -59,6 +59,7 @@ import ErrorState from '@/shared/ui/ErrorState.vue'
 import LoadingSkeleton from '@/shared/ui/LoadingSkeleton.vue'
 import Modal from '@/shared/ui/Modal.vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
+import StateHistoryTimeline, { type StateHistoryEntry } from '@/shared/ui/StateHistoryTimeline.vue'
 import Select from '@/shared/ui/Select.vue'
 import TextField from '@/shared/ui/TextField.vue'
 import Toast from '@/shared/ui/Toast.vue'
@@ -677,6 +678,17 @@ watch(() => route.params.id, load)
           </div>
         </div>
       </section>
+
+      <StateHistoryTimeline
+        :entries="
+          (pedido as Pedido & { historial_estados?: StateHistoryEntry[] }).historial_estados ?? []
+        "
+        :current-status-code="currentCode"
+        :incomplete="
+          Boolean((pedido as Pedido & { historial_incompleto?: boolean }).historial_incompleto)
+        "
+        test-id="pedido-state-timeline"
+      />
 
       <section class="panel" aria-labelledby="order-progress-title">
         <div class="section-heading">
