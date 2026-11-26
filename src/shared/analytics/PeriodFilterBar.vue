@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { Calendar, RefreshCw, SlidersHorizontal } from '@lucide/vue'
-import Button from '@/shared/ui/Button.vue'
+import { Calendar, SlidersHorizontal } from '@lucide/vue'
+import { dateRangeError } from '@/shared/validation/dateRange'
 import { buildPeriodPreset, formatDateLaPaz, type PeriodPresetKey } from './formatters'
 
 export interface SellerOption {
@@ -19,8 +19,6 @@ const props = withDefaults(
     vendedores?: SellerOption[]
     moneda?: string
     monedas?: string[]
-    loading?: boolean
-    lastUpdatedText?: string
     showSeller?: boolean
     showCurrency?: boolean
   }>(),
@@ -29,8 +27,6 @@ const props = withDefaults(
     vendedores: () => [],
     moneda: '',
     monedas: () => ['BOB', 'USD'],
-    loading: false,
-    lastUpdatedText: '',
     showSeller: true,
     showCurrency: true,
   },
@@ -43,7 +39,6 @@ const emit = defineEmits<{
   'update:vendedorId': [value: number | null]
   'update:moneda': [value: string]
   apply: []
-  refresh: []
 }>()
 
 const preset = ref<PeriodPresetKey>('todo')
@@ -65,9 +60,7 @@ const activePeriodSummary = computed(() => {
   return presets.find((p) => p.key === preset.value)?.label ?? 'Todo el período'
 })
 
-const invalidRange = computed(() =>
-  Boolean(props.fechaDesde && props.fechaHasta && props.fechaDesde > props.fechaHasta),
-)
+const rangeError = computed(() => dateRangeError(props.fechaDesde ?? '', props.fechaHasta ?? ''))
 
 watch(
   () => [props.fechaDesde, props.fechaHasta],
@@ -91,9 +84,11 @@ function onPresetChange(next: PeriodPresetKey) {
 function onCustomDateChange(kind: 'desde' | 'hasta', value: string) {
   preset.value = 'personalizado'
   const clean = value.trim() || null
+  const nextDesde = kind === 'desde' ? clean : props.fechaDesde
+  const nextHasta = kind === 'hasta' ? clean : props.fechaHasta
   if (kind === 'desde') emit('update:fechaDesde', clean)
   else emit('update:fechaHasta', clean)
-  if (!invalidRange.value) emit('apply')
+  if (!dateRangeError(nextDesde ?? '', nextHasta ?? '')) emit('apply')
 }
 
 function onSellerChange(value: string) {
@@ -209,22 +204,10 @@ function onGranularityChange(value: string) {
       </label>
     </div>
 
-    <div class="period-bar__meta">
-      <div class="period-bar__dates">
-        <span v-if="fechaReferencia" class="period-bar__chip">
-          <Calendar :size="14" aria-hidden="true" />
-          Corte: {{ formatDateLaPaz(fechaReferencia) }}
-        </span>
-        <span v-if="lastUpdatedText" class="period-bar__updated">
-          Actualizado: {{ lastUpdatedText }}
-        </span>
-        <span v-if="invalidRange" class="period-bar__error" role="alert">
-          La fecha inicial no puede superar la fecha final.
-        </span>
-      </div>
-      <Button variant="secondary" :disabled="loading" @click="emit('refresh')">
-        <RefreshCw :size="15" aria-hidden="true" />Actualizar
-      </Button>
+    <div v-if="rangeError" class="period-bar__meta">
+      <span class="period-bar__error" role="alert">
+        {{ rangeError }}
+      </span>
     </div>
   </section>
 </template>

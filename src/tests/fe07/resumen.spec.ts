@@ -1,5 +1,5 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { flushPromises, mount } from '@vue/test-utils'
+import { mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -233,61 +233,94 @@ describe('FE07 resumen operativo', () => {
         proformaCalls += 1
         return HttpResponse.json({ detail: 'Forbidden' }, { status: 403 })
       }),
-      http.get('http://localhost:8000/api/v1/ordenes-trabajo/', () =>
-        HttpResponse.json([
-          {
-            id: 1,
-            pedido: 9,
-            proforma_numero: 4,
-            proforma_titulo: 'Escritorio gerencial',
-            cliente_resumen: { id: 10, nombre: 'Constructora Norte', empresa: null, celular: null },
-            jefe_taller: null,
-            numero: 40,
-            fecha: '2026-09-26',
-            fecha_inicio: null,
-            fecha_fin: null,
-            responsable_recepcion: null,
-            fecha_entrega: null,
-            lugar_entrega: null,
-            estado_saldo: null,
-            estado_saldo_info: null,
-            estado: 20,
-            estado_info: { id: 20, codigo: 'PENDIENTE', nombre: 'Pendiente' },
-            created_by: 2,
-            updated_by: 2,
-            detalles: [
+      http.get('http://localhost:8000/api/v1/dashboard/taller/', () =>
+        HttpResponse.json({
+          metadata: {
+            generado_en: '2026-11-27T18:00:00Z',
+            zona_horaria: 'America/La_Paz',
+            fecha_corte: '2026-11-27',
+            alcance_rol: 'taller',
+          },
+          filtros_aplicados: {
+            fecha_desde: null,
+            fecha_hasta: null,
+            estado_ot: null,
+            moneda: null,
+            vendedor: null,
+            familia_producto: null,
+            agrupacion: 'month',
+          },
+          indicadores: {
+            pendientes: 2,
+            en_proceso: 12,
+            terminadas: 16,
+            canceladas: 2,
+            carga_activa_fabricacion: 14,
+            fabricaciones_iniciadas_periodo: 28,
+            fabricaciones_terminadas_periodo: 16,
+            tiempo_promedio_fabricacion_horas: 135.53,
+            tiempo_promedio_fabricacion_dias: 5.65,
+            ordenes_con_duracion_medible: 16,
+            antiguedad_promedio_activas_dias: 14.08,
+            antiguedad_maxima_activas_dias: 37,
+            ordenes_con_antiguedad_medible: 12,
+            entregas_proximas: 2,
+            entregas_retrasadas: 0,
+            entregas_efectivas: 13,
+            entregas_evaluables_plazo: 13,
+            entregas_en_plazo: 13,
+            cumplimiento_entregas_porcentaje: '100.00',
+          },
+          cola_prioridades: [],
+        }),
+      ),
+      http.get('http://localhost:8000/api/v1/dashboard/taller/planificacion/', () =>
+        HttpResponse.json({
+          metadata: {
+            generado_en: '2026-11-27T18:00:00Z',
+            zona_horaria: 'America/La_Paz',
+            fecha_corte: '2026-11-27',
+            alcance_rol: 'taller',
+          },
+          filtros_aplicados: {
+            fecha_desde: null,
+            fecha_hasta: null,
+            estado_ot: null,
+            moneda: null,
+            vendedor: null,
+            familia_producto: null,
+            agrupacion: 'month',
+          },
+          calendario: [],
+          analisis_fabricacion: {
+            distribucion_estados: [
+              { estado_codigo: 'EN_PROCESO', estado_nombre: 'En proceso', cantidad: 12 },
+            ],
+            evolucion_fabricaciones: [{ periodo: '2026-11-01', iniciadas: 17, terminadas: 8 }],
+            muebles_fabricados_por_tipo: [
               {
-                id: 88,
-                tipo_item_info: { id: 9, codigo: 'MUEBLE_MEDIDA', nombre: 'A medida' },
-                producto: null,
-                familia_producto: null,
-                nombre: 'Escritorio a medida',
-                descripcion: 'Melamina',
-                cantidad: '1.0000',
-                unidad_info: { id: 2, codigo: 'PIEZA', nombre: 'Pieza' },
-                especificacion: {
-                  id: 1,
-                  proforma_detalle: 88,
-                  tipo_mueble: null,
-                  tipo_mueble_info: null,
-                  observaciones: null,
-                  datos_tecnicos: { componentes: [{ nombre: 'Mesón' }] },
-                },
+                tipo_mueble_codigo: 'CREDENZA',
+                tipo_mueble_nombre: 'Credenza',
+                ordenes: 7,
+                piezas_fabricadas: 12,
               },
             ],
+            cumplimiento_entregas: {
+              entregas_efectivas: 13,
+              entregas_evaluables_plazo: 13,
+              entregas_en_plazo: 13,
+              cumplimiento_entregas_porcentaje: '100.00',
+              entregas_retrasadas: 0,
+            },
           },
-        ]),
+        }),
       ),
     )
     const workshop = await render(['taller.operar'])
-    await flushPromises()
+    await vi.waitFor(() => expect(workshop.text()).toContain('Operación de taller'))
     expect(proformaCalls).toBe(0)
-    expect(workshop.text()).toContain('Operación y seguimiento de taller.')
-    expect(workshop.text()).toContain('Órdenes de trabajo1')
-    expect(workshop.text()).toContain('Con fabricación a medida1')
-    expect(workshop.text()).toContain('Solo catálogo0')
-    expect(workshop.find('table').text()).toContain('Pendiente1')
-    expect(workshop.findAll('nav a').map((x) => x.text())).toEqual([
+    expect(workshop.text()).toContain('Carga activa en taller')
+    expect(workshop.findAll('.quick-actions a').map((x) => x.text())).toEqual([
       'Consultar órdenes de trabajo',
       'Ver fabricación a medida',
     ])

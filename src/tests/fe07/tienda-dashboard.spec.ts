@@ -177,7 +177,12 @@ const alvaroSeguimiento = {
           unidad_codigo: 'PIEZA',
           unidad_nombre: 'Pieza',
           estado_disponibilidad: 'DISPONIBLE',
-          imagen_principal: null,
+          imagen_principal: {
+            original: '/media/productos/s101/original.webp',
+            ancho: 800,
+            alto: 800,
+            variantes: { '320': '/media/productos/s101/320.webp' },
+          },
         },
         {
           producto_id: 2,
@@ -288,6 +293,8 @@ describe('Fase 3 TiendaDashboard', () => {
     expect(text).toContain('108.585,01')
     expect(text).toContain('62.132,36')
     expect(text).toContain('incidencias')
+    expect(text).not.toContain('Corte:')
+    expect(wrapper.get('.header-actions').text()).toContain('Actualizar')
     expect(wrapper.find('select[aria-label="Filtrar por vendedor"]').exists()).toBe(false)
 
     // Accesos rápidos
@@ -349,6 +356,8 @@ describe('Fase 3 TiendaDashboard', () => {
     await clickTab('Disponibilidad')
     expect(wrapper.text()).toContain('Silla Ejecutiva')
     expect(wrapper.text()).toContain('Bajo pedido')
+    const prodImg = wrapper.get('.product-compact-thumb img')
+    expect(prodImg.attributes('src')).toBe('http://localhost:8000/media/productos/s101/320.webp')
 
     const beforeCatSeg = segCalls
     await wrapper.get('select[aria-label="Filtrar categoría de disponibilidad"]').setValue('SILLA')

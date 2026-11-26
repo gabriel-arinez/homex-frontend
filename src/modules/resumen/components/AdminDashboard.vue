@@ -10,6 +10,7 @@ import {
   Clock,
   FileText,
   LayoutDashboard,
+  RefreshCw,
   ShieldCheck,
   ShoppingBag,
   TrendingUp,
@@ -26,6 +27,7 @@ import type {
 import { useSessionStore } from '@/app/stores/useSessionStore'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import Badge from '@/shared/ui/Badge.vue'
+import Button from '@/shared/ui/Button.vue'
 import Card from '@/shared/ui/Card.vue'
 import DetailTabs, { type DetailTabItem } from '@/shared/ui/DetailTabs.vue'
 import ErrorState from '@/shared/ui/ErrorState.vue'
@@ -53,6 +55,7 @@ import {
   formatTimeLaPaz,
   toNumber,
 } from '@/shared/analytics/formatters'
+import { dateRangeError } from '@/shared/validation/dateRange'
 import { adminDashboardService } from '../services/adminDashboardService'
 
 type AdminTabId = 'general' | 'comercial' | 'finanzas' | 'operaciones' | 'inventario'
@@ -294,7 +297,7 @@ async function loadCatalogCategories() {
 }
 
 async function loadAll() {
-  if (fechaDesde.value && fechaHasta.value && fechaDesde.value > fechaHasta.value) {
+  if (dateRangeError(fechaDesde.value ?? '', fechaHasta.value ?? '')) {
     return
   }
   await Promise.all([fetchResumen(), fetchComercial(), fetchFinanzas(), fetchInventario()])
@@ -688,10 +691,18 @@ const tabs = computed<DetailTabItem[]>(() => [
       @menu="emit('open-menu')"
     >
       <template #actions>
-        <Badge tone="neutral">
-          <ShieldCheck :size="13" aria-hidden="true" />
-          Supervisión administrativa
-        </Badge>
+        <div class="header-actions">
+          <span v-if="lastUpdatedText" class="header-updated">
+            Actualizado: {{ lastUpdatedText }}
+          </span>
+          <Button variant="secondary" :disabled="anyLoading" @click="loadAll">
+            <RefreshCw :size="15" aria-hidden="true" />Actualizar
+          </Button>
+          <Badge tone="neutral">
+            <ShieldCheck :size="13" aria-hidden="true" />
+            Supervisión administrativa
+          </Badge>
+        </div>
       </template>
     </PageHeader>
 
@@ -704,10 +715,7 @@ const tabs = computed<DetailTabItem[]>(() => [
       :fecha-referencia="fechaReferencia"
       :vendedores="vendedoresCache"
       :monedas="availableCurrencies"
-      :loading="anyLoading"
-      :last-updated-text="lastUpdatedText"
       @apply="loadAll"
-      @refresh="loadAll"
     />
 
     <div v-if="staleBlocks.length" class="stale-banner" role="status">
@@ -1308,6 +1316,19 @@ const tabs = computed<DetailTabItem[]>(() => [
   min-width: 0;
   max-width: 100%;
   overflow-x: clip;
+}
+
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.header-updated {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
 }
 
 .admin-dash > *,

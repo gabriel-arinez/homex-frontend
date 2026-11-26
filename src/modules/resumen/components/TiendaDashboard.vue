@@ -11,7 +11,7 @@ import {
   FilePlus2,
   FileText,
   LayoutDashboard,
-  Package,
+  RefreshCw,
   ShoppingBag,
   Store,
   TrendingUp,
@@ -23,12 +23,15 @@ import type {
   DashboardTiendaResumen,
   DisponibilidadComercial,
   ElementoAgendaComercial,
+  ImagenPrincipal,
   ProductoDisponibilidad,
   ValorCatalogoPublico,
 } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
+import ProductImage from '@/modules/productos/components/ProductImage.vue'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import Badge from '@/shared/ui/Badge.vue'
+import Button from '@/shared/ui/Button.vue'
 import Card from '@/shared/ui/Card.vue'
 import DetailTabs, { type DetailTabItem } from '@/shared/ui/DetailTabs.vue'
 import EmptyState from '@/shared/ui/EmptyState.vue'
@@ -56,17 +59,13 @@ import {
   formatTimeLaPaz,
   toNumber,
 } from '@/shared/analytics/formatters'
+import { dateRangeError } from '@/shared/validation/dateRange'
 import {
   tiendaDashboardService,
   type AgendaCategoriaCodigo,
 } from '../services/tiendaDashboardService'
 
 type TiendaTabId = 'general' | 'proformas' | 'pedidos' | 'disponibilidad'
-
-interface ProductImagePayload {
-  original?: string | null
-  variantes?: Record<string, string> | null
-}
 
 const AGENDA_CATEGORIES: Array<{
   key: AgendaCategoriaCodigo
@@ -381,7 +380,7 @@ async function loadCatalogCategories() {
 }
 
 async function loadAll() {
-  if (fechaDesde.value && fechaHasta.value && fechaDesde.value > fechaHasta.value) {
+  if (dateRangeError(fechaDesde.value ?? '', fechaHasta.value ?? '')) {
     return
   }
   await Promise.all([fetchResumen(), fetchAgenda(), fetchDisponibilidad()])
@@ -391,7 +390,7 @@ async function loadAll() {
 }
 
 function onPeriodOrCurrencyApply() {
-  if (fechaDesde.value && fechaHasta.value && fechaDesde.value > fechaHasta.value) {
+  if (dateRangeError(fechaDesde.value ?? '', fechaHasta.value ?? '')) {
     return
   }
   void Promise.all([fetchResumen(), fetchAgenda()]).then(() => {
@@ -693,10 +692,10 @@ const dispCatSeries = computed(() => {
   ]
 })
 
-function productThumbnail(p: ProductoDisponibilidad): string | null {
-  const img = p.imagen_principal as ProductImagePayload | null | undefined
-  if (!img) return null
-  return img.variantes?.['160'] || img.variantes?.['320'] || img.original || null
+function productImageData(p: ProductoDisponibilidad): ImagenPrincipal | null {
+  const img = p.imagen_principal as ImagenPrincipal | null | undefined
+  if (!img || !img.original) return null
+  return img
 }
 
 function dispBadge(estado: string): {
@@ -731,10 +730,18 @@ const tabs = computed<DetailTabItem[]>(() => [
       @menu="emit('open-menu')"
     >
       <template #actions>
-        <Badge tone="neutral">
-          <Store :size="13" aria-hidden="true" />
-          {{ vendorName }}
-        </Badge>
+        <div class="header-actions">
+          <span v-if="lastUpdatedText" class="header-updated">
+            Actualizado: {{ lastUpdatedText }}
+          </span>
+          <Button variant="secondary" :disabled="anyLoading" @click="loadAll">
+            <RefreshCw :size="15" aria-hidden="true" />Actualizar
+          </Button>
+          <Badge tone="neutral">
+            <Store :size="13" aria-hidden="true" />
+            {{ vendorName }}
+          </Badge>
+        </div>
       </template>
     </PageHeader>
 
@@ -766,10 +773,7 @@ const tabs = computed<DetailTabItem[]>(() => [
       :fecha-referencia="fechaReferencia"
       :monedas="availableCurrencies"
       :show-seller="false"
-      :loading="anyLoading"
-      :last-updated-text="lastUpdatedText"
       @apply="onPeriodOrCurrencyApply"
-      @refresh="loadAll"
     />
 
     <div v-if="staleBlocks.length" class="stale-banner" role="status">
@@ -1377,13 +1381,12 @@ const tabs = computed<DetailTabItem[]>(() => [
               >
                 <RouterLink :to="`/productos/${prod.producto_id}`" class="product-compact-link">
                   <div class="product-compact-thumb">
-                    <img
-                      v-if="productThumbnail(prod)"
-                      :src="productThumbnail(prod)!"
+                    <ProductImage
+                      :image="productImageData(prod)"
                       :alt="prod.nombre"
-                      loading="lazy"
+                      :category-code="prod.categoria_codigo"
+                      sizes="44px"
                     />
-                    <Package v-else :size="18" aria-hidden="true" />
                   </div>
                   <div class="product-compact-info">
                     <strong>{{ prod.nombre }}</strong>
@@ -1416,6 +1419,19 @@ const tabs = computed<DetailTabItem[]>(() => [
   min-width: 0;
   max-width: 100%;
   overflow-x: clip;
+}
+
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.header-updated {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
 }
 
 .tienda-dash > *,
@@ -1666,22 +1682,28 @@ const tabs = computed<DetailTabItem[]>(() => [
 }
 
 .product-compact-thumb {
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2.5rem;
+  height: 2.5rem;
   flex: none;
   border-radius: 0.45rem;
   overflow: hidden;
-  display: grid;
-  place-items: center;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  color: var(--color-text-secondary);
 }
 
-.product-compact-thumb img {
+.product-compact-thumb :deep(.product-image) {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+}
+
+.product-compact-thumb :deep(.fallback-icon-box) {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+}
+
+.product-compact-thumb :deep(.fallback-label) {
+  display: none;
 }
 
 .product-compact-info {
