@@ -300,4 +300,56 @@ describe('Fase 4 TallerDashboard', () => {
     await wrapper.get('input[aria-label="Fecha hasta"]').setValue('2026-12-15')
     expect(wrapper.text()).toContain('La fecha no puede ser futura.')
   })
+
+  it('recupera todas las páginas del calendario sin truncar silenciosamente en la página 10', async () => {
+    const requestedPages: number[] = []
+    server.use(
+      http.get('http://localhost:8000/api/v1/dashboard/taller/', () =>
+        HttpResponse.json(tallerResumen),
+      ),
+      http.get('http://localhost:8000/api/v1/dashboard/taller/planificacion/', ({ request }) => {
+        const url = new URL(request.url)
+        const page = Number(url.searchParams.get('page') || '1')
+        const hasRange = url.searchParams.has('entrega_desde')
+        if (!hasRange) {
+          return HttpResponse.json(tallerPlanificacion)
+        }
+        requestedPages.push(page)
+        const total = 520
+        const pageSize = 50
+        const start = (page - 1) * pageSize
+        const count = Math.max(0, Math.min(pageSize, total - start))
+        const results = Array.from({ length: count }, (_, idx) => ({
+          orden_trabajo_id: start + idx + 1,
+          numero_ot: start + idx + 1,
+          tipo_evento: 'ENTREGA_PREVISTA',
+          naturaleza: 'PLANIFICADA',
+          fecha: '2026-11-27',
+          fecha_hora: null,
+          cliente_nombre: `Cliente ${start + idx + 1}`,
+          estado_codigo: 'EN_PROCESO',
+        }))
+        return HttpResponse.json({
+          ...tallerPlanificacion,
+          calendario_eventos: {
+            total,
+            page,
+            page_size: pageSize,
+            resumen_naturaleza: { total, planificados: total, efectivos: 0 },
+            results,
+          },
+        })
+      }),
+    )
+
+    const wrapper = await mountTallerResumen()
+    await vi.waitFor(() => {
+      expect(requestedPages).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+    })
+    const tabBtn = wrapper
+      .findAll('button[role="tab"]')
+      .find((b) => b.text().includes('Planificación y entregas'))
+    await tabBtn!.trigger('click')
+    expect(wrapper.text()).toContain('520 eventos en el mes')
+  })
 })

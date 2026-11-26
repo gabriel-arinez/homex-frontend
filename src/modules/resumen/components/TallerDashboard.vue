@@ -347,10 +347,12 @@ async function fetchCalendarMonth() {
         controller.signal,
       )
       if (seq !== calSeq) return
-      collected.push(...res.calendario_eventos.results)
+      const chunk = res.calendario_eventos.results
+      collected.push(...chunk)
       total = res.calendario_eventos.total
+      if (!chunk.length) break
       page += 1
-    } while (collected.length < total && page <= 10)
+    } while (collected.length < total)
     if (seq !== calSeq) return
     calEventos.value = collected
     if (!selectedDay.value || !selectedDay.value.startsWith(calMonth.value)) {
