@@ -103,7 +103,7 @@ const groups: Array<{
     ],
   },
   {
-    label: 'Finanzas y clientes',
+    label: 'Cobros y directorio',
     items: [
       { label: 'Recibos', to: '/recibos', icon: ReceiptText, capabilities: ['comercial.operar'] },
       { label: 'Clientes', to: '/clientes', icon: Users, capabilities: ['comercial.operar'] },

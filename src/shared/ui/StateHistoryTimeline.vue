@@ -91,7 +91,7 @@ function automaticLabel(entry: StateHistoryEntry): string {
     <div class="state-timeline__header">
       <div class="state-timeline__title-row">
         <Clock3 :size="16" aria-hidden="true" />
-        <h3>{{ title }}</h3>
+        <h2>{{ title }}</h2>
       </div>
       <Badge v-if="incomplete" tone="warning" :dot="false">Historial incompleto</Badge>
     </div>
@@ -186,7 +186,7 @@ function automaticLabel(entry: StateHistoryEntry): string {
   align-items: center;
   gap: var(--space-2, 0.5rem);
 }
-.state-timeline__header h3 {
+.state-timeline__header h2 {
   margin: 0;
   font-size: 0.95rem;
   font-weight: 600;
