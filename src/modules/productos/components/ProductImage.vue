@@ -11,11 +11,13 @@ const props = withDefaults(
     categoryCode?: string | null
     sizes?: string
     eager?: boolean
+    compact?: boolean
   }>(),
   {
     categoryCode: null,
     sizes: '(max-width: 480px) 100vw, (max-width: 1024px) 50vw, 320px',
     eager: false,
+    compact: false,
   },
 )
 const failed = ref(false)
@@ -44,7 +46,8 @@ const srcset = computed(() => variants.value.map((item) => `${item.url} ${item.w
 <template>
   <div
     class="product-image"
-    :style="image ? { aspectRatio: `${image.ancho} / ${image.alto}` } : undefined"
+    :class="{ 'product-image--compact': compact }"
+    :style="image && !compact ? { aspectRatio: `${image.ancho} / ${image.alto}` } : undefined"
   >
     <img
       v-if="source && !failed"
@@ -73,10 +76,28 @@ const srcset = computed(() => variants.value.map((item) => `${item.url} ${item.w
   border-radius: var(--radius-card);
   background: var(--color-surface-soft, var(--color-background));
 }
+.product-image--compact {
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
 img {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+.product-image--compact img {
+  object-fit: cover;
+}
+.product-image--compact .fallback-icon-box {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: inherit;
+}
+.product-image--compact .fallback-label {
+  display: none;
 }
 .fallback {
   display: grid;

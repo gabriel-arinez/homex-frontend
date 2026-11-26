@@ -65,7 +65,42 @@ const tallerResumen = {
         dias_diferencia: 8,
         categoria_prioridad: 'PENDIENTE_INICIAR',
       },
+      {
+        orden_trabajo_id: 36,
+        numero_ot: 36,
+        cliente_nombre: 'Carla Méndez',
+        vendedor_nombre: 'Alvaro Huallpa',
+        muebles_solicitados: [
+          { nombre: 'Estante modular', tipo_mueble: 'ESTANTE', cantidad: '1.0000' },
+        ],
+        estado_codigo: 'TERMINADA',
+        estado_nombre: 'Terminada',
+        pedido_estado_codigo: 'EN_PRODUCCION',
+        fecha_prevista: '2026-12-08',
+        dias_diferencia: 11,
+        categoria_prioridad: 'TERMINADA_PENDIENTE_AUTORIZACION',
+      },
+      {
+        orden_trabajo_id: 37,
+        numero_ot: 37,
+        cliente_nombre: 'Jorge Rojas',
+        vendedor_nombre: 'Rodrigo Ramos',
+        muebles_solicitados: [{ nombre: 'Gavetero', tipo_mueble: 'GAVETERO', cantidad: '1.0000' }],
+        estado_codigo: 'EN_PROCESO',
+        estado_nombre: 'En proceso',
+        pedido_estado_codigo: 'EN_PRODUCCION',
+        fecha_prevista: null,
+        dias_diferencia: null,
+        categoria_prioridad: 'SIN_FECHA_ENTREGA',
+      },
     ],
+    resumen_conteos: {
+      entrega_vencida: 0,
+      entrega_proxima: 1,
+      pendiente_iniciar: 1,
+      terminada_pendiente_autorizacion: 1,
+      sin_fecha_entrega: 1,
+    },
   },
 }
 
@@ -74,7 +109,12 @@ const tallerPlanificacion = {
   calendario_eventos: {
     total: 2,
     page: 1,
-    page_size: 50,
+    page_size: 20,
+    resumen_naturaleza: {
+      total: 2,
+      planificados: 1,
+      efectivos: 1,
+    },
     results: [
       {
         orden_trabajo_id: 31,
@@ -207,13 +247,34 @@ describe('Fase 4 TallerDashboard', () => {
     expect(wrapper.text()).toContain('37 d')
 
     await clickTab('Planificación y entregas')
+    expect(wrapper.text()).toContain('Noviembre 2026')
     expect(wrapper.text()).toContain('OT #25')
+
+    // Navegación a diciembre y cambio a vista alternativa Listado de eventos
+    await wrapper.get('button[aria-label="Mes siguiente"]').trigger('click')
+    await vi.waitFor(() => {
+      expect(wrapper.text()).toContain('Diciembre 2026')
+    })
+
+    const listadoBtn = wrapper
+      .findAll('button')
+      .find((b) => b.text().includes('Listado de eventos'))
+    await listadoBtn!.trigger('click')
+    await vi.waitFor(() => {
+      expect(wrapper.text()).toContain('Total conjunto: 2 eventos')
+    })
     await wrapper.get('select[aria-label="Filtrar naturaleza de eventos"]').setValue('PLANIFICADA')
-    expect(wrapper.text()).toContain('OT #31')
-    expect(wrapper.text()).not.toContain('OT #25')
+    await vi.waitFor(() => {
+      expect(wrapper.text()).toContain('OT #31')
+    })
+
+    // Verifica que las 5 categorías reales de prioridades se muestran en la cola
+    await clickTab('General')
+    expect(wrapper.text()).toContain('Terminadas por autorizar')
+    expect(wrapper.text()).toContain('Sin fecha de entrega')
   })
 
-  it('valida rango de fechas con dateRangeError y aísla fallos parciales', async () => {
+  it('valida rango de fechas con dateRangeError (histórico vs planificación futura) y aísla fallos parciales', async () => {
     server.use(
       http.get('http://localhost:8000/api/v1/dashboard/taller/', () =>
         HttpResponse.json(tallerResumen),
@@ -232,5 +293,9 @@ describe('Fase 4 TallerDashboard', () => {
     await wrapper.get('input[aria-label="Fecha desde"]').setValue('2026-11-25')
     await wrapper.get('input[aria-label="Fecha hasta"]').setValue('2026-11-10')
     expect(wrapper.text()).toContain('La fecha inicial no puede ser posterior a la fecha final.')
+
+    // Fecha futura bloqueada en filtro histórico
+    await wrapper.get('input[aria-label="Fecha hasta"]').setValue('2026-12-15')
+    expect(wrapper.text()).toContain('La fecha no puede ser futura.')
   })
 })

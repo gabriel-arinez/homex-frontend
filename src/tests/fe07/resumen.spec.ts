@@ -271,7 +271,19 @@ describe('FE07 resumen operativo', () => {
             entregas_en_plazo: 13,
             cumplimiento_entregas_porcentaje: '100.00',
           },
-          cola_prioridades: [],
+          cola_prioridades: {
+            total: 0,
+            page: 1,
+            page_size: 50,
+            resumen_conteos: {
+              entrega_vencida: 0,
+              entrega_proxima: 0,
+              pendiente_iniciar: 0,
+              terminada_pendiente_autorizacion: 0,
+              sin_fecha_entrega: 0,
+            },
+            results: [],
+          },
         }),
       ),
       http.get('http://localhost:8000/api/v1/dashboard/taller/planificacion/', () =>
@@ -291,7 +303,13 @@ describe('FE07 resumen operativo', () => {
             familia_producto: null,
             agrupacion: 'month',
           },
-          calendario: [],
+          calendario_eventos: {
+            total: 1,
+            page: 1,
+            page_size: 20,
+            resumen_naturaleza: { total: 1, planificados: 0, efectivos: 1 },
+            results: [],
+          },
           analisis_fabricacion: {
             distribucion_estados: [
               { estado_codigo: 'EN_PROCESO', estado_nombre: 'En proceso', cantidad: 12 },

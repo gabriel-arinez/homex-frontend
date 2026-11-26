@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Calendar, SlidersHorizontal } from '@lucide/vue'
-import { dateRangeError } from '@/shared/validation/dateRange'
+import { dateRangeError, localToday } from '@/shared/validation/dateRange'
 import { buildPeriodPreset, formatDateLaPaz, type PeriodPresetKey } from './formatters'
 
 export interface SellerOption {
@@ -60,7 +60,10 @@ const activePeriodSummary = computed(() => {
   return presets.find((p) => p.key === preset.value)?.label ?? 'Todo el período'
 })
 
-const rangeError = computed(() => dateRangeError(props.fechaDesde ?? '', props.fechaHasta ?? ''))
+const maxDate = computed(() => props.fechaReferencia || localToday())
+const rangeError = computed(() =>
+  dateRangeError(props.fechaDesde ?? '', props.fechaHasta ?? '', maxDate.value),
+)
 
 watch(
   () => [props.fechaDesde, props.fechaHasta],
@@ -74,7 +77,7 @@ watch(
 function onPresetChange(next: PeriodPresetKey) {
   preset.value = next
   if (next === 'personalizado') return
-  const refDate = props.fechaReferencia || new Date().toISOString().slice(0, 10)
+  const refDate = props.fechaReferencia || localToday()
   const range = buildPeriodPreset(next, refDate)
   emit('update:fechaDesde', range.fecha_desde)
   emit('update:fechaHasta', range.fecha_hasta)
@@ -88,7 +91,7 @@ function onCustomDateChange(kind: 'desde' | 'hasta', value: string) {
   const nextHasta = kind === 'hasta' ? clean : props.fechaHasta
   if (kind === 'desde') emit('update:fechaDesde', clean)
   else emit('update:fechaHasta', clean)
-  if (!dateRangeError(nextDesde ?? '', nextHasta ?? '')) emit('apply')
+  if (!dateRangeError(nextDesde ?? '', nextHasta ?? '', maxDate.value)) emit('apply')
 }
 
 function onSellerChange(value: string) {

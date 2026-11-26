@@ -1303,7 +1303,7 @@ const tabs = computed<DetailTabItem[]>(() => [
                 : formatInteger(dispResumen?.con_stock_disponible)
             "
             detail="Modalidad CON_STOCK con existencia"
-            to="/productos"
+            to="/productos?estado_stock=NORMAL"
             tone="success"
           />
           <MetricKpiCard
@@ -1314,7 +1314,7 @@ const tabs = computed<DetailTabItem[]>(() => [
                 : formatInteger(dispResumen?.bajo_pedido)
             "
             detail="Se cotizan bajo pedido (no agotados)"
-            to="/productos"
+            to="/productos?estado_stock=BAJO_PEDIDO"
           />
           <MetricKpiCard
             label="Agotados"
@@ -1325,7 +1325,7 @@ const tabs = computed<DetailTabItem[]>(() => [
             "
             detail="Productos CON_STOCK en cero"
             :tone="(dispResumen?.con_stock_agotado ?? 0) > 0 ? 'danger' : 'default'"
-            to="/productos"
+            to="/productos?estado_stock=SIN_EXISTENCIAS"
           />
           <MetricKpiCard
             label="Con stock bajo"
@@ -1343,6 +1343,7 @@ const tabs = computed<DetailTabItem[]>(() => [
                 : 'Según umbral mínimo configurado'
             "
             :tone="(dispResumen?.con_stock_bajo ?? 0) > 0 ? 'warning' : 'default'"
+            to="/productos?estado_stock=STOCK_BAJO"
           />
         </div>
 
@@ -1386,6 +1387,7 @@ const tabs = computed<DetailTabItem[]>(() => [
                       :alt="prod.nombre"
                       :category-code="prod.categoria_codigo"
                       sizes="44px"
+                      compact
                     />
                   </div>
                   <div class="product-compact-info">

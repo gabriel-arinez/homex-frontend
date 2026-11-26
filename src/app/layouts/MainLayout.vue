@@ -114,13 +114,13 @@ onBeforeUnmount(() => {
   width: 100%;
   min-width: 0;
 }
-@media (min-width: 48rem) and (max-width: 63.99rem) {
+@media (min-width: 48.01rem) and (max-width: 63.99rem) {
   .shell main {
     margin-left: var(--sidebar-compact);
     padding: var(--space-6);
   }
 }
-@media (max-width: 47.99rem) {
+@media (max-width: 48rem) {
   .shell main {
     margin-left: 0;
     padding: var(--space-4);

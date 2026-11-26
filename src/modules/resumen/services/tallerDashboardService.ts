@@ -9,6 +9,9 @@ export interface TallerDashboardQuery {
   tipo_mueble?: string | null
   entrega_desde?: string | null
   entrega_hasta?: string | null
+  categoria_prioridad?: string | null
+  naturaleza_evento?: string | null
+  tipo_evento?: string | null
   page?: number
   page_size?: number
 }

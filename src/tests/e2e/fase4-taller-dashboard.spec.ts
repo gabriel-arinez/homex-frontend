@@ -62,6 +62,13 @@ const tallerMock = {
         categoria_prioridad: 'PENDIENTE_INICIAR',
       },
     ],
+    resumen_conteos: {
+      entrega_vencida: 0,
+      entrega_proxima: 1,
+      pendiente_iniciar: 1,
+      terminada_pendiente_autorizacion: 0,
+      sin_fecha_entrega: 0,
+    },
   },
 }
 
@@ -70,7 +77,12 @@ const planificacionMock = {
   calendario_eventos: {
     total: 1,
     page: 1,
-    page_size: 50,
+    page_size: 20,
+    resumen_naturaleza: {
+      total: 1,
+      planificados: 1,
+      efectivos: 0,
+    },
     results: [
       {
         orden_trabajo_id: 31,
@@ -189,6 +201,15 @@ test('@a11y Fase 4 TallerDashboard cumple accesibilidad, renderiza gráficos y r
       () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
     )
     expect(noOverflow).toBe(true)
+    if (width === 768) {
+      const sidebarClosed = await page.evaluate(() => {
+        const aside = document.querySelector('aside')
+        if (!aside) return false
+        const rect = aside.getBoundingClientRect()
+        return rect.right <= 1 || getComputedStyle(aside).visibility === 'hidden'
+      })
+      expect(sidebarClosed).toBe(true)
+    }
     if (width === 1440 || width === 390) {
       expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
     }
@@ -200,10 +221,17 @@ test('@a11y Fase 4 TallerDashboard cumple accesibilidad, renderiza gráficos y r
   await assertAllVisibleChartsRendered(page, 1)
 
   await mainTabs.getByRole('tab', { name: /Planificación y entregas/i }).click()
+  await expect(page.getByRole('heading', { name: 'Noviembre 2026' })).toBeVisible()
+  await page.getByRole('button', { name: 'Mes siguiente' }).click()
+  await expect(page.getByRole('heading', { name: 'Diciembre 2026' })).toBeVisible()
+  await page.getByRole('button', { name: /01 dic 2026/i }).click()
   await expect(page.getByRole('link', { name: 'OT #31' })).toHaveAttribute(
     'href',
     '/ordenes-trabajo/31',
   )
+  await page.getByRole('button', { name: 'Listado de eventos' }).click()
+  await expect(page.getByRole('heading', { name: 'Listado de eventos de taller' })).toBeVisible()
+  await expect(page.getByText('Total conjunto: 1 eventos')).toBeVisible()
 
   await page.addInitScript(() => localStorage.setItem('homex.theme', 'dark'))
   await page.goto('/resumen')

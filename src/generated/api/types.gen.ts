@@ -1031,6 +1031,7 @@ export type PaginacionCalendarioTaller = {
   total: number
   page: number
   page_size: number
+  resumen_naturaleza: ResumenNaturalezaCalendarioTaller
   results: Array<EventoCalendarioTaller>
 }
 
@@ -1038,6 +1039,7 @@ export type PaginacionColaPrioridadTaller = {
   total: number
   page: number
   page_size: number
+  resumen_conteos: ResumenColaPrioridadTaller
   results: Array<ElementoColaPrioridadTaller>
 }
 
@@ -1699,6 +1701,14 @@ export type ResultadoCatalogo = {
 export type ResultadoEnum =
   'PROCESSING' | 'TRANSCRIBED' | 'REQUIRES_REVIEW' | 'NO_PROPOSAL' | 'ERROR'
 
+export type ResumenColaPrioridadTaller = {
+  entrega_vencida: number
+  entrega_proxima: number
+  pendiente_iniciar: number
+  terminada_pendiente_autorizacion: number
+  sin_fecha_entrega: number
+}
+
 export type ResumenConteosAgenda = {
   proformas_proximas_vencer: number
   proformas_pendientes_revision: number
@@ -1739,6 +1749,12 @@ export type ResumenInventario = {
   stock_bajo: number
   agotados: number
   sin_stock_minimo: number
+}
+
+export type ResumenNaturalezaCalendarioTaller = {
+  total: number
+  planificados: number
+  efectivos: number
 }
 
 export type RevisionCampoCatalogo = {
@@ -3535,6 +3551,12 @@ export type V1DashboardTallerRetrieveData = {
   body?: never
   path?: never
   query?: {
+    categoria_prioridad?:
+      | 'ENTREGA_PROXIMA'
+      | 'ENTREGA_VENCIDA'
+      | 'PENDIENTE_INICIAR'
+      | 'SIN_FECHA_ENTREGA'
+      | 'TERMINADA_PENDIENTE_AUTORIZACION'
     entrega_desde?: string
     entrega_hasta?: string
     estado_fabricacion?: string
@@ -3564,8 +3586,10 @@ export type V1DashboardTallerPlanificacionRetrieveData = {
     fecha_desde?: string
     fecha_hasta?: string
     granularidad?: 'diaria' | 'mensual' | 'semanal'
+    naturaleza_evento?: 'EFECTIVA' | 'PLANIFICADA'
     page?: number
     page_size?: number
+    tipo_evento?: 'ENTREGA_EFECTIVA' | 'ENTREGA_PREVISTA' | 'FIN_FABRICACION' | 'INICIO_FABRICACION'
     tipo_mueble?: string
   }
   url: '/api/v1/dashboard/taller/planificacion/'

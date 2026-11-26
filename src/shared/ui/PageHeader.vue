@@ -59,7 +59,7 @@ const emit = defineEmits<{ menu: [] }>()
   flex-wrap: wrap;
   gap: var(--space-3);
 }
-@media (max-width: 47.99rem) {
+@media (max-width: 48rem) {
   .page-header {
     display: grid;
     margin-bottom: var(--space-6);

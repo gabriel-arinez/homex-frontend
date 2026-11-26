@@ -639,7 +639,7 @@ nav a.router-link-active::before {
   width: 100%;
   padding-inline: 0;
 }
-@media (min-width: 48rem) and (max-width: 63.99rem) {
+@media (min-width: 48.01rem) and (max-width: 63.99rem) {
   .sidebar-layer,
   .sidebar {
     width: var(--sidebar-compact);
@@ -649,7 +649,7 @@ nav a.router-link-active::before {
     box-shadow: 0 0 0 100vmax var(--color-overlay);
   }
 }
-@media (max-width: 47.99rem) {
+@media (max-width: 48rem) {
   .sidebar-layer {
     width: 100vw;
     background: var(--color-overlay);
