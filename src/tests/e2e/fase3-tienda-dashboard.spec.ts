@@ -131,6 +131,26 @@ const seguimientoMock = {
       bajo_pedido: 6,
       sin_stock_minimo: 31,
     },
+    por_categoria: [
+      {
+        categoria_codigo: 'SILLA',
+        categoria_nombre: 'Silla',
+        total_activos: 25,
+        con_stock_disponible: 22,
+        con_stock_bajo: 0,
+        con_stock_agotado: 3,
+        bajo_pedido: 0,
+      },
+      {
+        categoria_codigo: 'PISO_FLOTANTE',
+        categoria_nombre: 'Piso flotante',
+        total_activos: 12,
+        con_stock_disponible: 6,
+        con_stock_bajo: 0,
+        con_stock_agotado: 0,
+        bajo_pedido: 6,
+      },
+    ],
     productos: {
       total: 2,
       page: 1,
@@ -195,12 +215,55 @@ async function setupTiendaRoutes(page: Page) {
       json: [{ id: 12, codigo: 'SILLA', nombre: 'Silla', concepto_codigo: 'CATEGORIA_PRODUCTO' }],
     }),
   )
-  await page.route('**/api/v1/dashboard/tienda/seguimiento/**', (r) =>
-    r.fulfill({ json: seguimientoMock }),
-  )
-  await page.route(/\/api\/v1\/dashboard\/tienda\/(?:\?.*)?$/, (r) =>
-    r.fulfill({ json: resumenMock }),
-  )
+  await page.route('**/api/v1/dashboard/tienda/seguimiento/**', (r) => {
+    const cat = new URL(r.request().url()).searchParams.get('categoria_agenda')
+    if (cat === 'PEDIDO_SALDO_PENDIENTE') {
+      return r.fulfill({
+        json: {
+          ...seguimientoMock,
+          agenda: {
+            ...seguimientoMock.agenda,
+            elementos: {
+              total: 1,
+              page: 1,
+              page_size: 5,
+              results: [
+                {
+                  tipo_documento: 'PEDIDO',
+                  documento_id: 103,
+                  proforma_id: 546,
+                  pedido_id: 103,
+                  numero_documento: 546,
+                  cliente_nombre: 'Cliente Saldo Real',
+                  fecha: '2026-11-20',
+                  estado_codigo: 'CONFIRMADO',
+                  estado_nombre: 'Confirmado',
+                  prioridad: 'MEDIA',
+                  categoria_agenda: 'PEDIDO_SALDO_PENDIENTE',
+                  dias_diferencia: null,
+                  moneda: 'BOB',
+                  saldo_pendiente: '11343.00',
+                },
+              ],
+            },
+          },
+        },
+      })
+    }
+    return r.fulfill({ json: seguimientoMock })
+  })
+  await page.route(/\/api\/v1\/dashboard\/tienda\/(?:\?.*)?$/, (r) => {
+    const desde = new URL(r.request().url()).searchParams.get('fecha_desde')
+    if (desde === '2026-11-01') {
+      return r.fulfill({
+        json: {
+          ...resumenMock,
+          indicadores: { ...resumenMock.indicadores, proformas_formalizadas: 76 },
+        },
+      })
+    }
+    return r.fulfill({ json: resumenMock })
+  })
 }
 
 async function assertAllVisibleChartsRendered(page: Page, expectedCount: number) {
@@ -257,9 +320,17 @@ test('@a11y Fase 3 TiendaDashboard cumple accesibilidad, renderiza gráficos y r
 
   await mainTabs.getByRole('tab', { name: /Pedidos y cobros/i }).click()
   await assertAllVisibleChartsRendered(page, 2)
+  await expect(page.getByRole('link', { name: 'Pedido #103 (Prof. #546)' })).toHaveAttribute(
+    'href',
+    '/pedidos/103',
+  )
 
   await mainTabs.getByRole('tab', { name: /Disponibilidad/i }).click()
   await assertAllVisibleChartsRendered(page, 1)
+
+  await mainTabs.getByRole('tab', { name: /General/i }).click()
+  await page.getByLabel('Selector de período').selectOption('este_mes')
+  await expect(page.getByText('76', { exact: true }).first()).toBeVisible()
 
   await page.addInitScript(() => localStorage.setItem('homex.theme', 'dark'))
   await page.goto('/resumen')

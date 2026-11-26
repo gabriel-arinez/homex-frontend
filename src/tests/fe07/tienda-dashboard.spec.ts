@@ -140,6 +140,26 @@ const alvaroSeguimiento = {
       bajo_pedido: 6,
       sin_stock_minimo: 31,
     },
+    por_categoria: [
+      {
+        categoria_codigo: 'SILLA',
+        categoria_nombre: 'Silla',
+        total_activos: 25,
+        con_stock_disponible: 22,
+        con_stock_bajo: 0,
+        con_stock_agotado: 3,
+        bajo_pedido: 0,
+      },
+      {
+        categoria_codigo: 'PISO_FLOTANTE',
+        categoria_nombre: 'Piso flotante',
+        total_activos: 12,
+        con_stock_disponible: 6,
+        con_stock_bajo: 0,
+        con_stock_agotado: 0,
+        bajo_pedido: 6,
+      },
+    ],
     productos: {
       total: 2,
       page: 1,
@@ -337,6 +357,107 @@ describe('Fase 3 TiendaDashboard', () => {
       expect(wrapper.get('a.shortcut-link').attributes('href')).toContain('/productos?categoria=12')
     })
     expect(resumenCalls).toBe(initialResumen)
+  })
+
+  it('cambia cifras KPI al filtrar período, valida enlaces de pedidos reales y aísla errores por categoría', async () => {
+    const agendaCatCalls: string[] = []
+    server.use(
+      http.get('http://localhost:8000/api/v1/dashboard/tienda/', ({ request }) => {
+        const desde = new URL(request.url).searchParams.get('fecha_desde')
+        if (desde === '2026-11-01') {
+          return HttpResponse.json({
+            ...alvaroResumen,
+            indicadores: {
+              ...alvaroResumen.indicadores,
+              proformas_formalizadas: 76,
+              pedidos_confirmados_periodo: 16,
+              tasa_conversion_cohorte: '21.05',
+            },
+            finanzas: {
+              por_moneda: [
+                {
+                  moneda: 'BOB',
+                  importe_pedidos_no_cancelados: '126688.62',
+                  cobros_validos_periodo: '75146.26',
+                  cobros_acumulados_cartera_vigente: '75146.26',
+                  saldo_pendiente: '51542.36',
+                  porcentaje_cobrado: '59.32',
+                },
+              ],
+              cobros_pedidos_cancelados: [],
+            },
+          })
+        }
+        return HttpResponse.json(alvaroResumen)
+      }),
+      http.get('http://localhost:8000/api/v1/dashboard/tienda/seguimiento/', ({ request }) => {
+        const url = new URL(request.url)
+        const cat = url.searchParams.get('categoria_agenda')
+        if (cat) agendaCatCalls.push(cat)
+        if (cat === 'PEDIDO_SALDO_PENDIENTE') {
+          return HttpResponse.json({
+            ...alvaroSeguimiento,
+            agenda: {
+              ...alvaroSeguimiento.agenda,
+              elementos: {
+                total: 1,
+                page: 1,
+                page_size: 5,
+                results: [
+                  {
+                    tipo_documento: 'PEDIDO',
+                    documento_id: 103,
+                    proforma_id: 546,
+                    pedido_id: 103,
+                    numero_documento: 546,
+                    cliente_nombre: 'Cliente Saldo Real',
+                    fecha: '2026-11-20',
+                    estado_codigo: 'CONFIRMADO',
+                    estado_nombre: 'Confirmado',
+                    prioridad: 'MEDIA',
+                    categoria_agenda: 'PEDIDO_SALDO_PENDIENTE',
+                    dias_diferencia: null,
+                    moneda: 'BOB',
+                    saldo_pendiente: '11343.00',
+                  },
+                ],
+              },
+            },
+          })
+        }
+        if (cat === 'ENTREGA_PROXIMA') {
+          return HttpResponse.json({ detail: 'Error categoría entregas' }, { status: 503 })
+        }
+        return HttpResponse.json(alvaroSeguimiento)
+      }),
+    )
+
+    const wrapper = await mountTiendaResumen()
+    await vi.waitFor(() => {
+      expect(wrapper.text()).toContain('170.717,37')
+      expect(agendaCatCalls).toContain('PEDIDO_SALDO_PENDIENTE')
+    })
+
+    // Cambio de período actualiza KPIs reales
+    await wrapper.get('select[aria-label="Selector de período"]').setValue('este_mes')
+    await vi.waitFor(() => {
+      expect(wrapper.text()).toContain('76')
+      expect(wrapper.text()).toContain('126.688,62')
+    })
+
+    // Enlace de pedido usa pedido_id (103) y nunca proforma_id (546), y muestra error en categoría fallida
+    const clickTab = async (label: string) => {
+      const btn = wrapper.findAll('button[role="tab"]').find((b) => b.text().includes(label))
+      await btn!.trigger('click')
+    }
+    await clickTab('Pedidos y cobros')
+    await vi.waitFor(() => {
+      expect(wrapper.text()).toContain('Pedido #103 (Prof. #546)')
+    })
+    const pedLink = wrapper.findAll('a.table-link').find((a) => a.text().includes('Pedido #103'))
+    expect(pedLink?.attributes('href')).toBe('/pedidos/103')
+    expect(wrapper.text()).toContain('11.343,00')
+    expect(wrapper.text()).toContain('Error categoría entregas')
   })
 
   it('aísla fallos parciales y descarta respuestas obsoletas fuera de orden', async () => {

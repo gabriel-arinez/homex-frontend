@@ -69,6 +69,7 @@ export type {
   DetalleOrdenTrabajoWritable,
   DetalleProforma,
   DetalleProformaWritable,
+  DisponibilidadCategoria,
   DisponibilidadComercial,
   ElementoAgendaComercial,
   ElementoColaPrioridadTaller,

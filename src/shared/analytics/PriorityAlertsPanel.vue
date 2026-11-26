@@ -19,6 +19,8 @@ export interface PriorityAlertCategory {
   viewAllLabel: string
   emptyTitle?: string
   emptyDescription?: string
+  error?: string
+  loading?: boolean
 }
 
 const props = withDefaults(
@@ -119,8 +121,12 @@ const visibleItems = computed(() => activeCategory.value?.items.slice(0, 5) ?? [
           </RouterLink>
         </div>
 
+        <LoadingSkeleton v-if="activeCategory.loading" :lines="3" />
+        <ErrorState v-else-if="activeCategory.error" :description="activeCategory.error">
+          <button type="button" @click="emit('retry')">Reintentar</button>
+        </ErrorState>
         <EmptyState
-          v-if="!visibleItems.length"
+          v-else-if="!visibleItems.length"
           :title="activeCategory.emptyTitle ?? 'Sin alertas activas'"
           :description="
             activeCategory.emptyDescription ?? 'No hay registros pendientes en esta categoría.'

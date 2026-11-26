@@ -19,8 +19,9 @@ import {
   Wallet,
 } from '@lucide/vue'
 import type {
+  AgendaComercial,
   DashboardTiendaResumen,
-  DashboardTiendaSeguimiento,
+  DisponibilidadComercial,
   ElementoAgendaComercial,
   ProductoDisponibilidad,
   ValorCatalogoPublico,
@@ -129,13 +130,20 @@ const moneda = ref<string>('')
 const categoriaLocal = ref<string>('')
 
 const resumen = ref<DashboardTiendaResumen | null>(null)
-const seguimiento = ref<DashboardTiendaSeguimiento | null>(null)
+const agenda = ref<AgendaComercial | null>(null)
+const disponibilidad = ref<DisponibilidadComercial | null>(null)
+const fechaReferenciaSeguimiento = ref<string | null>(null)
+
 const agendaBuckets = ref<Partial<Record<AgendaCategoriaCodigo, ElementoAgendaComercial[]>>>({})
+const agendaErrorByCat = ref<Partial<Record<AgendaCategoriaCodigo, string>>>({})
+const agendaLoadingByCat = ref<Partial<Record<AgendaCategoriaCodigo, boolean>>>({})
 
 const loadingResumen = ref(true)
-const loadingSeguimiento = ref(true)
+const loadingAgenda = ref(true)
+const loadingDisponibilidad = ref(true)
 const errorResumen = ref('')
-const errorSeguimiento = ref('')
+const errorAgenda = ref('')
+const errorDisponibilidad = ref('')
 
 const lastUpdatedText = ref('')
 const catalogCategories = ref<ValorCatalogoPublico[]>([])
@@ -143,18 +151,20 @@ const activeMoneyChartCurrency = ref<string>('BOB')
 const activeDonutCurrency = ref<string>('BOB')
 
 let resumenCtrl: AbortController | null = null
-let seguimientoCtrl: AbortController | null = null
 let agendaCtrl: AbortController | null = null
+let agendaBucketsCtrl: AbortController | null = null
+let disponibilidadCtrl: AbortController | null = null
 let resumenSeq = 0
-let seguimientoSeq = 0
 let agendaSeq = 0
+let disponibilidadSeq = 0
+const agendaCatSeq: Partial<Record<AgendaCategoriaCodigo, number>> = {}
 
 const vendorName = computed(() => session.identity?.display_name ?? 'Encargado de tienda')
 
 const scopeDescription = computed(() => `Gestión comercial personal de ${vendorName.value}.`)
 
 const fechaReferencia = computed(
-  () => resumen.value?.fecha_referencia ?? seguimiento.value?.fecha_referencia ?? null,
+  () => resumen.value?.fecha_referencia ?? fechaReferenciaSeguimiento.value ?? null,
 )
 
 const hasPeriodFilter = computed(() => Boolean(fechaDesde.value && fechaHasta.value))
@@ -166,7 +176,9 @@ const periodScopeLabel = computed(() => {
   return 'Todo el histórico'
 })
 
-const anyLoading = computed(() => loadingResumen.value || loadingSeguimiento.value)
+const anyLoading = computed(
+  () => loadingResumen.value || loadingAgenda.value || loadingDisponibilidad.value,
+)
 
 const availableCurrencies = computed(() => {
   const set = new Set<string>(['BOB', 'USD'])
@@ -183,14 +195,10 @@ const categoryOptions = computed(() => {
       nombre: c.nombre,
     }))
   }
-  const map = new Map<string, string>()
-  for (const p of seguimiento.value?.disponibilidad.productos.results ?? []) {
-    if (!map.has(p.categoria_codigo)) map.set(p.categoria_codigo, p.categoria_nombre)
-  }
-  return Array.from(map.entries()).map(([codigo, nombre]) => ({
+  return (disponibilidad.value?.por_categoria ?? []).map((c) => ({
     id: null as number | null,
-    codigo,
-    nombre,
+    codigo: c.categoria_codigo,
+    nombre: c.categoria_nombre,
   }))
 })
 
@@ -204,8 +212,9 @@ const productosTargetRoute = computed(() => {
 const staleBlocks = computed(() => {
   const items: string[] = []
   if (errorResumen.value && resumen.value) items.push(`Actividad (${errorResumen.value})`)
-  if (errorSeguimiento.value && seguimiento.value) {
-    items.push(`Agenda y disponibilidad (${errorSeguimiento.value})`)
+  if (errorAgenda.value && agenda.value) items.push(`Agenda (${errorAgenda.value})`)
+  if (errorDisponibilidad.value && disponibilidad.value) {
+    items.push(`Disponibilidad (${errorDisponibilidad.value})`)
   }
   return items
 })
@@ -245,84 +254,120 @@ async function fetchResumen() {
   }
 }
 
-async function fetchAgendaBuckets(base: DashboardTiendaSeguimiento) {
-  const seq = ++agendaSeq
-  agendaCtrl?.abort()
-  const controller = new AbortController()
-  agendaCtrl = controller
-
-  const counts = base.agenda.resumen_conteos
-  const countMap: Record<AgendaCategoriaCodigo, number> = {
-    PROFORMA_PROXIMA_VENCER: counts.proformas_proximas_vencer,
-    PROFORMA_PENDIENTE_REVISION: counts.proformas_pendientes_revision,
-    PROFORMA_ENVIADA: counts.proformas_enviadas,
-    PEDIDO_LISTO_ENTREGA: counts.pedidos_listos_entrega,
-    PEDIDO_SALDO_PENDIENTE: counts.pedidos_con_saldo_pendiente,
-    ENTREGA_PROXIMA: counts.entregas_proximas,
-    ENTREGA_RETRASADA: counts.entregas_retrasadas,
-  }
-
-  const nextBuckets: Partial<Record<AgendaCategoriaCodigo, ElementoAgendaComercial[]>> = {}
-  for (const cat of AGENDA_CATEGORIES) {
-    nextBuckets[cat.key] = base.agenda.elementos.results
-      .filter((el) => el.categoria_agenda === cat.key)
+async function fetchAgendaCategory(catKey: AgendaCategoriaCodigo, signal: AbortSignal) {
+  const catSeq = (agendaCatSeq[catKey] ?? 0) + 1
+  agendaCatSeq[catKey] = catSeq
+  agendaLoadingByCat.value = { ...agendaLoadingByCat.value, [catKey]: true }
+  agendaErrorByCat.value = { ...agendaErrorByCat.value, [catKey]: '' }
+  try {
+    const resp = await tiendaDashboardService.getSeguimiento(
+      {
+        moneda: moneda.value || null,
+        categoria_agenda: catKey,
+        page_size: 5,
+      },
+      signal,
+    )
+    if (agendaCatSeq[catKey] !== catSeq || signal.aborted) return
+    const validated = resp.agenda.elementos.results
+      .filter((el) => el.categoria_agenda === catKey)
       .slice(0, 5)
-  }
-  agendaBuckets.value = nextBuckets
-
-  const activeKeys = AGENDA_CATEGORIES.map((c) => c.key).filter((key) => countMap[key] > 0)
-  if (!activeKeys.length) return
-
-  const results = await Promise.allSettled(
-    activeKeys.map(async (catKey) => {
-      const resp = await tiendaDashboardService.getSeguimiento(
-        {
-          moneda: moneda.value || null,
-          categoria_agenda: catKey,
-          page_size: 5,
-        },
-        controller.signal,
-      )
-      return [catKey, resp.agenda.elementos.results.slice(0, 5)] as const
-    }),
-  )
-  if (seq !== agendaSeq || controller.signal.aborted) return
-
-  const updated = { ...agendaBuckets.value }
-  for (const res of results) {
-    if (res.status === 'fulfilled') {
-      const [key, items] = res.value
-      updated[key] = items
+    agendaBuckets.value = { ...agendaBuckets.value, [catKey]: validated }
+  } catch (err) {
+    if (agendaCatSeq[catKey] !== catSeq || (err as { name?: string })?.name === 'AbortError') {
+      return
+    }
+    const message =
+      err instanceof Error ? err.message : 'No se pudo cargar los registros de esta categoría.'
+    agendaErrorByCat.value = { ...agendaErrorByCat.value, [catKey]: message }
+    agendaBuckets.value = { ...agendaBuckets.value, [catKey]: [] }
+  } finally {
+    if (agendaCatSeq[catKey] === catSeq) {
+      agendaLoadingByCat.value = { ...agendaLoadingByCat.value, [catKey]: false }
     }
   }
-  agendaBuckets.value = updated
 }
 
-async function fetchSeguimiento() {
-  const seq = ++seguimientoSeq
-  seguimientoCtrl?.abort()
+async function fetchAgenda() {
+  const seq = ++agendaSeq
+  agendaCtrl?.abort()
+  agendaBucketsCtrl?.abort()
   const controller = new AbortController()
-  seguimientoCtrl = controller
-  loadingSeguimiento.value = true
-  errorSeguimiento.value = ''
+  agendaCtrl = controller
+  loadingAgenda.value = true
+  errorAgenda.value = ''
   try {
     const data = await tiendaDashboardService.getSeguimiento(
       {
         moneda: moneda.value || null,
+        page_size: 20,
+      },
+      controller.signal,
+    )
+    if (seq !== agendaSeq) return
+    agenda.value = data.agenda
+    fechaReferenciaSeguimiento.value = data.fecha_referencia
+
+    const counts = data.agenda.resumen_conteos
+    const countMap: Record<AgendaCategoriaCodigo, number> = {
+      PROFORMA_PROXIMA_VENCER: counts.proformas_proximas_vencer,
+      PROFORMA_PENDIENTE_REVISION: counts.proformas_pendientes_revision,
+      PROFORMA_ENVIADA: counts.proformas_enviadas,
+      PEDIDO_LISTO_ENTREGA: counts.pedidos_listos_entrega,
+      PEDIDO_SALDO_PENDIENTE: counts.pedidos_con_saldo_pendiente,
+      ENTREGA_PROXIMA: counts.entregas_proximas,
+      ENTREGA_RETRASADA: counts.entregas_retrasadas,
+    }
+
+    const activeKeys = AGENDA_CATEGORIES.map((c) => c.key).filter((key) => countMap[key] > 0)
+    for (const cat of AGENDA_CATEGORIES) {
+      if (countMap[cat.key] === 0) {
+        agendaBuckets.value = { ...agendaBuckets.value, [cat.key]: [] }
+        agendaErrorByCat.value = { ...agendaErrorByCat.value, [cat.key]: '' }
+        agendaLoadingByCat.value = { ...agendaLoadingByCat.value, [cat.key]: false }
+      }
+    }
+
+    if (activeKeys.length) {
+      const bucketsController = new AbortController()
+      agendaBucketsCtrl = bucketsController
+      await Promise.allSettled(
+        activeKeys.map((catKey) => fetchAgendaCategory(catKey, bucketsController.signal)),
+      )
+    }
+  } catch (err) {
+    if (seq !== agendaSeq || (err as { name?: string })?.name === 'AbortError') return
+    errorAgenda.value =
+      err instanceof Error ? err.message : 'No se pudo cargar la agenda comercial.'
+  } finally {
+    if (seq === agendaSeq) loadingAgenda.value = false
+  }
+}
+
+async function fetchDisponibilidad() {
+  const seq = ++disponibilidadSeq
+  disponibilidadCtrl?.abort()
+  const controller = new AbortController()
+  disponibilidadCtrl = controller
+  loadingDisponibilidad.value = true
+  errorDisponibilidad.value = ''
+  try {
+    const data = await tiendaDashboardService.getSeguimiento(
+      {
         categoria: categoriaLocal.value || null,
         page_size: 20,
       },
       controller.signal,
     )
-    if (seq !== seguimientoSeq) return
-    seguimiento.value = data
-    void fetchAgendaBuckets(data)
+    if (seq !== disponibilidadSeq) return
+    disponibilidad.value = data.disponibilidad
+    fechaReferenciaSeguimiento.value = data.fecha_referencia
   } catch (err) {
-    if (seq !== seguimientoSeq || (err as { name?: string })?.name === 'AbortError') return
-    errorSeguimiento.value =
-      err instanceof Error ? err.message : 'No se pudo cargar agenda y disponibilidad.'
+    if (seq !== disponibilidadSeq || (err as { name?: string })?.name === 'AbortError') return
+    errorDisponibilidad.value =
+      err instanceof Error ? err.message : 'No se pudo cargar la disponibilidad comercial.'
   } finally {
-    if (seq === seguimientoSeq) loadingSeguimiento.value = false
+    if (seq === disponibilidadSeq) loadingDisponibilidad.value = false
   }
 }
 
@@ -331,7 +376,7 @@ async function loadCatalogCategories() {
     const items = await proformasService.options('CATEGORIA_PRODUCTO')
     catalogCategories.value = items.filter((item) => item.concepto_codigo === 'CATEGORIA_PRODUCTO')
   } catch {
-    // Fallback to categories extracted from disponibilidad
+    // Fallback to por_categoria extracted from disponibilidad
   }
 }
 
@@ -339,14 +384,25 @@ async function loadAll() {
   if (fechaDesde.value && fechaHasta.value && fechaDesde.value > fechaHasta.value) {
     return
   }
-  await Promise.all([fetchResumen(), fetchSeguimiento()])
-  if (!errorResumen.value || !errorSeguimiento.value) {
+  await Promise.all([fetchResumen(), fetchAgenda(), fetchDisponibilidad()])
+  if (!errorResumen.value || !errorAgenda.value || !errorDisponibilidad.value) {
     lastUpdatedText.value = formatTimeLaPaz(new Date())
   }
 }
 
+function onPeriodOrCurrencyApply() {
+  if (fechaDesde.value && fechaHasta.value && fechaDesde.value > fechaHasta.value) {
+    return
+  }
+  void Promise.all([fetchResumen(), fetchAgenda()]).then(() => {
+    if (!errorResumen.value || !errorAgenda.value) {
+      lastUpdatedText.value = formatTimeLaPaz(new Date())
+    }
+  })
+}
+
 function onCategoryChange() {
-  void fetchSeguimiento()
+  void fetchDisponibilidad()
 }
 
 onMounted(() => {
@@ -356,8 +412,9 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   resumenCtrl?.abort()
-  seguimientoCtrl?.abort()
   agendaCtrl?.abort()
+  agendaBucketsCtrl?.abort()
+  disponibilidadCtrl?.abort()
 })
 
 // Indicadores principales
@@ -503,15 +560,20 @@ const donutSlices = computed(() => {
   ]
 })
 
-// Agenda comercial
+// Enlaces seguros de agenda (nunca usar proforma_id para enlazar a pedidos)
+function resolveAgendaTarget(el: ElementoAgendaComercial): string | undefined {
+  if (el.tipo_documento === 'PROFORMA') {
+    return el.proforma_id > 0 ? `/proformas/${el.proforma_id}` : undefined
+  }
+  return el.pedido_id && el.pedido_id > 0 ? `/pedidos/${el.pedido_id}` : undefined
+}
+
 function mapAgendaRow(el: ElementoAgendaComercial): AlertRowItem {
   const isProforma = el.tipo_documento === 'PROFORMA'
-  const to = isProforma
-    ? `/proformas/${el.proforma_id}`
-    : `/pedidos/${el.pedido_id ?? el.documento_id}`
+  const to = resolveAgendaTarget(el)
   const docLabel = isProforma
     ? `Proforma #${el.numero_documento}`
-    : `Pedido Prof. #${el.numero_documento}`
+    : `Pedido #${el.pedido_id ?? el.documento_id} (Prof. #${el.numero_documento})`
   const parts: string[] = [el.estado_nombre, formatDateLaPaz(el.fecha)]
 
   let badge = el.estado_nombre
@@ -547,7 +609,7 @@ function mapAgendaRow(el: ElementoAgendaComercial): AlertRowItem {
   }
 }
 
-const agendaCounts = computed(() => seguimiento.value?.agenda.resumen_conteos ?? null)
+const agendaCounts = computed(() => agenda.value?.resumen_conteos ?? null)
 
 const totalAgendaIncidencias = computed(() => {
   if (!agendaCounts.value) return null
@@ -582,55 +644,50 @@ const agendaCategories = computed<PriorityAlertCategory[]>(() => {
     viewAllTo: cfg.viewAllTo,
     viewAllLabel: cfg.viewAllLabel,
     emptyDescription: cfg.emptyDescription,
+    error: agendaErrorByCat.value[cfg.key] || '',
+    loading: Boolean(agendaLoadingByCat.value[cfg.key]),
   }))
 })
 
-const pedidosSaldoRows = computed(() => agendaBuckets.value.PEDIDO_SALDO_PENDIENTE ?? [])
+function validPedidosForCategory(catKey: AgendaCategoriaCodigo): ElementoAgendaComercial[] {
+  return (agendaBuckets.value[catKey] ?? []).filter(
+    (el) =>
+      el.categoria_agenda === catKey &&
+      el.tipo_documento === 'PEDIDO' &&
+      typeof el.pedido_id === 'number' &&
+      el.pedido_id > 0,
+  )
+}
+
+const pedidosSaldoRows = computed(() => validPedidosForCategory('PEDIDO_SALDO_PENDIENTE'))
 const pedidosEntregadosConSaldoRows = computed(() =>
   pedidosSaldoRows.value.filter((p) => p.estado_codigo === 'ENTREGADO'),
 )
-const entregasProximasRows = computed(() => agendaBuckets.value.ENTREGA_PROXIMA ?? [])
-const entregasRetrasadasRows = computed(() => agendaBuckets.value.ENTREGA_RETRASADA ?? [])
+const entregasProximasRows = computed(() => validPedidosForCategory('ENTREGA_PROXIMA'))
+const entregasRetrasadasRows = computed(() => validPedidosForCategory('ENTREGA_RETRASADA'))
 
-// Disponibilidad comercial
-const dispResumen = computed(() => seguimiento.value?.disponibilidad.resumen ?? null)
-const dispProductos = computed(() => seguimiento.value?.disponibilidad.productos.results ?? [])
+// Disponibilidad comercial (agrupación completa desde backend, independiente de paginación)
+const dispResumen = computed(() => disponibilidad.value?.resumen ?? null)
+const dispProductos = computed(() => disponibilidad.value?.productos.results ?? [])
+const dispPorCategoria = computed(() => disponibilidad.value?.por_categoria ?? [])
 
-const dispCategorySummary = computed(() => {
-  const map = new Map<
-    string,
-    { nombre: string; disponible: number; bajoPedido: number; agotado: number }
-  >()
-  for (const p of dispProductos.value) {
-    let entry = map.get(p.categoria_codigo)
-    if (!entry) {
-      entry = { nombre: p.categoria_nombre, disponible: 0, bajoPedido: 0, agotado: 0 }
-      map.set(p.categoria_codigo, entry)
-    }
-    if (p.modalidad_abastecimiento === 'BAJO_PEDIDO') entry.bajoPedido += 1
-    else if (p.estado_disponibilidad === 'AGOTADO') entry.agotado += 1
-    else entry.disponible += 1
-  }
-  return Array.from(map.values())
-})
-
-const dispCatLabels = computed(() => dispCategorySummary.value.map((c) => c.nombre))
+const dispCatLabels = computed(() => dispPorCategoria.value.map((c) => c.categoria_nombre))
 const dispCatSeries = computed(() => {
-  if (!dispCategorySummary.value.length) return []
+  if (!dispPorCategoria.value.length) return []
   return [
     {
       name: 'Disponibles (con stock)',
-      data: dispCategorySummary.value.map((c) => c.disponible),
+      data: dispPorCategoria.value.map((c) => c.con_stock_disponible),
       colorKey: 'info' as const,
     },
     {
       name: 'Bajo pedido',
-      data: dispCategorySummary.value.map((c) => c.bajoPedido),
+      data: dispPorCategoria.value.map((c) => c.bajo_pedido),
       colorKey: 'warning' as const,
     },
     {
       name: 'Agotados',
-      data: dispCategorySummary.value.map((c) => c.agotado),
+      data: dispPorCategoria.value.map((c) => c.con_stock_agotado),
       colorKey: 'primary' as const,
     },
   ]
@@ -711,7 +768,7 @@ const tabs = computed<DetailTabItem[]>(() => [
       :show-seller="false"
       :loading="anyLoading"
       :last-updated-text="lastUpdatedText"
-      @apply="loadAll"
+      @apply="onPeriodOrCurrencyApply"
       @refresh="loadAll"
     />
 
@@ -720,9 +777,9 @@ const tabs = computed<DetailTabItem[]>(() => [
       <span> Mostrando datos anteriores desactualizados en: {{ staleBlocks.join(' · ') }}. </span>
     </div>
 
-    <!-- 6 Indicadores principales del vendedor -->
+    <!-- 6 Indicadores principales del vendedor (no muestran datos de otro período mientras recargan) -->
     <section aria-label="Mis indicadores principales">
-      <LoadingSkeleton v-if="loadingResumen && !resumen" :lines="4" />
+      <LoadingSkeleton v-if="loadingResumen" :lines="4" />
       <ErrorState v-else-if="errorResumen && !resumen" :description="errorResumen">
         <button type="button" @click="fetchResumen()">Reintentar</button>
       </ErrorState>
@@ -816,13 +873,13 @@ const tabs = computed<DetailTabItem[]>(() => [
       <section class="section-block" aria-label="Mi agenda comercial">
         <PriorityAlertsPanel
           title="Mi agenda comercial"
-          description="Seguimiento prioritario de tus proformas, pedidos con saldo y entregas."
+          description="Seguimiento actual de tus proformas, pedidos con saldo y entregas (no filtrado por período histórico)."
           count-label="incidencias"
           heading-level="h2"
           :categories="agendaCategories"
-          :loading="loadingSeguimiento && !seguimiento"
-          :error="errorSeguimiento && !seguimiento ? errorSeguimiento : ''"
-          @retry="fetchSeguimiento()"
+          :loading="loadingAgenda && !agenda"
+          :error="errorAgenda && !agenda ? errorAgenda : ''"
+          @retry="fetchAgenda()"
         />
       </section>
 
@@ -914,7 +971,7 @@ const tabs = computed<DetailTabItem[]>(() => [
           <MetricKpiCard
             label="Próximas a vencer"
             :value="
-              errorSeguimiento && !seguimiento
+              errorAgenda && !agenda
                 ? 'No disponible'
                 : formatInteger(agendaCounts?.proformas_proximas_vencer)
             "
@@ -1076,12 +1133,14 @@ const tabs = computed<DetailTabItem[]>(() => [
           <AnalyticsTableCard
             title="Pedidos con saldo pendiente"
             description="Incluye entregados que todavía mantienen saldo por cobrar."
-            :loading="loadingSeguimiento && !seguimiento"
-            :error="errorSeguimiento && !seguimiento ? errorSeguimiento : ''"
+            :loading="loadingAgenda || Boolean(agendaLoadingByCat.PEDIDO_SALDO_PENDIENTE)"
+            :error="
+              agendaErrorByCat.PEDIDO_SALDO_PENDIENTE || (errorAgenda && !agenda ? errorAgenda : '')
+            "
             :is-empty="!pedidosSaldoRows.length"
             empty-title="Sin saldos pendientes"
             empty-description="Todos tus pedidos activos están al día."
-            @retry="fetchSeguimiento()"
+            @retry="fetchAgenda()"
           >
             <p v-if="pedidosEntregadosConSaldoRows.length" class="sub-highlight">
               {{ formatInteger(pedidosEntregadosConSaldoRows.length) }} pedido(s) ya entregados
@@ -1099,11 +1158,8 @@ const tabs = computed<DetailTabItem[]>(() => [
               <tbody>
                 <tr v-for="ped in pedidosSaldoRows" :key="ped.documento_id">
                   <td>
-                    <RouterLink
-                      :to="`/pedidos/${ped.pedido_id ?? ped.documento_id}`"
-                      class="table-link"
-                    >
-                      Prof. #{{ ped.numero_documento }}
+                    <RouterLink :to="`/pedidos/${ped.pedido_id}`" class="table-link">
+                      Pedido #{{ ped.pedido_id }} (Prof. #{{ ped.numero_documento }})
                     </RouterLink>
                   </td>
                   <td>{{ ped.cliente_nombre }}</td>
@@ -1125,12 +1181,12 @@ const tabs = computed<DetailTabItem[]>(() => [
           <AnalyticsTableCard
             title="Entregas próximas (7 días)"
             description="Pedidos programados para entrega en los próximos 7 días."
-            :loading="loadingSeguimiento && !seguimiento"
-            :error="errorSeguimiento && !seguimiento ? errorSeguimiento : ''"
+            :loading="loadingAgenda || Boolean(agendaLoadingByCat.ENTREGA_PROXIMA)"
+            :error="agendaErrorByCat.ENTREGA_PROXIMA || (errorAgenda && !agenda ? errorAgenda : '')"
             :is-empty="!entregasProximasRows.length"
             empty-title="Sin entregas próximas"
             empty-description="No tienes entregas programadas en los próximos 7 días."
-            @retry="fetchSeguimiento()"
+            @retry="fetchAgenda()"
           >
             <table class="compact-table">
               <thead>
@@ -1144,11 +1200,8 @@ const tabs = computed<DetailTabItem[]>(() => [
               <tbody>
                 <tr v-for="ent in entregasProximasRows" :key="ent.documento_id">
                   <td>
-                    <RouterLink
-                      :to="`/pedidos/${ent.pedido_id ?? ent.documento_id}`"
-                      class="table-link"
-                    >
-                      Prof. #{{ ent.numero_documento }}
+                    <RouterLink :to="`/pedidos/${ent.pedido_id}`" class="table-link">
+                      Pedido #{{ ent.pedido_id }} (Prof. #{{ ent.numero_documento }})
                     </RouterLink>
                   </td>
                   <td>{{ ent.cliente_nombre }}</td>
@@ -1164,12 +1217,14 @@ const tabs = computed<DetailTabItem[]>(() => [
           <AnalyticsTableCard
             title="Entregas retrasadas"
             description="Pedidos cuya fecha de entrega prevista ya venció."
-            :loading="loadingSeguimiento && !seguimiento"
-            :error="errorSeguimiento && !seguimiento ? errorSeguimiento : ''"
+            :loading="loadingAgenda || Boolean(agendaLoadingByCat.ENTREGA_RETRASADA)"
+            :error="
+              agendaErrorByCat.ENTREGA_RETRASADA || (errorAgenda && !agenda ? errorAgenda : '')
+            "
             :is-empty="!entregasRetrasadasRows.length"
             empty-title="Sin entregas retrasadas"
             empty-description="No tienes entregas fuera de plazo."
-            @retry="fetchSeguimiento()"
+            @retry="fetchAgenda()"
           >
             <table class="compact-table">
               <thead>
@@ -1183,11 +1238,8 @@ const tabs = computed<DetailTabItem[]>(() => [
               <tbody>
                 <tr v-for="ent in entregasRetrasadasRows" :key="ent.documento_id">
                   <td>
-                    <RouterLink
-                      :to="`/pedidos/${ent.pedido_id ?? ent.documento_id}`"
-                      class="table-link"
-                    >
-                      Prof. #{{ ent.numero_documento }}
+                    <RouterLink :to="`/pedidos/${ent.pedido_id}`" class="table-link">
+                      Pedido #{{ ent.pedido_id }} (Prof. #{{ ent.numero_documento }})
                     </RouterLink>
                   </td>
                   <td>{{ ent.cliente_nombre }}</td>
@@ -1242,7 +1294,7 @@ const tabs = computed<DetailTabItem[]>(() => [
           <MetricKpiCard
             label="Disponibles (con stock)"
             :value="
-              errorSeguimiento && !seguimiento
+              errorDisponibilidad && !disponibilidad
                 ? 'No disponible'
                 : formatInteger(dispResumen?.con_stock_disponible)
             "
@@ -1253,7 +1305,7 @@ const tabs = computed<DetailTabItem[]>(() => [
           <MetricKpiCard
             label="Bajo pedido"
             :value="
-              errorSeguimiento && !seguimiento
+              errorDisponibilidad && !disponibilidad
                 ? 'No disponible'
                 : formatInteger(dispResumen?.bajo_pedido)
             "
@@ -1263,7 +1315,7 @@ const tabs = computed<DetailTabItem[]>(() => [
           <MetricKpiCard
             label="Agotados"
             :value="
-              errorSeguimiento && !seguimiento
+              errorDisponibilidad && !disponibilidad
                 ? 'No disponible'
                 : formatInteger(dispResumen?.con_stock_agotado)
             "
@@ -1274,7 +1326,7 @@ const tabs = computed<DetailTabItem[]>(() => [
           <MetricKpiCard
             label="Con stock bajo"
             :value="
-              errorSeguimiento && !seguimiento
+              errorDisponibilidad && !disponibilidad
                 ? 'No disponible'
                 : (dispResumen?.sin_stock_minimo ?? 0) > 0 &&
                     (dispResumen?.con_stock_bajo ?? 0) === 0
@@ -1293,26 +1345,26 @@ const tabs = computed<DetailTabItem[]>(() => [
         <div class="two-col">
           <BarChartCard
             title="Disponibilidad por categoría"
-            description="Separación entre productos con stock, bajo pedido y agotados."
+            description="Totales completos por categoría (independientes de la paginación)."
             :labels="dispCatLabels"
             :series="dispCatSeries"
             horizontal
             :height="260"
-            :loading="loadingSeguimiento"
-            :error="errorSeguimiento && !seguimiento ? errorSeguimiento : ''"
+            :loading="loadingDisponibilidad"
+            :error="errorDisponibilidad && !disponibilidad ? errorDisponibilidad : ''"
             :value-formatter="formatInteger"
-            @retry="fetchSeguimiento()"
+            @retry="fetchDisponibilidad()"
           />
 
           <AnalyticsTableCard
             title="Listado compacto de productos"
             description="Acceso directo al detalle comercial de cada producto."
-            :loading="loadingSeguimiento && !seguimiento"
-            :error="errorSeguimiento && !seguimiento ? errorSeguimiento : ''"
+            :loading="loadingDisponibilidad && !disponibilidad"
+            :error="errorDisponibilidad && !disponibilidad ? errorDisponibilidad : ''"
             :is-empty="!dispProductos.length"
             empty-title="Sin productos para este filtro"
             empty-description="Ajusta la categoría seleccionada para ver productos."
-            @retry="fetchSeguimiento()"
+            @retry="fetchDisponibilidad()"
           >
             <div v-if="!dispProductos.length">
               <EmptyState title="Sin productos" description="No hay resultados." />

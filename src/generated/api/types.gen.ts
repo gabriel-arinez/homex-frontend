@@ -530,8 +530,19 @@ export type DetalleProforma = {
   readonly galeria_id: string | null
 }
 
+export type DisponibilidadCategoria = {
+  categoria_codigo: string
+  categoria_nombre: string
+  total_activos: number
+  con_stock_disponible: number
+  con_stock_bajo: number
+  con_stock_agotado: number
+  bajo_pedido: number
+}
+
 export type DisponibilidadComercial = {
   resumen: ResumenDisponibilidad
+  por_categoria: Array<DisponibilidadCategoria>
   productos: PaginacionDisponibilidadProductos
 }
 
