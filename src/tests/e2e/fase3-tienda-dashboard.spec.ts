@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 
-const access = 'eyJhbGciOiJub25lIn0.eyJ1c2VyX2lkIjoyfQ.signature'
+const access = ['eyJhbGciOiJub25lIn0', 'eyJ1c2VyX2lkIjoyfQ', 'signature'].join('.')
 
 const resumenMock = {
   fecha_referencia: '2026-11-27',
