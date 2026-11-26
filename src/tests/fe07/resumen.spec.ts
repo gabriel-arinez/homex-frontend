@@ -13,26 +13,6 @@ const states = [
   { id: 2, codigo: 'ENVIADA', nombre: 'Enviada', concepto_codigo: 'ESTADO_PROFORMA' },
   { id: 3, codigo: 'APROBADA', nombre: 'Aprobada', concepto_codigo: 'ESTADO_PROFORMA' },
 ]
-function mock(counts: Record<string, number>, failure?: string | ((state: string) => boolean)) {
-  server.use(
-    http.get('http://localhost:8000/api/v1/catalogo/opciones/', () => HttpResponse.json(states)),
-    http.get('http://localhost:8000/api/v1/proformas/', ({ request }) => {
-      const state = new URL(request.url).searchParams.get('estado') ?? ''
-      const shouldFail = typeof failure === 'function' ? failure(state) : state === failure
-      if (shouldFail)
-        return HttpResponse.json(
-          { detail: 'Métrica temporalmente no disponible.' },
-          { status: 503 },
-        )
-      return HttpResponse.json({
-        count: counts[state] ?? 0,
-        next: null,
-        previous: null,
-        results: [],
-      })
-    }),
-  )
-}
 async function render(capabilities: Capability[] = ['comercial.operar']) {
   const pinia = createPinia()
   setActivePinia(pinia)
@@ -64,46 +44,78 @@ describe('FE07 resumen operativo', () => {
     expect(urls[0]).toContain('estado=ENVIADA')
     expect(urls[0]).toContain('page_size=1')
   })
-  it('muestra KPI y fallback textual accesible', async () => {
-    mock({ BORRADOR: 2, ENVIADA: 3, APROBADA: 1 })
-    const w = await render()
-    await flushPromises()
-    expect(w.text()).toContain('Borradores2')
-    expect(w.text()).toContain('Enviadas3')
-    expect(w.find('table').text()).toContain('Total consultado6')
-    expect(w.find('.bars').attributes('aria-hidden')).toBe('true')
-  })
-  it('conserva métricas sanas cuando una consulta falla', async () => {
-    mock({ BORRADOR: 2, APROBADA: 1 }, 'ENVIADA')
-    const w = await render()
-    await flushPromises()
-    expect(w.text()).toContain('1 indicador no pudo actualizarse')
-    expect(w.text()).toContain('No disponible')
-    expect(w.text()).toContain('Borradores2')
-    expect(w.find('table').text()).toContain('Subtotal disponible3')
-    expect(w.find('table').text()).not.toContain('Total consultado3')
-  })
-  it('representa estado vacío real con conteos cero', async () => {
-    mock({})
-    const w = await render()
-    await flushPromises()
-    expect(w.text()).toContain('Total consultado0')
-    expect(w.text()).not.toContain('Sin métricas disponibles')
-    expect(w.findAll('.bar-row i')).toHaveLength(3)
-    for (const bar of w.findAll('.bar-row i'))
-      expect(bar.attributes('style')).toContain('width: 0%')
-  })
-  it('adapta accesos a capacidades sin métricas inventadas', async () => {
-    mock({})
-    const seller = await render()
-    await flushPromises()
-    expect(seller.findAll('nav a').map((x) => x.text())).toEqual([
-      'Revisar proformas',
-      'Consultar pedidos',
-      'Nueva captura asistida',
-    ])
+  it('delega comercial.operar a TiendaDashboard y conserva estados de servicio', async () => {
+    server.use(
+      http.get('http://localhost:8000/api/v1/dashboard/tienda/', () =>
+        HttpResponse.json({
+          fecha_referencia: '2026-11-27',
+          vendedor_id: 2,
+          indicadores: {
+            total_proformas: 10,
+            borradores: 2,
+            proformas_formalizadas: 8,
+            pedidos_generados: 2,
+            pedidos_derivados_cohorte: 2,
+            pedidos_no_cancelados_cohorte: 2,
+            pedidos_confirmados_periodo: 2,
+            pedidos_no_cancelados: 2,
+            tasa_conversion_cohorte: '25.00',
+            cobertura_formalizacion: {
+              con_marca_temporal: 0,
+              aproximadas_por_fecha: 8,
+              anuladas_sin_evidencia_formalizacion: 0,
+            },
+            distribucion_proformas_estado: [],
+            distribucion_pedidos_estado: [],
+            comparaciones_periodo_anterior: null,
+            limitaciones: [],
+          },
+          finanzas: { por_moneda: [], cobros_pedidos_cancelados: [] },
+          evolucion: { granularidad: 'mensual', puntos_conteo: [], series_monetarias: [] },
+        }),
+      ),
+      http.get('http://localhost:8000/api/v1/dashboard/tienda/seguimiento/', () =>
+        HttpResponse.json({
+          fecha_referencia: '2026-11-27',
+          vendedor_id: 2,
+          agenda: {
+            resumen_conteos: {
+              proformas_proximas_vencer: 0,
+              proformas_pendientes_revision: 0,
+              proformas_enviadas: 0,
+              pedidos_listos_entrega: 0,
+              pedidos_con_saldo_pendiente: 0,
+              entregas_proximas: 0,
+              entregas_retrasadas: 0,
+            },
+            elementos: { total: 0, page: 1, page_size: 20, results: [] },
+          },
+          disponibilidad: {
+            resumen: {
+              total_activos: 0,
+              con_stock_disponible: 0,
+              con_stock_bajo: 0,
+              con_stock_agotado: 0,
+              bajo_pedido: 0,
+              sin_stock_minimo: 0,
+            },
+            productos: { total: 0, page: 1, page_size: 20, results: [] },
+          },
+        }),
+      ),
+    )
+    const seller = await render(['comercial.operar'])
+    await vi.waitFor(
+      () => {
+        expect(seller.text()).toContain('Mi actividad comercial')
+      },
+      { timeout: 5000 },
+    )
+    expect(seller.text()).toContain('Nueva proforma')
+    expect(seller.text()).toContain('Cotizar mediante voz')
     expect(seller.text()).not.toMatch(/99\.9|eficiencia|stock valorizado/i)
-
+  })
+  it('conserva la delegación de administrador y taller en ResumenView', async () => {
     server.use(
       http.get('http://localhost:8000/api/v1/dashboard/administrador/*', () =>
         HttpResponse.json({
@@ -280,21 +292,75 @@ describe('FE07 resumen operativo', () => {
       'Ver fabricación a medida',
     ])
   })
-  it('recupera un indicador fallido al actualizar y restaura el total completo', async () => {
+  it('recupera métricas al reintentar en TiendaDashboard tras fallo inicial', async () => {
     let failing = true
-    mock({ BORRADOR: 2, ENVIADA: 3, APROBADA: 1 }, (state) => failing && state === 'ENVIADA')
+    server.use(
+      http.get('http://localhost:8000/api/v1/dashboard/tienda/', () =>
+        failing
+          ? HttpResponse.json({ detail: 'Error temporal' }, { status: 503 })
+          : HttpResponse.json({
+              fecha_referencia: '2026-11-27',
+              vendedor_id: 2,
+              indicadores: {
+                total_proformas: 10,
+                borradores: 2,
+                proformas_formalizadas: 8,
+                pedidos_generados: 2,
+                pedidos_derivados_cohorte: 2,
+                pedidos_no_cancelados_cohorte: 2,
+                pedidos_confirmados_periodo: 2,
+                pedidos_no_cancelados: 2,
+                tasa_conversion_cohorte: '25.00',
+                cobertura_formalizacion: {
+                  con_marca_temporal: 0,
+                  aproximadas_por_fecha: 8,
+                  anuladas_sin_evidencia_formalizacion: 0,
+                },
+                distribucion_proformas_estado: [],
+                distribucion_pedidos_estado: [],
+                comparaciones_periodo_anterior: null,
+                limitaciones: [],
+              },
+              finanzas: { por_moneda: [], cobros_pedidos_cancelados: [] },
+              evolucion: { granularidad: 'mensual', puntos_conteo: [], series_monetarias: [] },
+            }),
+      ),
+      http.get('http://localhost:8000/api/v1/dashboard/tienda/seguimiento/', () =>
+        HttpResponse.json({
+          fecha_referencia: '2026-11-27',
+          vendedor_id: 2,
+          agenda: {
+            resumen_conteos: {
+              proformas_proximas_vencer: 0,
+              proformas_pendientes_revision: 0,
+              proformas_enviadas: 0,
+              pedidos_listos_entrega: 0,
+              pedidos_con_saldo_pendiente: 0,
+              entregas_proximas: 0,
+              entregas_retrasadas: 0,
+            },
+            elementos: { total: 0, page: 1, page_size: 20, results: [] },
+          },
+          disponibilidad: {
+            resumen: {
+              total_activos: 0,
+              con_stock_disponible: 0,
+              con_stock_bajo: 0,
+              con_stock_agotado: 0,
+              bajo_pedido: 0,
+              sin_stock_minimo: 0,
+            },
+            productos: { total: 0, page: 1, page_size: 20, results: [] },
+          },
+        }),
+      ),
+    )
     const w = await render()
-    await flushPromises()
-    expect(w.text()).toContain('1 indicador no pudo actualizarse')
-    expect(w.find('table').text()).toContain('Subtotal disponible3')
-
+    await vi.waitFor(() => expect(w.text()).toContain('Reintentar'))
     failing = false
-    const actualizar = w.findAll('button').find((button) => button.text().includes('Actualizar'))
-    expect(actualizar).toBeDefined()
-    await actualizar!.trigger('click')
-    await flushPromises()
-
-    expect(w.text()).not.toContain('indicador no pudo actualizarse')
-    expect(w.find('table').text()).toContain('Total consultado6')
+    const retry = w.findAll('button').find((button) => button.text().includes('Reintentar'))
+    expect(retry).toBeDefined()
+    await retry!.trigger('click')
+    await vi.waitFor(() => expect(w.text()).toContain('Mis proformas formalizadas'))
   })
 })

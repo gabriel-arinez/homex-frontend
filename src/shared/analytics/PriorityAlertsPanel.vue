@@ -23,19 +23,32 @@ export interface PriorityAlertCategory {
 
 const props = withDefaults(
   defineProps<{
+    title?: string
+    description?: string
+    countLabel?: string
+    headingLevel?: 'h2' | 'h3'
     categories: PriorityAlertCategory[]
     loading?: boolean
     error?: string
   }>(),
   {
+    title: 'Alertas prioritarias',
+    description: 'Registros concretos que requieren atención operativa y seguimiento directo.',
+    countLabel: 'incidencias',
+    headingLevel: 'h3',
     loading: false,
     error: '',
   },
 )
 
-const emit = defineEmits<{ retry: [] }>()
+const emit = defineEmits<{ retry: []; 'category-change': [key: string] }>()
 
 const selectedKey = ref<string>('')
+
+function selectCategory(key: string) {
+  selectedKey.value = key
+  emit('category-change', key)
+}
 
 const activeCategory = computed<PriorityAlertCategory | null>(() => {
   if (!props.categories.length) return null
@@ -55,12 +68,12 @@ const visibleItems = computed(() => activeCategory.value?.items.slice(0, 5) ?? [
       <div class="priority-alerts__title">
         <AlertTriangle :size="17" class="priority-alerts__icon" aria-hidden="true" />
         <div>
-          <h3>Alertas prioritarias</h3>
-          <p>Registros concretos que requieren atención operativa y seguimiento directo.</p>
+          <component :is="headingLevel" class="priority-alerts__heading">{{ title }}</component>
+          <p>{{ description }}</p>
         </div>
       </div>
       <Badge v-if="!loading && !error" :tone="totalAlerts > 0 ? 'warning' : 'neutral'">
-        {{ formatInteger(totalAlerts) }} activas
+        {{ formatInteger(totalAlerts) }} {{ countLabel }}
       </Badge>
       <Badge v-else-if="error" tone="danger">No disponible</Badge>
     </div>
@@ -80,7 +93,7 @@ const visibleItems = computed(() => activeCategory.value?.items.slice(0, 5) ?? [
           :aria-selected="activeCategory.key === cat.key"
           class="priority-alerts__pill"
           :class="{ 'is-active': activeCategory.key === cat.key }"
-          @click="selectedKey = cat.key"
+          @click="selectCategory(cat.key)"
         >
           <span>{{ cat.label }}</span>
           <Badge :tone="cat.totalCount > 0 ? 'warning' : 'neutral'">
@@ -157,7 +170,7 @@ const visibleItems = computed(() => activeCategory.value?.items.slice(0, 5) ?? [
   flex: none;
 }
 
-.priority-alerts__title h3 {
+.priority-alerts__heading {
   margin: 0;
   font-size: 1rem;
   font-weight: 700;

@@ -14,6 +14,7 @@ import EmptyState from '@/shared/ui/EmptyState.vue'
 import { useSessionStore } from '@/app/stores/useSessionStore'
 
 const AdminDashboard = defineAsyncComponent(() => import('../components/AdminDashboard.vue'))
+const TiendaDashboard = defineAsyncComponent(() => import('../components/TiendaDashboard.vue'))
 
 const emit = defineEmits<{ 'open-menu': [] }>()
 const session = useSessionStore()
@@ -89,7 +90,7 @@ const workshopBars = computed(() =>
 )
 
 async function load() {
-  if (isAdmin.value) {
+  if (isAdmin.value || isCommercial.value) {
     loading.value = false
     return
   }
@@ -123,6 +124,7 @@ onMounted(load)
 </script>
 <template>
   <AdminDashboard v-if="isAdmin" @open-menu="emit('open-menu')" />
+  <TiendaDashboard v-else-if="isCommercial" @open-menu="emit('open-menu')" />
   <div v-else>
     <PageHeader title="Resumen" :description="scopeDescription" show-menu @menu="emit('open-menu')">
       <template #actions>

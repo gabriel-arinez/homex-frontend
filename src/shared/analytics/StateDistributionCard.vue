@@ -27,8 +27,36 @@ const props = withDefaults(
 const total = computed(() => props.items.reduce((sum, x) => sum + x.cantidad, 0))
 const max = computed(() => Math.max(1, ...props.items.map((x) => x.cantidad)))
 
+const stateTones: Record<string, 'neutral' | 'success' | 'warning' | 'danger' | 'info'> = {
+  BORRADOR: 'neutral',
+  INACTIVO: 'neutral',
+  EN_REVISION: 'warning',
+  EN_PRODUCCION: 'warning',
+  EN_PROCESO: 'warning',
+  ENVIADA: 'info',
+  CONFIRMADO: 'info',
+  PENDIENTE: 'info',
+  APROBADA: 'success',
+  LISTO_ENTREGA: 'success',
+  ENTREGADO: 'success',
+  TERMINADA: 'success',
+  ACTIVO: 'success',
+  NO_CONCRETADA: 'danger',
+  CANCELADA: 'danger',
+  CANCELADO: 'danger',
+  ANULADA: 'danger',
+  VENCIDA: 'danger',
+  ERROR: 'danger',
+}
+
 function barTone(codigo: string): string {
   const code = codigo.toUpperCase()
+  const tone = stateTones[code]
+  if (tone === 'danger') return 'var(--color-danger)'
+  if (tone === 'success') return 'var(--color-success)'
+  if (tone === 'warning') return 'var(--color-warning)'
+  if (tone === 'info') return 'var(--color-info)'
+  if (tone === 'neutral') return 'var(--color-text-secondary)'
   if (
     code.includes('CANCEL') ||
     code.includes('ANUL') ||
@@ -41,8 +69,7 @@ function barTone(codigo: string): string {
     code.includes('ENTREG') ||
     code.includes('PAGAD') ||
     code.includes('TERMIN') ||
-    code.includes('APROB') ||
-    code.includes('CONVERT')
+    code.includes('APROB')
   ) {
     return 'var(--color-success)'
   }

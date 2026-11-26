@@ -1378,6 +1378,7 @@ export type ProductoDisponibilidad = {
   unidad_codigo: string
   unidad_nombre: string
   estado_disponibilidad: string
+  imagen_principal?: unknown
 }
 
 export type ProductoMasVendido = {
@@ -3592,6 +3593,14 @@ export type V1DashboardTiendaSeguimientoRetrieveData = {
   path?: never
   query?: {
     categoria?: string
+    categoria_agenda?:
+      | 'ENTREGA_PROXIMA'
+      | 'ENTREGA_RETRASADA'
+      | 'PEDIDO_LISTO_ENTREGA'
+      | 'PEDIDO_SALDO_PENDIENTE'
+      | 'PROFORMA_ENVIADA'
+      | 'PROFORMA_PENDIENTE_REVISION'
+      | 'PROFORMA_PROXIMA_VENCER'
     moneda?: string
     page?: number
     page_size?: number

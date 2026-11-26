@@ -34,37 +34,65 @@ async function mock(
       : r.fulfill({ json: { count: counts[state] ?? 0, next: null, previous: null, results: [] } })
   })
 }
-test('FE07 muestra distribución y fallback textual con datos del servidor', async ({ page }) => {
+test('FE07 delega encargado de tienda a TiendaDashboard con accesos rápidos', async ({ page }) => {
   await mock(page)
+  await page.route('**/api/v1/dashboard/tienda/**', (r) =>
+    r.fulfill({
+      json: {
+        fecha_referencia: '2026-11-27',
+        vendedor_id: 1,
+        indicadores: {
+          total_proformas: 10,
+          borradores: 2,
+          proformas_formalizadas: 8,
+          pedidos_generados: 2,
+          pedidos_derivados_cohorte: 2,
+          pedidos_no_cancelados_cohorte: 2,
+          pedidos_confirmados_periodo: 2,
+          pedidos_no_cancelados: 2,
+          tasa_conversion_cohorte: '25.00',
+          cobertura_formalizacion: {
+            con_marca_temporal: 0,
+            aproximadas_por_fecha: 8,
+            anuladas_sin_evidencia_formalizacion: 0,
+          },
+          distribucion_proformas_estado: [],
+          distribucion_pedidos_estado: [],
+          comparaciones_periodo_anterior: null,
+          limitaciones: [],
+        },
+        finanzas: { por_moneda: [], cobros_pedidos_cancelados: [] },
+        evolucion: { granularidad: 'mensual', puntos_conteo: [], series_monetarias: [] },
+        agenda: {
+          resumen_conteos: {
+            proformas_proximas_vencer: 0,
+            proformas_pendientes_revision: 0,
+            proformas_enviadas: 0,
+            pedidos_listos_entrega: 0,
+            pedidos_con_saldo_pendiente: 0,
+            entregas_proximas: 0,
+            entregas_retrasadas: 0,
+          },
+          elementos: { total: 0, page: 1, page_size: 20, results: [] },
+        },
+        disponibilidad: {
+          resumen: {
+            total_activos: 0,
+            con_stock_disponible: 0,
+            con_stock_bajo: 0,
+            con_stock_agotado: 0,
+            bajo_pedido: 0,
+            sin_stock_minimo: 0,
+          },
+          productos: { total: 0, page: 1, page_size: 20, results: [] },
+        },
+      },
+    }),
+  )
   await page.goto('/resumen')
-  await expect(page.getByText('Proformas editables actuales')).toBeVisible()
-  await expect(
-    page.getByRole('table', { name: 'Conteos actuales de proformas por estado' }),
-  ).toContainText('Total consultado6')
+  await expect(page.getByRole('heading', { name: 'Mi actividad comercial' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Nueva proforma' })).toBeVisible()
   await expect(page.getByText(/99.9|stock valorizado|eficiencia/i)).toHaveCount(0)
-})
-test('FE07 conserva datos parciales y recupera el total al actualizar', async ({ page }) => {
-  let failing = true
-  await mock(page, { failure: (state) => failing && state === 'ENVIADA' })
-  await page.goto('/resumen')
-  await expect(page.getByRole('status')).toContainText('1 indicador no pudo actualizarse')
-  await expect(page.getByText('No disponible')).toBeVisible()
-  await expect(page.getByRole('table')).toContainText('Subtotal disponible3')
-
-  failing = false
-  await page.getByRole('button', { name: 'Actualizar' }).click()
-
-  await expect(page.getByText(/indicador no pudo actualizarse/)).toHaveCount(0)
-  await expect(page.getByRole('table')).toContainText('Total consultado6')
-})
-test('FE07 representa cero sin fabricar actividad', async ({ page }) => {
-  await mock(page, { counts: {} })
-  await page.goto('/resumen')
-  await expect(page.getByRole('table')).toContainText('Total consultado0')
-  await expect(page.locator('.bar-row i')).toHaveCount(3)
-  for (const bar of await page.locator('.bar-row i').all())
-    await expect(bar).toHaveCSS('width', '0px')
-  await expect(page.getByText('Revisar proformas')).toBeVisible()
 })
 test('FE07 presenta dashboard analítico para administrador sin alterar tienda/taller', async ({
   page,
@@ -227,11 +255,14 @@ test('FE07 presenta visión operativa de taller para JEFE_TALLER', async ({ page
 })
 test('@a11y FE07 funciona en tema oscuro y mantiene valores sin hover', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('homex.theme', 'dark'))
-  await mock(page)
+  await mock(page, { capabilities: ['taller.operar'] })
+  await page.route('**/api/v1/ordenes-trabajo/**', (r) =>
+    r.fulfill({ json: { count: 0, next: null, previous: null, results: [] } }),
+  )
   await page.setViewportSize({ width: 390, height: 900 })
   await page.goto('/resumen')
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-  await expect(page.getByRole('table')).toBeVisible()
+  await expect(page.getByText('Operación y seguimiento de taller.')).toBeVisible()
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
   expect(
     await page.evaluate(

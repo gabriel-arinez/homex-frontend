@@ -1874,6 +1874,9 @@ onMounted(async () => {
     void ensureFullClient(queryCliente)
   }
   editorReady.value = true
+  if (route.query.voz === '1' && !persisted.value && !furnitureOpen.value) {
+    openFurnitureDraft()
+  }
 })
 onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 </script>
