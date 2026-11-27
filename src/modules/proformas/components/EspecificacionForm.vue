@@ -283,6 +283,12 @@ const pendientesVisibles = computed(() =>
       if (p.codigo === 'TIPO_NO_RESUELTO') return !form.tipo_mueble
       if (p.codigo === 'NO_QUANTITY') return !cantidadValida.value
       if (p.codigo === 'TOTAL_NEGOCIADO' || p.codigo === 'INVALID_PRICE') return !precioValido.value
+      if (p.codigo === 'PRECIO_AMBIGUO')
+        return (
+          !precioValido.value ||
+          voiceResolution('mueble-precio')?.state !== 'reviewed' ||
+          voiceResolution('mueble-precio')?.snapshot !== JSON.stringify(pendingValue(p))
+        )
       if (p.codigo === 'ESPESOR_SIN_COMPONENTE') {
         const uid = espesoresConfirmados[p.indice]
         const correction = correccionesEspesor[p.indice]
@@ -544,7 +550,8 @@ function fieldForPending(p: PendienteAsistida): string | null {
       : 'nuevo-componente'
   if (p.codigo === 'TIPO_NO_RESUELTO') return 'tipo-mueble'
   if (p.codigo === 'NO_QUANTITY') return 'mueble-cantidad'
-  if (['TOTAL_NEGOCIADO', 'INVALID_PRICE'].includes(p.codigo)) return 'mueble-precio'
+  if (['TOTAL_NEGOCIADO', 'INVALID_PRICE', 'PRECIO_AMBIGUO'].includes(p.codigo))
+    return 'mueble-precio'
   return null
 }
 const criticalPending = computed(() =>
@@ -557,6 +564,7 @@ const criticalPending = computed(() =>
         'MISSING_UNIT',
         'MISSING_AXIS',
         'INVALID_PRICE',
+        'PRECIO_AMBIGUO',
         'NO_QUANTITY',
       ].includes(p.codigo),
   ),
@@ -896,7 +904,8 @@ function pendingField(p: PendienteAsistida, indice: number): string {
   if (r?.tipo === 'ESPESOR_SIN_COMPONENTE')
     return `componentes.${espesoresConfirmados[indice] ?? destinosEspesor[indice] ?? ''}.espesor`
   if (p.codigo === 'NO_QUANTITY') return 'cantidad'
-  if (['INVALID_PRICE', 'TOTAL_NEGOCIADO'].includes(p.codigo)) return 'precio_unitario'
+  if (['INVALID_PRICE', 'TOTAL_NEGOCIADO', 'PRECIO_AMBIGUO'].includes(p.codigo))
+    return 'precio_unitario'
   if (p.codigo === 'TIPO_NO_RESUELTO') return 'tipo_mueble'
   return p.ruta || p.codigo
 }
@@ -925,7 +934,8 @@ function pendingValue(p: PendienteAsistida): unknown {
     return componentes.find((c) => c.uid === uid)?.espesor ?? r.valor ?? null
   }
   if (p.codigo === 'NO_QUANTITY') return comercial.cantidad
-  if (['INVALID_PRICE', 'TOTAL_NEGOCIADO'].includes(p.codigo)) return comercial.precio_unitario
+  if (['INVALID_PRICE', 'TOTAL_NEGOCIADO', 'PRECIO_AMBIGUO'].includes(p.codigo))
+    return comercial.precio_unitario
   if (p.codigo === 'TIPO_NO_RESUELTO') return form.tipo_mueble
   return null
 }
@@ -1624,7 +1634,9 @@ function submit(): boolean {
                 ? correccionesEspesor[indice]
                   ? 'corregido'
                   : 'confirmado'
-                : state === 'reviewed'
+                : state === 'reviewed' &&
+                    (p.codigo !== 'PRECIO_AMBIGUO' ||
+                      Number(originalPendingValues[indice]) === Number(pendingValue(p)))
                   ? 'confirmado'
                   : 'corregido',
             valor_original: originalPendingValues[indice] ?? null,
