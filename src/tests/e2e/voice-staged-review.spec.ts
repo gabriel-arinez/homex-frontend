@@ -128,10 +128,17 @@ test('@a11y catalog voice uses automatic ASR, corrected text, explicit interpret
   expect(textRequests).toBe(0)
   expect((await new AxeBuilder({ page }).include('.staged-voice').analyze()).violations).toEqual([])
   await expect(page.locator('input[name=nombre]')).toHaveValue('')
+  // Partial text is processable; empty and numeric-only text still cannot be submitted.
   await drawer.locator('textarea').fill('dato '.repeat(19).trim())
   await expect(
     drawer.getByRole('button', { name: 'Procesar y aplicar', exact: true }),
-  ).toBeDisabled()
+  ).toBeEnabled()
+  for (const invalid of ['', '123']) {
+    await drawer.locator('textarea').fill(invalid)
+    await expect(
+      drawer.getByRole('button', { name: 'Procesar y aplicar', exact: true }),
+    ).toBeDisabled()
+  }
   await drawer.locator('textarea').fill('dato '.repeat(20).trim())
   await expect(
     drawer.getByRole('button', { name: 'Procesar y aplicar', exact: true }),

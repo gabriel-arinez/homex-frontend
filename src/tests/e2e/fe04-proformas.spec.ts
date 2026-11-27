@@ -1305,9 +1305,16 @@ for (const width of [360, 768, 1440]) {
     await expect(drawer.locator('textarea')).toHaveValue(captura24.texto_transcrito_original!)
     expect(captures).toBe(1)
     await expect(page.getByLabel('Nombre comercial del mueble')).toHaveValue('Mueble previo')
+    // A short technical identity can be interpreted without bypassing final review.
     await expect(
       drawer.getByRole('button', { name: 'Procesar y aplicar', exact: true }),
-    ).toBeDisabled()
+    ).toBeEnabled()
+    for (const invalid of ['', '123']) {
+      await drawer.locator('textarea').fill(invalid)
+      await expect(
+        drawer.getByRole('button', { name: 'Procesar y aplicar', exact: true }),
+      ).toBeDisabled()
+    }
     await drawer
       .locator('textarea')
       .fill(

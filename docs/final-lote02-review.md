@@ -44,3 +44,14 @@ partial-intake contract. CI's contract-drift job selects that exact backend comm
 Only the real acoustic `integration-real` job is skipped for this candidate branch
 (push and PR head); ordinary tests, accessibility, build, contract and security
 jobs remain enabled. Frozen text is not presented as a new ASR browser evaluation.
+
+## Browser policy regression alignment
+
+S2/S12 deliberately supersede the former20-word submission minimum. Remote CI
+exposed four browser assertions still enforcing that old policy, reproduced locally
+before updating tests. The19-word and valid-short-capture cases now expect enabled
+interpretation, with additional empty/numeric-only negative checks. Audio-duration,
+explicit interpretation/application, price review, no-save, responsive and Axe checks
+remain intact. This changes the requested policy expectation, not the NLP output or
+commercial validation merely to obtain a passing result. Mock PCM/HTTP fixtures in
+these browser suites never call a real ASR model or a business backend.
