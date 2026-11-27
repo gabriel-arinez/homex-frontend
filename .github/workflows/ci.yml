@@ -124,7 +124,7 @@ jobs:
         with:
           repository: gabriel-arinez/homex-backend
           # Contrato y consumidor de galerías coordinados por revisión inmutable.
-          ref: ${{ inputs.integration_peer_ref || '5d18c875f7c35420c91ccc19813a8e1b94f958a5' }}
+          ref: ${{ inputs.integration_peer_ref || '2a846bb3d2e9fd7b329e2db296ac92755e4ba4f7' }}
           path: backend-prf04-contract
       - name: Verificar snapshot OpenAPI idéntico al backend coordinado
         run: cmp contracts/backend-openapi.yaml backend-prf04-contract/docs/openapi.yaml
