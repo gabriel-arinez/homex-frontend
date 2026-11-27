@@ -52,11 +52,13 @@ it.each([
     const validate = wrapper.findAll('button').find((b) => b.text().includes('Validar'))!
     await validate.trigger('click')
     await flushPromises()
-    const statuses = wrapper.emitted('voiceReviewChange')?.at(-1)?.[0] as Array<{ state: string }>
+    const statuses = wrapper.emitted('voiceReviewChange')?.slice(-1)[0]?.[0] as Array<{
+      state: string
+    }>
     expect(statuses).toBeDefined()
     expect(JSON.stringify(statuses)).toContain('reviewed')
     expect(vm.submit()).toBe(true)
-    const saved = wrapper.emitted('save')?.at(-1)?.[0]
+    const saved = wrapper.emitted('save')?.slice(-1)[0]?.[0]
     expect(JSON.stringify(saved)).toContain(`"estado":"${state}"`)
     expect(JSON.stringify(saved)).toContain('"valor_original":"500.00"')
     expect(JSON.stringify(saved)).toContain(`"valor_final":"${final}"`)
