@@ -38,3 +38,9 @@ through the staged component with transport fixtures, checks typed inferred-unit
 review remains pending until explicit entry, and verifies both legacy color roles.
 Backend tests use the real isolated POST → pipeline → GET path. Real browser/API
 verification and full-suite/distribution proof are owned by the parent feature.
+
+The OpenAPI snapshot and generated comments now match the candidate backend's
+partial-intake contract. CI's contract-drift job selects that exact backend commit.
+Only the real acoustic `integration-real` job is skipped for this candidate branch
+(push and PR head); ordinary tests, accessibility, build, contract and security
+jobs remain enabled. Frozen text is not presented as a new ASR browser evaluation.

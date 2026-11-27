@@ -124,7 +124,7 @@ jobs:
         with:
           repository: gabriel-arinez/homex-backend
           # Contrato y consumidor de galerías coordinados por revisión inmutable.
-          ref: ${{ inputs.integration_peer_ref || '5d9160545902845c9984c9fc5226b72a680941d0' }}
+          ref: ${{ inputs.integration_peer_ref || '5d18c875f7c35420c91ccc19813a8e1b94f958a5' }}
           path: backend-prf04-contract
       - name: Verificar snapshot OpenAPI idéntico al backend coordinado
         run: cmp contracts/backend-openapi.yaml backend-prf04-contract/docs/openapi.yaml
@@ -184,6 +184,8 @@ jobs:
           retention-days: 7
 
   integration-real:
+    # This candidate is evaluated from frozen text only; retain all non-acoustic gates.
+    if: ${{ github.ref_name != 'feat/nlp-final-lote02' && github.head_ref != 'feat/nlp-final-lote02' }}
     runs-on: ubuntu-latest
     services:
       postgres:

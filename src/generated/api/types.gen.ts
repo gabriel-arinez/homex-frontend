@@ -327,7 +327,7 @@ export type CrearAsistida = {
   clave_idempotencia: string
   proforma?: number | null
   /**
-   * Descripción comercial revisada: al menos 20 palabras y hasta 3000 caracteres.
+   * Reviewed transcript up to 3000 characters; partial descriptions are allowed.
    */
   texto?: string
   sesion_borrador: string
@@ -359,7 +359,7 @@ export type CrearCapturaTexto = {
 export type CrearCatalogo = {
   clave_idempotencia: string
   /**
-   * Descripción comercial revisada: al menos 20 palabras y hasta 3000 caracteres.
+   * Reviewed transcript up to 3000 characters; partial descriptions are allowed.
    */
   texto?: string
   sesion_borrador: string
@@ -1949,7 +1949,7 @@ export type CrearAsistidaWritable = {
   clave_idempotencia: string
   proforma?: number | null
   /**
-   * Descripción comercial revisada: al menos 20 palabras y hasta 3000 caracteres.
+   * Reviewed transcript up to 3000 characters; partial descriptions are allowed.
    */
   texto?: string
   audio?: Blob | File
@@ -1973,7 +1973,7 @@ export type CrearCapturaMultipartWritable = {
 export type CrearCatalogoWritable = {
   clave_idempotencia: string
   /**
-   * Descripción comercial revisada: al menos 20 palabras y hasta 3000 caracteres.
+   * Reviewed transcript up to 3000 characters; partial descriptions are allowed.
    */
   texto?: string
   audio?: Blob | File
