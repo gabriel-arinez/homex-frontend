@@ -99,5 +99,5 @@ test('FE09 restaura sesión y permite recargar una ruta SPA operativa', async ({
   await expect(
     page.getByRole('heading', { name: 'Mi actividad comercial', exact: true }),
   ).toBeVisible()
-  await expect(page.getByText('Gestión comercial personal de María Vendedora.')).toBeVisible()
+  await expect(page.getByText('Seguimiento comercial, proformas, pedidos y cobros.')).toBeVisible()
 })
