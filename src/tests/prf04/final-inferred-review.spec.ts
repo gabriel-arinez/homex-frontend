@@ -9,10 +9,12 @@ import { reviewProjection } from '@/modules/capturas/reviewProjection'
 
 vi.mock('@/modules/capturas/audioLimits', async (original) => ({
   ...(await original<typeof import('@/modules/capturas/audioLimits')>()),
-  readAudioDuration: vi.fn().mockResolvedValue(30),
+  readAudioDuration: vi.fn<() => Promise<number>>().mockResolvedValue(30),
 }))
 vi.mock('@/modules/capturas/audioConversion', () => ({
-  prepareAudioForCapture: vi.fn().mockResolvedValue(new Blob(['audio'], { type: 'audio/wav' })),
+  prepareAudioForCapture: vi
+    .fn<() => Promise<Blob>>()
+    .mockResolvedValue(new Blob(['audio'], { type: 'audio/wav' })),
 }))
 afterEach(() => vi.restoreAllMocks())
 
