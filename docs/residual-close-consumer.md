@@ -14,3 +14,9 @@ are not acoustically processed. Both current backend workflow consumers and the
 contract reference advance together. Main and production remain untouched.
 
 Risk: items2,3,5 (trusted review, consumer contracts and CI coordination).
+
+Restoring D04 exposed a pre-existing ambiguous integration-login assertion: the
+same account name appears in both the authenticated sidebar and seller filter.
+The fixture now scopes its unchanged exact-name/visibility assertion to the
+sidebar's complementary landmark. No application behavior, audio fixture or
+expectation was removed; the complete real integration gate must run again.

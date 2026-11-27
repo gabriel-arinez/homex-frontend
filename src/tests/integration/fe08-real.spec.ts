@@ -12,7 +12,9 @@ async function login(page: Page) {
   await page.getByLabel('Contraseña').fill('fe08-integration-only')
   await page.getByRole('button', { name: 'Ingresar' }).click()
   await expect(page).toHaveURL(/\/resumen$/)
-  await expect(page.getByText('Integración FE08', { exact: true })).toBeVisible()
+  await expect(
+    page.getByRole('complementary').getByText('Integración FE08', { exact: true }),
+  ).toBeVisible()
   return consoleErrors
 }
 
