@@ -1,7 +1,7 @@
 # Residual closure frontend consumer
 
-This candidate consumes backend `7c2ae9033984ac487e3eae05977df966691e5c46`, whose locked NLP artifact is0.1.32
-(`prf04-rules-context-4`, `catalog-0.1.32`). No API schema field was added.
+This candidate consumes backend `dc4437f0dc4b575971d5c740b5a69ac7fcc94cb3`, whose locked NLP artifact is `0.1.33`
+(`prf04-rules-context-5`, `catalog-0.1.33`). No API schema field was added.
 The contract snapshot and generated client are unchanged and checked.
 
 Explicit quantity-one price suggestions remain pending until the existing Validar
