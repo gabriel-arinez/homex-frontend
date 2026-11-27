@@ -75,6 +75,20 @@ export function pendienteResuelto(
     if (!componente) return false
     const valor = componente[r.campo ?? '']
     if (r.campo === 'cantidad_interna') return Number.isInteger(Number(valor)) && Number(valor) > 0
+    // Optional axis markers prevent another complete axis from resolving an inferred one.
+    // Legacy component requests without a marker retain their existing behavior.
+    if (r.campo === 'dimensiones' && r.valor) {
+      if (!['ancho', 'alto', 'largo', 'profundidad', 'diametro'].includes(r.valor)) return false
+      if (typeof valor !== 'string') return false
+      const axis = r.valor === 'diametro' ? 'di[aá]metro' : r.valor
+      const match = valor.match(
+        new RegExp(
+          `(?:^|;)\\s*${axis}\\s*:\\s*(\\d+(?:[.,]\\d+)?)\\s*(mm|cm|m|pulgadas)\\s*(?:;|$)`,
+          'i',
+        ),
+      )
+      return !!match && Number(match[1]!.replace(',', '.')) > 0
+    }
     return !!String(valor ?? '').trim()
   }
   const normalizar = (valor: string) =>

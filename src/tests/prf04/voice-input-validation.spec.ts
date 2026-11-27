@@ -22,9 +22,20 @@ describe('commercial voice input bounds', () => {
     expect(countTranscriptWords('  silla  de 18 mm, 1,5 m; 2x3 ... — /  450 Bs. ')).toBe(9)
     expect(countTranscriptWords('  ... —  ')).toBe(0)
   })
-  it('requires 20 words without deciding commercial validity', () => {
-    for (const text of ['', '   ', words(19)]) expect(validateTranscript(text)).toBeTruthy()
-    for (const n of [20, 21]) expect(validateTranscript(words(n))).toBe('')
+  it('accepts partial letter-bearing text without deciding commercial validity', () => {
+    for (const text of ['', '   ', '12345', '!!!', '💺'])
+      expect(validateTranscript(text)).toBeTruthy()
+    for (const text of [
+      'á',
+      'una mesa',
+      'una mesa simple',
+      'tres escritorios blancos',
+      'un mueble de melamina',
+      words(19),
+      words(20),
+      words(21),
+    ])
+      expect(validateTranscript(text)).toBe('')
   })
   it('allows 2999/3000 characters but rejects 3001 without changing text', () => {
     expect(MAX_TRANSCRIPT_CHARACTERS).toBe(3000)

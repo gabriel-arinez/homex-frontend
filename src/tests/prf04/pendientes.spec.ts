@@ -70,3 +70,33 @@ describe('asignación explícita de espesor ambiguo', () => {
     expect(componentes[1]).toHaveProperty('espesor', '27 mm')
   })
 })
+
+it('requires the optional pending component axis while keeping legacy field resolution', () => {
+  const pending = aviso({
+    tipo: 'COMPONENTE',
+    uid: 'piece',
+    campo: 'dimensiones',
+    valor: 'profundidad',
+  })
+  const component = { uid: 'piece', nombre: 'Credenza', dimensiones: 'ancho: 90 cm' }
+  expect(pendienteResuelto(pending, [], [component], [])).toBe(false)
+  for (const value of ['ancho: 90 cm; profundidad: 0 cm', 'ancho: 90 cm; profundidad: 62 kg']) {
+    expect(pendienteResuelto(pending, [], [{ ...component, dimensiones: value }], [])).toBe(false)
+  }
+  expect(
+    pendienteResuelto(
+      pending,
+      [],
+      [{ ...component, dimensiones: 'ancho: 90 cm; profundidad: 62 cm' }],
+      [],
+    ),
+  ).toBe(true)
+  expect(
+    pendienteResuelto(
+      aviso({ tipo: 'COMPONENTE', uid: 'piece', campo: 'dimensiones' }),
+      [],
+      [component],
+      [],
+    ),
+  ).toBe(true)
+})

@@ -10,7 +10,6 @@ import {
   MAX_TRANSCRIPT_CHARACTERS,
   CAPTURE_TIMEOUT_MS,
   validateTranscript,
-  countTranscriptWords,
   countTranscriptCharacters,
 } from '../audioLimits'
 import { prepareAudioForCapture } from '../audioConversion'
@@ -132,7 +131,6 @@ const appliedEvidence = computed<VoiceEvidence[]>(() => {
     fieldLabel: item.label,
   }))
 })
-const transcriptWords = computed(() => countTranscriptWords(text.value))
 const transcriptCharacters = computed(() => countTranscriptCharacters(text.value))
 const transcriptError = computed(() => validateTranscript(text.value))
 const hasTranscriptStage = computed(() =>
@@ -618,12 +616,6 @@ function pasteTranscript(event: ClipboardEvent) {
       </label>
 
       <div id="voice-transcript-count" class="transcript-constraints" aria-live="polite">
-        <span
-          class="constraint-pill"
-          :class="transcriptWords >= 20 ? 'constraint-pill--ok' : 'constraint-pill--warn'"
-        >
-          {{ transcriptWords }} / 20 palabras mínimas
-        </span>
         <span
           class="constraint-pill"
           :class="

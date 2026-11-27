@@ -43,8 +43,7 @@ export function countTranscriptCharacters(text: string): number {
 }
 
 export function validateTranscript(text: string): string {
-  if (countTranscriptWords(text) < 20)
-    return 'Completa la descripción con al menos 20 palabras antes de procesarla.'
+  if (!/[\p{L}]/u.test(text)) return 'Ingresa contenido textual procesable antes de procesarlo.'
   if (countTranscriptCharacters(text) > MAX_TRANSCRIPT_CHARACTERS)
     return `La descripción supera ${MAX_TRANSCRIPT_CHARACTERS} caracteres. Reduce el texto antes de procesarlo.`
   return ''
