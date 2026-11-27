@@ -215,7 +215,7 @@ async function submitAjuste() {
   <Modal
     :open="open"
     wide
-    title="Registrar movimiento de inventario"
+    title="Registrar movimiento de stock"
     description="Registra una entrada o salida manual de tipo Ajuste. Esta operación quedará registrada permanentemente y no podrá editarse ni eliminarse."
     @close="emit('close')"
   >

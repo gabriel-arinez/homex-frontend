@@ -39,7 +39,8 @@ import {
 } from '@/modules/productos/utils/presentacionCatalogo'
 import { ApiError } from '@/shared/api'
 import { downloadBlob } from '@/shared/download/downloadBlob'
-import { buildExportFilename } from '@/shared/download/exportFilename'
+import ExportExcelModal from '@/shared/download/ExportExcelModal.vue'
+import { buildTrayExportFilename, exportRangeError } from '@/shared/download/exportExcel'
 import { movimientosStockService } from '../services/movimientosStockService'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
@@ -297,9 +298,47 @@ async function load() {
   }
 }
 
-async function exportExcel() {
-  if (dateError.value || exportingCsv.value) return
+const exportModalOpen = ref(false)
+const exportModalError = ref('')
+const exportTipoLabel = computed(
+  () => types.value.find((t) => t.codigo === type.value)?.nombre || type.value,
+)
+const exportFilenameSegments = computed(() => [
+  selectedProduct.value?.sku || (producto.value ? `prod-${producto.value}` : ''),
+  selectedProduct.value?.sku ? selectedProduct.value?.nombre : '',
+  pedido.value ? `pedido-${pedido.value}` : '',
+  exportTipoLabel.value,
+  direccion.value,
+  search.value.trim(),
+])
+const exportActiveFilters = computed(() => [
+  {
+    label: 'Producto',
+    value: selectedProduct.value
+      ? `${selectedProduct.value.sku} — ${selectedProduct.value.nombre}`
+      : producto.value
+        ? `#${producto.value}`
+        : '',
+  },
+  { label: 'Pedido', value: pedido.value ? `#${pedido.value}` : '' },
+  { label: 'Tipo', value: exportTipoLabel.value },
+  { label: 'Dirección', value: direccion.value },
+  { label: 'Búsqueda', value: search.value.trim() },
+])
+function openExportModal() {
+  exportModalError.value = ''
+  exportModalOpen.value = true
+}
+
+async function exportExcel(range: { fechaDesde: string; fechaHasta: string }) {
+  if (exportingCsv.value) return
+  const rangeErr = exportRangeError(range.fechaDesde, range.fechaHasta)
+  if (rangeErr) {
+    exportModalError.value = rangeErr
+    return
+  }
   exportingCsv.value = true
+  exportModalError.value = ''
   try {
     const blob = await movimientosStockService.exportarExcel({
       search: search.value.trim() || undefined,
@@ -307,37 +346,26 @@ async function exportExcel() {
       direccion: direccion.value || undefined,
       pedido: pedido.value ? Number(pedido.value) : undefined,
       producto: producto.value ? Number(producto.value) : undefined,
-      fecha_desde: fechaDesde.value || undefined,
-      fecha_hasta: fechaHasta.value || undefined,
+      fecha_desde: range.fechaDesde,
+      fecha_hasta: range.fechaHasta,
     })
-    const hasFullRange = Boolean(fechaDesde.value && fechaHasta.value)
-    const tipoLabel = types.value.find((t) => t.codigo === type.value)?.nombre || type.value
-    const dateSegment = hasFullRange
-      ? `${fechaDesde.value}_a_${fechaHasta.value}`
-      : fechaDesde.value
-        ? `desde-${fechaDesde.value}`
-        : fechaHasta.value
-          ? `hasta-${fechaHasta.value}`
-          : ''
-    const filename = buildExportFilename(
-      producto.value || hasFullRange ? 'reporte-stock' : 'movimientos-stock',
-      [
-        selectedProduct.value?.sku || (producto.value ? `prod-${producto.value}` : ''),
-        selectedProduct.value?.sku ? selectedProduct.value?.nombre : '',
-        pedido.value ? `pedido-${pedido.value}` : '',
-        tipoLabel,
-        direccion.value,
-        search.value.trim(),
-        dateSegment,
-      ],
-      'xlsx',
+    const filename = buildTrayExportFilename(
+      'reporte-stock',
+      exportFilenameSegments.value,
+      range.fechaDesde,
+      range.fechaHasta,
     )
     downloadBlob(blob, filename)
+    exportModalOpen.value = false
     toastTone.value = 'success'
     toastMessage.value = 'Reporte Excel exportado correctamente.'
   } catch (err) {
-    toastTone.value = 'danger'
-    toastMessage.value = err instanceof ApiError ? err.message : 'No pudimos exportar el Excel.'
+    exportModalError.value =
+      err instanceof ApiError
+        ? err.message
+        : err instanceof Error
+          ? err.message
+          : 'No pudimos exportar el Excel.'
   } finally {
     exportingCsv.value = false
   }
@@ -479,11 +507,7 @@ onBeforeUnmount(() => {
       @menu="emit('openMenu')"
     >
       <template #actions>
-        <Button
-          variant="secondary"
-          :disabled="exportingCsv || Boolean(dateError)"
-          @click="exportExcel"
-        >
+        <Button variant="secondary" :disabled="exportingCsv" @click="openExportModal">
           <Download :size="16" aria-hidden="true" />
           {{ exportingCsv ? 'Exportando...' : 'Exportar Excel' }}
         </Button>
@@ -710,7 +734,7 @@ onBeforeUnmount(() => {
         :description="
           hasFilters
             ? 'No hay movimientos que coincidan con los filtros aplicados.'
-            : 'Todavía no se registraron movimientos de inventario.'
+            : 'Todavía no se registraron movimientos de stock.'
         "
       >
         <Button v-if="hasFilters" variant="secondary" @click="clearFilters">Limpiar filtros</Button>
@@ -895,6 +919,19 @@ onBeforeUnmount(() => {
       :initial-type="ajusteTipo"
       @close="ajusteOpen = false"
       @saved="onAjusteSaved"
+    />
+    <ExportExcelModal
+      :open="exportModalOpen"
+      title="Exportar movimientos de stock a Excel"
+      prefix="reporte-stock"
+      :initial-from="fechaDesde"
+      :initial-to="fechaHasta"
+      :active-filters="exportActiveFilters"
+      :filename-segments="exportFilenameSegments"
+      :busy="exportingCsv"
+      :error-message="exportModalError"
+      @close="exportModalOpen = false"
+      @confirm="exportExcel"
     />
   </div>
 </template>

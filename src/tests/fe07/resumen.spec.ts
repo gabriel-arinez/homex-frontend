@@ -224,7 +224,10 @@ describe('FE07 resumen operativo', () => {
     await vi.waitFor(() => {
       expect(admin.text()).toContain('Resumen general')
     })
-    expect(admin.text()).toContain('Supervisión administrativa')
+    expect(admin.text()).not.toContain('Supervisión administrativa')
+    expect(admin.text()).toContain(
+      'Indicadores comerciales, financieros, operativos y de existencias.',
+    )
   })
   it('presenta visión operativa de taller para JEFE_TALLER sin consultar proformas', async () => {
     let proformaCalls = 0

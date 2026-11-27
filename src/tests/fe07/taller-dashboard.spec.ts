@@ -265,7 +265,7 @@ describe('Fase 4 TallerDashboard', () => {
     await vi.waitFor(() => {
       expect(wrapper.text()).toContain('Total conjunto: 2 eventos')
     })
-    await wrapper.get('select[aria-label="Filtrar naturaleza de eventos"]').setValue('PLANIFICADA')
+    await wrapper.get('select[aria-label="Filtrar clase de evento"]').setValue('PLANIFICADA')
     await vi.waitFor(() => {
       expect(wrapper.text()).toContain('OT #31')
     })

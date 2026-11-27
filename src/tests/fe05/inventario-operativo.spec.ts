@@ -126,7 +126,7 @@ describe('Inventario operativo (P1, P2, P4, P5, P6)', () => {
     await flushPromises()
 
     expect(wrapper.text()).not.toContain('stock reservado')
-    expect(wrapper.text()).toContain('restituidas al inventario mediante reversa')
+    expect(wrapper.text()).toContain('restituidas a existencias mediante reversa')
   })
 
   it('P4 & P5: ProductoDetailView muestra origen de demanda y restringe stock mínimo a admin', async () => {
@@ -496,22 +496,33 @@ describe('Inventario operativo (P1, P2, P4, P5, P6)', () => {
     })
     await flushPromises()
 
-    // Permite exportar la bandeja ordinaria sin exigir ambas fechas
-    const exportBtn = wrapper.findAll('button').find((b) => b.text().includes('Exportar Excel'))!
-    await exportBtn.trigger('click')
+    // Abre el modal de exportación y exige rango de fechas antes de confirmar
+    const openBtn = wrapper.findAll('button').find((b) => b.text().includes('Exportar Excel'))!
+    await openBtn.trigger('click')
+    await flushPromises()
+    expect(excelSpy).not.toHaveBeenCalled()
+
+    await wrapper.get('input[name="export_fecha_desde"]').setValue('2026-11-01')
+    await wrapper.get('input[name="export_fecha_hasta"]').setValue('2026-11-22')
+    await flushPromises()
+    const modalBtns = wrapper.findAll('button').filter((b) => b.text().includes('Exportar Excel'))
+    await modalBtns[modalBtns.length - 1]!.trigger('click')
     await flushPromises()
     expect(excelSpy).toHaveBeenCalledTimes(1)
     expect(excelSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        fecha_desde: undefined,
-        fecha_hasta: undefined,
+        fecha_desde: '2026-11-01',
+        fecha_hasta: '2026-11-22',
       }),
     )
 
-    // Con rango de fechas en ruta también llama a exportarExcel con el período
+    // Con rango de fechas en ruta lo precarga en el modal y exporta con el período
     await router.push('/movimientos-stock?desde=2026-11-01&hasta=2026-11-22')
     await flushPromises()
-    await exportBtn.trigger('click')
+    await openBtn.trigger('click')
+    await flushPromises()
+    const modalBtns2 = wrapper.findAll('button').filter((b) => b.text().includes('Exportar Excel'))
+    await modalBtns2[modalBtns2.length - 1]!.trigger('click')
     await flushPromises()
     expect(excelSpy).toHaveBeenCalledWith(
       expect.objectContaining({

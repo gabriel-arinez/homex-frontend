@@ -14,6 +14,7 @@ import type { Recibo, ValorCatalogoPublico } from '@/generated/api'
 import DocumentViewerModal from '@/modules/proformas/components/DocumentViewerModal.vue'
 import DatePresentation from '@/shared/ui/DatePresentation.vue'
 import { downloadBlob } from '@/shared/download/downloadBlob'
+import ExportExcelModal from '@/shared/download/ExportExcelModal.vue'
 import { exportTrayExcel } from '@/shared/download/exportExcel'
 import { buildExportFilename } from '@/shared/download/exportFilename'
 import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
@@ -50,41 +51,50 @@ const error = ref('')
 const toastMessage = ref('')
 const toastTone = ref<'success' | 'danger'>('success')
 const exportingExcel = ref(false)
-async function exportExcel() {
-  if (exportingExcel.value || dateError.value) return
+const exportModalOpen = ref(false)
+const exportModalError = ref('')
+const exportStateLabel = computed(() =>
+  stateFilter.value.toUpperCase() === 'EMITIDO'
+    ? 'Emitido'
+    : stateFilter.value.toUpperCase() === 'ANULADO'
+      ? 'Anulado'
+      : stateFilter.value,
+)
+const exportPaymentLabel = computed(
+  () =>
+    paymentTypes.value.find(
+      (t) => String(t.id) === paymentFilter.value || t.codigo === paymentFilter.value,
+    )?.nombre || paymentFilter.value,
+)
+const exportActiveFilters = computed(() => [
+  { label: 'Estado', value: exportStateLabel.value },
+  { label: 'Tipo de pago', value: exportPaymentLabel.value },
+  { label: 'Búsqueda', value: search.value.trim() },
+])
+function openExportModal() {
+  exportModalError.value = ''
+  exportModalOpen.value = true
+}
+async function exportExcel(range: { fechaDesde: string; fechaHasta: string }) {
+  if (exportingExcel.value) return
   exportingExcel.value = true
+  exportModalError.value = ''
   try {
-    const stateLabel =
-      stateFilter.value.toUpperCase() === 'EMITIDO'
-        ? 'Emitido'
-        : stateFilter.value.toUpperCase() === 'ANULADO'
-          ? 'Anulado'
-          : stateFilter.value
-    const paymentLabel =
-      paymentTypes.value.find(
-        (t) => String(t.id) === paymentFilter.value || t.codigo === paymentFilter.value,
-      )?.nombre || paymentFilter.value
     await exportTrayExcel({
       endpoint: '/api/v1/recibos/exportar-excel/',
       query: {
         search: search.value.trim() || undefined,
         estado: stateFilter.value || undefined,
         tipo_pago: paymentFilter.value || undefined,
-        fecha_desde: dateFrom.value || undefined,
-        fecha_hasta: dateTo.value || undefined,
       },
+      fechaDesde: range.fechaDesde,
+      fechaHasta: range.fechaHasta,
       prefix: 'recibos',
-      filenameSegments: [
-        stateLabel,
-        paymentLabel,
-        search.value.trim(),
-        dateFrom.value,
-        dateTo.value,
-      ],
+      filenameSegments: [exportStateLabel.value, exportPaymentLabel.value, search.value.trim()],
     })
+    exportModalOpen.value = false
   } catch (err) {
-    toastTone.value = 'danger'
-    toastMessage.value = err instanceof Error ? err.message : 'No pudimos exportar el Excel.'
+    exportModalError.value = err instanceof Error ? err.message : 'No pudimos exportar el Excel.'
   } finally {
     exportingExcel.value = false
   }
@@ -307,9 +317,8 @@ onMounted(load)
         <Button
           variant="secondary"
           :processing="exportingExcel"
-          :disabled="exportingExcel || Boolean(dateError)"
-          :title="dateError || undefined"
-          @click="exportExcel"
+          :disabled="exportingExcel"
+          @click="openExportModal"
         >
           <FileSpreadsheet :size="16" aria-hidden="true" />
           {{ exportingExcel ? 'Exportando…' : 'Exportar Excel' }}
@@ -542,6 +551,19 @@ onMounted(load)
       @close="closePreview"
       @download="previewRecibo && handleDownload(previewRecibo.id)"
       @retry="previewRecibo && loadPdf(previewRecibo.id)"
+    />
+    <ExportExcelModal
+      :open="exportModalOpen"
+      title="Exportar recibos a Excel"
+      prefix="recibos"
+      :initial-from="dateFrom"
+      :initial-to="dateTo"
+      :active-filters="exportActiveFilters"
+      :filename-segments="[exportStateLabel, exportPaymentLabel, search.trim()]"
+      :busy="exportingExcel"
+      :error-message="exportModalError"
+      @close="exportModalOpen = false"
+      @confirm="exportExcel"
     />
   </div>
 </template>

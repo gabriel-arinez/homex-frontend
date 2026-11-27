@@ -13,6 +13,7 @@ import {
 import type { NotaEntrega } from '@/generated/api'
 import DocumentViewerModal from '@/modules/proformas/components/DocumentViewerModal.vue'
 import { downloadBlob } from '@/shared/download/downloadBlob'
+import ExportExcelModal from '@/shared/download/ExportExcelModal.vue'
 import { exportTrayExcel } from '@/shared/download/exportExcel'
 import { buildExportFilename } from '@/shared/download/exportFilename'
 import { usePdfDocument } from '@/shared/pdf/usePdfDocument'
@@ -47,23 +48,31 @@ const error = ref('')
 const toastMessage = ref('')
 const toastTone = ref<'success' | 'danger'>('success')
 const exportingExcel = ref(false)
-async function exportExcel() {
-  if (exportingExcel.value || dateError.value) return
+const exportModalOpen = ref(false)
+const exportModalError = ref('')
+const exportActiveFilters = computed(() => [{ label: 'Búsqueda', value: search.value.trim() }])
+function openExportModal() {
+  exportModalError.value = ''
+  exportModalOpen.value = true
+}
+async function exportExcel(range: { fechaDesde: string; fechaHasta: string }) {
+  if (exportingExcel.value) return
   exportingExcel.value = true
+  exportModalError.value = ''
   try {
     await exportTrayExcel({
       endpoint: '/api/v1/notas-entrega/exportar-excel/',
       query: {
         search: search.value.trim() || undefined,
-        fecha_desde: dateFrom.value || undefined,
-        fecha_hasta: dateTo.value || undefined,
       },
+      fechaDesde: range.fechaDesde,
+      fechaHasta: range.fechaHasta,
       prefix: 'notas-entrega',
-      filenameSegments: [search.value.trim(), dateFrom.value, dateTo.value],
+      filenameSegments: [search.value.trim()],
     })
+    exportModalOpen.value = false
   } catch (err) {
-    toastTone.value = 'danger'
-    toastMessage.value = err instanceof Error ? err.message : 'No pudimos exportar el Excel.'
+    exportModalError.value = err instanceof Error ? err.message : 'No pudimos exportar el Excel.'
   } finally {
     exportingExcel.value = false
   }
@@ -252,9 +261,8 @@ onMounted(load)
         <Button
           variant="secondary"
           :processing="exportingExcel"
-          :disabled="exportingExcel || Boolean(dateError)"
-          :title="dateError || undefined"
-          @click="exportExcel"
+          :disabled="exportingExcel"
+          @click="openExportModal"
         >
           <FileSpreadsheet :size="16" aria-hidden="true" />
           {{ exportingExcel ? 'Exportando…' : 'Exportar Excel' }}
@@ -432,6 +440,19 @@ onMounted(load)
       @close="closePdfViewer"
       @retry="loadDocument(previewTarget.id)"
       @download="handleDownload(previewTarget.id)"
+    />
+    <ExportExcelModal
+      :open="exportModalOpen"
+      title="Exportar notas de entrega a Excel"
+      prefix="notas-entrega"
+      :initial-from="dateFrom"
+      :initial-to="dateTo"
+      :active-filters="exportActiveFilters"
+      :filename-segments="[search.trim()]"
+      :busy="exportingExcel"
+      :error-message="exportModalError"
+      @close="exportModalOpen = false"
+      @confirm="exportExcel"
     />
   </div>
 </template>

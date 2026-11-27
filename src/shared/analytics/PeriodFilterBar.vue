@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Calendar, SlidersHorizontal } from '@lucide/vue'
-import { dateRangeError, localToday } from '@/shared/validation/dateRange'
+import { dateRangeError, isValidDate, localToday } from '@/shared/validation/dateRange'
 import { buildPeriodPreset, formatDateLaPaz, type PeriodPresetKey } from './formatters'
 
 export interface SellerOption {
@@ -43,6 +43,8 @@ const emit = defineEmits<{
 
 const preset = ref<PeriodPresetKey>('todo')
 const mobileExpanded = ref(false)
+const invalidDesdeInput = ref(false)
+const invalidHastaInput = ref(false)
 
 const presets: Array<{ key: PeriodPresetKey; label: string }> = [
   { key: 'todo', label: 'Todo el período' },
@@ -61,14 +63,40 @@ const activePeriodSummary = computed(() => {
 })
 
 const maxDate = computed(() => props.fechaReferencia || localToday())
-const rangeError = computed(() =>
-  dateRangeError(props.fechaDesde ?? '', props.fechaHasta ?? '', maxDate.value),
+const desdeMax = computed(() =>
+  props.fechaHasta && props.fechaHasta < maxDate.value ? props.fechaHasta : maxDate.value,
 )
+const desdeError = computed(() => {
+  if (invalidDesdeInput.value) return 'Ingresa una fecha válida.'
+  const from = props.fechaDesde ?? ''
+  if (!from) return ''
+  if (!isValidDate(from)) return 'Ingresa una fecha válida.'
+  if (maxDate.value && from > maxDate.value) return 'La fecha no puede ser futura.'
+  if (props.fechaHasta && isValidDate(props.fechaHasta) && from > props.fechaHasta) {
+    return 'La fecha inicial no puede ser posterior a la fecha final.'
+  }
+  return ''
+})
+const hastaError = computed(() => {
+  if (invalidHastaInput.value) return 'Ingresa una fecha válida.'
+  const to = props.fechaHasta ?? ''
+  if (!to) return ''
+  if (!isValidDate(to)) return 'Ingresa una fecha válida.'
+  if (maxDate.value && to > maxDate.value) return 'La fecha no puede ser futura.'
+  if (props.fechaDesde && isValidDate(props.fechaDesde) && props.fechaDesde > to) {
+    return 'La fecha final no puede ser anterior a la fecha inicial.'
+  }
+  return ''
+})
+const rangeError = computed(() => {
+  if (invalidDesdeInput.value || invalidHastaInput.value) return 'Ingresa una fecha válida.'
+  return dateRangeError(props.fechaDesde ?? '', props.fechaHasta ?? '', maxDate.value)
+})
 
 watch(
   () => [props.fechaDesde, props.fechaHasta],
   ([desde, hasta]) => {
-    if (!desde && !hasta) {
+    if (!desde && !hasta && !invalidDesdeInput.value && !invalidHastaInput.value) {
       preset.value = 'todo'
     }
   },
@@ -76,6 +104,8 @@ watch(
 
 function onPresetChange(next: PeriodPresetKey) {
   preset.value = next
+  invalidDesdeInput.value = false
+  invalidHastaInput.value = false
   if (next === 'personalizado') return
   const refDate = props.fechaReferencia || localToday()
   const range = buildPeriodPreset(next, refDate)
@@ -84,29 +114,39 @@ function onPresetChange(next: PeriodPresetKey) {
   emit('apply')
 }
 
-function onCustomDateChange(kind: 'desde' | 'hasta', value: string) {
+function onCustomDateInput(kind: 'desde' | 'hasta', el: HTMLInputElement) {
   preset.value = 'personalizado'
-  const clean = value.trim() || null
+  const bad = Boolean(el.validity?.badInput)
+  if (kind === 'desde') invalidDesdeInput.value = bad
+  else invalidHastaInput.value = bad
+  const clean = el.value.trim() || null
   const nextDesde = kind === 'desde' ? clean : props.fechaDesde
   const nextHasta = kind === 'hasta' ? clean : props.fechaHasta
   if (kind === 'desde') emit('update:fechaDesde', clean)
   else emit('update:fechaHasta', clean)
-  if (!dateRangeError(nextDesde ?? '', nextHasta ?? '', maxDate.value)) emit('apply')
+  if (
+    !bad &&
+    !invalidDesdeInput.value &&
+    !invalidHastaInput.value &&
+    !dateRangeError(nextDesde ?? '', nextHasta ?? '', maxDate.value)
+  ) {
+    emit('apply')
+  }
 }
 
 function onSellerChange(value: string) {
   emit('update:vendedorId', value ? Number(value) : null)
-  emit('apply')
+  if (!rangeError.value) emit('apply')
 }
 
 function onCurrencyChange(value: string) {
   emit('update:moneda', value)
-  emit('apply')
+  if (!rangeError.value) emit('apply')
 }
 
 function onGranularityChange(value: string) {
   emit('update:granularidad', value as 'diaria' | 'semanal' | 'mensual')
-  emit('apply')
+  if (!rangeError.value) emit('apply')
 }
 </script>
 
@@ -149,31 +189,42 @@ function onGranularityChange(value: string) {
         </select>
       </label>
 
-      <label class="period-bar__field">
+      <label class="period-bar__field" :class="{ 'period-bar__field--error': Boolean(desdeError) }">
         <span>Desde</span>
         <input
           type="date"
           aria-label="Fecha desde"
           :value="fechaDesde ?? ''"
-          @change="onCustomDateChange('desde', ($event.target as HTMLInputElement).value)"
+          :max="desdeMax"
+          :aria-invalid="Boolean(desdeError) || undefined"
+          @change="onCustomDateInput('desde', $event.target as HTMLInputElement)"
         />
+        <small v-if="desdeError" class="period-bar__field-error" role="alert">
+          {{ desdeError }}
+        </small>
       </label>
 
-      <label class="period-bar__field">
+      <label class="period-bar__field" :class="{ 'period-bar__field--error': Boolean(hastaError) }">
         <span>Hasta</span>
         <input
           type="date"
           aria-label="Fecha hasta"
           :value="fechaHasta ?? ''"
-          @change="onCustomDateChange('hasta', ($event.target as HTMLInputElement).value)"
+          :min="fechaDesde || undefined"
+          :max="maxDate"
+          :aria-invalid="Boolean(hastaError) || undefined"
+          @change="onCustomDateInput('hasta', $event.target as HTMLInputElement)"
         />
+        <small v-if="hastaError" class="period-bar__field-error" role="alert">
+          {{ hastaError }}
+        </small>
       </label>
 
       <label class="period-bar__field">
-        <span>Granularidad</span>
+        <span>Agrupar por</span>
         <select
           :value="granularidad"
-          aria-label="Granularidad temporal"
+          aria-label="Agrupar por"
           @change="onGranularityChange(($event.target as HTMLSelectElement).value)"
         >
           <option value="diaria">Diaria</option>
@@ -207,7 +258,7 @@ function onGranularityChange(value: string) {
       </label>
     </div>
 
-    <div v-if="rangeError" class="period-bar__meta">
+    <div v-if="rangeError && !desdeError && !hastaError" class="period-bar__meta">
       <span class="period-bar__error" role="alert">
         {{ rangeError }}
       </span>
@@ -331,5 +382,16 @@ function onGranularityChange(value: string) {
 .period-bar__error {
   color: var(--color-danger);
   font-weight: 600;
+}
+
+.period-bar__field--error input {
+  border-color: var(--color-danger);
+}
+
+.period-bar__field-error {
+  color: var(--color-danger);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.3;
 }
 </style>

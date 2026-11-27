@@ -510,7 +510,7 @@ onMounted(() => void load())
       "
       :description="
         confirmAction === 'approve'
-          ? 'Esta acción confirmará el pedido y aplicará los movimientos de inventario correspondientes. No se podrá deshacer desde la proforma.'
+          ? 'Esta acción confirmará el pedido y aplicará los movimientos de stock correspondientes. No se podrá deshacer desde la proforma.'
           : confirmAction === 'cancel'
             ? 'La proforma quedará anulada y no podrá editarse ni aprobarse.'
             : confirmAction === 'not-completed'

@@ -11,7 +11,6 @@ import {
   FileText,
   LayoutDashboard,
   RefreshCw,
-  ShieldCheck,
   ShoppingBag,
   TrendingUp,
   Wallet,
@@ -24,9 +23,7 @@ import type {
   InventarioAdmin,
   ValorCatalogoPublico,
 } from '@/generated/api'
-import { useSessionStore } from '@/app/stores/useSessionStore'
 import { proformasService } from '@/modules/proformas/services/proformasService'
-import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
 import Card from '@/shared/ui/Card.vue'
 import DetailTabs, { type DetailTabItem } from '@/shared/ui/DetailTabs.vue'
@@ -55,13 +52,12 @@ import {
   formatTimeLaPaz,
   toNumber,
 } from '@/shared/analytics/formatters'
-import { dateRangeError } from '@/shared/validation/dateRange'
+import { dateRangeError, localToday } from '@/shared/validation/dateRange'
 import { adminDashboardService } from '../services/adminDashboardService'
 
 type AdminTabId = 'general' | 'comercial' | 'finanzas' | 'operaciones' | 'inventario'
 
 const emit = defineEmits<{ 'open-menu': [] }>()
-const session = useSessionStore()
 
 const activeTab = ref<AdminTabId>('general')
 
@@ -104,10 +100,7 @@ let comercialSeq = 0
 let finanzasSeq = 0
 let inventarioSeq = 0
 
-const scopeDescription = computed(() => {
-  const actor = session.identity?.display_name ?? 'Administrador'
-  return `Supervisión administrativa global de ${actor}.`
-})
+const scopeDescription = 'Indicadores comerciales, financieros, operativos y de existencias.'
 
 const fechaReferencia = computed(
   () => resumen.value?.fecha_referencia ?? comercial.value?.fecha_referencia ?? null,
@@ -166,7 +159,8 @@ const staleBlocks = computed(() => {
   if (errorResumen.value && resumen.value) items.push(`Resumen (${errorResumen.value})`)
   if (errorComercial.value && comercial.value) items.push(`Comercial (${errorComercial.value})`)
   if (errorFinanzas.value && finanzas.value) items.push(`Finanzas (${errorFinanzas.value})`)
-  if (errorInventario.value && inventario.value) items.push(`Inventario (${errorInventario.value})`)
+  if (errorInventario.value && inventario.value)
+    items.push(`Existencias (${errorInventario.value})`)
   return items
 })
 
@@ -281,7 +275,8 @@ async function fetchInventario() {
     inventario.value = data
   } catch (err) {
     if (seq !== inventarioSeq || (err as { name?: string })?.name === 'AbortError') return
-    errorInventario.value = err instanceof Error ? err.message : 'No se pudo cargar el inventario.'
+    errorInventario.value =
+      err instanceof Error ? err.message : 'No se pudieron cargar las existencias.'
   } finally {
     if (seq === inventarioSeq) loadingInventario.value = false
   }
@@ -297,7 +292,13 @@ async function loadCatalogCategories() {
 }
 
 async function loadAll() {
-  if (dateRangeError(fechaDesde.value ?? '', fechaHasta.value ?? '')) {
+  if (
+    dateRangeError(
+      fechaDesde.value ?? '',
+      fechaHasta.value ?? '',
+      fechaReferencia.value || localToday(),
+    )
+  ) {
     return
   }
   await Promise.all([fetchResumen(), fetchComercial(), fetchFinanzas(), fetchInventario()])
@@ -678,7 +679,7 @@ const tabs = computed<DetailTabItem[]>(() => [
   { id: 'comercial', label: 'Comercial', icon: BarChart3 },
   { id: 'finanzas', label: 'Finanzas', icon: Wallet },
   { id: 'operaciones', label: 'Operaciones', icon: Wrench },
-  { id: 'inventario', label: 'Inventario', icon: Boxes },
+  { id: 'inventario', label: 'Existencias', icon: Boxes },
 ])
 </script>
 
@@ -698,10 +699,6 @@ const tabs = computed<DetailTabItem[]>(() => [
           <Button variant="secondary" :disabled="anyLoading" @click="loadAll">
             <RefreshCw :size="15" aria-hidden="true" />Actualizar
           </Button>
-          <Badge tone="neutral">
-            <ShieldCheck :size="13" aria-hidden="true" />
-            Supervisión administrativa
-          </Badge>
         </div>
       </template>
     </PageHeader>
@@ -753,15 +750,15 @@ const tabs = computed<DetailTabItem[]>(() => [
           to="/pedidos"
         />
         <MetricKpiCard
-          label="Conversión por cohorte"
+          label="Proformas convertidas en pedidos"
           :icon="TrendingUp"
           :value="formatPercent(indComercial?.tasa_conversion_cohorte)"
           :scope-note="periodScopeLabel"
           :approximate="hasApproximateCohort"
-          :detail="`${formatInteger(indComercial?.pedidos_derivados_cohorte)} derivados de ${formatInteger(indComercial?.proformas_formalizadas)}`"
+          :detail="`${formatInteger(indComercial?.pedidos_derivados_cohorte)} pedidos de ${formatInteger(indComercial?.proformas_formalizadas)} proformas`"
         />
         <MetricKpiCard
-          label="Importe vigente"
+          label="Importe de pedidos no cancelados"
           :icon="Wallet"
           :value="
             errorFinanzas && !finanzas
@@ -771,11 +768,11 @@ const tabs = computed<DetailTabItem[]>(() => [
                 : 'Sin datos'
           "
           :scope-note="`${primaryFin?.moneda ?? 'BOB'} · ${periodScopeLabel}`"
-          :detail="secondaryFinSummary || `Cartera vigente ${primaryFin?.moneda ?? ''}`"
+          :detail="secondaryFinSummary || `Pedidos no cancelados ${primaryFin?.moneda ?? ''}`"
           to="/pedidos"
         />
         <MetricKpiCard
-          label="Cobros acumulados"
+          label="Total cobrado por esos pedidos"
           :icon="Banknote"
           :value="
             errorFinanzas && !finanzas
@@ -866,12 +863,12 @@ const tabs = computed<DetailTabItem[]>(() => [
       <section class="section-block" aria-label="Situación financiera resumida">
         <div class="section-block__head">
           <h2>Situación financiera resumida</h2>
-          <p>Conciliación de cartera vigente y evolución de cobros válidos del período.</p>
+          <p>Conciliación de pedidos no cancelados y evolución de cobros válidos del período.</p>
         </div>
         <div class="two-col">
           <DonutChartCard
             :title="`Cobros acumulados vs. saldo pendiente (${donutCurrency})`"
-            description="Conciliación de la cartera vigente filtrada."
+            description="Conciliación de pedidos no cancelados filtrados."
             :slices="donutSlices"
             :center-label="formatPercent(donutMonedaRow?.porcentaje_cobrado)"
             center-sublabel="Cobrado"
@@ -937,7 +934,7 @@ const tabs = computed<DetailTabItem[]>(() => [
       <section class="section-block" aria-label="Distribuciones comerciales">
         <div class="section-block__head">
           <h2>Estado actual de documentos comerciales</h2>
-          <p>Fotografía actual de proformas y pedidos según los filtros aplicados.</p>
+          <p>Estado actual de proformas y pedidos según los filtros aplicados.</p>
         </div>
         <div class="two-col">
           <StateDistributionCard
@@ -992,7 +989,7 @@ const tabs = computed<DetailTabItem[]>(() => [
         <div class="two-col">
           <DonutChartCard
             :title="`Cobros acumulados vs. saldo pendiente (${donutCurrency})`"
-            description="Conciliación de la cartera vigente filtrada."
+            description="Conciliación de pedidos no cancelados filtrados."
             :slices="donutSlices"
             :center-label="formatPercent(donutMonedaRow?.porcentaje_cobrado)"
             center-sublabel="Cobrado"
@@ -1125,7 +1122,7 @@ const tabs = computed<DetailTabItem[]>(() => [
         <div class="section-block__head-row">
           <div class="section-block__head">
             <h2>Producción, taller y entregas</h2>
-            <p>Órdenes de fabricación a medida separadas de órdenes técnicas de catálogo.</p>
+            <p>Órdenes de fabricación a medida separadas de órdenes de productos de catálogo.</p>
           </div>
           <label class="local-filter">
             <span>Estado de fabricación</span>
@@ -1180,12 +1177,12 @@ const tabs = computed<DetailTabItem[]>(() => [
 
         <div class="two-col">
           <StateDistributionCard
-            title="Órdenes funcionales de fabricación"
+            title="Órdenes de fabricación"
             description="Exclusivamente ítems de fabricación a medida."
             :items="prod?.ordenes_fabricacion_por_estado ?? []"
           />
           <StateDistributionCard
-            title="Órdenes técnicas de catálogo"
+            title="Órdenes de productos de catálogo"
             description="Contabilizadas por separado de taller."
             :items="prod?.ordenes_tecnicas_por_estado ?? []"
           />
@@ -1193,17 +1190,17 @@ const tabs = computed<DetailTabItem[]>(() => [
       </section>
     </div>
 
-    <!-- TAB 5: INVENTARIO -->
+    <!-- TAB 5: EXISTENCIAS -->
     <div
       v-if="activeTab === 'inventario'"
       class="tab-panel"
       role="tabpanel"
-      aria-label="Inventario"
+      aria-label="Existencias"
     >
-      <section class="section-block" aria-label="Inventario">
+      <section class="section-block" aria-label="Existencias">
         <div class="section-block__head-row">
           <div class="section-block__head">
-            <h2>Inventario y productos</h2>
+            <h2>Productos y existencias</h2>
             <p>
               Disponibilidad comercial, umbrales configurados y productos más vendidos por unidad.
             </p>
@@ -1213,7 +1210,7 @@ const tabs = computed<DetailTabItem[]>(() => [
               <span>Categoría</span>
               <select
                 v-model="categoriaLocal"
-                aria-label="Filtrar categoría de inventario"
+                aria-label="Filtrar categoría de existencias"
                 @change="onCategoryChange"
               >
                 <option value="">Todas las categorías</option>

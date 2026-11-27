@@ -429,7 +429,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 
     <PageHeader
       :title="product?.nombre || 'Producto'"
-      description="Ficha comercial, galería multimedia y disponibilidad operativa en inventario."
+      description="Ficha comercial, galería multimedia y disponibilidad operativa en existencias."
       show-menu
       @menu="emit('openMenu')"
     >
@@ -563,7 +563,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
             <div class="stat__body">
               <span>Stock actual</span>
               <strong class="stat__value">{{ unidadesProducto(product, product.stock) }}</strong>
-              <small>Contabilizado en inventario</small>
+              <small>Contabilizado en existencias</small>
               <div class="stat__badges">
                 <Badge
                   v-if="estadoStockMeta(product.estado_stock).showBadge"

@@ -40,13 +40,15 @@ export function categorizeEvidenceLabel(
   if (decision === 'UNRESOLVED' || decision === 'REJECTED') return 'conflict'
   const key = (label ?? '').toLowerCase()
   if (
-    /precio|costo|cantidad(?!_interna)|unidad|descuento|moneda|nombre|sku|promocion|comercial|titulo|descripcion/.test(
+    /precio|costo|cantidad(?!_interna)|unidad|descuento|moneda|nombre|sku|promocion|comercial|titulo|descripcion|modelo|marca|categoria|familia|modalidad/.test(
       key,
     )
   ) {
     return 'commercial'
   }
-  if (/ancho|alto|profundidad|largo|diametro|espesor_piso|m2|medida|dimension/.test(key)) {
+  if (
+    /ancho|alto|profundidad|largo|diametro|espesor_mm|espesor_piso|m2|medida|dimension/.test(key)
+  ) {
     return 'dimensions'
   }
   return 'structure'
@@ -95,41 +97,115 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-const NUMBER_WORDS: Record<string, string[]> = {
-  '0': ['cero'],
-  '1': ['uno', 'una', 'un'],
-  '2': ['dos'],
-  '3': ['tres'],
-  '4': ['cuatro'],
-  '5': ['cinco'],
-  '6': ['seis'],
-  '7': ['siete'],
-  '8': ['ocho'],
-  '9': ['nueve'],
-  '10': ['diez'],
-  '11': ['once'],
-  '12': ['doce'],
-  '15': ['quince'],
-  '18': ['dieciocho'],
-  '20': ['veinte'],
-  '24': ['veinticuatro'],
-  '25': ['veinticinco'],
-  '30': ['treinta'],
-  '40': ['cuarenta'],
-  '50': ['cincuenta'],
-  '60': ['sesenta'],
-  '70': ['setenta'],
-  '80': ['ochenta'],
-  '90': ['noventa'],
-  '100': ['cien', 'ciento'],
-  '120': ['ciento veinte'],
-  '150': ['ciento cincuenta'],
-  '180': ['ciento ochenta'],
-  '200': ['doscientos', 'doscientas'],
-  '300': ['trescientos', 'trescientas'],
-  '400': ['cuatrocientos', 'cuatrocientas'],
-  '500': ['quinientos', 'quinientas'],
-  '1000': ['mil'],
+const UNITS_WORDS = [
+  'cero',
+  'uno',
+  'dos',
+  'tres',
+  'cuatro',
+  'cinco',
+  'seis',
+  'siete',
+  'ocho',
+  'nueve',
+  'diez',
+  'once',
+  'doce',
+  'trece',
+  'catorce',
+  'quince',
+  'dieciseis',
+  'diecisiete',
+  'dieciocho',
+  'diecinueve',
+  'veinte',
+  'veintiuno',
+  'veintidos',
+  'veintitres',
+  'veinticuatro',
+  'veinticinco',
+  'veintiseis',
+  'veintisiete',
+  'veintiocho',
+  'veintinueve',
+]
+const TENS_WORDS = [
+  '',
+  '',
+  '',
+  'treinta',
+  'cuarenta',
+  'cincuenta',
+  'sesenta',
+  'setenta',
+  'ochenta',
+  'noventa',
+]
+const HUNDREDS_WORDS = [
+  '',
+  'ciento',
+  'doscientos',
+  'trescientos',
+  'cuatrocientos',
+  'quinientos',
+  'seiscientos',
+  'setecientos',
+  'ochocientos',
+  'novecientos',
+]
+
+function intToSpanishWords(n: number): string {
+  if (n < 0 || !Number.isInteger(n) || n > 999999) return ''
+  if (n === 0) return 'cero'
+  if (n === 100) return 'cien'
+  if (n < 30) return UNITS_WORDS[n] ?? ''
+  if (n < 100) {
+    const t = Math.floor(n / 10)
+    const u = n % 10
+    return u === 0 ? TENS_WORDS[t]! : `${TENS_WORDS[t]} y ${UNITS_WORDS[u]}`
+  }
+  if (n < 1000) {
+    const h = Math.floor(n / 100)
+    const rest = n % 100
+    return rest === 0
+      ? h === 1
+        ? 'cien'
+        : HUNDREDS_WORDS[h]!
+      : `${HUNDREDS_WORDS[h]} ${intToSpanishWords(rest)}`
+  }
+  const thousands = Math.floor(n / 1000)
+  const rest = n % 1000
+  const prefix = thousands === 1 ? 'mil' : `${intToSpanishWords(thousands)} mil`
+  return rest === 0 ? prefix : `${prefix} ${intToSpanishWords(rest)}`
+}
+
+function spanishNumberToWords(n: number): string[] {
+  const base = intToSpanishWords(n)
+  if (!base) return []
+  const variants = new Set<string>([base])
+  if (n === 1) {
+    variants.add('una')
+    variants.add('un')
+  }
+  if (base.endsWith('uno')) variants.add(base.slice(0, -1))
+  if (base.includes('doscientos')) variants.add(base.replace('doscientos', 'doscientas'))
+  if (base.includes('trescientos')) variants.add(base.replace('trescientos', 'trescientas'))
+  if (base.includes('cuatrocientos')) variants.add(base.replace('cuatrocientos', 'cuatrocientas'))
+  if (base.includes('quinientos')) variants.add(base.replace('quinientos', 'quinientas'))
+  if (base.includes('seiscientos')) variants.add(base.replace('seiscientos', 'seiscientas'))
+  if (base.includes('setecientos')) variants.add(base.replace('setecientos', 'setecientas'))
+  if (base.includes('ochocientos')) variants.add(base.replace('ochocientos', 'ochocientas'))
+  if (base.includes('novecientos')) variants.add(base.replace('novecientos', 'novecientas'))
+  const accented: Record<string, string> = {
+    dieciseis: 'dieciséis',
+    veintidos: 'veintidós',
+    veintitres: 'veintitrés',
+    veintiseis: 'veintiséis',
+  }
+  for (const [plain, acc] of Object.entries(accented)) {
+    if (base.includes(plain)) variants.add(base.replace(plain, acc))
+  }
+  return Array.from(variants)
 }
 
 const UNIT_ALIASES: Record<string, string[]> = {
@@ -139,6 +215,9 @@ const UNIT_ALIASES: Record<string, string[]> = {
   m2: ['m2', 'm²', 'metros cuadrados', 'metro cuadrado'],
   und: ['und', 'unidad', 'unidades', 'u', 'pieza', 'piezas', 'pza', 'pzas'],
   caja: ['caja', 'cajas'],
+  bs: ['bs', 'boliviano', 'bolivianos', 'bob'],
+  usd: ['usd', 'dolar', 'dolares', 'dólar', 'dólares', '$'],
+  '%': ['%', 'por ciento', 'porciento'],
 }
 
 function numberVariants(raw: string): string[] {
@@ -162,9 +241,8 @@ function numberVariants(raw: string): string[] {
       variants.add(metersTwo.replace('.', ','))
       variants.add(cm)
     }
-    const words = NUMBER_WORDS[String(num)]
-    if (words) {
-      for (const word of words) variants.add(word)
+    if (Number.isInteger(num)) {
+      for (const word of spanishNumberToWords(num)) variants.add(word)
     }
   }
   return Array.from(variants).filter(Boolean)
@@ -183,20 +261,38 @@ function unitVariants(rawUnit: string): string[] {
 function humanizeFieldLabel(label?: string): string {
   const key = (label ?? '').trim()
   if (!key) return 'Dato extraído'
+  if (key.toLowerCase().startsWith('especificaciones.')) {
+    return `Característica: ${key.slice('especificaciones.'.length).replace(/_/g, ' ')}`
+  }
   const map: Record<string, string> = {
     NOMBRE: 'Nombre comercial',
+    SKU: 'Código SKU',
+    MODELO: 'Modelo',
+    MARCA: 'Marca',
+    CATEGORIA: 'Categoría',
+    FAMILIA: 'Familia',
     CANTIDAD: 'Cantidad',
+    UNIDAD_STOCK: 'Unidad comercial',
     PRECIO_UNITARIO: 'Precio unitario',
+    PRECIO_LISTA: 'Precio normal de venta',
     DESCUENTO: 'Descuento',
     ANCHO: 'Dimensión: ancho',
+    ANCHO_MM: 'Dimensión: ancho (mm)',
     ALTO: 'Dimensión: alto',
     LARGO: 'Dimensión: largo',
+    LARGO_MM: 'Dimensión: largo (mm)',
     PROFUNDIDAD: 'Dimensión: profundidad',
     DIAMETRO: 'Dimensión: diámetro',
     ESPESOR: 'Espesor',
+    ESPESOR_MM: 'Espesor (mm)',
+    M2_POR_CAJA: 'm² por caja',
     MATERIAL: 'Material',
     COLOR: 'Color',
+    COLOR_PRIMARIO: 'Color primario',
+    COLOR_SECUNDARIO: 'Color secundario',
     ACABADO: 'Acabado',
+    DISENO: 'Diseño',
+    TIPO: 'Tipo',
     COMPONENTE: 'Componente',
     CANTIDAD_INTERNA: 'Cantidad de componente',
     ACCESORIO: 'Accesorio',
@@ -554,4 +650,72 @@ export function buildFurnitureTranscriptEvidence(
       ...(r.candidateId ? { candidateId: r.candidateId } : {}),
       ...(r.resolved ? { resolved: true } : {}),
     }))
+}
+
+export function buildCatalogTranscriptEvidence(
+  transcript: string,
+  evidence: VoiceEvidence[] = [],
+  humanReviews: HumanReviewStatus[] = [],
+  fieldNameMap: Record<string, string> = {},
+): VoiceEvidence[] {
+  const cleanText = transcript.trim()
+  if (!cleanText) return []
+  const chars = Array.from(transcript)
+  const reviewByField = new Map(humanReviews.map((r) => [r.field, r]))
+  const ranges: VoiceEvidence[] = []
+
+  const overlaps = (start: number, end: number) =>
+    ranges.some((r) => Math.max(r.start, start) < Math.min(r.end, end))
+
+  for (const item of evidence) {
+    if (!item || typeof item !== 'object') continue
+    const rawDecision =
+      item.decision === 'UNRESOLVED' || item.decision === 'REJECTED' ? item.decision : 'ACCEPTED'
+    // Never mark unused context words as errors when no real conflict reason exists.
+    if (rawDecision === 'REJECTED' && !item.reason) continue
+    if (
+      !Number.isInteger(item.start) ||
+      !Number.isInteger(item.end) ||
+      item.start < 0 ||
+      item.end <= item.start ||
+      item.end > chars.length
+    ) {
+      continue
+    }
+    if (item.text && chars.slice(item.start, item.end).join('') !== item.text) continue
+    if (overlaps(item.start, item.end)) continue
+
+    const rawLabel = item.label ?? ''
+    const mappedField = fieldNameMap[rawLabel] ?? rawLabel
+    const review = reviewByField.get(mappedField) ?? reviewByField.get(rawLabel)
+    if (review?.state === 'discarded') continue
+
+    const isResolved = review?.state === 'reviewed' || review?.state === 'edited'
+    const decision: VoiceEvidence['decision'] = isResolved ? 'ACCEPTED' : rawDecision
+    const baseCategory = categorizeEvidenceLabel(rawLabel, rawDecision)
+    const category: EvidenceCategory =
+      isResolved && baseCategory === 'conflict'
+        ? categorizeEvidenceLabel(rawLabel, 'ACCEPTED')
+        : baseCategory
+    const reason = isResolved
+      ? review.state === 'edited'
+        ? 'Corregido en revisión humana'
+        : 'Validado en revisión humana'
+      : (item.reason ?? null)
+
+    ranges.push({
+      start: item.start,
+      end: item.end,
+      text: chars.slice(item.start, item.end).join(''),
+      decision,
+      category,
+      fieldLabel: humanizeFieldLabel(rawLabel),
+      label: rawLabel || humanizeFieldLabel(rawLabel),
+      reason,
+      ...(item.candidateId ? { candidateId: item.candidateId } : {}),
+      ...(isResolved ? { resolved: true } : {}),
+    })
+  }
+
+  return ranges.sort((a, b) => a.start - b.start)
 }

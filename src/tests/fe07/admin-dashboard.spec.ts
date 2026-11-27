@@ -282,7 +282,7 @@ describe('Fase 2 AdminDashboard y formateadores analíticos', () => {
     const initialInventarioCalls = inventarioCalls
 
     await wrapper.get('button[role="tab"]:nth-of-type(5)').trigger('click')
-    const select = wrapper.get('select[aria-label="Filtrar categoría de inventario"]')
+    const select = wrapper.get('select[aria-label="Filtrar categoría de existencias"]')
     await select.setValue('SILLA')
 
     await vi.waitFor(() => {

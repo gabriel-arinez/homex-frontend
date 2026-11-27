@@ -14,6 +14,7 @@ import {
   RotateCcw,
   Truck,
 } from '@lucide/vue'
+import ExportExcelModal from '@/shared/download/ExportExcelModal.vue'
 import { exportTrayExcel } from '@/shared/download/exportExcel'
 import type { Pedido, ProformaListado, ValorCatalogoPublico } from '@/generated/api'
 import { proformasService } from '@/modules/proformas/services/proformasService'
@@ -48,31 +49,39 @@ const proformasById = ref<Record<number, ProformaListado>>({})
 const loading = ref(true)
 const error = ref('')
 const exportingExcel = ref(false)
-async function exportExcel() {
-  if (exportingExcel.value || dateError.value) return
+const exportModalOpen = ref(false)
+const exportModalError = ref('')
+const exportSelectedState = computed(() =>
+  states.value.find((x) => String(x.id) === stateFilter.value || x.codigo === stateFilter.value),
+)
+const exportStateLabel = computed(() => exportSelectedState.value?.nombre || stateFilter.value)
+const exportActiveFilters = computed(() => [
+  { label: 'Estado', value: exportStateLabel.value },
+  { label: 'Búsqueda', value: search.value.trim() },
+])
+function openExportModal() {
+  exportModalError.value = ''
+  exportModalOpen.value = true
+}
+async function exportExcel(range: { fechaDesde: string; fechaHasta: string }) {
+  if (exportingExcel.value) return
   exportingExcel.value = true
+  exportModalError.value = ''
   try {
-    const selectedState = states.value.find(
-      (x) => String(x.id) === stateFilter.value || x.codigo === stateFilter.value,
-    )
     await exportTrayExcel({
       endpoint: '/api/v1/pedidos/exportar-excel/',
       query: {
         search: search.value.trim() || undefined,
-        estado: selectedState?.codigo || stateFilter.value || undefined,
-        fecha_desde: dateFrom.value || undefined,
-        fecha_hasta: dateTo.value || undefined,
+        estado: exportSelectedState.value?.codigo || stateFilter.value || undefined,
       },
+      fechaDesde: range.fechaDesde,
+      fechaHasta: range.fechaHasta,
       prefix: 'pedidos',
-      filenameSegments: [
-        selectedState?.nombre || stateFilter.value,
-        search.value.trim(),
-        dateFrom.value,
-        dateTo.value,
-      ],
+      filenameSegments: [exportStateLabel.value, search.value.trim()],
     })
+    exportModalOpen.value = false
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'No pudimos exportar el Excel.'
+    exportModalError.value = err instanceof Error ? err.message : 'No pudimos exportar el Excel.'
   } finally {
     exportingExcel.value = false
   }
@@ -249,9 +258,8 @@ onMounted(load)
         <Button
           variant="secondary"
           :processing="exportingExcel"
-          :disabled="exportingExcel || Boolean(dateError)"
-          :title="dateError || undefined"
-          @click="exportExcel"
+          :disabled="exportingExcel"
+          @click="openExportModal"
         >
           <FileSpreadsheet :size="16" aria-hidden="true" />
           {{ exportingExcel ? 'Exportando…' : 'Exportar Excel' }}
@@ -426,6 +434,19 @@ onMounted(load)
         </div>
       </nav>
     </template>
+    <ExportExcelModal
+      :open="exportModalOpen"
+      title="Exportar pedidos a Excel"
+      prefix="pedidos"
+      :initial-from="dateFrom"
+      :initial-to="dateTo"
+      :active-filters="exportActiveFilters"
+      :filename-segments="[exportStateLabel, search.trim()]"
+      :busy="exportingExcel"
+      :error-message="exportModalError"
+      @close="exportModalOpen = false"
+      @confirm="exportExcel"
+    />
   </div>
 </template>
 

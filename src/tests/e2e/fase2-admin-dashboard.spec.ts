@@ -322,7 +322,7 @@ test('@a11y Fase 2 AdminDashboard cumple accesibilidad, renderiza gráficos real
   await page.getByRole('tab', { name: /Operaciones/i }).click()
   await expect(page.getByText('Producción, taller y entregas')).toBeVisible()
 
-  await page.getByRole('tab', { name: /Inventario/i }).click()
+  await page.getByRole('tab', { name: /Existencias/i }).click()
   await assertAllVisibleChartsRendered(page, 2)
   await expect(page.getByText('Silla Ejecutiva').first()).toBeVisible()
 

@@ -23,6 +23,7 @@ import ProformaActionsMenu from '../components/ProformaActionsMenu.vue'
 import DocumentViewerModal from '../components/DocumentViewerModal.vue'
 import { useProformaPdf } from '../composables/useProformaPdf'
 import { downloadBlob } from '@/shared/download/downloadBlob'
+import ExportExcelModal from '@/shared/download/ExportExcelModal.vue'
 import { exportTrayExcel } from '@/shared/download/exportExcel'
 import { buildExportFilename } from '@/shared/download/exportFilename'
 import Badge from '@/shared/ui/Badge.vue'
@@ -73,34 +74,44 @@ const states = ref<ValorCatalogoPublico[]>([])
 const loading = ref(true)
 const error = ref('')
 const exportingExcel = ref(false)
-async function exportExcel() {
-  if (exportingExcel.value || dateError.value) return
+const exportModalOpen = ref(false)
+const exportModalError = ref('')
+const exportStateLabel = computed(
+  () => states.value.find((s) => s.codigo === state.value)?.nombre || state.value,
+)
+const exportClientLabel = computed(
+  () => customerName.value.trim() || (customer.value ? `cliente-${customer.value}` : ''),
+)
+const exportActiveFilters = computed(() => [
+  { label: 'Estado', value: exportStateLabel.value },
+  { label: 'Cliente', value: exportClientLabel.value },
+  { label: 'Búsqueda', value: search.value.trim() },
+])
+function openExportModal() {
+  exportModalError.value = ''
+  exportModalOpen.value = true
+}
+async function exportExcel(range: { fechaDesde: string; fechaHasta: string }) {
+  if (exportingExcel.value) return
   exportingExcel.value = true
+  exportModalError.value = ''
   try {
-    const stateLabel = states.value.find((s) => s.codigo === state.value)?.nombre || state.value
-    const clientLabel =
-      customerName.value.trim() || (customer.value ? `cliente-${customer.value}` : '')
     await exportTrayExcel({
       endpoint: '/api/v1/proformas/exportar-excel/',
       query: {
         search: search.value.trim() || undefined,
         estado: state.value || undefined,
         cliente: customer.value || undefined,
-        fecha_desde: dateFrom.value || undefined,
-        fecha_hasta: dateTo.value || undefined,
         ordering: '-ultima_actividad_comercial',
       },
+      fechaDesde: range.fechaDesde,
+      fechaHasta: range.fechaHasta,
       prefix: 'proformas',
-      filenameSegments: [
-        stateLabel,
-        clientLabel,
-        search.value.trim(),
-        dateFrom.value,
-        dateTo.value,
-      ],
+      filenameSegments: [exportStateLabel.value, exportClientLabel.value, search.value.trim()],
     })
+    exportModalOpen.value = false
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'No pudimos exportar el Excel.'
+    exportModalError.value = err instanceof Error ? err.message : 'No pudimos exportar el Excel.'
   } finally {
     exportingExcel.value = false
   }
@@ -367,8 +378,8 @@ onBeforeUnmount(() => {
         <Button
           variant="secondary"
           :processing="exportingExcel"
-          :disabled="exportingExcel || Boolean(dateError)"
-          @click="exportExcel"
+          :disabled="exportingExcel"
+          @click="openExportModal"
         >
           <FileSpreadsheet :size="16" aria-hidden="true" />
           {{ exportingExcel ? 'Exportando…' : 'Exportar Excel' }}
@@ -588,6 +599,19 @@ onBeforeUnmount(() => {
       @close="previewModalOpen = false"
       @retry="loadDocument(previewQuote.id)"
       @download="downloadDocumentPdf"
+    />
+    <ExportExcelModal
+      :open="exportModalOpen"
+      title="Exportar proformas a Excel"
+      prefix="proformas"
+      :initial-from="dateFrom"
+      :initial-to="dateTo"
+      :active-filters="exportActiveFilters"
+      :filename-segments="[exportStateLabel, exportClientLabel, search.trim()]"
+      :busy="exportingExcel"
+      :error-message="exportModalError"
+      @close="exportModalOpen = false"
+      @confirm="exportExcel"
     />
   </div>
 </template>

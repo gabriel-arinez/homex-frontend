@@ -6,7 +6,11 @@ import {
   type VoiceFieldReview,
   type FieldVoiceReview,
 } from '@/modules/capturas/fieldVoiceReview'
-import type { VoiceEvidence } from '@/modules/capturas/voiceEvidence'
+import {
+  buildCatalogTranscriptEvidence,
+  type VoiceEvidence,
+} from '@/modules/capturas/voiceEvidence'
+import TranscriptEvidence from '@/modules/capturas/components/TranscriptEvidence.vue'
 import { dateRangeError } from '@/shared/validation/dateRange'
 import { diffFormFields, type FormFieldChange } from '@/shared/forms/useFormChanges'
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
@@ -75,6 +79,8 @@ const recordingElapsed = ref(0)
 const voiceObservations = ref<FieldVoiceReview[]>([])
 const VOICE_REVIEW_REQUIRED = 'Revisa los campos señalados antes de guardar el producto.'
 const voiceWarnings = ref<string[]>([])
+const voiceTranscriptText = ref('')
+const voiceRawEvidence = ref<VoiceEvidence[]>([])
 const voiceCaptureId = ref<number>()
 const voiceFieldReviews = ref<VoiceFieldReview[]>([])
 let voiceAuditHistory: unknown = (
@@ -139,6 +145,14 @@ function clearResolvedVoiceError() {
     error.value = ''
 }
 const voiceReview = computed(() => ({ fields: voiceFields.value, resolve: resolveVoiceField }))
+const voiceTranscriptEvidence = computed(() =>
+  buildCatalogTranscriptEvidence(
+    voiceTranscriptText.value,
+    voiceRawEvidence.value,
+    voiceFields.value.map((f) => ({ field: f.field, state: f.state, reason: f.reason })),
+    catalogFieldNames,
+  ),
+)
 
 function updateRecording(active: boolean, paused: boolean, elapsed: number) {
   recordingActive.value = active
@@ -415,6 +429,8 @@ function onVoiceApplied(payload: {
     delete fields.observaciones
   }
   payload = { ...payload, fields }
+  voiceTranscriptText.value = payload.text?.trim() ?? ''
+  voiceRawEvidence.value = Array.isArray(payload.evidence) ? [...payload.evidence] : []
   voiceCaptureId.value = payload.capture_id
   voiceFieldReviews.value = [
     ...(payload.field_reviews ?? []),
@@ -450,7 +466,9 @@ function onVoiceApplied(payload: {
         ? Object.keys(payload.fields.especificaciones).map((name) => `especificaciones.${name}`)
         : [key],
     ),
-    ...(payload.evidence ?? []).flatMap((e) => (e.label ? [e.label] : [])),
+    ...(payload.evidence ?? []).flatMap((e) =>
+      e.label && e.decision !== 'REJECTED' ? [e.label] : [],
+    ),
   ])
   voiceObservations.value = Array.from(names).map((field) => {
     const pending = (payload.evidence ?? []).find(
@@ -1000,7 +1018,7 @@ onBeforeUnmount(() => {
                 name="modalidad_abastecimiento"
                 label="Modalidad de abastecimiento *"
                 :options="[
-                  { value: 'CON_STOCK', label: 'Con stock (control de inventario)' },
+                  { value: 'CON_STOCK', label: 'Con stock (control de existencias)' },
                   { value: 'BAJO_PEDIDO', label: 'Bajo pedido (sin necesidad de existencias)' },
                 ]"
               />
@@ -1402,6 +1420,19 @@ onBeforeUnmount(() => {
           </p>
         </section>
 
+        <!-- Transcripción del dictado -->
+        <section
+          v-if="voiceTranscriptText"
+          class="catalog-section aside-card voice-transcript-card"
+          aria-label="Transcripción del dictado"
+        >
+          <header class="voice-transcript-card__header">
+            <FileText :size="16" aria-hidden="true" />
+            <h4>Transcripción del dictado</h4>
+          </header>
+          <TranscriptEvidence :text="voiceTranscriptText" :evidence="voiceTranscriptEvidence" />
+        </section>
+
         <!-- Disponibilidad y existencias -->
         <section class="catalog-section aside-card" aria-labelledby="status-title">
           <div class="aside-heading">
@@ -1425,7 +1456,7 @@ onBeforeUnmount(() => {
               <strong>Abastecimiento bajo pedido</strong>
               <p>
                 Este producto se cotiza y confirma sin requerir existencias físicas ni movimientos
-                de inventario.
+                de stock.
               </p>
             </template>
             <template v-else>
@@ -2148,6 +2179,21 @@ onBeforeUnmount(() => {
 
 .voice-transcription-card {
   border-color: var(--color-primary-soft, #e02e32);
+}
+
+.voice-transcript-card__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text);
+}
+
+.voice-transcript-card__header h4 {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 650;
+  color: var(--color-text);
+  letter-spacing: -0.01em;
 }
 
 .voice-badge-done {

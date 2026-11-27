@@ -1934,7 +1934,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
       "
       :description="
         transitionConfirm === 'approve'
-          ? 'Esta acción confirmará el pedido y aplicará los movimientos de inventario correspondientes. No se podrá deshacer desde la proforma.'
+          ? 'Esta acción confirmará el pedido y aplicará los movimientos de stock correspondientes. No se podrá deshacer desde la proforma.'
           : transitionConfirm === 'cancel'
             ? 'La proforma quedará anulada y no podrá editarse ni aprobarse.'
             : transitionConfirm === 'not-completed'

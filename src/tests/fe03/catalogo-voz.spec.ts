@@ -261,9 +261,9 @@ describe('Voz en creación de catálogo', () => {
     )
     expect((w.get('input[name="precio"]').element as HTMLInputElement).value).toBe('4500.00')
 
-    // La barra lateral muestra la transcripción conservada y sus avisos
-    expect(w.text()).not.toContain('Descripción original por voz')
-    expect(w.text()).not.toContain('Nombre Silla Ergonómica Pro precio 4500')
+    // La barra lateral muestra la transcripción del dictado y los campos completados por voz
+    expect(w.text()).toContain('Transcripción del dictado')
+    expect(w.text()).toContain('Nombre Silla Ergonómica Pro precio 4500')
     expect(w.text()).toContain('✓ Completado por voz')
     expect(w.emitted('save')).toBeUndefined()
     w.unmount()

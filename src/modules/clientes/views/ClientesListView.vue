@@ -12,6 +12,7 @@ import {
   RotateCcw,
   UserRound,
 } from '@lucide/vue'
+import ExportExcelModal from '@/shared/download/ExportExcelModal.vue'
 import { exportTrayExcel } from '@/shared/download/exportExcel'
 import type { Cliente, ValorCatalogoPublico } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
@@ -41,17 +42,31 @@ const loading = ref(true)
 const error = ref('')
 const toastMessage = ref('')
 const exportingExcel = ref(false)
-async function exportExcel() {
+const exportModalOpen = ref(false)
+const exportModalError = ref('')
+const exportStatusLabel = computed(() =>
+  status.value === 'activos' ? 'Activos' : status.value === 'inactivos' ? 'Inactivos' : '',
+)
+const exportTypeLabel = computed(() =>
+  type.value === 'todos'
+    ? ''
+    : types.value.find((t) => String(t.id) === type.value || t.codigo === type.value)?.nombre ||
+      type.value,
+)
+const exportActiveFilters = computed(() => [
+  { label: 'Estado', value: exportStatusLabel.value },
+  { label: 'Tipo', value: exportTypeLabel.value },
+  { label: 'Búsqueda', value: search.value.trim() },
+])
+function openExportModal() {
+  exportModalError.value = ''
+  exportModalOpen.value = true
+}
+async function exportExcel(range: { fechaDesde: string; fechaHasta: string }) {
   if (exportingExcel.value) return
   exportingExcel.value = true
+  exportModalError.value = ''
   try {
-    const statusLabel =
-      status.value === 'activos' ? 'Activos' : status.value === 'inactivos' ? 'Inactivos' : ''
-    const typeLabel =
-      type.value === 'todos'
-        ? ''
-        : types.value.find((t) => String(t.id) === type.value || t.codigo === type.value)?.nombre ||
-          type.value
     await exportTrayExcel({
       endpoint: '/api/v1/clientes/exportar-excel/',
       query: {
@@ -59,11 +74,14 @@ async function exportExcel() {
         activo: status.value === 'todos' ? undefined : status.value === 'activos',
         tipo_cliente: type.value === 'todos' ? undefined : type.value,
       },
+      fechaDesde: range.fechaDesde,
+      fechaHasta: range.fechaHasta,
       prefix: 'clientes',
-      filenameSegments: [statusLabel, typeLabel, search.value.trim()],
+      filenameSegments: [exportStatusLabel.value, exportTypeLabel.value, search.value.trim()],
     })
+    exportModalOpen.value = false
   } catch (err) {
-    toastMessage.value = err instanceof Error ? err.message : 'No pudimos exportar el Excel.'
+    exportModalError.value = err instanceof Error ? err.message : 'No pudimos exportar el Excel.'
   } finally {
     exportingExcel.value = false
   }
@@ -263,7 +281,7 @@ onBeforeUnmount(() => {
           variant="secondary"
           :processing="exportingExcel"
           :disabled="exportingExcel"
-          @click="exportExcel"
+          @click="openExportModal"
         >
           <FileSpreadsheet :size="16" aria-hidden="true" />
           {{ exportingExcel ? 'Exportando…' : 'Exportar Excel' }}
@@ -449,6 +467,17 @@ onBeforeUnmount(() => {
       :confirm-label="clientToToggle?.activo === false ? 'Reactivar cliente' : 'Desactivar cliente'"
       @close="clientToToggle = null"
       @confirm="confirmToggleStatus"
+    />
+    <ExportExcelModal
+      :open="exportModalOpen"
+      title="Exportar clientes a Excel"
+      prefix="clientes"
+      :active-filters="exportActiveFilters"
+      :filename-segments="[exportStatusLabel, exportTypeLabel, search.trim()]"
+      :busy="exportingExcel"
+      :error-message="exportModalError"
+      @close="exportModalOpen = false"
+      @confirm="exportExcel"
     />
   </div>
 </template>

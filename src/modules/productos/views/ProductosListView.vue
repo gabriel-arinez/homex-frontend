@@ -21,6 +21,7 @@ import {
   RotateCcw,
   Tag,
 } from '@lucide/vue'
+import ExportExcelModal from '@/shared/download/ExportExcelModal.vue'
 import { exportTrayExcel } from '@/shared/download/exportExcel'
 import type { FamiliaProducto, Producto, ValorCatalogoPublico } from '@/generated/api'
 import { useSessionStore } from '@/app/stores/useSessionStore'
@@ -78,9 +79,55 @@ const notice = ref('')
 const toastMessage = ref('')
 const toastTone = ref<'success' | 'danger'>('success')
 const exportingExcel = ref(false)
-async function exportExcel() {
+const exportModalOpen = ref(false)
+const exportModalError = ref('')
+const stockLabels: Record<string, string> = {
+  BAJO_PEDIDO: 'Bajo pedido',
+  SIN_EXISTENCIAS: 'Sin existencias',
+  STOCK_BAJO: 'Stock bajo',
+  NORMAL: 'Normal',
+  SIN_MINIMO: 'Sin mínimo',
+}
+const exportStatusLabel = computed(() =>
+  status.value === 'activos' ? 'Activos' : status.value === 'inactivos' ? 'Inactivos' : '',
+)
+const exportStockLabel = computed(() =>
+  stockStatus.value ? stockLabels[stockStatus.value] || stockStatus.value : '',
+)
+const exportCategoryLabel = computed(
+  () => categories.value.find((c) => String(c.id) === category.value)?.nombre || category.value,
+)
+const exportFamilyLabel = computed(
+  () => families.value.find((f) => String(f.id) === extras.familia)?.nombre || extras.familia,
+)
+const exportExtraSegments = computed(() =>
+  availableExtra.value
+    .filter((key) => key !== 'familia' && Boolean(extras[key]))
+    .map((key) => (key === 'espesor_mm' ? `${extras[key]}mm` : extras[key])),
+)
+const exportFilenameSegments = computed(() => [
+  exportStatusLabel.value,
+  exportStockLabel.value,
+  exportCategoryLabel.value,
+  exportFamilyLabel.value,
+  ...exportExtraSegments.value,
+  search.value.trim(),
+])
+const exportActiveFilters = computed(() => [
+  { label: 'Estado', value: exportStatusLabel.value },
+  { label: 'Disponibilidad', value: exportStockLabel.value },
+  { label: 'Categoría', value: exportCategoryLabel.value },
+  { label: 'Familia', value: exportFamilyLabel.value },
+  { label: 'Búsqueda', value: search.value.trim() },
+])
+function openExportModal() {
+  exportModalError.value = ''
+  exportModalOpen.value = true
+}
+async function exportExcel(range: { fechaDesde: string; fechaHasta: string }) {
   if (exportingExcel.value) return
   exportingExcel.value = true
+  exportModalError.value = ''
   try {
     const query: Record<string, string | number | boolean | undefined> = {
       search: search.value.trim() || undefined,
@@ -92,38 +139,17 @@ async function exportExcel() {
       const value = extras[key]
       if (value) query[key] = value
     }
-    const statusLabel =
-      status.value === 'activos' ? 'Activos' : status.value === 'inactivos' ? 'Inactivos' : ''
-    const stockLabels: Record<string, string> = {
-      BAJO_PEDIDO: 'Bajo pedido',
-      SIN_EXISTENCIAS: 'Sin existencias',
-      STOCK_BAJO: 'Stock bajo',
-      NORMAL: 'Normal',
-      SIN_MINIMO: 'Sin mínimo',
-    }
-    const categoryLabel =
-      categories.value.find((c) => String(c.id) === category.value)?.nombre || category.value
-    const familyLabel =
-      families.value.find((f) => String(f.id) === extras.familia)?.nombre || extras.familia
-    const extraSegments = availableExtra.value
-      .filter((key) => key !== 'familia' && Boolean(extras[key]))
-      .map((key) => (key === 'espesor_mm' ? `${extras[key]}mm` : extras[key]))
     await exportTrayExcel({
       endpoint: '/api/v1/catalogo/productos/exportar-excel/',
       query,
+      fechaDesde: range.fechaDesde,
+      fechaHasta: range.fechaHasta,
       prefix: 'productos',
-      filenameSegments: [
-        statusLabel,
-        stockStatus.value ? stockLabels[stockStatus.value] || stockStatus.value : '',
-        categoryLabel,
-        familyLabel,
-        ...extraSegments,
-        search.value.trim(),
-      ],
+      filenameSegments: exportFilenameSegments.value,
     })
+    exportModalOpen.value = false
   } catch (err) {
-    toastTone.value = 'danger'
-    toastMessage.value = err instanceof Error ? err.message : 'No pudimos exportar el Excel.'
+    exportModalError.value = err instanceof Error ? err.message : 'No pudimos exportar el Excel.'
   } finally {
     exportingExcel.value = false
   }
@@ -563,7 +589,7 @@ onBeforeUnmount(() => {
           variant="secondary"
           :processing="exportingExcel"
           :disabled="exportingExcel"
-          @click="exportExcel"
+          @click="openExportModal"
         >
           <FileSpreadsheet :size="16" aria-hidden="true" />
           {{ exportingExcel ? 'Exportando…' : 'Exportar Excel' }}
@@ -1059,6 +1085,17 @@ onBeforeUnmount(() => {
       :confirm-label="toggleTarget?.activo === false ? 'Activar' : 'Desactivar'"
       @close="toggleTarget = null"
       @confirm="confirmToggleProductStatus"
+    />
+    <ExportExcelModal
+      :open="exportModalOpen"
+      title="Exportar productos a Excel"
+      prefix="productos"
+      :active-filters="exportActiveFilters"
+      :filename-segments="exportFilenameSegments"
+      :busy="exportingExcel"
+      :error-message="exportModalError"
+      @close="exportModalOpen = false"
+      @confirm="exportExcel"
     />
   </div>
 </template>

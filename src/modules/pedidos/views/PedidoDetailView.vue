@@ -384,7 +384,7 @@ const alternativeTransitions = computed(() => {
 })
 
 const cancelledMessage =
-  'Este pedido fue cancelado y las existencias descontadas fueron restituidas al inventario mediante reversa.'
+  'Este pedido fue cancelado y las existencias descontadas fueron restituidas a existencias mediante reversa.'
 
 function stepLabel(step: (typeof allWorkflowSteps)[number]) {
   const fromCatalog = states.value.find((s) => s.codigo === step.codigo)?.nombre
@@ -527,7 +527,7 @@ async function confirmTransition() {
 const cancel = () =>
   action(
     () => pedidosService.cancel(pedidoId.value),
-    'Pedido cancelado y stock devuelto al inventario.',
+    'Pedido cancelado y stock devuelto a existencias.',
   ).finally(() => (cancelOpen.value = false))
 
 async function receipt() {
@@ -1205,7 +1205,7 @@ watch(() => route.params.id, load)
     <ConfirmDialog
       :open="cancelOpen"
       title="Cancelar pedido"
-      description="Si el pedido ya tiene recibos emitidos, no podrá cancelarse. Al confirmar, las existencias descontadas al confirmar el pedido se restituirán al inventario mediante reversa."
+      description="Si el pedido ya tiene recibos emitidos, no podrá cancelarse. Al confirmar, las existencias descontadas al confirmar el pedido se restituirán a existencias mediante reversa."
       confirm-label="Cancelar pedido"
       danger
       @close="cancelOpen = false"

@@ -204,7 +204,9 @@ test('FE07 presenta dashboard analítico para administrador sin alterar tienda/t
   await mock(page, { capabilities: ['comercial.operar', 'comercial.administrar'] })
   await page.goto('/resumen')
   await expect(page.getByRole('heading', { name: 'Resumen general' })).toBeVisible()
-  await expect(page.getByText('Supervisión administrativa global de María HOMEX.')).toBeVisible()
+  await expect(
+    page.getByText('Indicadores comerciales, financieros, operativos y de existencias.'),
+  ).toBeVisible()
 })
 test('FE07 presenta visión operativa de taller para JEFE_TALLER', async ({ page }) => {
   await mock(page, { capabilities: ['taller.operar'] })

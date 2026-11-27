@@ -1,6 +1,10 @@
 export function localToday(now = new Date()): string {
-  const pad = (value: number) => String(value).padStart(2, '0')
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/La_Paz',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now)
 }
 
 export function isValidDate(value: string): boolean {

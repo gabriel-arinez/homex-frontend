@@ -57,7 +57,7 @@ const isMonetaryMetric = computed(
 
 const metricLabels: Record<SellerMetricKey, string> = {
   proformas_formalizadas: 'Proformas formalizadas',
-  pedidos_generados: 'Pedidos derivados de cohorte',
+  pedidos_generados: 'Pedidos generados',
   conversion_comercial: 'Conversión comercial (%)',
   importe_pedidos_no_cancelados: 'Importe de pedidos vigentes',
   cobros_validos: 'Cobros acumulados',
@@ -157,7 +157,7 @@ function chartValueFormatter(val: number): string {
               <th scope="col">Formalizadas</th>
               <th scope="col">Pedidos</th>
               <th scope="col">Conversión</th>
-              <th scope="col">Importe vigente</th>
+              <th scope="col">Importe de pedidos no cancelados</th>
               <th scope="col">Cobros acumulados</th>
               <th scope="col">Saldo pendiente</th>
             </tr>

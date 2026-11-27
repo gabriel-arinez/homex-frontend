@@ -26,7 +26,6 @@ import type {
   ProductoDisponibilidad,
   ValorCatalogoPublico,
 } from '@/generated/api'
-import { useSessionStore } from '@/app/stores/useSessionStore'
 import ProductImage from '@/modules/productos/components/ProductImage.vue'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import Badge from '@/shared/ui/Badge.vue'
@@ -58,7 +57,7 @@ import {
   formatTimeLaPaz,
   toNumber,
 } from '@/shared/analytics/formatters'
-import { dateRangeError } from '@/shared/validation/dateRange'
+import { dateRangeError, localToday } from '@/shared/validation/dateRange'
 import {
   tiendaDashboardService,
   type AgendaCategoriaCodigo,
@@ -118,7 +117,6 @@ const AGENDA_CATEGORIES: Array<{
 ]
 
 const emit = defineEmits<{ 'open-menu': [] }>()
-const session = useSessionStore()
 
 const activeTab = ref<TiendaTabId>('general')
 const fechaDesde = ref<string | null>(null)
@@ -157,9 +155,7 @@ let agendaSeq = 0
 let disponibilidadSeq = 0
 const agendaCatSeq: Partial<Record<AgendaCategoriaCodigo, number>> = {}
 
-const vendorName = computed(() => session.identity?.display_name ?? 'Encargado de tienda')
-
-const scopeDescription = computed(() => `Gestión comercial personal de ${vendorName.value}.`)
+const scopeDescription = 'Seguimiento comercial, proformas, pedidos y cobros.'
 
 const fechaReferencia = computed(
   () => resumen.value?.fecha_referencia ?? fechaReferenciaSeguimiento.value ?? null,
@@ -379,7 +375,13 @@ async function loadCatalogCategories() {
 }
 
 async function loadAll() {
-  if (dateRangeError(fechaDesde.value ?? '', fechaHasta.value ?? '')) {
+  if (
+    dateRangeError(
+      fechaDesde.value ?? '',
+      fechaHasta.value ?? '',
+      fechaReferencia.value || localToday(),
+    )
+  ) {
     return
   }
   await Promise.all([fetchResumen(), fetchAgenda(), fetchDisponibilidad()])
@@ -806,12 +808,12 @@ const tabs = computed<DetailTabItem[]>(() => [
           to="/pedidos"
         />
         <MetricKpiCard
-          label="Mi conversión por cohorte"
+          label="Proformas convertidas en pedidos"
           :icon="TrendingUp"
           :value="formatPercent(ind?.tasa_conversion_cohorte)"
           :scope-note="periodScopeLabel"
           :approximate="hasApproximateCohort"
-          :detail="`${formatInteger(ind?.pedidos_derivados_cohorte)} derivados de ${formatInteger(ind?.proformas_formalizadas)}`"
+          :detail="`${formatInteger(ind?.pedidos_derivados_cohorte)} pedidos de ${formatInteger(ind?.proformas_formalizadas)} proformas`"
         />
         <MetricKpiCard
           label="Importe de mis pedidos"
@@ -826,7 +828,7 @@ const tabs = computed<DetailTabItem[]>(() => [
           to="/pedidos"
         />
         <MetricKpiCard
-          label="Cobros acumulados (cartera)"
+          label="Total cobrado por esos pedidos"
           :icon="Banknote"
           :value="
             primaryFin
@@ -897,7 +899,7 @@ const tabs = computed<DetailTabItem[]>(() => [
 
           <DonutChartCard
             :title="`Resumen financiero (${donutCurrency})`"
-            description="Cobros acumulados frente a saldo pendiente de tu cartera vigente."
+            description="Total cobrado frente a saldo pendiente de tus pedidos no cancelados."
             :slices="donutSlices"
             :center-label="formatPercent(donutMonedaRow?.porcentaje_cobrado)"
             center-sublabel="Cobrado"
@@ -937,8 +939,8 @@ const tabs = computed<DetailTabItem[]>(() => [
           <div class="section-block__head">
             <h2>Mis proformas y conversión</h2>
             <p>
-              La distribución por estado refleja tu fotografía actual; la conversión evalúa la
-              cohorte del período.
+              La distribución por estado refleja el estado actual; la conversión evalúa las
+              proformas del período seleccionado.
             </p>
           </div>
           <RouterLink to="/proformas" class="shortcut-link">
@@ -996,7 +998,7 @@ const tabs = computed<DetailTabItem[]>(() => [
 
           <BarChartCard
             title="Formalizadas y pedidos derivados"
-            :description="`Serie ${granularidad} de proformas formalizadas y pedidos derivados.`"
+            :description="`Serie ${granularidad} de proformas formalizadas y pedidos generados a partir de esas proformas.`"
             :labels="evoConteoLabels"
             :series="evoConteoSeries"
             :loading="loadingResumen"

@@ -66,8 +66,8 @@ describe('Fase 5.1 correcciones transversales', () => {
       'Pedidos',
       'Órdenes de trabajo',
       'Notas de entrega',
-      'Clientes',
       'Recibos',
+      'Clientes',
     ])
   })
 
@@ -85,7 +85,7 @@ describe('Fase 5.1 correcciones transversales', () => {
     ],
     ['RecibosListView', RecibosListView, '/recibos?desde=2026-11-10&hasta=2026-11-01'],
   ])(
-    '%s deshabilita Exportar Excel y muestra motivo ante rango de fechas inválido',
+    '%s abre el modal de exportación y deshabilita confirmar ante rango de fechas inválido',
     async (_name, Comp, path) => {
       server.use(
         http.get('http://localhost:8000/api/v1/pedidos/', () => HttpResponse.json([])),
@@ -101,8 +101,12 @@ describe('Fase 5.1 correcciones transversales', () => {
         global: { plugins: [router], stubs: { Teleport: true } },
       })
       await flushPromises()
-      const exportBtn = w.findAll('button').find((b) => b.text().includes('Exportar Excel'))!
-      expect(exportBtn.attributes('disabled')).toBeDefined()
+      const openBtn = w.findAll('button').find((b) => b.text().includes('Exportar Excel'))!
+      await openBtn.trigger('click')
+      await flushPromises()
+      const confirmBtns = w.findAll('button').filter((b) => b.text().includes('Exportar Excel'))
+      const modalConfirmBtn = confirmBtns[confirmBtns.length - 1]!
+      expect(modalConfirmBtn.attributes('disabled')).toBeDefined()
       expect(w.text()).toContain('La fecha inicial no puede ser posterior a la fecha final.')
     },
   )

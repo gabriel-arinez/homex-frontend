@@ -67,7 +67,7 @@ const groups: Array<{
     ],
   },
   {
-    label: 'Comercial e inventario',
+    label: 'Comercial',
     items: [
       { label: 'Proformas', to: '/proformas', icon: FileText, capabilities: ['comercial.operar'] },
       {
@@ -105,8 +105,8 @@ const groups: Array<{
   {
     label: 'Cobros y directorio',
     items: [
-      { label: 'Clientes', to: '/clientes', icon: Users, capabilities: ['comercial.operar'] },
       { label: 'Recibos', to: '/recibos', icon: ReceiptText, capabilities: ['comercial.operar'] },
+      { label: 'Clientes', to: '/clientes', icon: Users, capabilities: ['comercial.operar'] },
     ],
   },
 ]

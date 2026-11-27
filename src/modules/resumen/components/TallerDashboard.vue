@@ -24,7 +24,6 @@ import type {
   ElementoColaPrioridadTaller,
   EventoCalendarioTaller,
 } from '@/generated/api'
-import { useSessionStore } from '@/app/stores/useSessionStore'
 import Badge from '@/shared/ui/Badge.vue'
 import Button from '@/shared/ui/Button.vue'
 import DetailTabs, { type DetailTabItem } from '@/shared/ui/DetailTabs.vue'
@@ -50,7 +49,7 @@ import {
   formatTimeLaPaz,
   toNumber,
 } from '@/shared/analytics/formatters'
-import { dateRangeError } from '@/shared/validation/dateRange'
+import { dateRangeError, localToday } from '@/shared/validation/dateRange'
 import { tallerDashboardService } from '../services/tallerDashboardService'
 
 type TallerTabId = 'general' | 'produccion' | 'planificacion'
@@ -127,7 +126,6 @@ const MONTH_NAMES = [
 ]
 
 const emit = defineEmits<{ 'open-menu': [] }>()
-const session = useSessionStore()
 
 const activeTab = ref<TallerTabId>('general')
 const vistaPlanificacion = ref<PlanificacionVista>('calendario')
@@ -138,7 +136,7 @@ const estadoFabricacion = ref<string>('')
 const tipoMueble = ref<string>('')
 
 // Estado separado de planificación / calendario (no altera los indicadores históricos)
-const calMonth = ref<string>('2026-11')
+const calMonth = ref<string>(localToday().slice(0, 7))
 const calMonthInitialized = ref(false)
 const selectedDay = ref<string | null>(null)
 const calEventos = ref<EventoCalendarioTaller[]>([])
@@ -171,10 +169,7 @@ let resumenSeq = 0
 let planifSeq = 0
 let calSeq = 0
 
-const actorName = computed(() => session.identity?.display_name ?? 'Jefe de taller')
-const scopeDescription = computed(
-  () => `Supervisión productiva y planificación de ${actorName.value}.`,
-)
+const scopeDescription = 'Seguimiento de fabricación, tiempos de producción y entregas.'
 const fechaReferencia = computed(
   () => resumen.value?.fecha_referencia ?? planificacion.value?.fecha_referencia ?? null,
 )
@@ -371,7 +366,13 @@ async function fetchCalendarMonth() {
 }
 
 async function loadAll() {
-  if (dateRangeError(fechaDesde.value ?? '', fechaHasta.value ?? '')) {
+  if (
+    dateRangeError(
+      fechaDesde.value ?? '',
+      fechaHasta.value ?? '',
+      fechaReferencia.value || localToday(),
+    )
+  ) {
     return
   }
   await Promise.all([fetchResumen(), fetchPlanificacion(true), fetchCalendarMonth()])
@@ -388,7 +389,7 @@ function goMonth(delta: number) {
 
 function goReferenceMonth() {
   const ref = fechaReferencia.value
-  calMonth.value = ref ? ref.slice(0, 7) : '2026-11'
+  calMonth.value = ref ? ref.slice(0, 7) : localToday().slice(0, 7)
   selectedDay.value = ref ?? `${calMonth.value}-01`
   void fetchCalendarMonth()
 }
@@ -618,10 +619,6 @@ const tabs = computed<DetailTabItem[]>(() => [
           <Button variant="secondary" :disabled="anyLoading" @click="loadAll">
             <RefreshCw :size="15" aria-hidden="true" />Actualizar
           </Button>
-          <Badge tone="neutral">
-            <Hammer :size="13" aria-hidden="true" />
-            Jefatura de taller
-          </Badge>
         </div>
       </template>
     </PageHeader>
@@ -715,12 +712,12 @@ const tabs = computed<DetailTabItem[]>(() => [
           label="Tiempo promedio fabricación"
           :icon="Hourglass"
           :value="avgDaysText"
-          :scope-note="`${ind?.ordenes_con_duracion_medible ?? 0} órdenes medibles`"
+          :scope-note="`${ind?.ordenes_con_duracion_medible ?? 0} órdenes con tiempos registrados`"
           :detail="
             ind?.tiempo_promedio_fabricacion_horas !== null &&
             ind?.tiempo_promedio_fabricacion_horas !== undefined
               ? `${ind.tiempo_promedio_fabricacion_horas.toFixed(1).replace('.', ',')} horas promedio`
-              : 'Sin duración medible'
+              : 'Sin tiempos registrados'
           "
         />
         <MetricKpiCard
@@ -797,12 +794,12 @@ const tabs = computed<DetailTabItem[]>(() => [
       <section class="section-block" aria-label="Tiempos operativos y muebles fabricados">
         <div class="kpi-grid kpi-grid--compact">
           <MetricKpiCard
-            label="Antigüedad promedio activas"
+            label="Tiempo transcurrido promedio (activas)"
             :value="avgActiveAgeText"
             :detail="`${formatInteger(ind?.ordenes_con_antiguedad_medible)} órdenes en proceso`"
           />
           <MetricKpiCard
-            label="Antigüedad máxima activas"
+            label="Tiempo transcurrido máximo (activas)"
             :value="
               ind?.antiguedad_maxima_activas_dias !== null &&
               ind?.antiguedad_maxima_activas_dias !== undefined
@@ -884,15 +881,15 @@ const tabs = computed<DetailTabItem[]>(() => [
 
           <div class="planif-filters">
             <label class="local-filter">
-              <span>Naturaleza</span>
+              <span>Clase de evento</span>
               <select
                 v-model="naturalezaEvento"
-                aria-label="Filtrar naturaleza de eventos"
+                aria-label="Filtrar clase de evento"
                 @change="onPlanificacionFilterChange"
               >
                 <option value="">Todos los eventos</option>
-                <option value="PLANIFICADA">Solo planificados</option>
-                <option value="EFECTIVA">Solo efectivos</option>
+                <option value="PLANIFICADA">Solo programados</option>
+                <option value="EFECTIVA">Solo actividades realizadas</option>
               </select>
             </label>
             <label class="local-filter">
@@ -1017,7 +1014,7 @@ const tabs = computed<DetailTabItem[]>(() => [
                     OT #{{ ev.numero_ot }}
                   </RouterLink>
                   <Badge :tone="eventPillTone(ev)">
-                    {{ ev.naturaleza === 'EFECTIVA' ? 'Efectiva' : 'Planificada' }}
+                    {{ ev.naturaleza === 'EFECTIVA' ? 'Actividad realizada' : 'Programada' }}
                   </Badge>
                 </div>
                 <strong>{{ EVENT_LABELS[ev.tipo_evento] ?? ev.tipo_evento }}</strong>
@@ -1040,7 +1037,7 @@ const tabs = computed<DetailTabItem[]>(() => [
           :error="errorPlanificacion && !planificacion ? errorPlanificacion : ''"
           :is-empty="!listadoEventos.length"
           empty-title="Sin eventos para este filtro"
-          empty-description="Ajusta el rango de planificación, naturaleza o tipo de evento."
+          empty-description="Ajusta el rango de planificación, clase o tipo de evento."
           @retry="fetchPlanificacion()"
         >
           <template #actions>
@@ -1074,8 +1071,8 @@ const tabs = computed<DetailTabItem[]>(() => [
             <span>
               Total conjunto: <strong>{{ listadoPagination?.total ?? 0 }}</strong> eventos
             </span>
-            <span>Planificados: {{ resumenNaturaleza.planificados }}</span>
-            <span>Efectivos: {{ resumenNaturaleza.efectivos }}</span>
+            <span>Programados: {{ resumenNaturaleza.planificados }}</span>
+            <span>Actividades realizadas: {{ resumenNaturaleza.efectivos }}</span>
           </div>
 
           <table class="compact-table">
@@ -1084,7 +1081,7 @@ const tabs = computed<DetailTabItem[]>(() => [
                 <th scope="col">Orden</th>
                 <th scope="col">Cliente</th>
                 <th scope="col">Evento</th>
-                <th scope="col">Naturaleza</th>
+                <th scope="col">Clase de evento</th>
                 <th scope="col">Fecha</th>
                 <th scope="col">Estado</th>
               </tr>
@@ -1103,7 +1100,7 @@ const tabs = computed<DetailTabItem[]>(() => [
                 <td>{{ EVENT_LABELS[ev.tipo_evento] ?? ev.tipo_evento }}</td>
                 <td>
                   <Badge :tone="ev.naturaleza === 'EFECTIVA' ? 'success' : 'info'">
-                    {{ ev.naturaleza === 'EFECTIVA' ? 'Efectiva' : 'Planificada' }}
+                    {{ ev.naturaleza === 'EFECTIVA' ? 'Actividad realizada' : 'Programada' }}
                   </Badge>
                 </td>
                 <td>{{ formatDateLaPaz(ev.fecha) }}</td>

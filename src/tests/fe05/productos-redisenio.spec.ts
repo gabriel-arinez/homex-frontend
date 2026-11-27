@@ -133,7 +133,7 @@ describe('Rediseño integral del apartado de Productos', () => {
       .find((b) => b.text().includes('Registrar entrada'))!
     await entryBtn.trigger('click')
     await flushPromises()
-    expect(wrapper.text()).toContain('Registrar movimiento de inventario')
+    expect(wrapper.text()).toContain('Registrar movimiento de stock')
     expect(wrapper.text()).toContain('21 piezas')
 
     wrapper.unmount()
@@ -262,6 +262,6 @@ describe('Rediseño integral del apartado de Productos', () => {
     const salidaBtn = wrapper.findAll('button').find((b) => b.text().includes('Salida stock'))!
     await salidaBtn.trigger('click')
     await flushPromises()
-    expect(wrapper.text()).toContain('Registrar movimiento de inventario')
+    expect(wrapper.text()).toContain('Registrar movimiento de stock')
   })
 })
