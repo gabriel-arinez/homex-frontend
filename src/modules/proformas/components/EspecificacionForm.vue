@@ -295,6 +295,10 @@ const pendientesVisibles = computed(() =>
         const valor = correction?.valor ?? p.resolucion?.valor
         return !uid || !componentes.some((c) => c.uid === uid && sameThickness(c.espesor, valor))
       }
+      if (p.resolucion?.tipo === 'OBSERVACIONES' || p.ruta === 'especificacion.observaciones') {
+        const obsState = voiceResolution('observaciones-especificacion')?.state
+        return obsState !== 'reviewed' && obsState !== 'edited'
+      }
       if (!pendienteResuelto(p, medidas, componentes, atributosGenerales)) return true
       if (p.codigo === 'CONFLICTING_VALUES') {
         const field = fieldForPending(p)
@@ -548,16 +552,41 @@ function fieldForPending(p: PendienteAsistida): string | null {
     return p.resolucion?.valor
       ? `espesor-destino-${'indice' in p ? p.indice : 0}`
       : 'nuevo-componente'
-  if (p.codigo === 'TIPO_NO_RESUELTO') return 'tipo-mueble'
+  if (p.resolucion?.tipo === 'OBSERVACIONES' || p.ruta === 'especificacion.observaciones')
+    return 'observaciones-especificacion'
+  if (p.codigo === 'TIPO_NO_RESUELTO') return props.studio ? 'tipo-mueble-buscador' : 'tipo-mueble'
   if (p.codigo === 'NO_QUANTITY') return 'mueble-cantidad'
   if (['TOTAL_NEGOCIADO', 'INVALID_PRICE', 'PRECIO_AMBIGUO'].includes(p.codigo))
     return 'mueble-precio'
+  if (p.ruta === '/item_proposal/name') return 'mueble-nombre-comercial'
+  if (p.ruta === '/item_proposal/price') return 'mueble-precio'
   return null
+}
+function etiquetaAccionPendiente(p: PendienteAsistida): string {
+  const r = p.resolucion
+  if (p.codigo === 'TIPO_NO_RESUELTO') return 'Revisar tipo de mueble'
+  if (p.codigo === 'NO_QUANTITY') return 'Revisar cantidad'
+  if (['TOTAL_NEGOCIADO', 'INVALID_PRICE', 'PRECIO_AMBIGUO'].includes(p.codigo))
+    return 'Revisar precio'
+  if (p.codigo === 'ESPESOR_SIN_COMPONENTE') return 'Revisar espesor'
+  if (p.codigo === 'SELECCION_COLOR' || p.codigo === 'COLOR_NO_RESUELTO') return 'Seleccionar color'
+  if (r?.tipo === 'DIMENSION' && r.clave)
+    return `Revisar ${etiquetaMedidaVisual(r.clave).toLowerCase()}`
+  if (r?.tipo === 'DIMENSIONES_NUEVAS') return 'Revisar medidas'
+  if (r?.tipo === 'COMPONENTE') {
+    if (r.campo === 'cantidad_interna') return 'Revisar cantidad'
+    if (r.campo === 'dimensiones') return 'Revisar medidas'
+    return `Revisar ${r.campo ?? 'componente'}`
+  }
+  if (r?.tipo === 'ATRIBUTO_GENERAL' && r.clave) return `Revisar ${r.clave}`
+  if (r?.tipo === 'OBSERVACIONES' || p.ruta === 'especificacion.observaciones')
+    return 'Revisar observaciones'
+  return 'Revisar dato'
 }
 const criticalPending = computed(() =>
   pendientesVisibles.value.filter(
     (p) =>
-      Boolean(p.resolucion) ||
+      (Boolean(p.resolucion) && p.resolucion?.tipo !== 'OBSERVACIONES') ||
       [
         'CONFLICTING_VALUES',
         'ESPESOR_SIN_COMPONENTE',
@@ -630,12 +659,15 @@ async function reviewPending(p: PendienteAsistida) {
     if (index >= 0) activeComponentUid.value = componentes[index]!.uid ?? String(index)
   }
   const field = fieldForPending(p)
+  if (!field) return
   const section =
     r?.tipo === 'COMPONENTE' || r?.tipo === 'ESPESOR_SIN_COMPONENTE'
       ? 'estructura'
-      : field?.startsWith('mueble-') && field !== 'mueble-nombre-comercial'
-        ? 'comercial'
-        : 'general'
+      : field === 'observaciones-especificacion'
+        ? 'accesorios'
+        : field.startsWith('mueble-') && field !== 'mueble-nombre-comercial'
+          ? 'comercial'
+          : 'general'
   emit('requestSection', section)
   // Let both the parent's section watcher and the dynamic controls settle before focusing.
   await nextTick()
@@ -644,7 +676,11 @@ async function reviewPending(p: PendienteAsistida) {
     formElement.value?.querySelectorAll<HTMLElement>('[name], [id]') ?? [],
   ).find((el) => el.getAttribute('name') === field || el.id === field)
   control?.closest('details')?.setAttribute('open', '')
-  control?.focus()
+  const focusTarget =
+    control && !control.matches('input, select, textarea, button')
+      ? (control.querySelector<HTMLElement>('input, select, textarea, button') ?? control)
+      : control
+  focusTarget?.focus()
 }
 
 function aplicarEspesor(p: PendienteAsistida & { indice: number }) {
@@ -1873,9 +1909,14 @@ watch(
                 </div>
               </div>
               <div class="pending-card__footer">
-                <Button type="button" variant="warning" @click="reviewPending(p)">
+                <Button
+                  v-if="fieldForPending(p)"
+                  type="button"
+                  variant="warning"
+                  @click="reviewPending(p)"
+                >
                   <ArrowUpRight :size="15" aria-hidden="true" />
-                  Revisar {{ p.resolucion?.clave || 'campo' }}
+                  {{ etiquetaAccionPendiente(p) }}
                 </Button>
                 <button
                   type="button"
@@ -3119,8 +3160,12 @@ watch(
               </div>
             </div>
             <div class="review-hero__summary">
-              <span v-if="revisionCompleta" class="review-check"
+              <span v-if="revisionCompleta && !pendientesVisibles.length" class="review-check"
                 ><CheckCircle2 :size="17" aria-hidden="true" /> Datos completos</span
+              >
+              <span v-else-if="revisionCompleta" class="review-check"
+                ><CheckCircle2 :size="17" aria-hidden="true" /> Listo con observaciones
+                opcionales</span
               >
               <span v-else class="review-check review-check--pending"
                 ><AlertCircle :size="17" aria-hidden="true" /> Hay información por revisar</span

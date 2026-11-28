@@ -437,7 +437,7 @@ it('focuses the editable creation control when all existing dimensions are alrea
   })
   await w
     .findAll('aside button')
-    .find((b) => b.text() === 'Revisar campo')!
+    .find((b) => b.text() === 'Revisar medidas')!
     .trigger('click')
   expect(document.activeElement).toBe(w.get('[aria-label="Nueva medida"]').element)
   expect(w.get('#agregar-medida').attributes('data-voice-state')).toBe('pending')
