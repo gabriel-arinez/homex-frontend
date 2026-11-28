@@ -5,6 +5,10 @@ import {
   humanVoiceDecision,
   type FieldVoiceReview,
 } from '@/modules/capturas/fieldVoiceReview'
+import {
+  esPendienteRuidoHistorico,
+  limpiarMensajeAsistencia,
+} from '@/modules/capturas/mensajesAsistencia'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import type {
   AtributoMueble,
@@ -275,10 +279,27 @@ function descartarPendiente(p: PendienteAsistida & { indice: number }) {
   error.value = ''
   changed()
 }
+const confirmacionesPendientes = reactive<
+  Record<number, { state: 'confirmed' | 'corrected'; value: unknown }>
+>({})
+function requiereConfirmacionIndividual(p: PendienteAsistida): boolean {
+  return p.resolucion?.tipo === 'OBSERVACIONES' || p.codigo === 'RECUPERACION_LEXICA'
+}
+function confirmarPendienteIndividual(p: PendienteAsistida & { indice: number }) {
+  const actual = clonarTecnica(pendingValue(p))
+  const original = originalPendingValues[p.indice] ?? null
+  confirmacionesPendientes[p.indice] = {
+    state: tecnicaIgual(actual, original) ? 'confirmed' : 'corrected',
+    value: actual,
+  }
+  error.value = ''
+  changed()
+}
 const pendientesVisibles = computed(() =>
   (props.pendientesAsistencia ?? [])
     .map((p, indice) => ({ ...p, indice }))
     .filter((p) => {
+      if (esPendienteRuidoHistorico(p)) return false
       if (descartes[p.indice]) return false
       if (p.codigo === 'TIPO_NO_RESUELTO') return !form.tipo_mueble
       if (p.codigo === 'NO_QUANTITY') return !cantidadValida.value
@@ -295,9 +316,10 @@ const pendientesVisibles = computed(() =>
         const valor = correction?.valor ?? p.resolucion?.valor
         return !uid || !componentes.some((c) => c.uid === uid && sameThickness(c.espesor, valor))
       }
-      if (p.resolucion?.tipo === 'OBSERVACIONES' || p.ruta === 'especificacion.observaciones') {
-        const obsState = voiceResolution('observaciones-especificacion')?.state
-        return obsState !== 'reviewed' && obsState !== 'edited'
+      if (requiereConfirmacionIndividual(p)) {
+        const confirmacion = confirmacionesPendientes[p.indice]
+        if (!confirmacion) return true
+        return !tecnicaIgual(confirmacion.value, pendingValue(p))
       }
       if (!pendienteResuelto(p, medidas, componentes, atributosGenerales)) return true
       if (p.codigo === 'CONFLICTING_VALUES') {
@@ -385,6 +407,12 @@ function rawSuggestedValue(
       final: c[match[1]!] ?? null,
     }
   }
+  if (field === 'observaciones-especificacion')
+    return {
+      field: 'observaciones',
+      original: props.especificacion?.observaciones ?? null,
+      final: form.observaciones.trim() || null,
+    }
   const clave = field.replace(/^unidad-/, '')
   const m = medidas.find((m) => m.clave === clave)
   return m
@@ -554,6 +582,7 @@ function fieldForPending(p: PendienteAsistida): string | null {
       : 'nuevo-componente'
   if (p.resolucion?.tipo === 'OBSERVACIONES' || p.ruta === 'especificacion.observaciones')
     return 'observaciones-especificacion'
+  if (p.codigo === 'RECUPERACION_LEXICA' && p.ruta === 'nombre') return 'mueble-nombre-comercial'
   if (p.codigo === 'TIPO_NO_RESUELTO') return props.studio ? 'tipo-mueble-buscador' : 'tipo-mueble'
   if (p.codigo === 'NO_QUANTITY') return 'mueble-cantidad'
   if (['TOTAL_NEGOCIADO', 'INVALID_PRICE', 'PRECIO_AMBIGUO'].includes(p.codigo))
@@ -586,7 +615,9 @@ function etiquetaAccionPendiente(p: PendienteAsistida): string {
 const criticalPending = computed(() =>
   pendientesVisibles.value.filter(
     (p) =>
-      (Boolean(p.resolucion) && p.resolucion?.tipo !== 'OBSERVACIONES') ||
+      (Boolean(p.resolucion) &&
+        p.resolucion?.tipo !== 'OBSERVACIONES' &&
+        p.codigo !== 'SELECCION_COLOR') ||
       [
         'CONFLICTING_VALUES',
         'ESPESOR_SIN_COMPONENTE',
@@ -936,6 +967,8 @@ function pendingField(p: PendienteAsistida, indice: number): string {
   if (r?.tipo === 'COMPONENTE') return `componentes.${r.uid}.${r.campo}`
   if (r?.tipo === 'DIMENSION') return r.clave ?? 'dimensiones'
   if (r?.tipo === 'ATRIBUTO_GENERAL') return r.clave ?? 'atributos'
+  if (r?.tipo === 'OBSERVACIONES') return 'observaciones'
+  if (p.codigo === 'RECUPERACION_LEXICA' && p.ruta === 'nombre') return 'nombre'
   if (r?.tipo === 'DIMENSIONES_NUEVAS') return 'dimensiones'
   if (r?.tipo === 'ESPESOR_SIN_COMPONENTE')
     return `componentes.${espesoresConfirmados[indice] ?? destinosEspesor[indice] ?? ''}.espesor`
@@ -958,6 +991,9 @@ function pendingValue(p: PendienteAsistida): unknown {
       atributosGenerales.find((a) => normalized(a.codigo ?? a.nombre) === normalized(r.clave ?? ''))
         ?.valor ?? null
     )
+  if (r?.tipo === 'OBSERVACIONES') return form.observaciones.trim() || null
+  if (p.codigo === 'RECUPERACION_LEXICA' && p.ruta === 'nombre')
+    return comercial.nombre.trim() || null
   if (r?.tipo === 'DIMENSIONES_NUEVAS')
     return Object.fromEntries(
       medidas
@@ -982,6 +1018,9 @@ const originalPendingValues = (props.pendientesAsistencia ?? []).map((p) => {
   const r = p.resolucion
   if (r?.tipo === 'DIMENSION') return clonarTecnica(dimensiones[r.clave ?? ''] ?? null)
   if (r?.tipo === 'DIMENSIONES_NUEVAS') return clonarTecnica(dimensiones)
+  if (r?.tipo === 'OBSERVACIONES') return clonarTecnica(props.especificacion?.observaciones ?? null)
+  if (p.codigo === 'RECUPERACION_LEXICA' && p.ruta === 'nombre')
+    return clonarTecnica(props.detalle?.nombre ?? null)
   const value = pendingValue(p)
   return clonarTecnica(value === '' ? null : value)
 })
@@ -1025,6 +1064,12 @@ if (Array.isArray(base.revision_humana_voz)) {
           if (uid) correccionesEspesor[indice] = { uid, valor: decision.valor_final }
         }
         const field = fieldForPending(p)
+        if (requiereConfirmacionIndividual(p) && decision.estado !== 'descartado') {
+          confirmacionesPendientes[indice] = {
+            state: decision.estado === 'corregido' ? 'corrected' : 'confirmed',
+            value: clonarTecnica(decision.valor_final ?? null),
+          }
+        }
         if (
           field &&
           decision.estado === 'confirmado' &&
@@ -1654,11 +1699,19 @@ function submit(): boolean {
   if (Object.prototype.hasOwnProperty.call(base, 'accesorios') || accesorios.length)
     cambios.accesorios = accesorios
   const datos = fusionarDatosTecnicos(base, cambios)
+  const hasOptionalColorChoice = pendientesVisibles.value.some(
+    (p) => p.codigo === 'SELECCION_COLOR',
+  )
+  if (hasOptionalColorChoice && !/color(?:\s+a)?\s+elecci[oó]n/i.test(form.observaciones)) {
+    form.observaciones = [form.observaciones.trim(), 'Color a elección'].filter(Boolean).join('; ')
+  }
   const decisiones = props.voiceCaptureId
     ? (props.pendientesAsistencia ?? []).flatMap((p, indice) => {
+        if (esPendienteRuidoHistorico(p)) return []
         if (pendientesVisibles.value.some((item) => item.indice === indice)) return []
         const field = fieldForPending(p)
         const state = field ? voiceResolution(field)?.state : undefined
+        const individual = confirmacionesPendientes[indice]
         return [
           humanVoiceDecision(props.voiceCaptureId!, {
             review_id: `pending:${indice}`,
@@ -1666,15 +1719,19 @@ function submit(): boolean {
             evidence_ids: [],
             estado: descartes[indice]
               ? 'descartado'
-              : p.resolucion?.tipo === 'ESPESOR_SIN_COMPONENTE'
-                ? correccionesEspesor[indice]
+              : individual
+                ? individual.state === 'corrected'
                   ? 'corregido'
                   : 'confirmado'
-                : state === 'reviewed' &&
-                    (p.codigo !== 'PRECIO_AMBIGUO' ||
-                      Number(originalPendingValues[indice]) === Number(pendingValue(p)))
-                  ? 'confirmado'
-                  : 'corregido',
+                : p.resolucion?.tipo === 'ESPESOR_SIN_COMPONENTE'
+                  ? correccionesEspesor[indice]
+                    ? 'corregido'
+                    : 'confirmado'
+                  : state === 'reviewed' &&
+                      (p.codigo !== 'PRECIO_AMBIGUO' ||
+                        Number(originalPendingValues[indice]) === Number(pendingValue(p)))
+                    ? 'confirmado'
+                    : 'corregido',
             valor_original: originalPendingValues[indice] ?? null,
             valor_final: descartes[indice] ? null : clonarTecnica(pendingValue(p)),
             ...(descartes[indice] ? { motivo: descartes[indice]!.motivo } : {}),
@@ -1879,7 +1936,9 @@ watch(
           </div>
           <ul class="pending-cards">
             <li v-for="p in pendientesVisibles" :key="p.indice" class="pending-card">
-              <p class="pending-card__message">{{ p.mensaje }}</p>
+              <p class="pending-card__message">
+                {{ limpiarMensajeAsistencia(p.mensaje, p.codigo) }}
+              </p>
               <div
                 v-if="
                   p.codigo === 'ESPESOR_SIN_COMPONENTE' &&
@@ -1917,6 +1976,22 @@ watch(
                 >
                   <ArrowUpRight :size="15" aria-hidden="true" />
                   {{ etiquetaAccionPendiente(p) }}
+                </Button>
+                <Button
+                  v-if="requiereConfirmacionIndividual(p)"
+                  type="button"
+                  variant="success"
+                  data-testid="confirmar-observacion"
+                  @click="confirmarPendienteIndividual(p)"
+                >
+                  <CheckCircle2 :size="15" aria-hidden="true" />
+                  {{
+                    tecnicaIgual(pendingValue(p), originalPendingValues[p.indice])
+                      ? p.codigo === 'RECUPERACION_LEXICA'
+                        ? 'Confirmar interpretación'
+                        : 'Confirmar observación'
+                      : 'Confirmar corrección'
+                  }}
                 </Button>
                 <button
                   type="button"
@@ -2943,7 +3018,9 @@ watch(
           <div v-if="base.advertencias?.length" class="observaciones-warnings">
             <h4>Información pendiente histórica</h4>
             <ul>
-              <li v-for="item in base.advertencias" :key="item">{{ item }}</li>
+              <li v-for="item in base.advertencias" :key="item">
+                {{ limpiarMensajeAsistencia(item) }}
+              </li>
             </ul>
           </div>
         </section>

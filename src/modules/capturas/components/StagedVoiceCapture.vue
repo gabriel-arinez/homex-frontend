@@ -24,6 +24,7 @@ import {
   type NlpCandidateLike,
   type VoiceEvidence,
 } from '../voiceEvidence'
+import { esPendienteRuidoHistorico, limpiarMensajeAsistencia } from '../mensajesAsistencia'
 const props = defineProps<{
   mode: 'catalog' | 'furniture'
   categoria?: CategoriaEnum
@@ -150,7 +151,11 @@ const proposal = computed(() =>
 )
 const warnings = computed(
   () =>
-    catalog.value?.propuesta?.warnings ?? furniture.value?.pendientes.map((p) => p.mensaje) ?? [],
+    catalog.value?.propuesta?.warnings?.map((w) => limpiarMensajeAsistencia(w)) ??
+    furniture.value?.pendientes
+      .filter((p) => !esPendienteRuidoHistorico(p))
+      .map((p) => limpiarMensajeAsistencia(p.mensaje, p.codigo)) ??
+    [],
 )
 let generation = 0,
   controller: AbortController | null = null

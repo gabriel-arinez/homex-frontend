@@ -4,6 +4,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import type { CapturaRevision, ConfirmarCaptura, ValorCatalogoPublico } from '@/generated/api'
 import { capturasService } from '../services/capturasService'
 import { hasUnsupportedLegacyDimensions, reviewProjection } from '../reviewProjection'
+import { esPendienteRuidoHistorico, limpiarMensajeAsistencia } from '../mensajesAsistencia'
 import { proformasService } from '@/modules/proformas/services/proformasService'
 import { Check } from '@lucide/vue'
 import PageHeader from '@/shared/ui/PageHeader.vue'
@@ -312,14 +313,20 @@ onBeforeUnmount(() => {
                 datos manualmente.
               </p>
               <ul
-                v-if="capture?.proyeccion_configurador?.pendientes.length"
+                v-if="
+                  capture?.proyeccion_configurador?.pendientes.some(
+                    (p) => !esPendienteRuidoHistorico(p),
+                  )
+                "
                 aria-label="Datos pendientes de revisión"
               >
                 <li
-                  v-for="(pending, index) in capture.proyeccion_configurador.pendientes"
+                  v-for="(pending, index) in capture.proyeccion_configurador.pendientes.filter(
+                    (p) => !esPendienteRuidoHistorico(p),
+                  )"
                   :key="index"
                 >
-                  {{ pending.mensaje }}
+                  {{ limpiarMensajeAsistencia(pending.mensaje, pending.codigo) }}
                 </li>
               </ul>
               <p v-if="capture.item_ia?.precio_total" class="hint">
