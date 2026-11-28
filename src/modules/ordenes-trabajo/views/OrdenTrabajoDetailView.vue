@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { limpiarMensajeAsistencia } from '@/modules/capturas/mensajesAsistencia'
 import {
   AlertTriangle,
   ArrowLeft,
@@ -980,7 +981,9 @@ const workOrderTabs = computed(() => [
                   <div>
                     <strong>Advertencias de taller</strong>
                     <ul>
-                      <li v-for="(adv, i) in line.spec.advertencias" :key="i">{{ adv }}</li>
+                      <li v-for="(adv, i) in line.spec.advertencias" :key="i">
+                        {{ limpiarMensajeAsistencia(adv) }}
+                      </li>
                     </ul>
                   </div>
                 </div>

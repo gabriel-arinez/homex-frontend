@@ -257,6 +257,8 @@ watch(
       delete espesoresConfirmados[Number(indice)]
     for (const indice of Object.keys(correccionesEspesor))
       delete correccionesEspesor[Number(indice)]
+    for (const indice of Object.keys(confirmacionesPendientes))
+      delete confirmacionesPendientes[Number(indice)]
   },
   { flush: 'sync' },
 )
@@ -3457,7 +3459,9 @@ watch(
             <div v-if="base.advertencias?.length" class="review-history">
               <h5>Advertencias de la información anterior</h5>
               <ul>
-                <li v-for="warning in base.advertencias" :key="warning">{{ warning }}</li>
+                <li v-for="warning in base.advertencias" :key="warning">
+                  {{ limpiarMensajeAsistencia(warning) }}
+                </li>
               </ul>
             </div>
           </article>

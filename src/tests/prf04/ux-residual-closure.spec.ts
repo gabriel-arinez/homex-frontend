@@ -176,4 +176,44 @@ describe('EspecificacionForm — cierre residual UX y resolución individual', (
     expect(wrapper.find('.pending-summary').exists()).toBe(false)
     wrapper.unmount()
   })
+
+  it('reinicia confirmacionesPendientes al cambiar la identidad de la captura aunque coincidan índices y valores', async () => {
+    const pendientes: PendienteAsistida[] = [
+      {
+        codigo: 'ESPECIFICACION',
+        ruta: 'especificacion.observaciones',
+        mensaje: 'Detalle adicional detectado: «madera enchapada». Revísalo en Observaciones.',
+        resolucion: { tipo: 'OBSERVACIONES' },
+      },
+    ]
+    const wrapper = mount(EspecificacionForm, {
+      props: {
+        tipos: [],
+        studio: true,
+        activeSection: 'revision',
+        voiceCaptureId: 101,
+        especificacion: baseSpec,
+        unidades: [{ id: 1, concepto_codigo: 'UNIDAD_MEDIDA', codigo: 'PIEZA', nombre: 'Pieza' }],
+        detalle: {
+          nombre: 'Mesa',
+          cantidad: '1',
+          unidad: 1,
+          precio_unitario: '1500.00',
+          descuento: '0.00',
+        },
+        pendientesAsistencia: pendientes,
+      },
+    })
+    await flushPromises()
+    await wrapper.get('[data-testid="confirmar-observacion"]').trigger('click')
+    expect(wrapper.findAll('.pending-card')).toHaveLength(0)
+
+    await wrapper.setProps({
+      voiceCaptureId: 202,
+      pendientesAsistencia: structuredClone(pendientes),
+    })
+    await flushPromises()
+    expect(wrapper.findAll('.pending-card')).toHaveLength(1)
+    wrapper.unmount()
+  })
 })
